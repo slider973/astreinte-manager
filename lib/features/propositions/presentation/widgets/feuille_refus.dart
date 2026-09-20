@@ -120,29 +120,63 @@ class _CorpsRefusState extends State<_CorpsRefus> {
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: PrimaryButton(
-                    libelle: AppStrings.refusGarder,
-                    variante: PrimaryButtonVariante.secondaire,
-                    onPressed: _garder,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.entreCibles),
-                Expanded(
-                  child: PrimaryButton(
-                    libelle: AppStrings.refusConfirmer,
-                    variante: PrimaryButtonVariante.danger,
-                    icone: Icons.cancel,
-                    onPressed: _refuser,
-                  ),
-                ),
-              ],
-            ),
+            _Boutons(onGarder: _garder, onRefuser: _refuser),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Les deux sorties de la feuille.
+///
+/// **Empilées sur téléphone, côte à côte au-delà.** Côte à côte à 390 dp,
+/// « Garder le créneau » s'écrivait « Garder le crén… » : un libellé d'action
+/// tronqué est un défaut, et raccourcir le libellé aurait coûté ce qu'il nomme
+/// (`DESIGN.md § Buttons`). Vu dans Chrome.
+///
+/// Empilées, l'ordre est délibéré : **la sortie inoffensive est la plus
+/// proche du pouce.** Un refus est irréversible ; il ne doit pas être le
+/// bouton qu'on atteint sans viser.
+class _Boutons extends StatelessWidget {
+  const _Boutons({required this.onGarder, required this.onRefuser});
+
+  final VoidCallback onGarder;
+  final VoidCallback onRefuser;
+
+  @override
+  Widget build(BuildContext context) {
+    final refuser = PrimaryButton(
+      libelle: AppStrings.refusConfirmer,
+      variante: PrimaryButtonVariante.danger,
+      icone: Icons.cancel,
+      pleineLargeur: true,
+      onPressed: onRefuser,
+    );
+    final garder = PrimaryButton(
+      libelle: AppStrings.refusGarder,
+      variante: PrimaryButtonVariante.secondaire,
+      pleineLargeur: true,
+      onPressed: onGarder,
+    );
+
+    if (AppWindowClass.of(context).estCompact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          refuser,
+          const SizedBox(height: AppSpacing.entreCibles),
+          garder,
+        ],
+      );
+    }
+
+    return Row(
+      children: <Widget>[
+        Expanded(child: garder),
+        const SizedBox(width: AppSpacing.entreCibles),
+        Expanded(child: refuser),
+      ],
     );
   }
 }

@@ -1712,8 +1712,7 @@ abstract final class AppStrings {
 
   static String planningSectionAttribues(int n) => 'Attribués ($n)';
   static String planningSectionDisponibles(int n) => 'Disponibles ($n)';
-  static String planningSectionNonDisponibles(int n) =>
-      'Non disponibles ($n)';
+  static String planningSectionNonDisponibles(int n) => 'Non disponibles ($n)';
 
   static const String planningAucunAttribue = 'Personne pour l\'instant.';
   static const String planningAttribuer = 'Attribuer';
@@ -1814,8 +1813,9 @@ abstract final class AppStrings {
   /// Ce que le bouton va faire, avant qu'on l'actionne. Le nombre compte les
   /// **membres** : c'est le nombre de téléphones qui vont sonner.
   static String publierDetail(int membres) => switch (membres) {
-    0 => 'Aucun pompier n\'est attribué : le planning deviendra simplement '
-        'visible de tous.',
+    0 =>
+      'Aucun pompier n\'est attribué : le planning deviendra simplement '
+          'visible de tous.',
     1 => '1 pompier recevra une notification.',
     _ => '$membres pompiers recevront une notification.',
   };
@@ -1923,8 +1923,7 @@ abstract final class AppStrings {
   static String suiviRetardataireLigne({
     required int creneaux,
     required String depuis,
-  }) =>
-      '$creneaux créneau${creneaux > 1 ? 'x' : ''} · proposé $depuis';
+  }) => '$creneaux créneau${creneaux > 1 ? 'x' : ''} · proposé $depuis';
 
   static String suiviRelanceLe(String depuis) => 'relancé $depuis';
 
@@ -1973,8 +1972,7 @@ abstract final class AppStrings {
   static const String suiviPersonne = 'personne';
 
   /// « en attente depuis 3 j », « accepté hier », « refusé il y a 2 h ».
-  static String suiviEtatDepuis(String etat, String depuis) =>
-      '$etat $depuis';
+  static String suiviEtatDepuis(String etat, String depuis) => '$etat $depuis';
 
   /// Le motif d'un refus, entre guillemets français.
   static String suiviMotifRefus(String motif) => '« $motif »';
@@ -1994,7 +1992,8 @@ abstract final class AppStrings {
   static String suiviValideLe(String date) =>
       'Planning validé le $date. Tout le monde peut le voir.';
 
-  static const String suiviBrouillonTitre = 'Le planning est encore en '
+  static const String suiviBrouillonTitre =
+      'Le planning est encore en '
       'brouillon';
   static const String suiviBrouillonTexte =
       'Rien n\'est parti : il n\'y a pas encore de réponse à suivre.';
@@ -2041,9 +2040,8 @@ abstract final class AppStrings {
 
   /// Abaisse la première lettre d'un fragment qui entre dans une phrase.
   /// Les dates courtes (« 15 sept. ») n'en sont pas affectées.
-  static String _enMinuscule(String texte) => texte.isEmpty
-      ? texte
-      : '${texte[0].toLowerCase()}${texte.substring(1)}';
+  static String _enMinuscule(String texte) =>
+      texte.isEmpty ? texte : '${texte[0].toLowerCase()}${texte.substring(1)}';
 
   /// « relancé hier », ajouté après le précédent quand la base a compté une
   /// relance. Le séparateur est un point médian, comme partout ailleurs.
@@ -2075,10 +2073,16 @@ abstract final class AppStrings {
   /// pendant que le pompier lisait sa notification. **Un fait, pas une
   /// panne** : bannière d'information, jamais de rouge.
   static const String propositionsDisparue =
-      'Ce créneau ne t\'est plus proposé : ton chef de centre l\'a repris ou '
-      'confié à quelqu\'un d\'autre.';
-  static String propositionsDisparueDetail(String creneau) =>
-      'Créneau concerné : $creneau.';
+      'Ce créneau ne t\'est plus proposé.';
+
+  /// La seconde ligne de la bannière. Deux lignes au plus : le créneau
+  /// d'abord — c'est ce qu'on cherche — puis la raison en trois mots.
+  static String propositionsDisparueDetail(String creneau) {
+    final debut = '${creneau[0].toUpperCase()}${creneau.substring(1)}';
+    return '$debut : ton chef de centre l\'a repris ou confié à '
+        'quelqu\'un d\'autre.';
+  }
+
   static const String propositionsDisparueFermer = 'Masquer ce message';
 
   static const String propositionsEchecTitre = 'Ta réponse n\'est pas partie.';
@@ -2088,8 +2092,7 @@ abstract final class AppStrings {
   static String propositionsPlanningValide(String mois) =>
       'Planning ${moisAvecDe(mois)} validé : tout le monde peut le voir '
       'maintenant.';
-  static const String propositionsPlanningValideFermer =
-      'Masquer ce message';
+  static const String propositionsPlanningValideFermer = 'Masquer ce message';
 
   // --- Les empêchements ---------------------------------------------------
 

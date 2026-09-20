@@ -34,6 +34,11 @@ class LigneDeProposition extends StatelessWidget {
   /// Largeur de la marge du registre : le numéro du jour et son abréviation.
   static const double largeurMarge = 48;
 
+  /// Largeur de la rangée d'actions quand elle se range à droite du corps.
+  /// Mesurée pour que « Refuser », son icône et ses marges tiennent sans
+  /// ellipse à l'échelle de texte ×1,3.
+  static const double largeurActions = 360;
+
   final Proposition proposition;
 
   final VoidCallback onAccepter;
@@ -80,31 +85,35 @@ class LigneDeProposition extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _Marge(jour: proposition.jour),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: actionsACote
-                  ? Row(
-                      children: <Widget>[
-                        Expanded(child: corps),
-                        const SizedBox(width: AppSpacing.lg),
-                        SizedBox(width: 320, child: actions),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        corps,
-                        const SizedBox(height: AppSpacing.md),
-                        actions,
-                      ],
-                    ),
-            ),
-          ],
-        ),
+        child: actionsACote
+            ? Row(
+                children: <Widget>[
+                  _Marge(jour: proposition.jour),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: corps),
+                  const SizedBox(width: AppSpacing.lg),
+                  SizedBox(width: largeurActions, child: actions),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      _Marge(jour: proposition.jour),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(child: corps),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  // **La rangée d'actions prend toute la largeur de la ligne**,
+                  // marge du registre comprise. Alignée sur le corps, elle
+                  // perdait les 60 dp de la marge et « Refuser » s'écrivait
+                  // « Ref… » sur un téléphone de 390. Vu dans Chrome.
+                  actions,
+                ],
+              ),
       ),
     );
   }
