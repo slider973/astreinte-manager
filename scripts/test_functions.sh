@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tests de bout en bout des Edge Functions d'invitation (ticket 006).
+# Tests de bout en bout des Edge Functions : invitations (ticket 006) et envoi de
+# notifications (ticket 025).
 #
 #   supabase start
 #   supabase functions serve          # dans un autre terminal
@@ -99,12 +100,19 @@ connexion() { # connexion <email> -> jeton d'accès
     -d "{\"email\":\"$1\",\"password\":\"$MDP\"}" | jq -r '.access_token // empty'
 }
 
+MEMBRE1_A="aaaaaaaa-0000-4000-8000-000000000101"
+MEMBRE2_A="aaaaaaaa-0000-4000-8000-000000000102"
+
 nettoyer() {
   sql "delete from audit_log where action like 'invitation.%';
        delete from notifications where type = 'invitation';
        delete from invitations;
        delete from memberships where left(user_id::text, 4) <> left(station_id::text, 4);
-       delete from auth.users where email like 'invite-test-%';" >/dev/null
+       delete from auth.users where email like 'invite-test-%';
+       delete from notifications where type <> 'invitation';
+       delete from notification_outbox;
+       delete from push_tokens where token like 'jeton-test-%';
+       update profiles set push_enabled = true where push_enabled = false;" >/dev/null
 }
 
 nettoyer
@@ -320,6 +328,175 @@ STATUT_RPC="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API_URL/rest/v1/r
   -d "{\"p_token\":\"$TOKEN1\",\"p_user_id\":\"aaaaaaaa-0000-4000-8000-000000000100\",\"p_email\":\"admin@caserne-a.test\"}")"
 verifier "accept_invitation refusée en RPC PostgREST" "oui" \
   "$([ "$STATUT_RPC" = "404" ] || [ "$STATUT_RPC" = "403" ] && echo oui || echo non)"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 8. send-notification : qui a le droit d'"'"'appeler'
+# ---------------------------------------------------------------------------
+appeler send-notification - '{}'
+verifier "sans jeton : 401" "401" "$STATUT"
+
+appeler send-notification "$ANON_KEY" '{}'
+verifier "la clé anon ne suffit pas : 401" "401" "$STATUT"
+
+# Le point le plus important de la fonction : un membre connecté, même admin, ne
+# doit jamais pouvoir écrire une notification à qui il veut, dans la caserne qu'il
+# veut. Cette fonction n'est pas une API cliente.
+appeler send-notification "$ADMIN_A" "{\"type\":\"assignment_proposed\",\"user_ids\":[\"$MEMBRE1_A\"]}"
+verifier "un admin connecté ne peut pas l'appeler : 401" "401" "$STATUT"
+verifier "code unauthenticated" "unauthenticated" "$(jq -r '.error.code' <<<"$CORPS")"
+
+appeler send-notification "$SERVICE_KEY" '{"type":"inconnu","user_ids":["'"$MEMBRE1_A"'"]}'
+verifier "type inconnu : 400" "400" "$STATUT"
+verifier "code invalid_type" "invalid_type" "$(jq -r '.error.code' <<<"$CORPS")"
+
+appeler send-notification "$SERVICE_KEY" '{"type":"schedule_validated"}'
+verifier "sans destinataire : code invalid_recipients" "invalid_recipients" \
+  "$(jq -r '.error.code' <<<"$CORPS")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 9. send-notification : un membre sans appareil reçoit un courriel'
+# ---------------------------------------------------------------------------
+sql "delete from push_tokens where user_id = '$MEMBRE1_A'" >/dev/null
+AVANT_MAIL="$(curl -s "$MAILPIT_URL/api/v1/messages?limit=1" | jq -r '.messages_count // 0')"
+
+appeler send-notification "$SERVICE_KEY" "{
+  \"type\": \"assignment_proposed\",
+  \"station_id\": \"$STATION_A\",
+  \"recipients\": [{\"user_id\": \"$MEMBRE1_A\", \"payload\": {
+      \"period\": \"2026-10\",
+      \"shifts\": [{\"date\": \"2026-10-12\", \"slot\": \"night\"}]}}]}"
+
+verifier "appel accepté : 200" "200" "$STATUT"
+verifier "le titre est lisible hors contexte" "Astreinte proposée le 12 octobre, nuit" \
+  "$(jq -r '.results[0].title' <<<"$CORPS")"
+verifier "lien profond /proposals" "/proposals" "$(jq -r '.results[0].route' <<<"$CORPS")"
+verifier "push sauté faute d'appareil" "no_token" "$(jq -r '.results[0].push.skipped' <<<"$CORPS")"
+verifier "courriel de repli parti" "true" "$(jq -r '.results[0].email.sent' <<<"$CORPS")"
+verifier "c'est bien un repli" "true" "$(jq -r '.results[0].email.fallback' <<<"$CORPS")"
+
+verifier "une ligne inapp pour le centre de notifications" "1" \
+  "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp' and type = 'assignment_proposed'")"
+verifier "une ligne email tracée et délivrée" "1" \
+  "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A' and channel = 'email' and delivered")"
+verifier "le lien profond est dans data.route" "/proposals" \
+  "$(sql "select data ->> 'route' from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp' limit 1")"
+
+APRES_MAIL="$(curl -s "$MAILPIT_URL/api/v1/messages?limit=1" | jq -r '.messages_count // 0')"
+verifier "le courriel est arrivé dans Mailpit" "oui" \
+  "$([ "$APRES_MAIL" -gt "$AVANT_MAIL" ] && echo oui || echo non)"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 10. send-notification : le réglage du membre'
+# ---------------------------------------------------------------------------
+sql "delete from notifications; update profiles set push_enabled = false where id = '$MEMBRE2_A'" >/dev/null
+
+appeler send-notification "$SERVICE_KEY" "{
+  \"type\": \"schedule_validated\",
+  \"station_id\": \"$STATION_A\",
+  \"user_ids\": [\"$MEMBRE2_A\"],
+  \"payload\": {\"period\": \"2026-10\"}}"
+
+verifier "type non critique : push coupé par le réglage" "push_disabled" \
+  "$(jq -r '.results[0].push.skipped' <<<"$CORPS")"
+verifier "et pas de courriel de contournement" "null" "$(jq -r '.results[0].email' <<<"$CORPS")"
+verifier "la ligne interne est écrite quand même" "1" \
+  "$(sql "select count(*) from notifications where user_id = '$MEMBRE2_A' and channel = 'inapp'")"
+
+appeler send-notification "$SERVICE_KEY" "{
+  \"type\": \"assignment_proposed\",
+  \"station_id\": \"$STATION_A\",
+  \"user_ids\": [\"$MEMBRE2_A\"],
+  \"payload\": {\"shifts\": [{\"date\": \"2026-10-12\", \"slot\": \"night\"}]}}"
+
+# docs/PRD.md § 6.5 : une proposition d'astreinte n'est pas désactivable. Sans
+# clés Firebase, le push est « indisponible » et non « coupé » — la nuance est
+# exactement ce qu'on vérifie ici.
+verifier "une proposition d'astreinte passe outre le réglage" "no_token" \
+  "$(jq -r '.results[0].push.skipped' <<<"$CORPS")"
+verifier "et repart par courriel faute d'appareil" "true" \
+  "$(jq -r '.results[0].email.sent' <<<"$CORPS")"
+
+sql "update profiles set push_enabled = true where id = '$MEMBRE2_A'" >/dev/null
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 11. send-notification : le regroupement'
+# ---------------------------------------------------------------------------
+sql "delete from notifications" >/dev/null
+
+appeler send-notification "$SERVICE_KEY" "{
+  \"type\": \"assignment_proposed\",
+  \"station_id\": \"$STATION_A\",
+  \"payload\": {\"period\": \"2026-10\"},
+  \"recipients\": [
+    {\"user_id\": \"$MEMBRE1_A\", \"payload\": {\"shifts\": [{\"date\": \"2026-10-03\", \"slot\": \"day\"}]}},
+    {\"user_id\": \"$MEMBRE1_A\", \"payload\": {\"shifts\": [{\"date\": \"2026-10-05\", \"slot\": \"night\"}]}},
+    {\"user_id\": \"$MEMBRE1_A\", \"payload\": {\"shifts\": [{\"date\": \"2026-10-12\", \"slot\": \"night\"}]}},
+    {\"user_id\": \"$MEMBRE2_A\", \"payload\": {\"shifts\": [{\"date\": \"2026-10-09\", \"slot\": \"day\"}]}}]}"
+
+verifier "quatre créneaux, deux destinataires" "2" "$(jq -r '.recipients' <<<"$CORPS")"
+verifier "une seule notification interne pour le membre aux trois créneaux" "1" \
+  "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp'")"
+verifier "et elle les résume" "3 astreintes proposées en octobre" \
+  "$(sql "select title from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp' limit 1")"
+verifier "l'autre membre garde son créneau unique" "Astreinte proposée le 9 octobre, jour" \
+  "$(sql "select title from notifications where user_id = '$MEMBRE2_A' and channel = 'inapp' limit 1")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 12. Sans clés Firebase : le push est indisponible, aucun jeton perdu'
+# ---------------------------------------------------------------------------
+sql "delete from notifications;
+     insert into push_tokens (user_id, token, platform, device_label)
+     values ('$MEMBRE1_A', 'jeton-test-inexistant', 'web', 'Test')" >/dev/null
+
+appeler send-notification "$SERVICE_KEY" "{
+  \"type\": \"assignment_proposed\",
+  \"station_id\": \"$STATION_A\",
+  \"user_ids\": [\"$MEMBRE1_A\"],
+  \"payload\": {\"shifts\": [{\"date\": \"2026-10-12\", \"slot\": \"night\"}]}}"
+
+verifier "push indisponible, pas en échec" "unavailable" "$(jq -r '.results[0].push.skipped' <<<"$CORPS")"
+verifier "aucun jeton supprimé : l'absence de clés n'accuse pas l'appareil" "0" \
+  "$(jq -r '.results[0].push.removed_tokens' <<<"$CORPS")"
+verifier "le jeton est toujours là" "1" \
+  "$(sql "select count(*) from push_tokens where token = 'jeton-test-inexistant'")"
+verifier "l'incident est tracé sur la ligne push" "1" \
+  "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A' and channel = 'push' and error is not null")"
+verifier "et le courriel a pris le relais" "true" "$(jq -r '.results[0].email.sent' <<<"$CORPS")"
+
+sql "delete from push_tokens where token = 'jeton-test-inexistant'" >/dev/null
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 13. Le chemin depuis la base : notify() → pg_net → Edge Function'
+# ---------------------------------------------------------------------------
+sql "delete from notifications; delete from notification_outbox" >/dev/null
+
+OUTBOX="$(sql "select notify('schedule_validated'::notification_type,
+  array['$MEMBRE1_A']::uuid[], '$STATION_A'::uuid,
+  '{\"period\":\"2026-10\"}'::jsonb)")"
+verifier "notify rend un identifiant de file" "oui" \
+  "$([ -n "$OUTBOX" ] && echo oui || echo non)"
+
+# pg_net dépile après le COMMIT : on laisse quelques secondes, pas plus.
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  ETAT="$(sql "select status from notification_outbox where id = '$OUTBOX'")"
+  [ "$ETAT" = "sent" ] && break
+  sleep 1
+done
+verifier "la demande est traitée puis close" "sent" "$ETAT"
+verifier "compte rendu rangé dans la file" "1" \
+  "$(sql "select (result ->> 'delivered')::int from notification_outbox where id = '$OUTBOX'")"
+verifier "la notification interne existe" "Planning d'octobre validé" \
+  "$(sql "select title from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp' limit 1")"
+
+# Idempotence du rejeu : reposter la même demande ne renvoie rien.
+APPEL="$(sql "select notify_post('$OUTBOX')")"
+verifier "une demande close n'est pas repostée" "f" "$APPEL"
 
 # ---------------------------------------------------------------------------
 echo ''
