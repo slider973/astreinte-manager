@@ -11,6 +11,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../dispos/presentation/mois_screen.dart';
+import '../../notifications/presentation/widgets/reglage_notifications.dart';
 
 /// La coquille des destinations de premier niveau.
 ///
@@ -128,6 +129,10 @@ class _Contenu extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.auDessusTitre),
         _BlocIdentite(appartenance: appartenance),
+        const SizedBox(height: AppSpacing.auDessusTitre),
+        // Le réglage des notifications se pose ici en attendant l'écran de
+        // profil du ticket 007, où il déménagera tel quel (ticket 024).
+        const ReglageNotifications(),
         const SizedBox(height: AppSpacing.auDessusTitre),
         const BoutonDeconnexion(),
       ],

@@ -10,6 +10,16 @@ abstract interface class ProfilRepository {
     required String nom,
     String? telephone,
   });
+
+  /// `profiles.push_enabled` : les notifications **non critiques** sont-elles
+  /// acceptées ? Les propositions d'astreinte, elles, partent toujours
+  /// (`docs/PRD.md § 6.5`) — cette colonne ne les concerne pas.
+  Future<bool> pushNonCritiques(String userId);
+
+  Future<void> definirPushNonCritiques({
+    required String userId,
+    required bool actif,
+  });
 }
 
 /// Implémentation Supabase.
@@ -40,6 +50,32 @@ class SupabaseProfilRepository implements ProfilRepository {
           // vide, pour que « pas de téléphone » ait une seule écriture.
           'phone': numero.isEmpty ? null : numero,
         })
+        .eq('id', userId);
+  }
+
+  @override
+  Future<bool> pushNonCritiques(String userId) async {
+    final ligne = await _client
+        .from('profiles')
+        .select('push_enabled')
+        .eq('id', userId)
+        .single();
+
+    // Colonne `not null default true` : la valeur existe toujours. Une
+    // réponse illisible est traitée comme « oui », qui est le défaut du
+    // schéma — jamais comme « non », qui couperait des rappels sans que
+    // personne ne l'ait demandé.
+    return ligne['push_enabled'] as bool? ?? true;
+  }
+
+  @override
+  Future<void> definirPushNonCritiques({
+    required String userId,
+    required bool actif,
+  }) async {
+    await _client
+        .from('profiles')
+        .update(<String, dynamic>{'push_enabled': actif})
         .eq('id', userId);
   }
 }

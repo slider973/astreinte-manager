@@ -13,10 +13,9 @@ void main() {
     });
 
     test('isProd et hasSupabaseConfig reflètent les valeurs fournies', () {
-      const env = Env(
+      const env = Env.sansPush(
         supabaseUrl: 'https://x.supabase.co',
         supabaseAnonKey: 'anon',
-        firebaseProjectId: '',
         appEnv: Env.prodEnv,
       );
 
@@ -25,10 +24,9 @@ void main() {
     });
 
     test('une clé anon vide rend la configuration Supabase incomplète', () {
-      const env = Env(
+      const env = Env.sansPush(
         supabaseUrl: 'https://x.supabase.co',
         supabaseAnonKey: '',
-        firebaseProjectId: '',
         appEnv: Env.devEnv,
       );
 

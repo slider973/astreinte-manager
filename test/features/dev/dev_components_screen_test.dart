@@ -31,10 +31,9 @@ List<Override> _overrides(Env env) => <Override>[
 
 const Env _dev = Env.fromDefines;
 
-const Env _prod = Env(
+const Env _prod = Env.sansPush(
   supabaseUrl: 'https://x.supabase.co',
   supabaseAnonKey: 'anon',
-  firebaseProjectId: '',
   appEnv: Env.prodEnv,
 );
 

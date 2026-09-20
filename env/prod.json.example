@@ -2,5 +2,9 @@
   "APP_ENV": "prod",
   "SUPABASE_URL": "https://<ref-du-projet>.supabase.co",
   "SUPABASE_ANON_KEY": "<clé anon du projet Supabase de production>",
-  "FIREBASE_PROJECT_ID": "<identifiant du projet Firebase>"
+  "FIREBASE_PROJECT_ID": "<identifiant du projet Firebase>",
+  "FIREBASE_API_KEY": "<apiKey de l'application web Firebase>",
+  "FIREBASE_APP_ID": "<appId de l'application web Firebase>",
+  "FIREBASE_MESSAGING_SENDER_ID": "<messagingSenderId du projet>",
+  "FIREBASE_VAPID_KEY": "<clé publique VAPID, onglet Cloud Messaging>"
 }

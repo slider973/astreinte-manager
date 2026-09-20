@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/env.dart';
+import 'core/firebase/firebase_bootstrap.dart';
 import 'core/supabase/supabase_bootstrap.dart';
 
 Future<void> main() async {
@@ -14,11 +15,17 @@ Future<void> main() async {
   // écran gris.
   final demarrage = await demarrerSupabase(env);
 
+  // Même règle pour Firebase : sans les cinq variables `FIREBASE_*`,
+  // l'application s'ouvre normalement, **sans notifications**, et le dit là où
+  // il faut (`docs/FIREBASE.md`). Aucune requête ne part vers Google.
+  final push = await demarrerFirebase(env);
+
   runApp(
     ProviderScope(
       overrides: [
         envProvider.overrideWithValue(env),
         supabaseDemarrageProvider.overrideWithValue(demarrage),
+        firebaseDemarrageProvider.overrideWithValue(push),
       ],
       child: const AstreinteApp(),
     ),

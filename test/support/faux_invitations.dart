@@ -251,6 +251,9 @@ class FauxProfilRepository implements ProfilRepository {
   final List<({String prenom, String nom, String? telephone})> ecritures =
       <({String prenom, String nom, String? telephone})>[];
 
+  /// `profiles.push_enabled`, avec la valeur par défaut du schéma.
+  bool pushNonCritiquesActifs = true;
+
   @override
   Future<void> completer({
     required String userId,
@@ -260,5 +263,20 @@ class FauxProfilRepository implements ProfilRepository {
   }) async {
     if (echoue) throw const FormatException('écriture refusée');
     ecritures.add((prenom: prenom, nom: nom, telephone: telephone));
+  }
+
+  @override
+  Future<bool> pushNonCritiques(String userId) async {
+    if (echoue) throw const FormatException('lecture refusée');
+    return pushNonCritiquesActifs;
+  }
+
+  @override
+  Future<void> definirPushNonCritiques({
+    required String userId,
+    required bool actif,
+  }) async {
+    if (echoue) throw const FormatException('écriture refusée');
+    pushNonCritiquesActifs = actif;
   }
 }

@@ -13,6 +13,12 @@ enum RepereAccueil {
   /// L'aide « Ajouter à l'écran d'accueil ».
   aideInstallation('accueil.installation.vue'),
 
+  /// La proposition d'activer les notifications, dernière étape de l'accueil
+  /// (ticket 024). Elle ne revient pas d'elle-même : un refus d'autorisation
+  /// est définitif dans le navigateur, et redemander serait insister dans le
+  /// vide. La reprise passe par le réglage du profil.
+  activationNotifications('accueil.notifications.vue'),
+
   /// Le membre a terminé au moins une peinture au glissement sur cet
   /// appareil : l'astuce du bloc d'aide n'a plus rien à lui apprendre.
   ///

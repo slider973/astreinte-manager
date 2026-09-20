@@ -16,7 +16,15 @@ Variables :
 | `APP_ENV` | `dev` ou `prod` (défaut : `dev`) |
 | `SUPABASE_URL` | URL du projet Supabase |
 | `SUPABASE_ANON_KEY` | Clé anon (publique, protégée par RLS). Jamais la clé service. |
-| `FIREBASE_PROJECT_ID` | Projet Firebase pour les push (ticket 024) |
+| `FIREBASE_PROJECT_ID` | Identifiant du projet Firebase |
+| `FIREBASE_API_KEY` | `apiKey` de l'application **web** Firebase |
+| `FIREBASE_APP_ID` | `appId` de l'application **web** Firebase |
+| `FIREBASE_MESSAGING_SENDER_ID` | `messagingSenderId` du projet |
+| `FIREBASE_VAPID_KEY` | Clé publique VAPID (« certificats push web ») |
+
+Les cinq variables `FIREBASE_*` sont toutes nécessaires ensemble : laissées vides, l'application
+démarre normalement **sans notifications**, et le dit à l'utilisateur. Aucune n'est un secret ;
+la procédure complète pour les obtenir est dans `docs/FIREBASE.md`.
 
 Exemple :
 
