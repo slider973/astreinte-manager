@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_breakpoints.dart';
-import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/widgets/app_banner.dart';
+import '../theme/app_breakpoints.dart';
+import '../theme/app_spacing.dart';
+import 'app_banner.dart';
 
-/// L'ossature des écrans d'avant-connexion.
+/// L'ossature des écrans sans navigation : connexion, invitation, accueil
+/// d'un nouveau membre.
 ///
-/// Ce n'est pas un composant du système : `AppScaffold` porte une navigation
-/// à cinq destinations qu'un visiteur non connecté n'a pas le droit d'avoir.
-/// On reprend donc ses règles — bannière pleine largeur sous le haut d'écran,
-/// zones sûres, marge de page selon la classe de fenêtre — sans sa navigation.
+/// `AppScaffold` porte une navigation à cinq destinations qu'un visiteur non
+/// connecté n'a pas le droit d'avoir, et qu'un nouvel arrivant n'a pas encore
+/// à découvrir. On reprend donc ses règles — bannière pleine largeur sous le
+/// haut d'écran, zones sûres, marge de page selon la classe de fenêtre — sans
+/// sa navigation.
 ///
-/// La colonne est bornée à 420 dp : une adresse e-mail et six chiffres n'ont
-/// jamais besoin de la largeur d'un écran de bureau.
-class AuthLayout extends StatelessWidget {
-  const AuthLayout({
+/// La colonne est bornée à 420 dp : une adresse e-mail, six chiffres ou trois
+/// gestes d'installation n'ont jamais besoin de la largeur d'un écran de
+/// bureau.
+class EcranSimple extends StatelessWidget {
+  const EcranSimple({
     required this.titre,
     required this.children,
     super.key,

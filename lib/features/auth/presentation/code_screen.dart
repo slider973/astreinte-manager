@@ -9,10 +9,10 @@ import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
+import '../../../core/widgets/champ_texte.dart';
+import '../../../core/widgets/ecran_simple.dart';
 import '../../../core/widgets/primary_button.dart';
 import 'controllers/code_controller.dart';
-import 'widgets/auth_layout.dart';
-import 'widgets/champ_auth.dart';
 
 /// Seconde étape : le code à six chiffres reçu par courriel.
 ///
@@ -62,7 +62,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
     final erreur = etat.erreur;
     final erreurDeChamp = erreur != null && erreur.estErreurDeChamp;
 
-    return AuthLayout(
+    return EcranSimple(
       titre: AppStrings.codeTitre,
       banniere: erreur != null && !erreurDeChamp
           ? AppBanner(variante: AppBannerVariante.erreur, texte: erreur.message)
@@ -75,7 +75,7 @@ class _CodeScreenState extends ConsumerState<CodeScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        ChampAuth(
+        ChampTexte(
           libelle: AppStrings.codeLabel,
           controleur: _code,
           clavier: TextInputType.number,
