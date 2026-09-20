@@ -289,11 +289,15 @@ Réponse `200` :
   "status": "published",
   "published_at": "2026-09-18T19:04:11.204Z",
   "period": "2026-10",
-  "assignments": 9,   // attributions horodatées par cette publication
-  "notified": 2,      // **membres**, pas attributions
-  "notification": {   // le compte rendu de send-notification, tel quel
-    "ok": true, "type": "assignment_proposed", "recipients": 2,
-    "delivered": 2, "failed": 0, "results": [ /* … */ ]
+  "assignments": 9, // attributions horodatées par cette publication
+  "notified": 2, // **membres**, pas attributions
+  "notification": { // le compte rendu de send-notification, tel quel
+    "ok": true,
+    "type": "assignment_proposed",
+    "recipients": 2,
+    "delivered": 2,
+    "failed": 0,
+    "results": [/* … */]
   }
 }
 ```
@@ -306,23 +310,23 @@ Un envoi en échec **n'annule pas** la publication : `ok` reste vrai pour le pla
 
 Erreurs, forme `{"error": {"code", "message"}}` :
 
-| Statut | `code`               | Quand                                                                        |
-| ------ | -------------------- | ---------------------------------------------------------------------------- |
-| 400    | `invalid_body`       | JSON invalide, `schedule_id` absent                                          |
-| 401    | `unauthenticated`    | Pas de jeton porteur, ou jeton qui n'identifie pas un utilisateur            |
-| 403    | `not_admin`          | L'appelant n'est pas admin **actif** de la caserne du planning              |
-| 403    | `station_suspended`  | Abonnement suspendu : la caserne est en lecture seule                        |
-| 404    | `schedule_not_found` | Planning inconnu                                                             |
-| 405    | `method_not_allowed` | Autre verbe que POST                                                         |
-| 409    | `schedule_not_draft` | Déjà publié — l'adjoint a été plus rapide. `status` accompagne l'erreur      |
-| 500    | `internal_error`     | Incident serveur                                                             |
+| Statut | `code`               | Quand                                                                   |
+| ------ | -------------------- | ----------------------------------------------------------------------- |
+| 400    | `invalid_body`       | JSON invalide, `schedule_id` absent                                     |
+| 401    | `unauthenticated`    | Pas de jeton porteur, ou jeton qui n'identifie pas un utilisateur       |
+| 403    | `not_admin`          | L'appelant n'est pas admin **actif** de la caserne du planning          |
+| 403    | `station_suspended`  | Abonnement suspendu : la caserne est en lecture seule                   |
+| 404    | `schedule_not_found` | Planning inconnu                                                        |
+| 405    | `method_not_allowed` | Autre verbe que POST                                                    |
+| 409    | `schedule_not_draft` | Déjà publié — l'adjoint a été plus rapide. `status` accompagne l'erreur |
+| 500    | `internal_error`     | Incident serveur                                                        |
 
 ### Ce qui n'est pas ici, et pourquoi
 
 - **La validation** n'est pas une action : le déclencheur `schedule_auto_validate` (migration
   `0019`) passe le planning en `validated` dès que chaque créneau atteint son effectif requis en
-  attributions **acceptées**, et notifie `schedule_validated` à tous les membres actifs. Aucune
-  Edge Function n'y participe.
+  attributions **acceptées**, et notifie `schedule_validated` à tous les membres actifs. Aucune Edge
+  Function n'y participe.
 - **La relance** des retardataires est une fonction SQL appelable par un admin
   (`remind_schedule(p_schedule)`), pas une Edge Function : elle passe par `notify(...)` et sa file,
   comme les crons du ticket 022 le feront.

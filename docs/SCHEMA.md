@@ -585,6 +585,24 @@ règle hebdomadaire, sans quoi elle ne servirait jamais un samedi.
 chaque créneau porte son propre effectif et rien en base ne le réécrit : c'est le critère du
 ticket 010, vérifié par `supabase/tests/planning_brouillon_test.sql § 2`.
 
+### Publication et suivi d'un planning (migration `0019`, ticket 019)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `publish_schedule` | `(p_schedule uuid, p_actor uuid) returns jsonb` `security definer`, **réservée à `service_role`** | La publication, **en une transaction** : droit de l'acteur, statut `draft → published`, `proposed_at` posé sur chaque attribution du brouillon, journal `schedule.published`. Rend les destinataires **déjà groupés par membre** — un objet par pompier, ses créneaux triés — prêts pour `send-notification`. Refus métier en `{"ok": false, "code": …}` : `schedule_not_found`, `not_admin`, `station_suspended`, `schedule_not_draft`. |
+| `remind_schedule` | `(p_schedule uuid) returns jsonb` `security definer`, ouverte à `authenticated` | La relance manuelle des retardataires, celle du bouton « Relancer maintenant ». Le retard a **une seule définition dans tout le produit** : celle de `v_schedule_progress.assignments_late`. Une notification par membre, `reminder_count` et `last_reminder_at` mis à jour, et une clé de dédoublonnage portant l'heure — un double clic ne coûte rien. |
+
+**Le groupement se fait en SQL, pas en TypeScript.** `send-notification` sait regrouper — c'est sa
+promesse et elle est testée chez elle — mais le faire ici le rend vérifiable par
+`scripts/test_rls.sh`, qui tourne en CI là où les Edge Functions ne sont pas joignables. Et le
+nombre annoncé à l'administrateur (« 18 pompiers notifiés ») vient alors du même comptage que
+l'envoi, jamais d'un second.
+
+**L'envoi n'est pas dans la transaction, et c'est délibéré.** Il vient après, depuis l'Edge
+Function, et ne peut donc pas défaire une publication acquise : une notification perdue se rattrape
+(file de `notify`, relance manuelle, crons du 022), une publication à moitié faite ne se rattrape
+pas.
+
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
 Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
@@ -630,7 +648,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `periods` | membre | admin |
 | `availabilities` | membre : les siennes ; admin : toutes celles de la caserne | membre : les siennes si période `open` et caserne writable ; admin : toutes |
 | `availability_preferences` | idem availabilities | idem |
-| `schedules` | membre si `status <> 'draft'` ; admin toujours | admin |
+| `schedules` | membre si `status <> 'draft'` ; admin toujours | admin, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0019`), et sauf les transitions de statut interdites par `docs/WORKFLOWS.md § 2`, que `schedules_guard_transition` refuse à tout le monde |
 | `shifts` | membre si le schedule est publié ou validé ; admin toujours | admin |
 | `assignments` | membre : les siennes si schedule publié ; tous les membres si validé ; admin toutes | membre : `status` uniquement, de `proposed` vers `accepted` ou `declined`, sur les siennes ; admin : tout, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0018`) |
 | `push_tokens` | soi-même | soi-même |
@@ -742,10 +760,30 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   et non une décision d'administration, et laisser la RLS de `periods` rejouer l'arbitrage
   aurait une conséquence absurde — `periods_update_admin` exige `station_writable()` alors que
   l'update de `stations` en est volontairement dispensé (§ 4).
-- `schedule_auto_validate` : après update d'un `assignment`, si tous les créneaux du
-  planning ont `count(accepted) >= required_count`, passe le planning en `validated` et
-  insère une notification `schedule_validated` (via `pg_net` vers l'Edge Function, ou via
-  une table `outbox` lue par cron — choix ticket 025).
+- `schedules_guard_transition` (migration `0019`, ticket 019) : `before update` sur
+  `schedules`. Impose **la machine à états du § 2 de `docs/WORKFLOWS.md`** — `draft →
+  published`, `published → validated | archived`, `validated → published | archived`, et
+  rien d'autre (`schedule_invalid_transition`). **Aucun retour en brouillon n'est possible,
+  pour personne**, rôle de service compris : sans cette garde, ramener un planning publié en
+  brouillon puis supprimer une attribution effaçait une proposition déjà partie, en deux
+  écritures. Gèle en outre la clé (`station_id`, `period_id`) — `schedule_key_immutable` — et
+  tient les deux horodatages : `published_at` est posé à la **première** publication et jamais
+  réécrit, `validated_at` est posé à la validation et **effacé** au retour en `published`.
+  Security invoker, comme `periods_guard_transition` : une machine à états est une propriété
+  du domaine, pas une règle d'interface.
+- `schedules_guard_suppression` (migration `0019`, ticket 019) : `before delete` sur
+  `schedules`. Refuse la suppression d'un planning qui n'est plus en brouillon
+  (`schedule_delete_published`). **C'est lui qui attrape la cascade** : une suppression en
+  cascade depuis `periods` ne consulte aucune politique RLS, mais elle déclenche bien les
+  triggers de ligne de la table enfant. La politique `schedules_delete_admin`, restreinte au
+  brouillon par la même migration, ne suffisait donc pas seule.
+- `schedule_auto_validate` (migration `0019`, ticket 019) : `after update` sur `assignments`,
+  `when (new.status = 'accepted' and old.status is distinct from new.status)`. Si **chaque**
+  créneau du planning atteint son effectif requis en attributions **acceptées** — la
+  validation se juge sur les acceptations seules, jamais sur `v_schedule_progress.shifts_filled`
+  (§ 6) —, passe le planning en `validated` et notifie `schedule_validated` à tous les membres
+  actifs par `notify(...)`. L'`update … where status = 'published' returning` arbitre la
+  course : deux acceptations simultanées ne produisent **qu'une** salve de notifications.
 - `periods_guard_transition` (migration `0012`, ticket 014) : `before update` sur `periods`.
   Tient `locked_at` à jour avec le statut, gèle la clé (`station_id`, `year`, `month`)
   — `period_key_immutable` — et **refuse une réouverture dont la date limite est déjà
@@ -944,7 +982,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | Fonction | Déclencheur | Rôle |
 |---|---|---|
 | `send-notification` | appel interne : `public.notify(...)` → pg_net (déclencheurs, crons), ou HTTP direct depuis une autre Edge Function | Prend un `notification_type`, des destinataires, une caserne et une charge utile ; regroupe, construit le texte français, écrit la ligne `inapp`, envoie le push FCM à tous les appareils du membre, envoie le courriel si le canal est demandé ou si le membre n'a aucun appareil, supprime les jetons définitivement rejetés (ticket 025, contrat dans `supabase/functions/README.md`) |
-| `publish-schedule` | app admin | Passe le planning en `published`, renseigne `proposed_at`, déclenche les notifications groupées |
+| `publish-schedule` | app admin | Appelle `publish_schedule` (SQL, atomique), puis `send-notification` avec les destinataires **déjà groupés par membre** : sept créneaux font une notification, pas sept (ticket 019, contrat dans `supabase/functions/README.md`) |
 | `reassign-shift` | app admin | Marque l'ancienne attribution `replaced`, crée la nouvelle, notifie le nouveau membre et l'admin |
 | `auto-propose` | app admin | Heuristique de remplissage du brouillon |
 | `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`) |
@@ -1021,8 +1059,11 @@ de disponibilités ; et décomposer le comput de Pâques en fonctions SQL élém
 Realtime activé sur `assignments`, `schedules`, `notifications` uniquement, filtré par
 `station_id` côté client. **`assignments` y est entrée la première** (migration `0018`,
 ticket 017) : deux adjoints qui construisent le même mois doivent voir le travail de l'autre.
-Les deux autres tables suivront avec les tickets qui en ont besoin ; `shifts` n'y entrera pas,
-un changement d'effectif requis étant un événement rare que « Rafraîchir » rattrape.
+**`schedules` a suivi** (migration `0019`, ticket 019) parce que la validation automatique est
+un `update` que personne ne déclenche depuis l'écran de suivi : sans ce canal, le chef verrait
+les réponses arriver une à une et ne verrait jamais le planning se valider. `notifications`
+suivra avec le ticket qui en aura besoin ; `shifts` n'y entrera pas, un changement d'effectif
+requis étant un événement rare que « Rafraîchir » rattrape.
 
 Trois vérifications ont conditionné cette inscription, et elles valent pour toute table qu'on
 y ajoutera :
@@ -1071,7 +1112,8 @@ Ordre proposé :
 16. `0016_cron_rappels_saisie.sql` (ticket 015 : `cron_availability_reminders` et la tâche `availability_reminders`)
 17. `0017_matrice_admin.sql` (ticket 016 : calendrier français en base, vue `v_member_load`, fonction `availability_matrix`)
 18. `0018_planning_brouillon.sql` (ticket 017 : `station_required_count`, `create_schedule`, `assignments_trace_disponibilite`, `assignments_audit_hors_dispo`, suppression d'attribution réservée au brouillon, vue `v_schedule_progress`, inscription d'`assignments` dans `supabase_realtime`)
-19. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
+19. `0019_publication_suivi.sql` (ticket 019 : `schedules_guard_transition`, `schedules_guard_suppression`, suppression d'un planning réservée au brouillon, `publish_schedule`, `schedule_auto_validate`, `remind_schedule`, inscription de `schedules` dans `supabase_realtime`)
+20. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
     `late_responders_report` (ticket 022), `archive_schedules` et `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des

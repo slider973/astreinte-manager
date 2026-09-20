@@ -24,13 +24,18 @@ class AttributionSuivi {
     this.derniereRelance,
   });
 
-  factory AttributionSuivi.depuisJson(Map<String, dynamic> ligne) {
-    final profil = ligne['profiles'];
+  /// [nom] vient de `memberships.display_name`, lu à part : **le nom d'usage
+  /// de la caserne n'est pas dans `profiles`** (`docs/SCHEMA.md § 2.3`), et le
+  /// canal temps réel ne diffuse de toute façon aucune jointure.
+  factory AttributionSuivi.depuisJson(
+    Map<String, dynamic> ligne, {
+    String nom = '',
+  }) {
     return AttributionSuivi(
       id: ligne['id']! as String,
       creneauId: ligne['shift_id']! as String,
       userId: ligne['user_id']! as String,
-      nom: _nom(profil is Map<String, dynamic> ? profil : null),
+      nom: nom,
       etat: etatDepuisSql(ligne['status'] as String?),
       proposeeLe: _instant(ligne['proposed_at']),
       repondueLe: _instant(ligne['responded_at']),
@@ -40,12 +45,24 @@ class AttributionSuivi {
     );
   }
 
-  /// Les colonnes lues, plus le nom du membre par la clé étrangère
-  /// `assignments.user_id`. Jamais `select *`.
+  /// Les colonnes lues. Jamais `select *` : une colonne inutile est une
+  /// colonne de plus sur le fil.
   static const String colonnes =
       'id, shift_id, user_id, status, proposed_at, responded_at, '
-      'decline_reason, reminder_count, last_reminder_at, '
-      'profiles!assignments_user_id_fkey(display_name, first_name, last_name)';
+      'decline_reason, reminder_count, last_reminder_at';
+
+  /// Les colonnes de `memberships` qui donnent le nom d'usage d'un membre, et
+  /// son repli quand il n'en a pas choisi.
+  static const String colonnesMembre =
+      'user_id, display_name, profiles!inner(first_name, last_name)';
+
+  /// Le nom d'usage d'un membre, depuis une ligne de `memberships`.
+  static String nomDeMembre(Map<String, dynamic> ligne) {
+    final affiche = (ligne['display_name'] as String?)?.trim();
+    if (affiche != null && affiche.isNotEmpty) return affiche;
+    final profil = ligne['profiles'];
+    return _nom(profil is Map<String, dynamic> ? profil : null);
+  }
 
   final String id;
   final String creneauId;
@@ -103,8 +120,6 @@ class AttributionSuivi {
 
   static String _nom(Map<String, dynamic>? profil) {
     if (profil == null) return '';
-    final affiche = (profil['display_name'] as String?)?.trim();
-    if (affiche != null && affiche.isNotEmpty) return affiche;
     final prenom = (profil['first_name'] as String?)?.trim() ?? '';
     final nom = (profil['last_name'] as String?)?.trim() ?? '';
     return '$prenom $nom'.trim();

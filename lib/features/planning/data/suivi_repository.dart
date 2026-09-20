@@ -203,6 +203,21 @@ class SupabaseSuiviRepository implements SuiviRepository {
                 .eq('station_id', stationId)
                 .inFilter('shift_id', ids);
 
+      // **Le nom d'usage vit dans `memberships`, pas dans `profiles`**
+      // (`docs/SCHEMA.md § 2.3`) : une jointure depuis `assignments` ne peut
+      // donc pas le rapporter. Une lecture de la caserne — soixante lignes —
+      // le donne pour tout le monde, y compris les membres désactivés depuis :
+      // une attribution ne perd pas son nom parce que son titulaire est parti.
+      final membres = await _client
+          .from('memberships')
+          .select(AttributionSuivi.colonnesMembre)
+          .eq('station_id', stationId);
+
+      final noms = <String, String>{
+        for (final ligne in membres)
+          ligne['user_id']! as String: AttributionSuivi.nomDeMembre(ligne),
+      };
+
       // La vue du ticket 017. Six nombres, rendus par la base, que rien ne
       // recompte en Dart.
       final avancement = await _client
@@ -229,7 +244,11 @@ class SupabaseSuiviRepository implements SuiviRepository {
           for (final ligne in creneaux) CreneauPlanning.depuisJson(ligne),
         ],
         attributions: <AttributionSuivi>[
-          for (final ligne in attributions) AttributionSuivi.depuisJson(ligne),
+          for (final ligne in attributions)
+            AttributionSuivi.depuisJson(
+              ligne,
+              nom: noms[ligne['user_id'] as String?] ?? '',
+            ),
         ],
         annee: annee,
         mois: mois,
