@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 004, 008
 - **Branche** : `feat/011-saisie-dispos-grille`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/10
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte
