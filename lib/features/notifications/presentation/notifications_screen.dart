@@ -11,7 +11,6 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_divider.dart';
 import '../../../core/widgets/empty_state.dart';
-import '../../../core/widgets/entete_section.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../domain/centre_providers.dart';
@@ -40,6 +39,20 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   /// Une action est en cours : les lignes n'ouvrent rien le temps de
   /// l'aller-retour, sinon deux touches rapides partent deux fois.
   bool _occupe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // **Relire à l'ouverture.** Le contrôleur est gardé en vie pour la
+    // pastille, donc il n'est pas relu par le simple fait d'arriver ici : sans
+    // ceci, un onglet laissé ouvert une heure rouvrirait le centre sur la
+    // liste d'il y a une heure. Une requête par ouverture, c'est le prix.
+    // Reporté d'une image : modifier un provider pendant `initState` est
+    // interdit par Riverpod.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _relire();
+    });
+  }
 
   void _relire() =>
       unawaited(ref.read(centreNotificationsProvider.notifier).rafraichir());
@@ -204,19 +217,30 @@ class _ListeNotifications extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
         child: CustomScrollView(
           slivers: <Widget>[
+            // Pas d'en-tête de section ici : il redirait « Notifications »
+            // juste sous la barre d'application. Seul le compte est une
+            // information — il dit combien de lignes suivent, et combien
+            // restent à lire.
             SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: marge),
+              padding: EdgeInsets.fromLTRB(
+                marge,
+                AppSpacing.lg,
+                marge,
+                AppSpacing.md,
+              ),
               sliver: SliverToBoxAdapter(
-                child: EnteteSection(
-                  titre: AppStrings.centreTitre,
-                  compte: AppStrings.centreCompte(
-                    lignes.length,
-                    donnees.nonLues,
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    AppStrings.centreCompte(lignes.length, donnees.nonLues),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  premiere: true,
                 ),
               ),
             ),
+            const SliverToBoxAdapter(child: AppDivider()),
             SliverPadding(
               // Les lignes vont bord à bord : leur fond dit l'état de lecture,
               // et un fond qui s'arrête avant la marge ferait une carte.

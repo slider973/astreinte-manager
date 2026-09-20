@@ -131,21 +131,27 @@ class _Marque extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // `Align` est indispensable : `SizedBox(width:)` impose une largeur
+    // **tight**, et sans lui le carré de 10 dp s'étirait à 16 — un rectangle
+    // couché, pas la case du registre. Vu en vrai dans Chrome.
     return SizedBox(
       width: LigneNotification.largeurMarque,
-      // Aligné sur la première ligne de texte, pas sur le haut du bloc.
-      child: Padding(
-        padding: const EdgeInsets.only(top: AppSpacing.xs + 1),
-        child: visible
-            ? Container(
-                width: LigneNotification.coteMarque,
-                height: LigneNotification.coteMarque,
-                decoration: BoxDecoration(
-                  color: couleur,
-                  borderRadius: AppRadius.caseRegistreRadius,
-                ),
-              )
-            : const SizedBox.shrink(),
+      child: Align(
+        // Aligné sur la première ligne de texte, pas sur le haut du bloc.
+        alignment: Alignment.topLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.xs + 1),
+          child: visible
+              ? Container(
+                  width: LigneNotification.coteMarque,
+                  height: LigneNotification.coteMarque,
+                  decoration: BoxDecoration(
+                    color: couleur,
+                    borderRadius: AppRadius.caseRegistreRadius,
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
       ),
     );
   }
@@ -222,6 +228,9 @@ class _Texte extends StatelessWidget {
   }
 }
 
+/// La largeur de la colonne de date à l'échelle 1 : « il y a 3 h » y tient.
+const double _largeurDate = 62;
+
 /// L'ancienneté, en marge droite comme la date d'un registre.
 class _Date extends StatelessWidget {
   const _Date({required this.texte, required this.lue});
@@ -233,13 +242,22 @@ class _Date extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // Une largeur **minimale** et non fixe : la colonne de date s'aligne pour
+    // les valeurs courantes (« hier », « 8 sept. », « il y a 3 h ») sans rien
+    // tronquer à grande échelle de texte.
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.xxs),
-      child: Text(
-        texte,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-          fontWeight: lue ? FontWeight.w400 : FontWeight.w600,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: MediaQuery.textScalerOf(context).scale(_largeurDate),
+        ),
+        child: Text(
+          texte,
+          textAlign: TextAlign.end,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: lue ? FontWeight.w400 : FontWeight.w600,
+          ),
         ),
       ),
     );
