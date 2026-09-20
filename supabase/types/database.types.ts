@@ -763,9 +763,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: {
+        Args: { p_email: string; p_token: string; p_user_id: string }
+        Returns: Json
+      }
+      create_invitation: {
+        Args: {
+          p_email: string
+          p_invited_by: string
+          p_role: Database["public"]["Enums"]["membership_role"]
+          p_station: string
+        }
+        Returns: Json
+      }
       is_admin: { Args: { p_station: string }; Returns: boolean }
       is_member: { Args: { p_station: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      mask_email: { Args: { p_email: string }; Returns: string }
       station_writable: { Args: { p_station: string }; Returns: boolean }
     }
     Enums: {
