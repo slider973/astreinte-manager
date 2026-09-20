@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 019
 - **Branche** : `feat/020-reattribution`
+- **Statut** : en cours depuis 2026-09-21
 
 ## À faire
 - Edge Function `reassign-shift` : marque l'ancienne attribution `replaced` (si accepted) ou laisse `declined`, crée la nouvelle en `proposed` avec `proposed_at = now()`, notifie le nouveau membre, notifie l'ancien si son attribution était acceptée.
