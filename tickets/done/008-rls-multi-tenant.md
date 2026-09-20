@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 002
 - **Branche** : `feat/008-rls-multi-tenant`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/3
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte
