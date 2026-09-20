@@ -1071,6 +1071,111 @@ abstract final class AppStrings {
   static const String ferieNoel = 'Noël';
 
   // -------------------------------------------------------------------
+  // Préférences de charge (ticket 013)
+  // -------------------------------------------------------------------
+
+  static const String preferencesTitre = 'Ce mois, je veux faire au maximum';
+
+  /// **La leçon.** C'est elle qui apprend au membre que l'outil a changé de
+  /// logique : cocher, c'est dire ce qu'on peut, pas ce qu'on veut. Un
+  /// pompier qui la lit coche ses quatre weekends ; un pompier qui ne la lit
+  /// pas continue d'en cocher un seul.
+  static const String preferencesLecon =
+      'Cocher tous tes weekends ne t\'engage pas à tous les faire. Dis ici '
+      'combien tu en veux vraiment.';
+
+  static const String preferencesAstreintes = 'Astreintes';
+  static const String preferencesWeekends = 'Weekends';
+
+  /// Écrit en toutes lettres, jamais un `∞` : le symbole n'est pas lisible
+  /// pour tout le monde.
+  static const String preferencesSansLimite = 'autant que nécessaire';
+
+  static String preferencesAstreintesCochees(int nombre) =>
+      '$nombre ${nombre <= 1 ? 'cochée' : 'cochées'} ce mois';
+
+  static String preferencesWeekendsCoches(int nombre) =>
+      '$nombre ${nombre <= 1 ? 'coché' : 'cochés'} ce mois';
+
+  static const String preferencesZeroAstreintes = 'Aucune astreinte ce mois';
+  static const String preferencesZeroWeekends = 'Aucun weekend ce mois';
+
+  /// Les valeurs seules : « 4 astreintes, 1 weekend ». Sous le titre, qui
+  /// dit déjà « au maximum », le préfixe serait un doublon.
+  static String preferencesValeurs(int? astreintes, int? weekends) {
+    if (astreintes == null && weekends == null) return preferencesSansLimite;
+    return <String>[
+      if (astreintes != null)
+        '$astreintes ${astreintes <= 1 ? 'astreinte' : 'astreintes'}',
+      if (weekends != null)
+        '$weekends ${weekends <= 1 ? 'weekend' : 'weekends'}',
+    ].join(', ');
+  }
+
+  /// Une rangée de la feuille de choix : « 4 astreintes au maximum ».
+  static String preferencesPlafondAstreintes(int n) =>
+      '$n ${n <= 1 ? 'astreinte' : 'astreintes'} au maximum';
+
+  /// Une rangée de la feuille de choix : « 2 weekends au maximum ».
+  static String preferencesPlafondWeekends(int n) =>
+      '$n ${n <= 1 ? 'weekend' : 'weekends'} au maximum';
+
+  /// La même chose en phrase, pour une annonce ou un résumé isolé.
+  static String preferencesResume(int? astreintes, int? weekends) =>
+      astreintes == null && weekends == null
+      ? preferencesResumeSansLimite
+      : 'Au maximum : ${preferencesValeurs(astreintes, weekends)}';
+
+  static const String preferencesResumeSansLimite =
+      'Au maximum : autant que nécessaire';
+
+  static const String preferencesModifier = 'Modifier mes maximums';
+
+  /// **L'écart, et sa raison.** Jamais un avertissement : dépasser son
+  /// maximum est ici le résultat recherché, pas une faute
+  /// (`docs/PRD.md § 7.4`).
+  static String preferencesEcartAstreintes(int cochees, int maximum) =>
+      'Tu as coché $cochees ${cochees <= 1 ? 'astreinte' : 'astreintes'} pour '
+      '$maximum ${maximum <= 1 ? 'voulue' : 'voulues'}. C\'est normal : tu '
+      'laisses le choix à ton chef.';
+
+  static String preferencesEcartWeekends(int coches, int maximum) =>
+      'Tu as coché $coches ${coches <= 1 ? 'weekend' : 'weekends'} pour '
+      '$maximum ${maximum <= 1 ? 'voulu' : 'voulus'}. C\'est normal : tu '
+      'laisses le choix à ton chef.';
+
+  /// La reprise n'est jamais silencieuse.
+  static String preferencesReprise(int mois) =>
+      'Repris de ${moisLongs[mois - 1]}. Change-le si ce n\'est plus vrai.';
+
+  static const String preferencesCommentaireRangee = 'Un mot pour ton chef';
+  static const String preferencesCommentaireInvite =
+      'Ex. : pas plus d\'un weekend, garde des enfants.';
+
+  static String preferencesCommentaireRestants(int nombre) =>
+      '$nombre ${nombre <= 1 ? 'caractère restant' : 'caractères restants'}';
+
+  static const String preferencesVerrouille =
+      'Mois verrouillé : tu ne peux plus changer tes maximums.';
+  static const String preferencesLectureSeule =
+      'Caserne en lecture seule : tu ne peux plus changer tes maximums.';
+  static const String preferencesAucuneVerrouille =
+      'Aucun maximum indiqué pour ce mois.';
+
+  static const String preferencesFeuilleAstreintes =
+      'Au maximum, combien d\'astreintes ?';
+  static const String preferencesFeuilleWeekends =
+      'Au maximum, combien de weekends ?';
+
+  /// Le rappel des maximums dans le résumé annoncé de la barre du bas : un
+  /// utilisateur de lecteur d'écran a l'écart complet sans entrer dans la
+  /// section.
+  static String compteursResumeMaximums(int? astreintes, int? weekends) {
+    if (astreintes == null && weekends == null) return '';
+    return '. ${preferencesResume(astreintes, weekends)}';
+  }
+
+  // -------------------------------------------------------------------
   // Écran de démonstration (build de développement)
   // -------------------------------------------------------------------
 

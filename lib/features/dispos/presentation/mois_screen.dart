@@ -22,6 +22,7 @@ import 'widgets/bloc_astuce.dart';
 import 'widgets/entete_colonnes.dart';
 import 'widgets/grille_calendrier.dart';
 import 'widgets/grille_registre.dart';
+import 'widgets/section_preferences.dart';
 import 'widgets/selecteur_mois.dart';
 
 /// Vrai si le membre a déjà terminé une peinture sur cet appareil.
@@ -307,6 +308,13 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
               child: BarreRaccourcis(),
             ),
           ),
+        // La place du ticket 013 : **au-dessus de la grille**, dans le même
+        // champ de vision que les raccourcis qui viennent de tout cocher. Le
+        // brief du 011 l'avait réservée sous le dernier jour du mois ; depuis
+        // le 012, on remplit un mois en deux touches sans jamais défiler
+        // jusque-là (`design/013 § 3`). En `large`, elle est dans le panneau.
+        if (!classe.estLarge)
+          const SliverToBoxAdapter(child: SectionPreferences()),
         if (astuce != null) SliverToBoxAdapter(child: astuce),
         SliverToBoxAdapter(child: _Annonce(texte: etat.annonce)),
         const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
@@ -325,7 +333,6 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
             aujourdhui: aujourdhui,
             deuxNiveaux: deuxNiveaux,
           ),
-        // Emplacement réservé au ticket 013 (quotas et commentaire).
         const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
       ],
     );
@@ -375,19 +382,24 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     onReessayer: () =>
         unawaited(ref.read(saisieControllerProvider.notifier).reessayer()),
     grand: grand,
+    plafondAstreintes: etat.preferences.valeurs.maxAstreintes,
+    plafondWeekends: etat.preferences.valeurs.maxWeekends,
   );
 
   /// En `large`, la barre du bas disparaît et son contenu s'installe en tête
   /// du panneau de droite.
   Widget _panneau(EtatSaisie etat) => SingleChildScrollView(
     padding: const EdgeInsets.all(AppSpacing.xl),
-    // Emplacement réservé au ticket 013 en dessous.
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         const BarreRaccourcis(vertical: true),
         const SizedBox(height: AppSpacing.xl),
         _barre(etat, grand: true),
+        // La place que le 011 avait réservée : sous les compteurs. Elle est
+        // gardée telle quelle — ici, rien n'est en concurrence avec la
+        // grille, et la section est visible sans défiler.
+        const SectionPreferences(dansPanneau: true),
       ],
     ),
   );

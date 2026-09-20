@@ -26,6 +26,8 @@ class BarreCompteurs extends StatelessWidget {
     this.onReessayer,
     this.montrerIndicateur = true,
     this.grand = false,
+    this.plafondAstreintes,
+    this.plafondWeekends,
   });
 
   /// Au-delà de ce facteur d'échelle, la barre passe sur deux lignes —
@@ -47,6 +49,16 @@ class BarreCompteurs extends StatelessWidget {
   /// Compteurs en `grand` pour le panneau latéral des grands écrans.
   final bool grand;
 
+  /// Le maximum d'astreintes voulu. **Aucun compteur ne le porte** : jours et
+  /// nuits ne le totalisent pas, et un quatrième compteur coûterait 40 dp de
+  /// grille en permanence (`design/013 § 5`). Il n'entre ici que dans le
+  /// résumé annoncé.
+  final int? plafondAstreintes;
+
+  /// Le maximum de weekends voulu. Celui-là se pose bien sur son compteur :
+  /// « 5 / 1 », visible pendant tout le défilement de la grille.
+  final int? plafondWeekends;
+
   @override
   Widget build(BuildContext context) {
     final echelle = MediaQuery.textScalerOf(context).scale(16) / 16;
@@ -62,8 +74,8 @@ class BarreCompteurs extends StatelessWidget {
         : const SizedBox.shrink();
 
     final chiffres = <Widget>[
-      // `plafond: null` dès aujourd'hui : le ticket 013 n'aura qu'à le
-      // remplir pour obtenir « 4 / 2 weekends », sans toucher à la barre.
+      // Jours et nuits n'ont pas de plafond : `max_shifts` porte sur leur
+      // somme, et « 20 / 4 nuits » serait faux.
       CountStat(
         libelle: AppStrings.compteurJours,
         valeur: compteurs.jours,
@@ -79,6 +91,7 @@ class BarreCompteurs extends StatelessWidget {
       CountStat(
         libelle: AppStrings.compteurWeekends,
         valeur: compteurs.weekends,
+        plafond: plafondWeekends,
         grand: grand,
         plafondAttendu: false,
       ),
@@ -86,11 +99,16 @@ class BarreCompteurs extends StatelessWidget {
 
     return Semantics(
       container: true,
-      label: AppStrings.compteursResume(
-        compteurs.jours,
-        compteurs.nuits,
-        compteurs.weekends,
-      ),
+      label:
+          AppStrings.compteursResume(
+            compteurs.jours,
+            compteurs.nuits,
+            compteurs.weekends,
+          ) +
+          AppStrings.compteursResumeMaximums(
+            plafondAstreintes,
+            plafondWeekends,
+          ),
       child: empile
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -13,6 +13,7 @@ import '../../domain/creneau_cle.dart';
 import '../../domain/disponibilite_mois.dart';
 import '../../domain/dispos_providers.dart';
 import '../../domain/periode_saisie.dart';
+import '../../domain/preferences_mois.dart';
 import '../../domain/raccourci.dart';
 
 /// Ce que la ligne d'un jour a besoin de savoir, et **rien d'autre**.
@@ -95,6 +96,7 @@ class EtatSaisie {
     this.dernierRaccourci,
     this.raccourciEnCours,
     this.messageRaccourci,
+    this.preferences = const EtatPreferences(),
   });
 
   final PeriodeSaisie periode;
@@ -157,6 +159,10 @@ class EtatSaisie {
   /// `Semantics` seule laisserait un voyant devant un bouton muet.
   final String? messageRaccourci;
 
+  /// **Ce que le membre veut faire ce mois-ci**, à côté de ce qu'il peut
+  /// faire. La moitié du produit qui manquait (ticket 013).
+  final EtatPreferences preferences;
+
   bool get enPeinture => pinceau != null;
 
   /// Vrai quand la grille accepte une saisie.
@@ -199,6 +205,7 @@ class EtatSaisie {
     RaccourciApplique? Function()? dernierRaccourci,
     PorteeRaccourci? Function()? raccourciEnCours,
     String? Function()? messageRaccourci,
+    EtatPreferences? preferences,
   }) => EtatSaisie(
     periode: periode ?? this.periode,
     mois: mois ?? this.mois,
@@ -222,6 +229,7 @@ class EtatSaisie {
     messageRaccourci: messageRaccourci == null
         ? this.messageRaccourci
         : messageRaccourci(),
+    preferences: preferences ?? this.preferences,
   );
 }
 
@@ -271,9 +279,26 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   /// Sert à oublier une tranche dès qu'elle est confirmée par le serveur.
   Set<String> _moisPersistes = <String>{};
 
+  /// Les préférences de charge en attente d'écriture, par `period_id`.
+  ///
+  /// **Même file, même délai, même indicateur que les cases** : un maximum
+  /// posé et dix cases peintes dans la même seconde partent ensemble, et
+  /// l'écran ne dit qu'une fois « Enregistrement… ».
+  final Map<String, PreferencesMois> _preferencesEnAttente =
+      <String, PreferencesMois>{};
+
+  /// Les périodes dont une préférence est gardée sur l'appareil.
+  Set<String> _preferencesPersistees = <String>{};
+
   Timer? _minuteur;
   bool _envoiEnCours = false;
   int _relance = 0;
+
+  /// La caserne est passée en lecture seule pendant la session. Gardé hors de
+  /// l'état parce qu'il doit survivre à un rechargement : sans lui, chaque
+  /// `recharger()` retenterait d'écrire la reprise et récolterait le même
+  /// refus.
+  bool _lectureSeuleConnue = false;
 
   bool _gesteActif = false;
   DisponibiliteMois? _moisAvantGeste;
@@ -320,6 +345,9 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       _file.clear();
       _serveur.clear();
       _moisPersistes.clear();
+      _preferencesEnAttente.clear();
+      _preferencesPersistees.clear();
+      _lectureSeuleConnue = false;
     }
     _stationId = appartenance.stationId;
     _userId = session.userId;
@@ -339,6 +367,17 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
             stationId: appartenance.stationId,
             userId: session.userId,
           );
+
+      final prefsGardees = await ref
+          .read(fileLocaleProvider)
+          .lirePreferences(
+            stationId: appartenance.stationId,
+            userId: session.userId,
+          );
+      for (final entree in prefsGardees.entries) {
+        _preferencesEnAttente.putIfAbsent(entree.key, () => entree.value);
+      }
+      _preferencesPersistees = prefsGardees.keys.toSet();
     }
 
     // Une file gardée peut viser un mois qui s'est verrouillé entre-temps —
@@ -351,6 +390,18 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     var perimee = false;
     _file.removeWhere((cle, _) {
       final abandonnee = !ouverts.contains(cle.cleMois);
+      perimee = perimee || abandonnee;
+      return abandonnee;
+    });
+    // Un maximum posé sur un mois qui s'est verrouillé depuis subit le même
+    // sort, et pour la même raison : le rejouer ne collectionnerait que des
+    // refus.
+    final periodesOuvertes = <String>{
+      for (final ouverte in periodes)
+        if (ouverte.ouverte) ouverte.id,
+    };
+    _preferencesEnAttente.removeWhere((id, _) {
+      final abandonnee = !periodesOuvertes.contains(id);
       perimee = perimee || abandonnee;
       return abandonnee;
     });
@@ -379,9 +430,19 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
 
     final horsLigne = !ref.read(connectiviteProvider).enLigne;
 
+    final preferences = await _chargerPreferences(
+      stationId: appartenance.stationId,
+      userId: session.userId,
+      periode: periode,
+      periodes: periodes,
+    );
+
     // Une file héritée d'un autre mois, d'une session précédente ou d'un
-    // envoi échoué ne dort pas : elle repart d'elle-même.
-    if (_file.isNotEmpty) _planifier();
+    // envoi échoué ne dort pas : elle repart d'elle-même. Une préférence en
+    // attente non plus — y compris celle que la reprise vient de poser.
+    if (_file.isNotEmpty || _preferencesEnAttente.isNotEmpty) _planifier();
+
+    final enAttente = _file.isNotEmpty || _preferencesEnAttente.isNotEmpty;
 
     return EtatSaisie(
       periode: periode,
@@ -392,14 +453,89 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
         mois: periode.mois,
         valeurs: <CreneauCle, DisponibiliteEtat>{...lues, ..._file},
       ),
-      sync: _file.isEmpty
+      sync: !enAttente
           ? SyncEtat.repos
           : horsLigne
           ? SyncEtat.horsLigne
           : SyncEtat.enregistrement,
       horsLigne: horsLigne,
       filePerimee: perimee,
+      preferences: preferences,
     );
+  }
+
+  /// Lit les préférences du mois affiché **et de son précédent**, en une
+  /// requête, puis applique la règle de reprise du `PRD § 6.3`.
+  ///
+  /// Trois cas, et trois seulement :
+  ///
+  /// 1. une ligne existe pour ce mois → elle fait foi ;
+  /// 2. pas de ligne, le mois précédent en a une, le mois est modifiable →
+  ///    les valeurs sont reprises, **écrites par la file ordinaire**, et
+  ///    annoncées à l'écran. Sans l'écriture, le membre verrait « 1 weekend »
+  ///    et l'admin ne verrait rien : deux vérités pour le même mois, et c'est
+  ///    celle de l'admin qui construit le planning ;
+  /// 3. sinon → autant que nécessaire, et **aucune ligne écrite**.
+  Future<EtatPreferences> _chargerPreferences({
+    required String stationId,
+    required String userId,
+    required PeriodeSaisie periode,
+    required List<PeriodeSaisie> periodes,
+  }) async {
+    final veille = DateTime(periode.annee, periode.mois - 1);
+    final clePrecedente = PeriodeSaisie.cleDe(veille.year, veille.month);
+    PeriodeSaisie? precedente;
+    for (final candidate in periodes) {
+      if (candidate.cle == clePrecedente) precedente = candidate;
+    }
+
+    Map<String, PreferencesMois> lues;
+    try {
+      lues = await ref
+          .read(disposRepositoryProvider)
+          .lirePreferences(
+            stationId: stationId,
+            userId: userId,
+            periodIds: <String>[
+              periode.id,
+              if (precedente != null) precedente.id,
+            ],
+          );
+    } on Object {
+      // Injoignable : on n'invente ni reprise ni valeur. La grille, elle, a
+      // déjà été lue ; perdre l'écran entier pour un quota serait pire.
+      lues = const <String, PreferencesMois>{};
+    }
+
+    // Une préférence gardée sur l'appareil prime sur ce que le serveur rend :
+    // elle porte ce que le membre a voulu et que la base n'a pas encore.
+    final enAttente = _preferencesEnAttente[periode.id];
+    if (enAttente != null) {
+      return EtatPreferences(
+        valeurs: enAttente,
+        ligneAuChargement: lues.containsKey(periode.id),
+      );
+    }
+
+    final existante = lues[periode.id];
+    if (existante != null) {
+      return EtatPreferences(valeurs: existante, ligneAuChargement: true);
+    }
+
+    final heritee = precedente == null ? null : lues[precedente.id];
+    // Une reprise est une écriture que le membre n'a pas demandée : on ne la
+    // déclenche que si elle porte une information. Une ligne à « sans limite »
+    // et sans commentaire n'apprend rien à l'admin du ticket 016 et ne vaut pas
+    // une écriture non sollicitée.
+    if (heritee == null ||
+        heritee.vide ||
+        !periode.ouverte ||
+        _lectureSeuleConnue) {
+      return const EtatPreferences();
+    }
+
+    _preferencesEnAttente[periode.id] = heritee;
+    return EtatPreferences(valeurs: heritee, repriseDe: precedente!.mois);
   }
 
   /// L'état courant, ou `null` si le provider a été disposé entre-temps.
@@ -669,6 +805,58 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   }
 
   // -------------------------------------------------------------------
+  // Les préférences de charge
+  // -------------------------------------------------------------------
+
+  /// Le nombre maximal d'astreintes voulu ce mois-ci. `null` : autant que
+  /// nécessaire.
+  void definirPlafondAstreintes(int? valeur) =>
+      _poserPreferences((p) => p.avecAstreintes(valeur));
+
+  /// Le nombre maximal de weekends voulu ce mois-ci. `null` : autant que
+  /// nécessaire.
+  void definirPlafondWeekends(int? valeur) =>
+      _poserPreferences((p) => p.avecWeekends(valeur));
+
+  /// Le mot du mois pour le chef de centre.
+  void definirCommentaire(String texte) =>
+      _poserPreferences((p) => p.avecCommentaire(texte));
+
+  /// Pose une préférence sur l'écran et dans la file.
+  ///
+  /// **Le même chemin que la case** : état optimiste, délai de 500 ms,
+  /// persistance sur l'appareil, envoi groupé, relances, refus. Taper un
+  /// commentaire lettre par lettre ne produit donc qu'une requête — chaque
+  /// frappe réarme le même minuteur.
+  ///
+  /// Le cran d'annulation d'un raccourci n'est **pas** désarmé ici : régler un
+  /// maximum n'est pas toucher une case, et le membre a le droit de faire les
+  /// deux dans n'importe quel ordre.
+  void _poserPreferences(PreferencesMois Function(PreferencesMois) changement) {
+    final etat = _etat;
+    if (etat == null || !etat.modifiable) return;
+
+    final voulues = changement(etat.preferences.valeurs);
+    if (voulues == etat.preferences.valeurs) return;
+
+    _preferencesEnAttente[etat.periode.id] = voulues;
+
+    _publier(
+      etat.copyWith(
+        preferences: etat.preferences.copyWith(
+          valeurs: voulues,
+          // La valeur n'est plus celle du mois précédent : c'est la sienne.
+          repriseDe: () => null,
+          enErreur: false,
+        ),
+        sync: etat.horsLigne ? SyncEtat.horsLigne : SyncEtat.enregistrement,
+        echecPersistant: false,
+      ),
+    );
+    _planifier();
+  }
+
+  // -------------------------------------------------------------------
   // La file
   // -------------------------------------------------------------------
 
@@ -720,7 +908,9 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   void _planifier() {
     // Rien ne part pendant un geste : la file est retenue tant que le doigt
     // est posé.
-    if (_gesteActif || _file.isEmpty) return;
+    if (_gesteActif || (_file.isEmpty && _preferencesEnAttente.isEmpty)) {
+      return;
+    }
     _relance = 0;
     _minuteur?.cancel();
     _minuteur = Timer(delaiEnvoi, () => unawaited(_envoyer()));
@@ -740,7 +930,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     _minuteur = null;
     if (_gesteActif) finGeste();
     await _envoyer();
-    return _file.isEmpty;
+    return _file.isEmpty && _preferencesEnAttente.isEmpty;
   }
 
   /// « Réessayer » : rejoue toute la file en attente.
@@ -757,13 +947,20 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     if (_gesteActif) return;
 
     final etat = _etat;
-    if (etat == null || _envoiEnCours || _file.isEmpty) return;
+    if (etat == null ||
+        _envoiEnCours ||
+        (_file.isEmpty && _preferencesEnAttente.isEmpty)) {
+      return;
+    }
 
     final stationId = _stationId;
     final userId = _userId;
     if (stationId == null || userId == null) return;
 
     final lot = Map<CreneauCle, DisponibiliteEtat>.of(_file);
+    final lotPreferences = Map<String, PreferencesMois>.of(
+      _preferencesEnAttente,
+    );
 
     final ecritures = <LigneDisponibilite>[
       for (final entree in lot.entries)
@@ -780,7 +977,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
           entree.key,
     ];
 
-    if (ecritures.isEmpty && suppressions.isEmpty) {
+    if (ecritures.isEmpty && suppressions.isEmpty && lotPreferences.isEmpty) {
       _retirerDeLaFile(lot);
       _appliquerAuServeur(lot);
       _publier(etat.copyWith(sync: SyncEtat.enregistre));
@@ -793,9 +990,10 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     }
 
     final depot = ref.read(disposRepositoryProvider);
+    final periodesPreferences = lotPreferences.keys.toList();
     try {
-      // Deux requêtes au plus, et elles partent ensemble : les deux jeux de
-      // clés sont disjoints, l'ordre n'a aucune conséquence.
+      // Trois requêtes au plus, et elles partent ensemble : les jeux de clés
+      // sont disjoints, l'ordre n'a aucune conséquence.
       final resultats = await Future.wait<int>(<Future<int>>[
         if (ecritures.isNotEmpty)
           depot.enregistrerLot(
@@ -809,6 +1007,13 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
             userId: userId,
             cles: suppressions,
           ),
+        for (final periodId in periodesPreferences)
+          depot.enregistrerPreferences(
+            stationId: stationId,
+            userId: userId,
+            periodId: periodId,
+            preferences: lotPreferences[periodId]!,
+          ),
       ]);
 
       var index = 0;
@@ -816,6 +1021,14 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
         // Une écriture refusée par la clause `using` d'une politique ne lève
         // pas : elle n'affecte aucune ligne. Le compte est la seule preuve.
         if (resultats[index++] != ecritures.length) {
+          throw const EchecDispos(ErreurDispos.verrouille);
+        }
+      }
+      final indexPreferences = index + (suppressions.isNotEmpty ? 1 : 0);
+      for (var rang = 0; rang < periodesPreferences.length; rang++) {
+        // Zéro ligne rendue par l'`upsert` : la politique a filtré. Même
+        // preuve, même conclusion que pour une case.
+        if (resultats[indexPreferences + rang] == 0) {
           throw const EchecDispos(ErreurDispos.verrouille);
         }
       }
@@ -834,6 +1047,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
 
       _envoiEnCours = false;
       _retirerDeLaFile(lot);
+      _retirerDesPreferences(lotPreferences);
       _appliquerAuServeur(lot);
       _relance = 0;
       // Confirmé par le serveur : l'entrée gardée sur l'appareil n'a plus
@@ -843,28 +1057,42 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
 
       final courant = _etat;
       if (courant == null) return;
+      final resteEnAttente =
+          _file.isNotEmpty || _preferencesEnAttente.isNotEmpty;
       _publier(
         courant.copyWith(
-          sync: _file.isEmpty ? SyncEtat.enregistre : SyncEtat.enregistrement,
+          sync: resteEnAttente ? SyncEtat.enregistrement : SyncEtat.enregistre,
           enErreur: courant.enErreur.difference(lot.keys.toSet()),
+          preferences: courant.preferences.copyWith(
+            // La ligne existe désormais en base : plus rien à reprendre.
+            ligneAuChargement: lotPreferences.containsKey(courant.periode.id)
+                ? true
+                : null,
+            enErreur: false,
+          ),
           echecPersistant: false,
         ),
       );
       // Une modification est arrivée pendant l'envoi : elle repart.
-      if (_file.isNotEmpty) _planifier();
+      if (resteEnAttente) _planifier();
     } on EchecDispos catch (echec) {
       _envoiEnCours = false;
-      await _traiterEchec(echec.erreur, lot);
+      await _traiterEchec(echec.erreur, lot, lotPreferences.keys.toSet());
     } on Object {
       _envoiEnCours = false;
-      await _traiterEchec(ErreurDispos.inconnue, lot);
+      await _traiterEchec(
+        ErreurDispos.inconnue,
+        lot,
+        lotPreferences.keys.toSet(),
+      );
     }
   }
 
   Future<void> _traiterEchec(
     ErreurDispos erreur,
-    Map<CreneauCle, DisponibiliteEtat> lot,
-  ) async {
+    Map<CreneauCle, DisponibiliteEtat> lot, [
+    Set<String> preferences = const <String>{},
+  ]) async {
     final etat = _etat;
     if (etat == null) return;
 
@@ -883,10 +1111,14 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       final courant = _etat;
       if (courant == null) return;
 
+      _lectureSeuleConnue = _lectureSeuleConnue || !verrouille;
       _publier(
         courant.copyWith(
           sync: SyncEtat.echec,
           enErreur: <CreneauCle>{...courant.enErreur, ...lot.keys},
+          preferences: courant.preferences.copyWith(
+            enErreur: preferences.contains(courant.periode.id),
+          ),
           lectureSeule: !verrouille,
           refusServeur: () => verrouille
               ? AppStrings.moisErreurVerrouilleEnCours
@@ -901,6 +1133,9 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       etat.copyWith(
         sync: SyncEtat.echec,
         enErreur: <CreneauCle>{...etat.enErreur, ...lot.keys},
+        preferences: etat.preferences.copyWith(
+          enErreur: preferences.contains(etat.periode.id),
+        ),
         // Un raté ne mérite pas un bandeau ; un blocage, si.
         echecPersistant: derniere,
       ),
@@ -1004,6 +1239,38 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       );
     }
     _moisPersistes = parMois.keys.toSet();
+
+    // Les maximums voyagent avec la file, et pour la même raison : la
+    // bannière hors ligne les promet aussi.
+    for (final oubliee in _preferencesPersistees.difference(
+      _preferencesEnAttente.keys.toSet(),
+    )) {
+      await depot.enregistrerPreferences(
+        stationId: stationId,
+        userId: userId,
+        periodId: oubliee,
+        preferences: null,
+      );
+    }
+    for (final attente in _preferencesEnAttente.entries) {
+      await depot.enregistrerPreferences(
+        stationId: stationId,
+        userId: userId,
+        periodId: attente.key,
+        preferences: attente.value,
+      );
+    }
+    _preferencesPersistees = _preferencesEnAttente.keys.toSet();
+  }
+
+  /// Retire de l'attente les préférences que le serveur vient de confirmer.
+  /// Une période remodifiée pendant l'envoi y reste.
+  void _retirerDesPreferences(Map<String, PreferencesMois> lot) {
+    for (final entree in lot.entries) {
+      if (_preferencesEnAttente[entree.key] == entree.value) {
+        _preferencesEnAttente.remove(entree.key);
+      }
+    }
   }
 
   void _retirerDeLaFile(Map<CreneauCle, DisponibiliteEtat> lot) {
@@ -1031,16 +1298,17 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     final etat = _etat;
     if (etat == null) return;
 
+    final enAttente = _file.isNotEmpty || _preferencesEnAttente.isNotEmpty;
     _publier(
       etat.copyWith(
         horsLigne: !enLigne,
         sync: enLigne
-            ? (_file.isEmpty ? etat.sync : SyncEtat.enregistrement)
+            ? (enAttente ? SyncEtat.enregistrement : etat.sync)
             : SyncEtat.horsLigne,
       ),
     );
 
-    if (enLigne && _file.isNotEmpty) {
+    if (enLigne && enAttente) {
       _relance = 0;
       unawaited(_envoyer());
     }

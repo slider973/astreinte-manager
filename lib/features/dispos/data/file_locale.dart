@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_status.dart';
 import '../domain/creneau_cle.dart';
+import '../domain/preferences_mois.dart';
 
 /// **La file d'écriture gardée sur l'appareil.**
 ///
@@ -38,6 +39,26 @@ abstract interface class FileLocale {
   Future<Set<String>> moisEnAttente({
     required String stationId,
     required String userId,
+  });
+
+  /// Les préférences de charge en attente d'écriture, rangées par
+  /// `period_id`.
+  ///
+  /// Un maximum posé dans une remise sans réseau vaut une case cochée : la
+  /// bannière hors ligne promet les deux.
+  Future<Map<String, PreferencesMois>> lirePreferences({
+    required String stationId,
+    required String userId,
+  });
+
+  /// Remplace ce qui est gardé pour une période. `null` **oublie** la
+  /// période : c'est ainsi qu'une préférence confirmée par le serveur
+  /// disparaît.
+  Future<void> enregistrerPreferences({
+    required String stationId,
+    required String userId,
+    required String periodId,
+    required PreferencesMois? preferences,
   });
 }
 
@@ -81,10 +102,25 @@ class FileLocalePartagee implements FileLocale {
     required String mois,
   }) => '$prefixe.$stationId.$userId.$mois';
 
+  /// Préfixe des préférences en attente. Distinct de celui de la file : une
+  /// clé de mois et une clé de période ne se confondent jamais.
+  static const String prefixePreferences = 'dispos.prefs';
+
+  static String clePreferenceDe({
+    required String stationId,
+    required String userId,
+    required String periodId,
+  }) => '$prefixePreferences.$stationId.$userId.$periodId';
+
   static String _prefixeMembre({
     required String stationId,
     required String userId,
   }) => '$prefixe.$stationId.$userId.';
+
+  static String _prefixeMembrePreferences({
+    required String stationId,
+    required String userId,
+  }) => '$prefixePreferences.$stationId.$userId.';
 
   @override
   Future<Map<CreneauCle, DisponibiliteEtat>> lire({
@@ -151,6 +187,67 @@ class FileLocalePartagee implements FileLocale {
     }
   }
 
+  @override
+  Future<Map<String, PreferencesMois>> lirePreferences({
+    required String stationId,
+    required String userId,
+  }) async {
+    final attente = <String, PreferencesMois>{};
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final debut = _prefixeMembrePreferences(
+        stationId: stationId,
+        userId: userId,
+      );
+
+      for (final cle in prefs.getKeys()) {
+        if (!cle.startsWith(debut)) continue;
+        final valeur = _relirePreference(prefs.getString(cle));
+        if (valeur != null) attente[cle.substring(debut.length)] = valeur;
+      }
+    } on Object {
+      return <String, PreferencesMois>{};
+    }
+    return attente;
+  }
+
+  @override
+  Future<void> enregistrerPreferences({
+    required String stationId,
+    required String userId,
+    required String periodId,
+    required PreferencesMois? preferences,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cle = clePreferenceDe(
+        stationId: stationId,
+        userId: userId,
+        periodId: periodId,
+      );
+
+      if (preferences == null) {
+        await prefs.remove(cle);
+        return;
+      }
+      await prefs.setString(cle, jsonEncode(preferences.versJson()));
+    } on Object {
+      // Même politique que la file : la saisie continue, elle ne survivra
+      // simplement pas à une fermeture de l'onglet.
+    }
+  }
+
+  static PreferencesMois? _relirePreference(String? brut) {
+    if (brut == null) return null;
+    try {
+      final document = jsonDecode(brut);
+      if (document is! Map<String, dynamic>) return null;
+      return PreferencesMois.depuisJson(document);
+    } on Object {
+      return null;
+    }
+  }
+
   static Map<CreneauCle, DisponibiliteEtat> _relire(String? brut) {
     if (brut == null) return <CreneauCle, DisponibiliteEtat>{};
     try {
@@ -213,6 +310,30 @@ class FileLocaleMemoire implements FileLocale {
     required String stationId,
     required String userId,
   }) async => _mois.keys.toSet();
+
+  /// Les préférences gardées, par `period_id`.
+  final Map<String, PreferencesMois> preferences = <String, PreferencesMois>{};
+
+  @override
+  Future<Map<String, PreferencesMois>> lirePreferences({
+    required String stationId,
+    required String userId,
+  }) async => Map<String, PreferencesMois>.of(preferences);
+
+  @override
+  Future<void> enregistrerPreferences({
+    required String stationId,
+    required String userId,
+    required String periodId,
+    required PreferencesMois? preferences,
+  }) async {
+    ecritures++;
+    if (preferences == null) {
+      this.preferences.remove(periodId);
+      return;
+    }
+    this.preferences[periodId] = preferences;
+  }
 }
 
 /// Le dépôt local de la file. Surchargé par [FileLocaleMemoire] dans les

@@ -30,6 +30,11 @@ class CompteursMois {
   /// disponible. Voir [uniteWeekend] pour la définition de l'unité.
   final int weekends;
 
+  /// Le total d'**astreintes** : jours et nuits confondus. C'est ce que
+  /// plafonne `max_shifts` (ticket 013), et c'est le seul nombre de l'écran
+  /// qu'aucun des trois compteurs ne porte seul.
+  int get astreintes => jours + nuits;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -70,6 +75,22 @@ DateTime? uniteWeekend(DateTime jour) {
     DateTime.sunday => nu.subtract(const Duration(days: 1)),
     _ => estJourFerie(nu) ? nu : null,
   };
+}
+
+/// Le nombre d'unités de weekend que contient un mois, quel que soit ce qui
+/// y est coché.
+///
+/// C'est la borne du plafond de weekends (ticket 013) : proposer « 6
+/// weekends » dans un mois qui n'en compte que 5 serait un chiffre faux. Le
+/// calcul est **exactement** celui du compteur — [uniteWeekend] —, jamais un
+/// second, ce que le brief du 011 § 7.6 laissait à trancher.
+int unitesWeekendDuMois(Iterable<DateTime> jours) {
+  final unites = <DateTime>{};
+  for (final jour in jours) {
+    final unite = uniteWeekend(jour);
+    if (unite != null) unites.add(unite);
+  }
+  return unites.length;
 }
 
 /// Ce qu'un membre a saisi pour un mois, plus ce que ça donne au compteur.

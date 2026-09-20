@@ -5,6 +5,7 @@ import '../../../core/supabase/enums.dart';
 import '../../../core/theme/app_status.dart';
 import '../domain/creneau_cle.dart';
 import '../domain/periode_saisie.dart';
+import '../domain/preferences_mois.dart';
 
 /// Pourquoi une lecture ou une écriture de disponibilités a échoué.
 enum ErreurDispos {
@@ -100,6 +101,31 @@ abstract interface class DisposRepository {
     required String userId,
     required List<CreneauCle> cles,
   });
+
+  /// Les préférences de charge du membre pour ces périodes, rangées par
+  /// `period_id`. Une période absente de la réponse n'a **pas** de ligne :
+  /// c'est ce qui déclenche la reprise du mois précédent.
+  ///
+  /// **Une seule requête** pour le mois affiché et son précédent : la reprise
+  /// ne coûte donc pas un aller-retour de plus à chaque changement de mois.
+  Future<Map<String, PreferencesMois>> lirePreferences({
+    required String stationId,
+    required String userId,
+    required List<String> periodIds,
+  });
+
+  /// **Une seule requête** : `upsert` sur l'unicité
+  /// `(station_id, user_id, period_id)`.
+  ///
+  /// Rend le nombre de lignes rendues par la base — 1 en cas de succès. Zéro
+  /// vaut refus, pour la même raison que [supprimerLot] : une politique RLS
+  /// qui filtre ne lève pas toujours.
+  Future<int> enregistrerPreferences({
+    required String stationId,
+    required String userId,
+    required String periodId,
+    required PreferencesMois preferences,
+  });
 }
 
 /// Implémentation Supabase. Aucune Edge Function : la RLS de `availabilities`
@@ -115,6 +141,9 @@ class SupabaseDisposRepository implements DisposRepository {
   /// `set_by` n'est jamais touché par cet écran : le membre saisit pour
   /// lui-même (brief § 7.1).
   static const String _colonnesDispo = 'date, slot, status';
+
+  static const String _colonnesPreference =
+      'period_id, max_shifts, max_weekends, comment';
 
   @override
   Future<List<PeriodeSaisie>> periodes(String stationId) async {
@@ -224,6 +253,55 @@ class SupabaseDisposRepository implements DisposRepository {
           .eq('user_id', userId)
           .or(filtre)
           .select(_colonnesDispo);
+
+      return rendues.length;
+    } on Object catch (echec) {
+      throw EchecDispos(_traduire(echec));
+    }
+  }
+
+  @override
+  Future<Map<String, PreferencesMois>> lirePreferences({
+    required String stationId,
+    required String userId,
+    required List<String> periodIds,
+  }) async {
+    if (periodIds.isEmpty) return <String, PreferencesMois>{};
+
+    try {
+      final lignes = await _client
+          .from('availability_preferences')
+          .select(_colonnesPreference)
+          .eq('station_id', stationId)
+          .eq('user_id', userId)
+          .inFilter('period_id', periodIds);
+
+      return <String, PreferencesMois>{
+        for (final ligne in lignes)
+          ligne['period_id']! as String: PreferencesMois.depuisJson(ligne),
+      };
+    } on Object catch (echec) {
+      throw EchecDispos(_traduire(echec));
+    }
+  }
+
+  @override
+  Future<int> enregistrerPreferences({
+    required String stationId,
+    required String userId,
+    required String periodId,
+    required PreferencesMois preferences,
+  }) async {
+    try {
+      final rendues = await _client
+          .from('availability_preferences')
+          .upsert(<String, dynamic>{
+            'station_id': stationId,
+            'user_id': userId,
+            'period_id': periodId,
+            ...preferences.versJson(),
+          }, onConflict: 'station_id,user_id,period_id')
+          .select(_colonnesPreference);
 
       return rendues.length;
     } on Object catch (echec) {
