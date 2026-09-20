@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : aucune
 - **Branche** : `feat/001-setup-flutter`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/1
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte
