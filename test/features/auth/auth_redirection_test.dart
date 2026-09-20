@@ -158,12 +158,59 @@ void main() {
 
     test('l\'écran des membres suit les mêmes règles que l\'accueil', () {
       expect(
-        redirectionAuth(etat: EtatAuth.connecte, chemin: AppRoutes.membres),
+        redirectionAuth(
+          etat: EtatAuth.connecte,
+          chemin: AppRoutes.membres,
+          estAdmin: true,
+        ),
         isNull,
       );
       expect(
         redirectionAuth(etat: EtatAuth.deconnecte, chemin: AppRoutes.membres),
         AppRoutes.connexion,
+      );
+    });
+  });
+
+  group('redirectionAuth et les écrans d\'administration', () {
+    const ecrans = <String>[
+      AppRoutes.prefixeAdmin,
+      AppRoutes.membres,
+      '${AppRoutes.membres}/${AppRoutes.inviterChemin}',
+      AppRoutes.parametres,
+      AppRoutes.periodes,
+      '/admin/schedule/2026-10',
+    ];
+
+    test('un membre y est renvoyé à l\'accueil', () {
+      for (final chemin in ecrans) {
+        expect(
+          redirectionAuth(etat: EtatAuth.connecte, chemin: chemin),
+          AppRoutes.accueil,
+          reason: chemin,
+        );
+      }
+    });
+
+    test('un admin les ouvre', () {
+      for (final chemin in ecrans) {
+        expect(
+          redirectionAuth(
+            etat: EtatAuth.connecte,
+            chemin: chemin,
+            estAdmin: true,
+          ),
+          isNull,
+          reason: chemin,
+        );
+      }
+    });
+
+    test('un chemin qui commence par « admin » sans en être n\'est pas '
+        'concerné', () {
+      expect(
+        redirectionAuth(etat: EtatAuth.connecte, chemin: '/administratif'),
+        isNull,
       );
     });
   });

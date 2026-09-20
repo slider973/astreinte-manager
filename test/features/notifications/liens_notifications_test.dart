@@ -1,4 +1,11 @@
+import 'dart:async';
+
+import 'package:astreinte_sp/app.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
+import 'package:astreinte_sp/core/router/destination_initiale.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/features/demarrage/presentation/demarrage_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -72,15 +79,19 @@ void main() {
       'la destination survit au démarrage à froid, session à restaurer '
       '(ticket 039)',
       (tester) async {
+        // Démarrage à froid : la session est encore en cours de restauration,
+        // l'application affiche son écran d'attente. C'est exactement ce que
+        // vit un pompier qui touche une notification, application fermée.
         final faux = await monterApp(
           tester,
+          sessionEnAttente: true,
           appartenances: const <Appartenance>[appartenanceMembre],
+          stabiliser: false,
         );
+        expect(find.byType(DemarrageScreen), findsOneWidget);
 
-        // Le lien arrive alors que personne n'est encore connecté : c'est
-        // exactement le chemin d'une notification touchée application fermée.
-        await ouvrirRoute(tester, '/availability/2026-10');
-        expect(emplacementCourant(tester), isNot('/availability/2026-10'));
+        await ouvrirRoute(tester, '/availability/2026-10', stabiliser: false);
+        expect(emplacementCourant(tester), AppRoutes.demarrage);
 
         faux.auth.ouvrirSession(sessionMembre);
         await tester.pumpAndSettle();
@@ -89,18 +100,109 @@ void main() {
       },
     );
 
-    testWidgets('sans lien profond, la connexion mène à l\'accueil', (
+    testWidgets('sans lien profond, la restauration mène à l\'accueil', (
       tester,
     ) async {
       final faux = await monterApp(
         tester,
+        sessionEnAttente: true,
         appartenances: const <Appartenance>[appartenanceMembre],
+        stabiliser: false,
       );
 
       faux.auth.ouvrirSession(sessionMembre);
       await tester.pumpAndSettle();
 
       expect(emplacementCourant(tester), '/');
+    });
+  });
+
+  group('La destination gardée ne fuit pas d\'une session à l\'autre', () {
+    testWidgets(
+      'un écran quitté à la déconnexion n\'attend pas la personne suivante',
+      (tester) async {
+        // Téléphone prêté, véhicule partagé : un chef de centre se déconnecte
+        // depuis l'écran des périodes, un pompier se connecte derrière lui.
+        // Aucune URL forgée dans ce scénario, seulement deux personnes et un
+        // appareil.
+        final faux = await monterApp(
+          tester,
+          session: sessionMembre,
+          appartenances: const <Appartenance>[_admin],
+          periodes: FauxPeriodesRepository(),
+        );
+        final conteneur = ProviderScope.containerOf(
+          tester.element(find.byType(AstreinteApp)),
+        );
+
+        await ouvrirRoute(tester, AppRoutes.periodes);
+        expect(emplacementCourant(tester), AppRoutes.periodes);
+
+        unawaited(faux.auth.seDeconnecter());
+        await tester.pumpAndSettle();
+        expect(emplacementCourant(tester), AppRoutes.connexion);
+
+        expect(
+          conteneur
+              .read(destinationInitialeProvider)
+              .reprendre(AppRoutes.connexion),
+          isNull,
+          reason: 'l\'écran des périodes ne doit pas attendre le suivant',
+        );
+      },
+    );
+
+    testWidgets(
+      'un lien ouvert alors que personne n\'est connecté n\'est pas rejoué',
+      (tester) async {
+        final faux = await monterApp(
+          tester,
+          appartenances: const <Appartenance>[appartenanceMembre],
+        );
+
+        await ouvrirRoute(tester, '/proposals');
+        expect(emplacementCourant(tester), AppRoutes.connexion);
+
+        faux.auth.ouvrirSession(sessionMembre);
+        await tester.pumpAndSettle();
+
+        expect(emplacementCourant(tester), AppRoutes.accueil);
+      },
+    );
+  });
+
+  group('Garde de rôle sur l\'administration', () {
+    testWidgets('un membre n\'ouvre aucun écran d\'administration', (
+      tester,
+    ) async {
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        appartenances: const <Appartenance>[appartenanceMembre],
+      );
+
+      for (final chemin in <String>[
+        AppRoutes.membres,
+        '${AppRoutes.membres}/${AppRoutes.inviterChemin}',
+        AppRoutes.parametres,
+        AppRoutes.periodes,
+      ]) {
+        await ouvrirRoute(tester, chemin);
+        expect(emplacementCourant(tester), AppRoutes.accueil, reason: chemin);
+      }
+    });
+
+    testWidgets('un admin, lui, les ouvre', (tester) async {
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        appartenances: const <Appartenance>[_admin],
+        periodes: FauxPeriodesRepository(),
+      );
+
+      await ouvrirRoute(tester, AppRoutes.periodes);
+
+      expect(emplacementCourant(tester), AppRoutes.periodes);
     });
   });
 }

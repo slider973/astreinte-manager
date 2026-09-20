@@ -73,6 +73,10 @@ abstract final class AppRoutes {
   /// coquille d'accueil éclate en routes.
   static const String parametreMois = 'mois';
 
+  /// Tout ce qui est réservé aux administrateurs de la caserne. La garde est
+  /// dans `redirectionAuth` : ce préfixe **est** la règle.
+  static const String prefixeAdmin = '/admin';
+
   /// Administration de la caserne : les membres et les invitations
   /// (ticket 006).
   static const String membres = '/admin/membres';
@@ -179,19 +183,31 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       }
       final jeton = ref.read(jetonInvitationProvider);
       final etat = ref.read(etatAuthProvider);
+
+      // Une session qui se ferme efface la destination en attente. Le cas
+      // n'est pas théorique : sur un téléphone prêté ou dans un véhicule
+      // partagé (`core/session/deconnexion.dart`), la personne suivante
+      // atterrirait sur l'écran que la précédente venait de quitter.
+      if (etat == EtatAuth.deconnecte) destinationInitiale.oublier();
+
       final redirection = redirectionAuth(
         etat: etat,
         chemin: state.matchedLocation,
         outilsDevAutorises: env.isDev,
+        estAdmin: ref.read(appartenanceCouranteProvider)?.estAdmin ?? false,
         cheminInvitationEnAttente: jeton == null
             ? null
             : AppRoutes.cheminInvitation(jeton),
       );
       if (redirection != null) {
-        // On quitte l'emplacement demandé pour restaurer la session ou se
-        // connecter : le garder, sans quoi la destination d'une notification
-        // est perdue au démarrage à froid (ticket 039).
-        destinationInitiale.memoriser(state.uri.toString());
+        // **Uniquement pendant la restauration à froid.** C'est le seul moment
+        // où l'emplacement demandé vient du dehors — une URL ouverte, une
+        // notification touchée — et non d'un écran que l'application affichait
+        // déjà. Mémoriser à la déconnexion rejouerait l'écran de la personne
+        // précédente pour la suivante.
+        if (etat == EtatAuth.chargement) {
+          destinationInitiale.memoriser(state.uri.toString());
+        }
         return redirection;
       }
 

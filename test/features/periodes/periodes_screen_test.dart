@@ -457,7 +457,7 @@ void main() {
       expect(find.text(_libelle(1)), findsOneWidget);
     });
 
-    testWidgets('un membre simple n\'y a rien à faire', (tester) async {
+    testWidgets('un membre simple n\'y entre pas', (tester) async {
       await _ouvrirPeriodes(
         tester,
         depot: FauxPeriodesRepository(
@@ -466,7 +466,11 @@ void main() {
         appartenance: appartenanceMembre,
       );
 
-      expect(find.text(AppStrings.periodesReserveAdmin), findsOneWidget);
+      // Depuis le ticket 024, la porte est fermée **par le routeur** : l'écran
+      // ne s'ouvre plus du tout. Sa propre phrase
+      // (`AppStrings.periodesReserveAdmin`) reste en seconde ligne, pour le
+      // jour où un rôle change pendant qu'il est affiché.
+      expect(find.byType(PeriodesScreen), findsNothing);
       expect(find.text(AppStrings.periodeActionVerrouiller), findsNothing);
     });
 

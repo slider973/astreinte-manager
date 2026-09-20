@@ -55,11 +55,25 @@ class DestinationInitiale {
 
   void oublier() => _gardee = null;
 
-  /// Vrai si l'emplacement porte une intention : autre chose que l'accueil nu
-  /// et qu'une étape traversée.
+  /// Vrai si l'emplacement porte une intention : **une adresse interne**,
+  /// autre chose que l'accueil nu et qu'une étape traversée.
   static bool vautLeDetour(String emplacement) {
+    // Une destination gardée est rejouée telle quelle dans `GoRouter.go` : ce
+    // qui entre ici doit donc être un chemin de l'application, et rien
+    // d'autre. Une adresse absolue (`https://ailleurs/…`), une adresse de
+    // protocole (`javascript:…`) ou un chemin à double barre oblique
+    // (`//ailleurs/…`, qui est une autorité) sortiraient de l'application.
+    // La stratégie d'URL en vigueur — le dièse de `go_router` — contient
+    // aujourd'hui les dégâts ; le ticket 032 peut la changer, et le contrôle
+    // ne doit pas dépendre de ce choix.
+    if (!emplacement.startsWith('/')) return false;
+    if (emplacement.startsWith('//')) return false;
+    // Certains navigateurs lisent `/\ailleurs` comme `//ailleurs`.
+    if (emplacement.contains(r'\')) return false;
+
     final uri = Uri.tryParse(emplacement);
     if (uri == null) return false;
+    if (uri.hasScheme || uri.hasAuthority) return false;
 
     final chemin = uri.path;
     if (chemin.isEmpty) return false;

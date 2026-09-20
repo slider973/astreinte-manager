@@ -74,7 +74,16 @@ class FauxAuthRepository implements AuthRepository {
     SessionUtilisateur? session,
     this.erreurEnvoi,
     this.erreurVerification,
+    this.enAttente = false,
   }) : _session = session;
+
+  /// Le flux ne dit rien tant que [ouvrirSession] n'a pas été appelée.
+  ///
+  /// C'est le **démarrage à froid** : le SDK Supabase relit son stockage local
+  /// et l'application reste en `EtatAuth.chargement` quelques instants. Sans
+  /// cette attente, un faux répond tout de suite et aucun test ne peut voir
+  /// l'écran de restauration ni ce qui s'y joue (ticket 039).
+  bool enAttente;
 
   /// Erreur levée par [envoyerCode], ou `null` pour réussir.
   AuthErreur? erreurEnvoi;
@@ -96,7 +105,7 @@ class FauxAuthRepository implements AuthRepository {
 
   @override
   Stream<SessionUtilisateur?> get sessions async* {
-    yield _session;
+    if (!enAttente) yield _session;
     yield* _controleur.stream;
   }
 
@@ -186,6 +195,9 @@ Future<AppMontee> monterApp(
   AuthErreur? erreurEnvoi,
   AuthErreur? erreurVerification,
   AuthErreur? erreurAppartenances,
+  /// Simule un démarrage à froid : la session n'arrive qu'à l'appel de
+  /// `faux.auth.ouvrirSession(...)`.
+  bool sessionEnAttente = false,
   MembresRepository? membres,
   InvitationRepository? invitations,
   ProfilRepository? profils,
@@ -210,6 +222,7 @@ Future<AppMontee> monterApp(
     session: session,
     erreurEnvoi: erreurEnvoi,
     erreurVerification: erreurVerification,
+    enAttente: sessionEnAttente,
   );
   addTearDown(auth.fermer);
   final memberships = FauxMembershipRepository(
@@ -287,12 +300,24 @@ Future<AppMontee> monterApp(
 
 /// Ouvre un chemin comme le ferait un lien reçu par courriel ou une barre
 /// d'adresse : c'est le routeur réel de l'application qui décide de la suite.
-Future<void> ouvrirRoute(WidgetTester tester, String chemin) async {
+Future<void> ouvrirRoute(
+  WidgetTester tester,
+  String chemin, {
+  /// À passer à faux quand l'écran d'arrivée porte un squelette de
+  /// chargement : son balayage tourne en boucle et `pumpAndSettle` ne rend
+  /// jamais la main.
+  bool stabiliser = true,
+}) async {
   final conteneur = ProviderScope.containerOf(
     tester.element(find.byType(AstreinteApp)),
   );
   conteneur.read(appRouterProvider).go(chemin);
-  await tester.pumpAndSettle();
+  if (stabiliser) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump();
+  }
 }
 
 /// Démonte l'arbre pour libérer les minuteries des contrôleurs.

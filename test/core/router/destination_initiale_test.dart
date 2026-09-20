@@ -59,6 +59,48 @@ void main() {
       );
     });
 
+    test('une destination qui sort de l\'application est rejetée', () {
+      // Ce qui est gardé ici est rejoué tel quel dans `GoRouter.go` : seule
+      // une adresse interne a le droit d'y entrer. La stratégie d'URL en
+      // vigueur contient aujourd'hui les dégâts, le ticket 032 peut la
+      // changer — le contrôle ne doit pas en dépendre.
+      for (final forgee in <String>[
+        'https://ailleurs.example/proposals',
+        'http://ailleurs.example',
+        '//ailleurs.example/proposals',
+        '/\\ailleurs.example',
+        r'/\/ailleurs.example',
+        'javascript:alert(1)',
+        'JavaScript:alert(1)',
+        'data:text/html,<script></script>',
+        'mailto:chef@caserne.fr',
+        'proposals',
+        '../proposals',
+        '',
+      ]) {
+        expect(
+          DestinationInitiale().memoriser(forgee),
+          isFalse,
+          reason: forgee,
+        );
+      }
+    });
+
+    test('une adresse interne, elle, passe', () {
+      for (final interne in <String>[
+        '/proposals',
+        '/availability/2026-10',
+        '/admin/schedule/2026-10',
+        '/?onglet=1',
+      ]) {
+        expect(
+          DestinationInitiale().memoriser(interne),
+          isTrue,
+          reason: interne,
+        );
+      }
+    });
+
     test('oublier remet tout à zéro', () {
       final destination = DestinationInitiale()
         ..memoriser('/proposals')
