@@ -136,23 +136,27 @@ class DayCell extends StatelessWidget {
           decoration: BoxDecoration(
             color: fond,
             borderRadius: AppRadius.controleRadius,
-            border: Border(
+            border: Border.all(color: statuts.filetDecoratif),
+          ),
+          child: Stack(
+            children: <Widget>[
               // Le jour courant se signe par un filet d'encre en marge, pas
               // par une pastille colorée.
-              left: BorderSide(
-                color: aujourdhui
-                    ? theme.colorScheme.primary
-                    : statuts.filetDecoratif,
-                width: aujourdhui ? AppStroke.etat : AppStroke.filet,
+              if (aujourdhui)
+                PositionedDirectional(
+                  top: 0,
+                  bottom: 0,
+                  start: 0,
+                  child: ColoredBox(
+                    color: theme.colorScheme.primary,
+                    child: const SizedBox(width: AppStroke.etat),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                child: contenu,
               ),
-              top: BorderSide(color: statuts.filetDecoratif),
-              right: BorderSide(color: statuts.filetDecoratif),
-              bottom: BorderSide(color: statuts.filetDecoratif),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            child: contenu,
+            ],
           ),
         ),
       ),

@@ -137,14 +137,18 @@ class _IconeRotative extends StatefulWidget {
 
 class _IconeRotativeState extends State<_IconeRotative>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controleur = AnimationController(
-    vsync: this,
-    duration: AppDuration.balayage,
-  );
+  // Créé dès initState, jamais paresseusement : un contrôleur instancié
+  // pendant dispose() irait chercher son TickerMode dans un arbre déjà
+  // démonté.
+  late final AnimationController _controleur;
 
   @override
   void initState() {
     super.initState();
+    _controleur = AnimationController(
+      vsync: this,
+      duration: AppDuration.balayage,
+    );
     if (widget.anime) unawaited(_controleur.repeat());
   }
 

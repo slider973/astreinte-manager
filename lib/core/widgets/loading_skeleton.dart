@@ -33,10 +33,19 @@ class LoadingSkeleton extends StatefulWidget {
 
 class _LoadingSkeletonState extends State<LoadingSkeleton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controleur = AnimationController(
-    vsync: this,
-    duration: AppDuration.balayage,
-  );
+  // Créé dès initState, jamais paresseusement : un contrôleur instancié
+  // pendant dispose() irait chercher son TickerMode dans un arbre déjà
+  // démonté.
+  late final AnimationController _controleur;
+
+  @override
+  void initState() {
+    super.initState();
+    _controleur = AnimationController(
+      vsync: this,
+      duration: AppDuration.balayage,
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -139,6 +148,7 @@ class SkeletonLigne extends StatelessWidget {
 class SkeletonBloc extends StatelessWidget {
   const SkeletonBloc({super.key, this.hauteur = 96});
 
+  /// Hauteur **minimale** : le bloc grandit si l'échelle de texte grandit.
   final double hauteur;
 
   @override
@@ -146,13 +156,14 @@ class SkeletonBloc extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      height: hauteur,
+      constraints: BoxConstraints(minHeight: hauteur),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         borderRadius: AppRadius.controleRadius,
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: const Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           SkeletonLigne(largeur: 140, hauteur: AppSpacing.xl - 4),

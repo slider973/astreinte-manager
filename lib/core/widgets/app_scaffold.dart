@@ -226,6 +226,20 @@ class AppScaffold extends StatelessWidget {
   }
 
   Widget _rail(BuildContext context, {required bool etendu}) {
+    // Le rail n'est pas défilant par défaut : sur un téléphone en paysage
+    // (600 × 360) ou à grande échelle de texte, cinq destinations ne tiennent
+    // pas. On le rend défilant sans qu'il perde sa hauteur pleine.
+    return LayoutBuilder(
+      builder: (context, contraintes) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: contraintes.maxHeight),
+          child: IntrinsicHeight(child: _railNu(etendu: etendu)),
+        ),
+      ),
+    );
+  }
+
+  Widget _railNu({required bool etendu}) {
     return NavigationRail(
       extended: etendu,
       minExtendedWidth: 180,

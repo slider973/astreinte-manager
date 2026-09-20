@@ -42,8 +42,10 @@ class CountStat extends StatelessWidget {
     final theme = Theme.of(context);
     final limite = plafond;
 
-    final styleValeur = (grand ? AppTextStyles.displayNombre : AppTextStyles.nombre)
-        .copyWith(color: theme.colorScheme.onSurface);
+    final styleValeur =
+        (grand ? AppTextStyles.displayNombre : AppTextStyles.nombre).copyWith(
+          color: theme.colorScheme.onSurface,
+        );
     final stylePlafond = AppTextStyles.nombre.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
@@ -66,25 +68,33 @@ class CountStat extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xxs),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text('$valeur', style: styleValeur),
-              if (limite != null) ...<Widget>[
-                Text(' / ', style: stylePlafond),
-                Text('$limite', style: stylePlafond),
-              ] else ...<Widget>[
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  AppStrings.compteurIllimite,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+          // À très grande échelle de texte, un gros total peut dépasser la
+          // colonne. On le réduit jusqu'à la largeur disponible plutôt que de
+          // le tronquer : un compteur à moitié lu est pire qu'un compteur un
+          // peu plus petit. Le libellé, lui, garde sa taille.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text('$valeur', style: styleValeur),
+                if (limite != null) ...<Widget>[
+                  Text(' / ', style: stylePlafond),
+                  Text('$limite', style: stylePlafond),
+                ] else ...<Widget>[
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    AppStrings.compteurIllimite,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ],
       ),

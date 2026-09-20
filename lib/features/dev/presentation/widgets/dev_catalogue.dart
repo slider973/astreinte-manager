@@ -736,6 +736,13 @@ class _Fenetre extends StatelessWidget {
       propositionsEnAttente: propositions,
     );
 
+    // Une fenêtre simulée grandit avec l'échelle de texte : à 2.0, un
+    // téléphone réel est équivalent à un écran deux fois plus petit, et la
+    // vignette doit rester une vignette lisible, pas une maquette tronquée.
+    final facteur = MediaQuery.textScalerOf(context).scale(16) / 16;
+    final largeurEffective = largeur * facteur;
+    final hauteurEffective = hauteur * facteur;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: context.statuts.filetDecoratif),
@@ -744,11 +751,11 @@ class _Fenetre extends StatelessWidget {
       child: ClipRRect(
         borderRadius: AppRadius.controleRadius,
         child: SizedBox(
-          width: largeur,
-          height: hauteur,
+          width: largeurEffective,
+          height: hauteurEffective,
           child: MediaQuery(
             data: MediaQuery.of(context).copyWith(
-              size: Size(largeur, hauteur),
+              size: Size(largeurEffective, hauteurEffective),
               viewPadding: EdgeInsets.zero,
               padding: EdgeInsets.zero,
             ),
@@ -761,7 +768,7 @@ class _Fenetre extends StatelessWidget {
                 variante: AppBannerVariante.information,
                 texte: 'Saisie ouverte jusqu\'au 15 septembre.',
               ),
-              child: const Padding(
+              child: const SingleChildScrollView(
                 padding: EdgeInsets.all(AppSpacing.lg),
                 child: CountStat(
                   libelle: AppStrings.compteurJours,
