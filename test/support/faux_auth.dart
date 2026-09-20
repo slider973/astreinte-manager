@@ -1,0 +1,184 @@
+import 'dart:async';
+
+import 'package:astreinte_sp/app.dart';
+import 'package:astreinte_sp/core/env.dart';
+import 'package:astreinte_sp/core/supabase/supabase_bootstrap.dart';
+import 'package:astreinte_sp/features/auth/data/auth_providers.dart';
+import 'package:astreinte_sp/features/auth/data/auth_repository.dart';
+import 'package:astreinte_sp/features/auth/data/membership_repository.dart';
+import 'package:astreinte_sp/features/auth/domain/appartenance.dart';
+import 'package:astreinte_sp/features/auth/domain/auth_erreur.dart';
+import 'package:astreinte_sp/features/auth/domain/session_utilisateur.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// Environnement de test : configuration Supabase présente, mais aucun réseau
+/// n'est jamais joint — les dépôts sont faux.
+const Env envDeTest = Env(
+  supabaseUrl: 'http://127.0.0.1:54321',
+  supabaseAnonKey: 'cle-anon-de-test',
+  firebaseProjectId: '',
+  appEnv: Env.devEnv,
+);
+
+const SessionUtilisateur sessionMembre = SessionUtilisateur(
+  userId: 'aaaaaaaa-0000-4000-8000-000000000101',
+  email: 'membre1@caserne-a.test',
+);
+
+const Appartenance appartenanceMembre = Appartenance(
+  id: 'm-1',
+  stationId: 'aaaaaaaa-0000-4000-8000-000000000001',
+  nomCaserne: 'CIS Saint-Martin',
+  role: RoleMembre.membre,
+  statut: StatutMembre.actif,
+  nomAffiche: 'Marie L.',
+);
+
+const Appartenance appartenanceDesactivee = Appartenance(
+  id: 'm-2',
+  stationId: 'aaaaaaaa-0000-4000-8000-000000000001',
+  nomCaserne: 'CIS Saint-Martin',
+  role: RoleMembre.membre,
+  statut: StatutMembre.desactive,
+);
+
+/// Un [AuthRepository] sans réseau : il compte les appels et rend ce qu'on lui
+/// a demandé de rendre.
+class FauxAuthRepository implements AuthRepository {
+  FauxAuthRepository({
+    SessionUtilisateur? session,
+    this.erreurEnvoi,
+    this.erreurVerification,
+  }) : _session = session;
+
+  /// Erreur levée par [envoyerCode], ou `null` pour réussir.
+  AuthErreur? erreurEnvoi;
+
+  /// Erreur levée par [verifierCode], ou `null` pour ouvrir une session.
+  AuthErreur? erreurVerification;
+
+  final StreamController<SessionUtilisateur?> _controleur =
+      StreamController<SessionUtilisateur?>.broadcast();
+
+  SessionUtilisateur? _session;
+
+  final List<String> emailsAppeles = <String>[];
+  final List<String> codesAppeles = <String>[];
+  int deconnexions = 0;
+
+  @override
+  Stream<SessionUtilisateur?> get sessions async* {
+    yield _session;
+    yield* _controleur.stream;
+  }
+
+  @override
+  SessionUtilisateur? get sessionCourante => _session;
+
+  @override
+  Future<void> envoyerCode(String email) async {
+    emailsAppeles.add(email);
+    final erreur = erreurEnvoi;
+    if (erreur != null) throw AuthEchec(erreur);
+  }
+
+  @override
+  Future<void> verifierCode({
+    required String email,
+    required String code,
+  }) async {
+    codesAppeles.add(code);
+    final erreur = erreurVerification;
+    if (erreur != null) throw AuthEchec(erreur);
+    ouvrirSession(
+      SessionUtilisateur(userId: sessionMembre.userId, email: email),
+    );
+  }
+
+  @override
+  Future<void> seDeconnecter() async {
+    deconnexions++;
+    _session = null;
+    _controleur.add(null);
+  }
+
+  void ouvrirSession(SessionUtilisateur session) {
+    _session = session;
+    _controleur.add(session);
+  }
+
+  void fermer() => _controleur.close();
+}
+
+/// Un [MembershipRepository] sans réseau.
+class FauxMembershipRepository implements MembershipRepository {
+  FauxMembershipRepository({
+    this.appartenances = const <Appartenance>[],
+    this.erreur,
+  });
+
+  List<Appartenance> appartenances;
+
+  /// Erreur levée à la lecture, ou `null`.
+  AuthErreur? erreur;
+
+  int lectures = 0;
+
+  @override
+  Future<List<Appartenance>> mesAppartenances(String userId) async {
+    lectures++;
+    final echec = erreur;
+    if (echec != null) throw AuthEchec(echec);
+    return appartenances;
+  }
+}
+
+/// Monte l'application entière avec des dépôts faux.
+///
+/// C'est le routeur réel qui décide de l'écran : les tests vérifient donc la
+/// redirection telle qu'elle sera vécue, sans toucher au réseau.
+Future<({FauxAuthRepository auth, FauxMembershipRepository memberships})>
+monterApp(
+  WidgetTester tester, {
+  SessionUtilisateur? session,
+  List<Appartenance> appartenances = const <Appartenance>[],
+  AuthErreur? erreurEnvoi,
+  AuthErreur? erreurVerification,
+  AuthErreur? erreurAppartenances,
+  Size taille = const Size(390, 844),
+}) async {
+  tester.view.physicalSize = taille * tester.view.devicePixelRatio;
+  addTearDown(tester.view.reset);
+
+  final auth = FauxAuthRepository(
+    session: session,
+    erreurEnvoi: erreurEnvoi,
+    erreurVerification: erreurVerification,
+  );
+  addTearDown(auth.fermer);
+  final memberships = FauxMembershipRepository(
+    appartenances: appartenances,
+    erreur: erreurAppartenances,
+  );
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        envProvider.overrideWithValue(envDeTest),
+        supabaseDemarrageProvider.overrideWithValue(SupabaseDemarrage.pret),
+        authRepositoryProvider.overrideWithValue(auth),
+        membershipRepositoryProvider.overrideWithValue(memberships),
+      ],
+      child: const AstreinteApp(),
+    ),
+  );
+  await tester.pumpAndSettle();
+
+  return (auth: auth, memberships: memberships);
+}
+
+/// Démonte l'arbre pour libérer les minuteries des contrôleurs.
+Future<void> demonter(WidgetTester tester) =>
+    tester.pumpWidget(const SizedBox.shrink());
