@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 005, 008
 - **Branche** : `feat/006-invitations-onboarding`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/7
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
