@@ -33,7 +33,22 @@ const config = {
  */
 const VERSION_SDK = '12.19.0';
 
-/* Destination par défaut quand la notification n'en porte pas. */
+/*
+ * Le service worker est enregistré à côté de l'application, quel que soit le
+ * chemin où celle-ci est servie. Tout se dérive donc de sa propre adresse, et
+ * rien n'est figé à la racine : l'hébergement du ticket 032 peut servir la PWA
+ * sous un sous-chemin sans que ce fichier bouge.
+ */
+const PORTEE = new URL('./', self.location).pathname;
+
+/*
+ * L'application sert ses routes derrière un dièse : c'est la stratégie d'URL
+ * par défaut de go_router, celle que suit déjà le lien d'invitation du
+ * ticket 006 (`APP_INVITE_PATH` = `/#/invite/{token}`). Une notification
+ * ouverte application fermée doit produire la même forme, sinon elle tombe sur
+ * une page introuvable — et c'est le seul mode de réception qui compte
+ * vraiment pour un pompier à qui on propose une astreinte.
+ */
 const ACCUEIL = '/';
 
 /* Le message convenu avec `lib/features/notifications/data/pont_web.dart`. */
@@ -64,13 +79,35 @@ if (configComplete) {
 
     return self.registration.showNotification(titre, {
       body: donnees.body || '',
-      icon: '/icons/Icon-192.png',
-      badge: '/icons/Icon-192.png',
+      icon: `${PORTEE}icons/Icon-192.png`,
+      badge: `${PORTEE}icons/Icon-192.png`,
       tag: donnees.tag || undefined,
       /* La destination voyage avec la notification : c'est elle qu'on ouvre. */
       data: { route: donnees.route || ACCUEIL },
     });
   });
+}
+
+/*
+ * L'adresse complète d'une destination interne, dièse compris.
+ *
+ * Tout ce qui n'est pas un chemin de l'application — adresse absolue, adresse
+ * de protocole, chemin à double barre oblique, qui est une autorité — retombe
+ * sur l'accueil : une notification ne doit jamais pouvoir ouvrir autre chose
+ * que cette application.
+ */
+function adresseInterne(lien) {
+  const interne =
+    typeof lien === 'string' &&
+    lien.startsWith('/') &&
+    !lien.startsWith('//') &&
+    !lien.includes('\\');
+
+  const accueil = new URL(`${PORTEE}#${ACCUEIL}`, self.location.origin);
+  if (!interne) return accueil.href;
+
+  const cible = new URL(`${PORTEE}#${lien}`, self.location.origin);
+  return cible.origin === self.location.origin ? cible.href : accueil.href;
 }
 
 /*
@@ -90,7 +127,7 @@ self.addEventListener('notificationclick', (evenement) => {
     donnees.route ||
     (donnees.FCM_MSG && donnees.FCM_MSG.data && donnees.FCM_MSG.data.route) ||
     ACCUEIL;
-  const cible = new URL(lien, self.location.origin).href;
+  const cible = adresseInterne(lien);
 
   evenement.waitUntil(
     self.clients
@@ -99,6 +136,12 @@ self.addEventListener('notificationclick', (evenement) => {
         for (const fenetre of fenetres) {
           if (new URL(fenetre.url).origin !== self.location.origin) continue;
           if ('focus' in fenetre) {
+            /*
+             * L'application est déjà ouverte : on lui poste le chemin interne
+             * (`/proposals`), qu'elle sait traduire et filtrer
+             * (`destination_push.dart`). Pas d'adresse complète ici : elle
+             * n'aurait rien à en faire.
+             */
             fenetre.postMessage({ type: TYPE_NAVIGATION, route: lien });
             return fenetre.focus();
           }
