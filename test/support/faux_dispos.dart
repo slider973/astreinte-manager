@@ -2,6 +2,7 @@ import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
+import 'package:astreinte_sp/features/dispos/domain/preferences_mois.dart';
 
 import 'faux_invitations.dart';
 
@@ -43,9 +44,11 @@ class FauxDisposRepository implements DisposRepository {
   FauxDisposRepository({
     List<PeriodeSaisie>? periodes,
     Map<CreneauCle, DisponibiliteEtat>? disponibilites,
+    Map<String, PreferencesMois>? preferences,
   }) : _periodes =
            periodes ?? <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 10)],
-       base = <CreneauCle, DisponibiliteEtat>{...?disponibilites};
+       base = <CreneauCle, DisponibiliteEtat>{...?disponibilites},
+       basePreferences = <String, PreferencesMois>{...?preferences};
 
   final List<PeriodeSaisie> _periodes;
 
@@ -62,6 +65,15 @@ class FauxDisposRepository implements DisposRepository {
   final List<List<CreneauCle>> suppressions = <List<CreneauCle>>[];
 
   int lectures = 0;
+
+  /// Les préférences « en base », par `period_id`.
+  final Map<String, PreferencesMois> basePreferences;
+
+  /// Les préférences reçues, dans l'ordre : `(period_id, valeurs)`.
+  final List<MapEntry<String, PreferencesMois>> ecrituresPreferences =
+      <MapEntry<String, PreferencesMois>>[];
+
+  int lecturesPreferences = 0;
 
   /// Erreur levée par les écritures, ou `null`.
   ErreurDispos? erreurEcriture;
@@ -138,5 +150,42 @@ class FauxDisposRepository implements DisposRepository {
       if (base.remove(cle) != null) supprimees++;
     }
     return supprimees;
+  }
+
+  @override
+  Future<Map<String, PreferencesMois>> lirePreferences({
+    required String stationId,
+    required String userId,
+    required List<String> periodIds,
+  }) async {
+    lecturesPreferences++;
+    final echec = erreurLecture;
+    if (echec != null) throw EchecDispos(echec);
+
+    return <String, PreferencesMois>{
+      for (final id in periodIds)
+        if (basePreferences.containsKey(id)) id: basePreferences[id]!,
+    };
+  }
+
+  @override
+  Future<int> enregistrerPreferences({
+    required String stationId,
+    required String userId,
+    required String periodId,
+    required PreferencesMois preferences,
+  }) async {
+    requetes++;
+    ecrituresPreferences.add(MapEntry<String, PreferencesMois>(
+      periodId,
+      preferences,
+    ));
+
+    final echec = erreurEcriture;
+    if (echec != null) throw EchecDispos(echec);
+    if (filtreSansLever) return 0;
+
+    basePreferences[periodId] = preferences;
+    return 1;
   }
 }

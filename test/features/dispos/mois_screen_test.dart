@@ -198,13 +198,16 @@ void main() {
       tester,
     ) async {
       final depot = FauxDisposRepository();
-      await ouvrirMois(tester, depot: depot);
-
-      // Quatre rangs, et non cinq : la bande de raccourcis du ticket 012
-      // occupe une soixantaine de dp entre le sélecteur et l'en-tête, donc
-      // une ligne de jour de moins est construite sur un écran de 390 × 844.
-      // Ce que le test prouve — un geste vertical coche une colonne entière
-      // sans toucher l'autre — ne dépend pas du nombre de rangs.
+      // **Fenêtre plus haute que le téléphone de référence, et c'est
+      // délibéré.** La police des tests dessine chaque glyphe comme un carré
+      // de la taille de la fonte : tout bloc de texte y est environ deux fois
+      // plus haut qu'à l'écran. Depuis que le ticket 013 pose la section des
+      // maximums dès la première case cochée, un rig de 390 × 844 ne
+      // construit plus quatre lignes de jour — alors que le vrai écran, lui,
+      // en garde trois (`design/013 § 3`, section mesurée à 94 dp). Ce que ce
+      // test prouve, c'est qu'un geste vertical coche une colonne entière
+      // sans toucher l'autre ; il lui faut des rangs, pas un téléphone.
+      await ouvrirMois(tester, depot: depot, taille: const Size(390, 1100));
       await peindre(
         tester,
         depart: caseDe(0, CreneauType.nuit),
@@ -416,7 +419,11 @@ void main() {
       (tester) async {
         final depot = FauxDisposRepository()
           ..erreurEcriture = ErreurDispos.inconnue;
-        await ouvrirMois(tester, depot: depot);
+        // Rig plus haut : bannière d'échec, sélecteur, raccourcis et section
+        // des maximums empilés au-dessus de la grille ne laissent plus de
+        // ligne de jour dans la police des tests (voir la note du geste de
+        // peinture).
+        await ouvrirMois(tester, depot: depot, taille: const Size(390, 1100));
 
         await tester.tap(caseDe(0, CreneauType.jour));
         await tester.pump(const Duration(seconds: 10));
