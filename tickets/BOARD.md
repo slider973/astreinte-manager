@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 009 | [Gestion des membres par l'admin](in-progress/009-gestion-membres.md) | P0 | 006 008 |  |
 
 ## À faire
 
@@ -54,4 +53,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 005 | [Connexion par email et code OTP](done/005-auth-otp.md) | P0 | 001 002 | https://github.com/slider973/astreinte-manager/pull/6 |
 | 006 | [Invitations et onboarding des membres](done/006-invitations-onboarding.md) | P0 | 005 008 | https://github.com/slider973/astreinte-manager/pull/7 |
 | 008 | [Row Level Security et fonctions d'accès](done/008-rls-multi-tenant.md) | P0 | 002 | https://github.com/slider973/astreinte-manager/pull/3 |
+| 009 | [Gestion des membres par l'admin](done/009-gestion-membres.md) | P0 | 006 008 |  |
 
