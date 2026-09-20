@@ -26,6 +26,7 @@ enum AuthErreur {
 
   /// Réservé au cas où le serveur dirait un jour « périmé » sans « invalide ».
   codeExpire(AppStrings.authCodeExpire),
+
   /// Le fournisseur d'envoi est coupé côté serveur. Rien à voir avec le
   /// compte de la personne : lui dire « aucun compte pour cette adresse »
   /// l'enverrait réclamer une invitation qu'elle a déjà.
@@ -117,9 +118,10 @@ AuthErreur traduireErreurAuth(Object erreur, {required AuthEtape etape}) {
   }
 
   return switch (erreur.statusCode) {
-    '400' || '401' || '403' || '422' => etape == AuthEtape.verification
-        ? AuthErreur.codeInvalide
-        : AuthErreur.emailInvalide,
+    '400' || '401' || '403' || '422' =>
+      etape == AuthEtape.verification
+          ? AuthErreur.codeInvalide
+          : AuthErreur.emailInvalide,
     _ => AuthErreur.inconnue,
   };
 }

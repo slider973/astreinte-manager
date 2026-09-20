@@ -15,10 +15,7 @@ void main() {
     });
 
     test('dateAvecJourSemaine compose la phrase annoncée', () {
-      expect(
-        dateAvecJourSemaine(DateTime(2026, 10, 10)),
-        'samedi 10 octobre',
-      );
+      expect(dateAvecJourSemaine(DateTime(2026, 10, 10)), 'samedi 10 octobre');
     });
 
     test('le premier du mois se dit « 1er »', () {

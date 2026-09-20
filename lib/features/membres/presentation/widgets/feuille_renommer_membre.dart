@@ -47,9 +47,7 @@ class _FeuilleRenommerState extends State<_FeuilleRenommer> {
 
   void _enregistrer() {
     final saisi = _controleur.text.trim();
-    Navigator.of(
-      context,
-    ).pop<NomAffiche>((nom: saisi.isEmpty ? null : saisi));
+    Navigator.of(context).pop<NomAffiche>((nom: saisi.isEmpty ? null : saisi));
   }
 
   @override

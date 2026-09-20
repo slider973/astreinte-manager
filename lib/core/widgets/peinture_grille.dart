@@ -101,6 +101,11 @@ class _PeintureGrilleState extends State<PeintureGrille>
 
   bool _enCours = false;
 
+  /// Le nombre de contacts posés sur la grille. Une peinture ne démarre
+  /// jamais à deux doigts — sinon un pincement annulerait la peinture en
+  /// cours puis en ouvrirait aussitôt une autre.
+  int _contacts = 0;
+
   /// Vrai quand le geste courant a été annulé : ses dernières mises à jour ne
   /// doivent plus rien peindre, et sa fin ne doit plus rien confirmer.
   bool _annule = false;
@@ -136,7 +141,7 @@ class _PeintureGrilleState extends State<PeintureGrille>
   // -------------------------------------------------------------------
 
   Drag? _demarrer(Offset global) {
-    if (!widget.actif) return null;
+    if (!widget.actif || _contacts > 1) return null;
 
     // Un second doigt pendant une peinture : annulation. C'est gratuit, parce
     // que rien n'est encore parti sur le réseau.
@@ -188,6 +193,10 @@ class _PeintureGrilleState extends State<PeintureGrille>
     _annule = true;
     _arreter();
     widget.onAnnulation();
+  }
+
+  void _relacher() {
+    if (_contacts > 0) _contacts--;
   }
 
   void _arreter() {
@@ -324,42 +333,57 @@ class _PeintureGrilleState extends State<PeintureGrille>
 
     if (!widget.actif) return contenu;
 
-    return MouseRegion(
-      cursor: _enCours ? SystemMouseCursors.cell : MouseCursor.defer,
-      child: RawGestureDetector(
-        gestures: <Type, GestureRecognizerFactory>{
-          DelayedMultiDragGestureRecognizer:
-              GestureRecognizerFactoryWithHandlers<
-                DelayedMultiDragGestureRecognizer
-              >(
-                () => DelayedMultiDragGestureRecognizer(
-                  delay: PeintureGrille.delaiAppuiLong,
-                  supportedDevices: const <PointerDeviceKind>{
-                    PointerDeviceKind.touch,
-                    PointerDeviceKind.unknown,
-                  },
-                  debugOwner: this,
-                ),
-                (instance) => instance.onStart = _demarrer,
-              ),
-          if (widget.pointeurFin)
-            ImmediateMultiDragGestureRecognizer:
+    return Listener(
+      // **Le second doigt annule, dès qu'il touche.**
+      //
+      // Le reconnaisseur d'appui long ne rapporte un second contact qu'après
+      // 300 ms d'immobilité : un vrai pincement, qui bouge tout de suite, ne
+      // l'atteint jamais. On écoute donc le contact brut. Tant qu'une
+      // peinture est en cours, le doigt qui l'a ouverte est encore posé :
+      // tout nouveau contact est forcément un second doigt.
+      onPointerDown: (_) {
+        _contacts++;
+        if (_enCours) _annuler();
+      },
+      onPointerUp: (_) => _relacher(),
+      onPointerCancel: (_) => _relacher(),
+      child: MouseRegion(
+        cursor: _enCours ? SystemMouseCursors.cell : MouseCursor.defer,
+        child: RawGestureDetector(
+          gestures: <Type, GestureRecognizerFactory>{
+            DelayedMultiDragGestureRecognizer:
                 GestureRecognizerFactoryWithHandlers<
-                  ImmediateMultiDragGestureRecognizer
+                  DelayedMultiDragGestureRecognizer
                 >(
-                  () => ImmediateMultiDragGestureRecognizer(
+                  () => DelayedMultiDragGestureRecognizer(
+                    delay: PeintureGrille.delaiAppuiLong,
                     supportedDevices: const <PointerDeviceKind>{
-                      PointerDeviceKind.mouse,
-                      PointerDeviceKind.stylus,
-                      PointerDeviceKind.invertedStylus,
-                      PointerDeviceKind.trackpad,
+                      PointerDeviceKind.touch,
+                      PointerDeviceKind.unknown,
                     },
                     debugOwner: this,
                   ),
                   (instance) => instance.onStart = _demarrer,
                 ),
-        },
-        child: contenu,
+            if (widget.pointeurFin)
+              ImmediateMultiDragGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<
+                    ImmediateMultiDragGestureRecognizer
+                  >(
+                    () => ImmediateMultiDragGestureRecognizer(
+                      supportedDevices: const <PointerDeviceKind>{
+                        PointerDeviceKind.mouse,
+                        PointerDeviceKind.stylus,
+                        PointerDeviceKind.invertedStylus,
+                        PointerDeviceKind.trackpad,
+                      },
+                      debugOwner: this,
+                    ),
+                    (instance) => instance.onStart = _demarrer,
+                  ),
+          },
+          child: contenu,
+        ),
       ),
     );
   }

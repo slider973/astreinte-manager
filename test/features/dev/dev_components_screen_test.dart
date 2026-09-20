@@ -60,23 +60,21 @@ Future<void> _monter(
 void main() {
   group('Route /dev/components', () {
     test('existe en développement, pas en production', () {
-      final routesDev =
-          ProviderContainer(overrides: _overrides(_dev))
-              .read(appRouterProvider)
-              .configuration
-              .routes
-              .whereType<GoRoute>()
-              .map((route) => route.path)
-              .toList();
+      final routesDev = ProviderContainer(overrides: _overrides(_dev))
+          .read(appRouterProvider)
+          .configuration
+          .routes
+          .whereType<GoRoute>()
+          .map((route) => route.path)
+          .toList();
 
-      final routesProd =
-          ProviderContainer(overrides: _overrides(_prod))
-              .read(appRouterProvider)
-              .configuration
-              .routes
-              .whereType<GoRoute>()
-              .map((route) => route.path)
-              .toList();
+      final routesProd = ProviderContainer(overrides: _overrides(_prod))
+          .read(appRouterProvider)
+          .configuration
+          .routes
+          .whereType<GoRoute>()
+          .map((route) => route.path)
+          .toList();
 
       expect(routesDev, contains(AppRoutes.devComponents));
       expect(routesProd, isNot(contains(AppRoutes.devComponents)));

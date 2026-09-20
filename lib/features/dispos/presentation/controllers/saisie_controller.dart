@@ -8,6 +8,7 @@ import '../../../../core/reseau/connectivite.dart';
 import '../../../../core/session/session_providers.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../data/dispos_repository.dart';
+import '../../data/file_locale.dart';
 import '../../domain/creneau_cle.dart';
 import '../../domain/disponibilite_mois.dart';
 import '../../domain/dispos_providers.dart';
@@ -88,6 +89,7 @@ class EtatSaisie {
     this.lectureSeule = false,
     this.refusServeur,
     this.echecPersistant = false,
+    this.filePerimee = false,
     this.annonce,
   });
 
@@ -123,6 +125,10 @@ class EtatSaisie {
 
   /// La relance automatique a échoué à son tour : la bannière apparaît.
   final bool echecPersistant;
+
+  /// Des écritures gardées sur l'appareil visaient un mois qui s'est
+  /// verrouillé entre-temps : elles ont été abandonnées, et il faut le dire.
+  final bool filePerimee;
 
   /// La dernière phrase à annoncer sans déplacer le focus.
   final String? annonce;
@@ -164,6 +170,7 @@ class EtatSaisie {
     bool? lectureSeule,
     String? Function()? refusServeur,
     bool? echecPersistant,
+    bool? filePerimee,
     String? Function()? annonce,
   }) => EtatSaisie(
     periode: periode ?? this.periode,
@@ -177,6 +184,7 @@ class EtatSaisie {
     lectureSeule: lectureSeule ?? this.lectureSeule,
     refusServeur: refusServeur == null ? this.refusServeur : refusServeur(),
     echecPersistant: echecPersistant ?? this.echecPersistant,
+    filePerimee: filePerimee ?? this.filePerimee,
     annonce: annonce == null ? this.annonce : annonce(),
   );
 }
@@ -213,6 +221,10 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   final Map<CreneauCle, DisponibiliteEtat> _file =
       <CreneauCle, DisponibiliteEtat>{};
 
+  /// Les mois dont une tranche de file est **gardée sur l'appareil**.
+  /// Sert à oublier une tranche dès qu'elle est confirmée par le serveur.
+  Set<String> _moisPersistes = <String>{};
+
   Timer? _minuteur;
   bool _envoiEnCours = false;
   int _relance = 0;
@@ -240,11 +252,59 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
 
     final appartenance = ref.watch(appartenanceCouranteProvider);
     final session = ref.watch(sessionProvider).value;
+    final periodes =
+        ref.watch(periodesProvider).value ?? const <PeriodeSaisie>[];
     final periode = ref.watch(periodeCouranteProvider);
     if (appartenance == null || session == null || periode == null) return null;
 
+    // Un changement de caserne ou d'utilisateur invalide tout : la file
+    // contient les créneaux d'un autre registre. Un changement de **mois**,
+    // lui, n'invalide rien — chaque clé porte sa date, et le dépôt écrit
+    // indifféremment des créneaux de plusieurs mois dans le même lot.
+    final autreCompte =
+        (_stationId != null && _stationId != appartenance.stationId) ||
+        (_userId != null && _userId != session.userId);
+    final premiereOuverture = _stationId == null;
+
+    if (autreCompte) {
+      _file.clear();
+      _serveur.clear();
+      _moisPersistes.clear();
+    }
     _stationId = appartenance.stationId;
     _userId = session.userId;
+
+    // Ce que l'appareil a gardé d'une session précédente. La mémoire vive
+    // prime : elle est forcément plus récente que le disque.
+    if (premiereOuverture || autreCompte) {
+      final gardee = await ref
+          .read(fileLocaleProvider)
+          .lire(stationId: appartenance.stationId, userId: session.userId);
+      for (final entree in gardee.entries) {
+        _file.putIfAbsent(entree.key, () => entree.value);
+      }
+      _moisPersistes = await ref
+          .read(fileLocaleProvider)
+          .moisEnAttente(
+            stationId: appartenance.stationId,
+            userId: session.userId,
+          );
+    }
+
+    // Une file gardée peut viser un mois qui s'est verrouillé entre-temps —
+    // le cron `lock_periods` tourne toutes les heures. La rejouer ne ferait
+    // que collectionner des refus : on l'abandonne, et on le dit.
+    final ouverts = <String>{
+      for (final ouverte in periodes)
+        if (ouverte.ouverte) ouverte.cle,
+    };
+    var perimee = false;
+    _file.removeWhere((cle, _) {
+      final abandonnee = !ouverts.contains(cle.cleMois);
+      perimee = perimee || abandonnee;
+      return abandonnee;
+    });
+    if (perimee) unawaited(_persister());
 
     final lues = await ref
         .read(disposRepositoryProvider)
@@ -255,17 +315,23 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
           mois: periode.mois,
         );
 
-    _serveur = Map<CreneauCle, DisponibiliteEtat>.of(lues);
+    // Le mois lu fait autorité pour ses propres créneaux ; on garde de ce
+    // qu'on savait des autres mois les seules clés encore en attente, parce
+    // que c'est cet état-là qui dit si un « non saisi » a une ligne à
+    // supprimer ou n'en a jamais eu.
+    _serveur = <CreneauCle, DisponibiliteEtat>{
+      for (final connu in _serveur.entries)
+        if (_file.containsKey(connu.key) && connu.key.cleMois != periode.cle)
+          connu.key: connu.value,
+      ...lues,
+    };
     _relance = 0;
 
-    // La file survit à un changement de caserne ou de session : elle ne doit
-    // pas repartir sur un autre mois que le sien.
-    _file.removeWhere(
-      (cle, _) =>
-          cle.date.year != periode.annee || cle.date.month != periode.mois,
-    );
-
     final horsLigne = !ref.read(connectiviteProvider).enLigne;
+
+    // Une file héritée d'un autre mois, d'une session précédente ou d'un
+    // envoi échoué ne dort pas : elle repart d'elle-même.
+    if (_file.isNotEmpty) _planifier();
 
     return EtatSaisie(
       periode: periode,
@@ -282,6 +348,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
           ? SyncEtat.horsLigne
           : SyncEtat.enregistrement,
       horsLigne: horsLigne,
+      filePerimee: perimee,
     );
   }
 
@@ -319,6 +386,13 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   void debutGeste() {
     final etat = _etat;
     if (etat == null || !etat.modifiable || _gesteActif) return;
+
+    // **Le minuteur déjà armé est désarmé ici.** Sans cela, une relance
+    // programmée à une seconde, ou le délai d'une touche simple faite deux
+    // cents millisecondes plus tôt, partiraient au beau milieu du geste : la
+    // base garderait des cases que l'annulation vient d'effacer de l'écran.
+    _minuteur?.cancel();
+    _minuteur = null;
 
     _gesteActif = true;
     _moisAvantGeste = etat.mois;
@@ -398,6 +472,11 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
         annonce: () => AppStrings.peintureAnnulee,
       ),
     );
+
+    // Le geste a désarmé le minuteur en s'ouvrant : ce qui attendait
+    // **avant** lui doit repartir, sinon une annulation emporterait une
+    // saisie qui n'avait rien à voir avec elle.
+    _planifier();
   }
 
   // -------------------------------------------------------------------
@@ -440,16 +519,23 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     _relance = 0;
     _minuteur?.cancel();
     _minuteur = Timer(delaiEnvoi, () => unawaited(_envoyer()));
+    // Ce qui vient d'être posé est gardé sur l'appareil avant même d'être
+    // envoyé : c'est ce que promet la bannière hors ligne.
+    unawaited(_persister());
   }
 
   /// Vide la file **immédiatement**, sans attendre le délai. Appelée quand on
   /// quitte l'écran, qu'on change de mois, ou que l'application passe en
   /// arrière-plan.
-  Future<void> viderMaintenant() async {
+  /// Rend **vrai si la file est effectivement partie**. Un appelant qui
+  /// enchaîne sur autre chose — quitter l'écran, changer de mois — doit
+  /// savoir que l'envoi a échoué plutôt que de le supposer réussi.
+  Future<bool> viderMaintenant() async {
     _minuteur?.cancel();
     _minuteur = null;
     if (_gesteActif) finGeste();
     await _envoyer();
+    return _file.isEmpty;
   }
 
   /// « Réessayer » : rejoue toute la file en attente.
@@ -460,6 +546,11 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   }
 
   Future<void> _envoyer() async {
+    // **Rien ne part pendant un geste**, quelle que soit l'origine de
+    // l'appel : un minuteur de relance, un délai encore en vol. Le geste se
+    // termine par `_planifier`, qui reprogramme ce qui a été retenu.
+    if (_gesteActif) return;
+
     final etat = _etat;
     if (etat == null || _envoiEnCours || _file.isEmpty) return;
 
@@ -524,13 +615,26 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
         }
       }
       if (suppressions.isNotEmpty && resultats[index] == 0) {
-        throw const EchecDispos(ErreurDispos.verrouille);
+        // Zéro ligne supprimée a deux causes très différentes : la RLS a
+        // filtré — mois verrouillé, caserne suspendue —, ou les lignes
+        // avaient déjà disparu. Un envoi accepté dans le même lot tranche
+        // tout de suite : la période n'est pas verrouillée, sinon il aurait
+        // été refusé lui aussi. Sans envoi pour trancher, on relit avant de
+        // conclure : accuser le verrouillage à tort coûte une bannière
+        // d'erreur et une file qui tourne en rond.
+        if (ecritures.isEmpty && await _lignesEncorePresentes(suppressions)) {
+          throw const EchecDispos(ErreurDispos.verrouille);
+        }
       }
 
       _envoiEnCours = false;
       _retirerDeLaFile(lot);
       _appliquerAuServeur(lot);
       _relance = 0;
+      // Confirmé par le serveur : l'entrée gardée sur l'appareil n'a plus
+      // de raison d'être, et rejouer une écriture déjà passée en aurait une
+      // mauvaise.
+      unawaited(_persister());
 
       final courant = _etat;
       if (courant == null) return;
@@ -624,6 +728,79 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     }
   }
 
+  /// Vrai si l'une au moins des lignes qu'on voulait supprimer est encore en
+  /// base — c'est-à-dire si la suppression a bien été **refusée**.
+  ///
+  /// Une lecture de plus, payée seulement dans le cas ambigu : un lot fait
+  /// uniquement de suppressions qui n'a rien affecté.
+  Future<bool> _lignesEncorePresentes(List<CreneauCle> cles) async {
+    final stationId = _stationId;
+    final userId = _userId;
+    if (stationId == null || userId == null || !ref.mounted) return true;
+
+    final parMois = <String, CreneauCle>{
+      for (final cle in cles) cle.cleMois: cle,
+    };
+
+    try {
+      final depot = ref.read(disposRepositoryProvider);
+      for (final exemple in parMois.values) {
+        final lues = await depot.lireMois(
+          stationId: stationId,
+          userId: userId,
+          annee: exemple.date.year,
+          mois: exemple.date.month,
+        );
+        final restantes = cles.where(
+          (cle) => cle.cleMois == exemple.cleMois && lues.containsKey(cle),
+        );
+        if (restantes.isNotEmpty) return true;
+      }
+    } on Object {
+      // Injoignable : on ne conclut pas à un succès. La file garde ses
+      // entrées et l'écran dit qu'il n'a pas pu.
+      return true;
+    }
+    return false;
+  }
+
+  /// Garde la file sur l'appareil, une tranche par mois.
+  ///
+  /// Appelée à chaque fois que la file change de façon durable : une saisie
+  /// confirmée, un geste terminé, un envoi réussi. Un mois qui n'a plus rien
+  /// en attente est **oublié**, pas réécrit vide.
+  Future<void> _persister() async {
+    final stationId = _stationId;
+    final userId = _userId;
+    if (stationId == null || userId == null || !ref.mounted) return;
+
+    final parMois = <String, Map<CreneauCle, DisponibiliteEtat>>{};
+    for (final entree in _file.entries) {
+      (parMois[entree.key.cleMois] ??=
+              <CreneauCle, DisponibiliteEtat>{})[entree.key] =
+          entree.value;
+    }
+
+    final depot = ref.read(fileLocaleProvider);
+    for (final oublie in _moisPersistes.difference(parMois.keys.toSet())) {
+      await depot.enregistrer(
+        stationId: stationId,
+        userId: userId,
+        mois: oublie,
+        entrees: const <CreneauCle, DisponibiliteEtat>{},
+      );
+    }
+    for (final tranche in parMois.entries) {
+      await depot.enregistrer(
+        stationId: stationId,
+        userId: userId,
+        mois: tranche.key,
+        entrees: tranche.value,
+      );
+    }
+    _moisPersistes = parMois.keys.toSet();
+  }
+
   void _retirerDeLaFile(Map<CreneauCle, DisponibiliteEtat> lot) {
     for (final entree in lot.entries) {
       // Une case modifiée à nouveau pendant l'envoi reste dans la file.
@@ -664,24 +841,46 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     }
   }
 
-  /// Change de mois. La file est vidée **avant** : le mois quitté ne laisse
-  /// jamais de modification derrière lui.
+  /// Change de mois.
+  ///
+  /// La file est vidée **avant** : le mois quitté ne laisse pas de
+  /// modification derrière lui. Mais si l'envoi échoue — hors ligne, serveur
+  /// muet — le changement a lieu quand même et **la file est conservée** :
+  /// chaque clé porte sa date, le dépôt écrit indifféremment des créneaux de
+  /// plusieurs mois dans le même lot, et le membre a le droit d'aller
+  /// regarder un autre mois sans perdre ce qu'il vient de déclarer.
   Future<void> choisirMois(String cle) async {
     if (!ref.mounted || ref.read(moisSelectionneProvider) == cle) return;
-    await viderMaintenant();
+
+    final partie = await viderMaintenant();
     if (!ref.mounted) return;
+    // Rien n'est parti : la file reste en attente, et elle est déjà gardée
+    // sur l'appareil. `build` la reprogrammera pour le nouveau mois.
+    if (!partie) await _persister();
+
     ref.read(moisSelectionneProvider.notifier).definir(cle);
   }
 
-  /// Relit tout depuis le serveur et **jette la file**. C'est ce que fait
-  /// « Recharger » après un refus : reprendre depuis l'état réel est le but.
+  /// Relit tout depuis le serveur, **sans jeter la file**.
+  ///
+  /// C'est ce que fait « Recharger » après un refus. La file n'est pas vidée
+  /// ici : `build` en retire les seules entrées qui visent un mois devenu
+  /// verrouillé, et le dit. Les autres — un mois toujours ouvert, une panne
+  /// passagère — sont exactement ce qu'il ne faut pas perdre.
   void recharger() {
-    _file.clear();
     _minuteur?.cancel();
     _relance = 0;
     if (!ref.mounted) return;
     ref.invalidate(periodesProvider);
     ref.invalidateSelf();
+  }
+
+  /// Accuse réception de la bannière « file périmée » : les entrées sont
+  /// déjà parties, il ne reste que la phrase à retirer.
+  void accuserFilePerimee() {
+    final etat = _etat;
+    if (etat == null || !etat.filePerimee) return;
+    _publier(etat.copyWith(filePerimee: false));
   }
 
   /// Retire l'annonce déjà lue, pour qu'une seconde peinture identique soit

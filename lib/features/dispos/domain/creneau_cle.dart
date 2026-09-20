@@ -21,8 +21,31 @@ class CreneauCle implements Comparable<CreneauCle> {
 
   final CreneauType creneau;
 
+  /// Relit une clé écrite par [toString] : `2026-10-04/nuit`.
+  ///
+  /// Rend `null` sur tout ce qui ne se relit pas. Une file gardée sur
+  /// l'appareil traverse les mises à jour de l'application : elle doit
+  /// pouvoir ignorer une entrée qu'elle ne comprend plus, jamais lever au
+  /// démarrage.
+  static CreneauCle? depuisTexte(String texte) {
+    final morceaux = texte.split('/');
+    if (morceaux.length != 2) return null;
+
+    final date = DateTime.tryParse(morceaux.first);
+    if (date == null) return null;
+
+    for (final creneau in CreneauType.values) {
+      if (creneau.name == morceaux.last) return CreneauCle(date, creneau);
+    }
+    return null;
+  }
+
   /// La date telle que Postgres l'attend : `2026-10-04`.
   String get dateIso => isoJour(date);
+
+  /// Le mois auquel la case appartient : `2026-10`. C'est la clé de la
+  /// période, et celle du rangement de la file sur l'appareil.
+  String get cleMois => '${date.year}-${date.month.toString().padLeft(2, '0')}';
 
   /// L'ordre de lecture du registre : par jour, puis jour avant nuit.
   @override

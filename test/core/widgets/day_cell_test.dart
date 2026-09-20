@@ -474,10 +474,7 @@ void main() {
       expect(_chip(tester, 0).onTap, isNull);
       expect(_chip(tester, 0).verrouille, isTrue);
       expect(
-        find.descendant(
-          of: find.byType(DayCell),
-          matching: find.byType(Focus),
-        ),
+        find.descendant(of: find.byType(DayCell), matching: find.byType(Focus)),
         findsNothing,
       );
     });

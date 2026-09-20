@@ -938,6 +938,13 @@ abstract final class AppStrings {
   static const String moisErreurEnregistrementBanniere =
       'Impossible d\'enregistrer tes disponibilités. Elles sont conservées sur '
       'ton téléphone.';
+
+  /// Des écritures gardées sur l'appareil visaient un mois qui s'est
+  /// verrouillé avant qu'elles ne partent. Nomme le problème **et** la
+  /// sortie : il n'y a plus qu'à passer par le chef de centre.
+  static const String moisFilePerimeeBanniere =
+      'Des disponibilités en attente visaient un mois désormais verrouillé. '
+      'Elles n\'ont pas été enregistrées : contacte ton chef de centre.';
   static const String moisErreurVerrouilleEnCours =
       'Le mois vient d\'être verrouillé. Tes dernières modifications n\'ont pas '
       'été enregistrées.';

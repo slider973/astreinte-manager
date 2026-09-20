@@ -386,7 +386,8 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
 
     final refus = etat.refusServeur;
     final variantes = <AppBannerVariante>[
-      if (refus != null || etat.echecPersistant) AppBannerVariante.erreur,
+      if (refus != null || etat.echecPersistant || etat.filePerimee)
+        AppBannerVariante.erreur,
       if (etat.horsLigne) AppBannerVariante.horsLigne,
       if (etat.lectureSeule && refus == null) AppBannerVariante.lectureSeule,
       if (!etat.periode.ouverte) AppBannerVariante.verrouille,
@@ -397,18 +398,32 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     if (gagnante == null) return null;
 
     return switch (gagnante) {
-      AppBannerVariante.erreur => AppBanner(
-        variante: AppBannerVariante.erreur,
-        texte: refus ?? AppStrings.moisErreurEnregistrementBanniere,
-        libelleAction: refus == null
-            ? AppStrings.actionReessayer
-            : AppStrings.actionRecharger,
-        onAction: refus == null
-            ? () => unawaited(
-                ref.read(saisieControllerProvider.notifier).reessayer(),
-              )
-            : () => ref.read(saisieControllerProvider.notifier).recharger(),
-      ),
+      // La file périmée passe devant : elle dit une perte déjà consommée,
+      // là où les deux autres disent un envoi qui peut encore aboutir.
+      AppBannerVariante.erreur => switch (0) {
+        _ when etat.filePerimee => AppBanner(
+          variante: AppBannerVariante.erreur,
+          texte: AppStrings.moisFilePerimeeBanniere,
+          libelleAction: AppStrings.actionFermer,
+          onAction: () =>
+              ref.read(saisieControllerProvider.notifier).accuserFilePerimee(),
+        ),
+        _ when refus != null => AppBanner(
+          variante: AppBannerVariante.erreur,
+          texte: refus,
+          libelleAction: AppStrings.actionRecharger,
+          onAction: () =>
+              ref.read(saisieControllerProvider.notifier).recharger(),
+        ),
+        _ => AppBanner(
+          variante: AppBannerVariante.erreur,
+          texte: AppStrings.moisErreurEnregistrementBanniere,
+          libelleAction: AppStrings.actionReessayer,
+          onAction: () => unawaited(
+            ref.read(saisieControllerProvider.notifier).reessayer(),
+          ),
+        ),
+      },
       AppBannerVariante.horsLigne => const AppBanner(
         variante: AppBannerVariante.horsLigne,
         texte: AppStrings.horsLigneDetail,

@@ -5,6 +5,7 @@ import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/session/session_utilisateur.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
+import 'package:astreinte_sp/features/dispos/data/file_locale.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/domain/dispos_providers.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
@@ -31,6 +32,7 @@ Future<ProviderContainer> ouvrir(
   WidgetTester tester, {
   required FauxDisposRepository depot,
   ConnectiviteMemoire? reseau,
+  FileLocaleMemoire? fileLocale,
 }) async {
   final conteneur = ProviderContainer(
     overrides: [
@@ -41,6 +43,7 @@ Future<ProviderContainer> ouvrir(
         (ref) => Stream<SessionUtilisateur?>.value(sessionMembre),
       ),
       disposRepositoryProvider.overrideWithValue(depot),
+      fileLocaleProvider.overrideWithValue(fileLocale ?? FileLocaleMemoire()),
       if (reseau != null) connectiviteProvider.overrideWithValue(reseau),
     ],
   );
@@ -838,6 +841,325 @@ void main() {
       expect(conteneur.read(saisieControllerProvider).value, isNull);
     });
   });
+
+  group('Bloquant 1 — changer de mois ne perd jamais la file', () {
+    testWidgets('hors ligne, la file survit au changement de mois et repart', (
+      tester,
+    ) async {
+      final depot = FauxDisposRepository(
+        periodes: <PeriodeSaisie>[
+          periodeOuverte(annee: 2026, mois: 10),
+          periodeOuverte(annee: 2026, mois: 11),
+        ],
+      )..erreurEcriture = ErreurDispos.reseau;
+      final reseau = ConnectiviteMemoire();
+      addTearDown(reseau.dispose);
+
+      final conteneur = await ouvrir(tester, depot: depot, reseau: reseau);
+      reseau.definir(enLigne: false);
+      await tester.pump();
+
+      // Dix cases peintes, hors ligne : la bannière promet un envoi au
+      // retour du réseau.
+      final controleur = pilote(conteneur)..debutGeste();
+      for (var numero = 1; numero <= 10; numero++) {
+        controleur.toucherPendantGeste(nuit(numero));
+      }
+      controleur.finGeste();
+      await tester.pump(apresLeDelai);
+      expect(etatDe(conteneur).sync, SyncEtat.horsLigne);
+
+      // Changement de mois : l'envoi échoue encore, le mois change quand
+      // même, et **la file reste intacte**.
+      await controleur.choisirMois('2026-11');
+      for (var essai = 0; essai < 20; essai++) {
+        await tester.pump();
+        if (etatDe(conteneur).periode.cle == '2026-11') break;
+      }
+      expect(etatDe(conteneur).periode.cle, '2026-11');
+
+      // Le réseau revient : les dix cases d'octobre partent.
+      depot.erreurEcriture = null;
+      reseau.definir(enLigne: true);
+      await tester.pump();
+      await tester.pump(apresLeDelai);
+
+      expect(depot.base, hasLength(10));
+      for (var numero = 1; numero <= 10; numero++) {
+        expect(
+          depot.base[nuit(numero)],
+          DisponibiliteEtat.disponible,
+          reason: 'la nuit du $numero octobre ne doit pas avoir disparu',
+        );
+      }
+    });
+
+    testWidgets('viderMaintenant dit si la file est réellement partie', (
+      tester,
+    ) async {
+      final depot = FauxDisposRepository()
+        ..erreurEcriture = ErreurDispos.reseau;
+      final conteneur = await ouvrir(tester, depot: depot);
+
+      pilote(conteneur).basculer(jour(4));
+      expect(await pilote(conteneur).viderMaintenant(), isFalse);
+
+      depot.erreurEcriture = null;
+      expect(await pilote(conteneur).viderMaintenant(), isTrue);
+      await tester.pump();
+    });
+
+    testWidgets('un envoi de deux mois part dans le même lot', (tester) async {
+      final depot = FauxDisposRepository(
+        periodes: <PeriodeSaisie>[
+          periodeOuverte(annee: 2026, mois: 10),
+          periodeOuverte(annee: 2026, mois: 11),
+        ],
+      )..erreurEcriture = ErreurDispos.reseau;
+
+      final conteneur = await ouvrir(tester, depot: depot);
+      pilote(conteneur).basculer(jour(4));
+      await tester.pump(apresLeDelai);
+
+      // Le changement de mois a lieu alors que l'envoi échoue encore.
+      await pilote(conteneur).choisirMois('2026-11');
+      for (var essai = 0; essai < 20; essai++) {
+        await tester.pump();
+        if (etatDe(conteneur).periode.cle == '2026-11') break;
+      }
+      depot
+        ..erreurEcriture = null
+        ..requetes = 0;
+
+      // Une case de novembre, alors que la file porte encore octobre.
+      pilote(
+        conteneur,
+      ).basculer(CreneauCle(DateTime(2026, 11, 4), CreneauType.jour));
+      await tester.pump(apresLeDelai);
+
+      expect(depot.requetes, 1, reason: 'les deux mois tiennent dans un lot');
+      expect(depot.base.keys.map((cle) => cle.cleMois).toSet(), <String>{
+        '2026-10',
+        '2026-11',
+      });
+    });
+  });
+
+  group('Bloquant 2 — rien ne part pendant un geste', () {
+    testWidgets('un geste ouvert juste après une touche retient l\'envoi', (
+      tester,
+    ) async {
+      final depot = FauxDisposRepository();
+      final conteneur = await ouvrir(tester, depot: depot);
+      final controleur = pilote(conteneur)..basculer(jour(4));
+
+      // Le délai de 500 ms est armé ; le geste s'ouvre 200 ms plus tard.
+      await tester.pump(const Duration(milliseconds: 200));
+      controleur
+        ..debutGeste()
+        ..toucherPendantGeste(nuit(4));
+
+      await tester.pump(const Duration(seconds: 5));
+      expect(
+        depot.requetes,
+        0,
+        reason: 'le minuteur armé avant le geste a été désarmé',
+      );
+
+      // L'annulation rend l'écran **et** la base à leur état d'avant-geste.
+      controleur.annulerGeste();
+      await tester.pump(apresLeDelai);
+
+      expect(etatDe(conteneur).etat(nuit(4)), DisponibiliteEtat.nonSaisi);
+      expect(depot.base.keys.single, jour(4));
+    });
+
+    testWidgets('une relance programmée ne part pas pendant un geste', (
+      tester,
+    ) async {
+      final depot = FauxDisposRepository()
+        ..erreurEcriture = ErreurDispos.inconnue;
+      final conteneur = await ouvrir(tester, depot: depot);
+      final controleur = pilote(conteneur)..basculer(jour(4));
+
+      await tester.pump(apresLeDelai);
+      expect(depot.requetes, 1);
+
+      // La relance est armée à 1 s. Le geste s'ouvre avant.
+      controleur
+        ..debutGeste()
+        ..toucherPendantGeste(nuit(4));
+      await tester.pump(const Duration(seconds: 5));
+
+      expect(depot.requetes, 1, reason: 'aucune relance ne part sous le doigt');
+
+      controleur.annulerGeste();
+      await tester.pump(const Duration(seconds: 10));
+      expect(etatDe(conteneur).etat(nuit(4)), DisponibiliteEtat.nonSaisi);
+    });
+  });
+
+  group('Bloquant 3 — la file est gardée sur l\'appareil', () {
+    testWidgets('une saisie est gardée avant même de partir', (tester) async {
+      final locale = FileLocaleMemoire();
+      final depot = FauxDisposRepository()
+        ..erreurEcriture = ErreurDispos.reseau;
+      final conteneur = await ouvrir(tester, depot: depot, fileLocale: locale);
+
+      pilote(conteneur).basculer(jour(4));
+      await tester.pump();
+
+      final gardee = await locale.lire(stationId: '', userId: '');
+      expect(gardee[jour(4)], DisponibiliteEtat.disponible);
+      await tester.pump(apresLeDelai);
+    });
+
+    testWidgets('une file gardée repart au démarrage suivant', (tester) async {
+      final locale = FileLocaleMemoire();
+      await locale.enregistrer(
+        stationId: '',
+        userId: '',
+        mois: '2026-10',
+        entrees: <CreneauCle, DisponibiliteEtat>{
+          nuit(7): DisponibiliteEtat.disponible,
+          jour(8): DisponibiliteEtat.absent,
+        },
+      );
+
+      final depot = FauxDisposRepository();
+      final conteneur = await ouvrir(tester, depot: depot, fileLocale: locale);
+
+      // Affichée dès l'ouverture, avant même d'être partie.
+      expect(etatDe(conteneur).etat(nuit(7)), DisponibiliteEtat.disponible);
+      expect(etatDe(conteneur).etat(jour(8)), DisponibiliteEtat.absent);
+
+      await tester.pump(apresLeDelai);
+      expect(depot.base[nuit(7)], DisponibiliteEtat.disponible);
+      expect(depot.base[jour(8)], DisponibiliteEtat.absent);
+    });
+
+    testWidgets('une entrée confirmée est oubliée du stockage', (tester) async {
+      final locale = FileLocaleMemoire();
+      final depot = FauxDisposRepository();
+      final conteneur = await ouvrir(tester, depot: depot, fileLocale: locale);
+
+      pilote(conteneur).basculer(jour(4));
+      await tester.pump(apresLeDelai);
+      await tester.pump();
+
+      expect(await locale.lire(stationId: '', userId: ''), isEmpty);
+      expect(await locale.moisEnAttente(stationId: '', userId: ''), isEmpty);
+    });
+
+    testWidgets(
+      'une file gardée sur un mois verrouillé est abandonnée, et l\'écran '
+      'le dit',
+      (tester) async {
+        final locale = FileLocaleMemoire();
+        await locale.enregistrer(
+          stationId: '',
+          userId: '',
+          mois: '2026-09',
+          entrees: <CreneauCle, DisponibiliteEtat>{
+            CreneauCle(DateTime(2026, 9, 7), CreneauType.nuit):
+                DisponibiliteEtat.disponible,
+          },
+        );
+
+        final depot = FauxDisposRepository(
+          periodes: <PeriodeSaisie>[
+            periodeVerrouillee(annee: 2026, mois: 9),
+            periodeOuverte(annee: 2026, mois: 10),
+          ],
+        );
+        final conteneur = await ouvrir(
+          tester,
+          depot: depot,
+          fileLocale: locale,
+        );
+
+        expect(etatDe(conteneur).filePerimee, isTrue);
+        await tester.pump(const Duration(seconds: 5));
+        expect(
+          depot.requetes,
+          0,
+          reason: 'on ne rejoue pas contre un mois verrouillé',
+        );
+        expect(await locale.lire(stationId: '', userId: ''), isEmpty);
+
+        pilote(conteneur).accuserFilePerimee();
+        expect(etatDe(conteneur).filePerimee, isFalse);
+      },
+    );
+
+    testWidgets('« Recharger » ne jette pas une file encore valable', (
+      tester,
+    ) async {
+      final depot = FauxDisposRepository()
+        ..erreurEcriture = ErreurDispos.inconnue;
+      final conteneur = await ouvrir(tester, depot: depot);
+
+      pilote(conteneur).basculer(jour(4));
+      await tester.pump(const Duration(seconds: 10));
+      expect(etatDe(conteneur).echecPersistant, isTrue);
+
+      depot.erreurEcriture = null;
+      pilote(conteneur).recharger();
+      for (var essai = 0; essai < 30; essai++) {
+        await tester.pump();
+        if (conteneur.read(saisieControllerProvider).hasValue) break;
+      }
+      await tester.pump(apresLeDelai);
+
+      expect(depot.base[jour(4)], DisponibiliteEtat.disponible);
+    });
+  });
+
+  group('Zéro ligne supprimée n\'est pas toujours un verrouillage', () {
+    testWidgets('une ligne déjà disparue n\'accuse pas le mois', (
+      tester,
+    ) async {
+      // La ligne est connue du serveur au chargement, puis effacée ailleurs.
+      final depot = _DepotSansLigne();
+      final conteneur = await ouvrir(tester, depot: depot);
+
+      pilote(conteneur).basculer(jour(4));
+      await tester.pump(apresLeDelai);
+      await tester.pump();
+      await tester.pump();
+
+      final etat = etatDe(conteneur);
+      expect(etat.sync, SyncEtat.enregistre);
+      expect(etat.refusServeur, isNull);
+      expect(etat.enErreur, isEmpty);
+    });
+
+    testWidgets('un envoi accepté dans le même lot innocente la période', (
+      tester,
+    ) async {
+      final depot = _DepotSuppressionMuette(
+        disponibilites: <CreneauCle, DisponibiliteEtat>{
+          jour(4): DisponibiliteEtat.absent,
+        },
+      );
+      final conteneur = await ouvrir(tester, depot: depot);
+
+      pilote(conteneur)
+        // jour(4) : absent → non saisi, donc une suppression.
+        ..basculer(jour(4))
+        // nuit(4) : non saisi → disponible, donc un envoi.
+        ..basculer(nuit(4));
+      await tester.pump(apresLeDelai);
+      await tester.pump();
+
+      expect(
+        etatDe(conteneur).sync,
+        SyncEtat.enregistre,
+        reason: 'l\'envoi accepté prouve que la période est ouverte',
+      );
+      expect(depot.lectures, 1, reason: 'aucune relecture n\'a été nécessaire');
+    });
+  });
 }
 
 /// Un dépôt qui accepte moins de lignes qu'on ne lui en donne : la clause
@@ -877,5 +1199,35 @@ class _DepotQuiSeVerrouille extends FauxDisposRepository {
     requetes++;
     _refuse = false;
     throw const EchecDispos(ErreurDispos.verrouille);
+  }
+}
+
+/// Un dépôt dont la ligne à supprimer a déjà disparu : la suppression
+/// n'affecte rien, et la relecture le confirme.
+class _DepotSansLigne extends FauxDisposRepository {
+  _DepotSansLigne()
+    : super(
+        disponibilites: <CreneauCle, DisponibiliteEtat>{
+          jour(4): DisponibiliteEtat.absent,
+        },
+      ) {
+    // Le contrôleur a lu « absent » ; quelqu'un d'autre a supprimé la ligne.
+    base.clear();
+  }
+}
+
+/// Un dépôt qui supprime pour de bon mais **rapporte zéro ligne**, comme le
+/// fait une politique RLS qui filtre. L'envoi du même lot, lui, passe.
+class _DepotSuppressionMuette extends FauxDisposRepository {
+  _DepotSuppressionMuette({super.disponibilites});
+
+  @override
+  Future<int> supprimerLot({
+    required String stationId,
+    required String userId,
+    required List<CreneauCle> cles,
+  }) async {
+    await super.supprimerLot(stationId: stationId, userId: userId, cles: cles);
+    return 0;
   }
 }

@@ -147,21 +147,18 @@ void main() {
   });
 
   group('DemarrageScreen', () {
-    testWidgets(
-      'une lecture d\'appartenances en échec n\'annonce pas « aucune '
-      'caserne »',
-      (tester) async {
-        await monterApp(
-          tester,
-          session: sessionMembre,
-          erreurAppartenances: AuthErreur.reseau,
-        );
+    testWidgets('une lecture d\'appartenances en échec n\'annonce pas « aucune '
+        'caserne »', (tester) async {
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        erreurAppartenances: AuthErreur.reseau,
+      );
 
-        expect(find.byType(DemarrageScreen), findsOneWidget);
-        expect(find.byType(AucuneCaserneScreen), findsNothing);
-        expect(find.text(AppStrings.erreurReseauTitre), findsOneWidget);
-        expect(find.text(AppStrings.actionReessayer), findsOneWidget);
-      },
-    );
+      expect(find.byType(DemarrageScreen), findsOneWidget);
+      expect(find.byType(AucuneCaserneScreen), findsNothing);
+      expect(find.text(AppStrings.erreurReseauTitre), findsOneWidget);
+      expect(find.text(AppStrings.actionReessayer), findsOneWidget);
+    });
   });
 }

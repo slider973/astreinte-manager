@@ -272,6 +272,58 @@ void main() {
       );
     });
 
+    testWidgets('un pincement annule, même si le second doigt bouge tout de '
+        'suite', (tester) async {
+      final touchees = <int>[];
+      final evenements = <String>[];
+
+      await monter(tester, _Damier(touchees: touchees, evenements: evenements));
+
+      final premier = await tester.startGesture(centre(1));
+      await tester.pump(PeintureGrille.delaiAppuiLong * 2);
+      expect(evenements, <String>['debut']);
+
+      // Un vrai pincement : le second doigt se pose **et part** aussitôt. Le
+      // reconnaisseur d'appui long ne le verrait jamais.
+      final second = await tester.startGesture(centre(8));
+      await second.moveBy(const Offset(0, -40));
+      await tester.pump();
+
+      expect(evenements, contains('annulation'));
+
+      touchees.clear();
+      await premier.moveTo(centre(5));
+      await tester.pump();
+      expect(touchees, isEmpty, reason: 'un geste annulé ne peint plus');
+
+      await premier.up();
+      await second.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('aucune nouvelle peinture ne s\'ouvre tant que deux doigts '
+        'sont posés', (tester) async {
+      final touchees = <int>[];
+      final evenements = <String>[];
+
+      await monter(tester, _Damier(touchees: touchees, evenements: evenements));
+
+      final premier = await tester.startGesture(centre(1));
+      await tester.pump(PeintureGrille.delaiAppuiLong * 2);
+      final second = await tester.startGesture(centre(8));
+      await tester.pump(PeintureGrille.delaiAppuiLong * 2);
+
+      expect(
+        evenements.where((nom) => nom == 'debut'),
+        hasLength(1),
+        reason: 'le second doigt annule, il n\'ouvre pas un second geste',
+      );
+
+      await premier.up();
+      await second.up();
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('Échap annule le geste', (tester) async {
       final touchees = <int>[];
       final evenements = <String>[];

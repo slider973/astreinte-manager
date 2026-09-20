@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
+import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
@@ -14,6 +15,7 @@ import 'package:astreinte_sp/core/widgets/peinture_grille.dart';
 import 'package:astreinte_sp/core/widgets/save_indicator.dart';
 import 'package:astreinte_sp/core/widgets/slot_chip.dart';
 import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
+import 'package:astreinte_sp/features/dispos/data/file_locale.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
@@ -41,6 +43,8 @@ Future<void> ouvrirMois(
   WidgetTester tester, {
   FauxDisposRepository? depot,
   ReperesLocaux? reperes,
+  FileLocale? fileLocale,
+  ConnectiviteMemoire? reseau,
   Size taille = const Size(390, 844),
 }) async {
   await monterApp(
@@ -48,6 +52,8 @@ Future<void> ouvrirMois(
     session: sessionMembre,
     appartenances: const <Appartenance>[appartenanceMembre],
     dispos: depot ?? FauxDisposRepository(),
+    fileLocale: fileLocale,
+    reseau: reseau,
     reperes:
         reperes ??
         ReperesLocauxMemoire(<RepereAccueil>{RepereAccueil.peintureDispos}),
@@ -533,6 +539,78 @@ void main() {
         'dim.',
         reason: 'le 1er novembre 2026 est un dimanche',
       );
+    });
+  });
+
+  group('MoisScreen — la file gardée sur l\'appareil', () {
+    testWidgets('une file gardée sur un mois verrouillé se dit en bannière', (
+      tester,
+    ) async {
+      final locale = FileLocaleMemoire();
+      await locale.enregistrer(
+        stationId: '',
+        userId: '',
+        mois: '2026-09',
+        entrees: <CreneauCle, DisponibiliteEtat>{
+          CreneauCle(DateTime(2026, 9, 7), CreneauType.nuit):
+              DisponibiliteEtat.disponible,
+        },
+      );
+
+      await ouvrirMois(
+        tester,
+        depot: FauxDisposRepository(
+          periodes: <PeriodeSaisie>[
+            periodeVerrouillee(annee: 2026, mois: 9),
+            periodeOuverte(annee: 2026, mois: 10),
+          ],
+        ),
+        fileLocale: locale,
+      );
+
+      expect(find.text(AppStrings.moisFilePerimeeBanniere), findsOneWidget);
+
+      await tester.tap(find.text(AppStrings.actionFermer));
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.moisFilePerimeeBanniere), findsNothing);
+    });
+
+    testWidgets('changer de mois hors ligne ne perd pas les cases posées', (
+      tester,
+    ) async {
+      final depot = FauxDisposRepository(
+        periodes: <PeriodeSaisie>[
+          periodeOuverte(annee: 2026, mois: 10),
+          periodeOuverte(annee: 2026, mois: 11),
+        ],
+      )..erreurEcriture = ErreurDispos.reseau;
+      final reseau = ConnectiviteMemoire();
+      addTearDown(reseau.dispose);
+      await ouvrirMois(tester, depot: depot, reseau: reseau);
+
+      reseau.definir(enLigne: false);
+      await tester.pump();
+      await tester.tap(caseDe(0, CreneauType.jour));
+      await tester.tap(caseDe(1, CreneauType.jour));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text(AppStrings.horsLigneDetail), findsOneWidget);
+
+      await choisirMois(tester, 11, 2026);
+      expect(
+        tester.widgetList<DayCell>(find.byType(DayCell)).first.nomJour,
+        'dim.',
+        reason: 'le 1er novembre 2026 est un dimanche',
+      );
+
+      // Le réseau revient : les deux cases d'octobre partent.
+      depot.erreurEcriture = null;
+      reseau.definir(enLigne: true);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      expect(depot.base.keys.map((cle) => cle.cleMois).toSet(), <String>{
+        '2026-10',
+      });
+      expect(depot.base, hasLength(2));
     });
   });
 

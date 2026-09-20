@@ -44,11 +44,7 @@ void main() {
         ActionMembre.desactiver,
       ]) {
         expect(
-          refusPour(
-            action: action,
-            membre: membreJean,
-            contexte: _seulAdmin,
-          ),
+          refusPour(action: action, membre: membreJean, contexte: _seulAdmin),
           RefusAdministration.dernierAdmin,
           reason: action.libelle,
         );
@@ -74,16 +70,19 @@ void main() {
       );
     });
 
-    test('« dernier admin » gagne sur « soi-même » : c\'est la phrase utile', () {
-      expect(
-        refusPour(
-          action: ActionMembre.retrograder,
-          membre: membreJean,
-          contexte: _seulAdmin,
-        ),
-        RefusAdministration.dernierAdmin,
-      );
-    });
+    test(
+      '« dernier admin » gagne sur « soi-même » : c\'est la phrase utile',
+      () {
+        expect(
+          refusPour(
+            action: ActionMembre.retrograder,
+            membre: membreJean,
+            contexte: _seulAdmin,
+          ),
+          RefusAdministration.dernierAdmin,
+        );
+      },
+    );
 
     test('un autre admin actif se rétrograde tant qu\'il en reste un', () {
       expect(

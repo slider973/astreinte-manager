@@ -45,10 +45,9 @@ void main() {
 
     test('2027 : lundi de Pâques en mars, pas en avril', () {
       // Pâques 2027 = 28 mars, donc le lundi de Pâques est le 29 mars.
-      expect(
-        joursFeriesDuMois(2027, 3),
-        <DateTime, String>{DateTime(2027, 3, 29): AppStrings.feriePaques},
-      );
+      expect(joursFeriesDuMois(2027, 3), <DateTime, String>{
+        DateTime(2027, 3, 29): AppStrings.feriePaques,
+      });
       expect(nomJourFerie(DateTime(2027, 4, 29)), isNull);
     });
 
@@ -78,7 +77,10 @@ void main() {
       expect(nomJourFerie(DateTime(2027)), AppStrings.feriePremierJanvier);
       expect(nomJourFerie(DateTime(2027, 5)), AppStrings.ferieFeteTravail);
       expect(nomJourFerie(DateTime(2027, 5, 8)), AppStrings.ferieVictoire1945);
-      expect(nomJourFerie(DateTime(2027, 7, 14)), AppStrings.ferieFeteNationale);
+      expect(
+        nomJourFerie(DateTime(2027, 7, 14)),
+        AppStrings.ferieFeteNationale,
+      );
       expect(nomJourFerie(DateTime(2027, 8, 15)), AppStrings.ferieAssomption);
       expect(nomJourFerie(DateTime(2027, 11)), AppStrings.ferieToussaint);
       expect(nomJourFerie(DateTime(2027, 11, 11)), AppStrings.ferieArmistice);
