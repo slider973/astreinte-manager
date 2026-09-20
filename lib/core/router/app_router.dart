@@ -20,6 +20,7 @@ import '../../features/onboarding/presentation/installation_screen.dart';
 import '../../features/onboarding/presentation/profil_accueil_screen.dart';
 import '../../features/parametres/presentation/parametres_screen.dart';
 import '../../features/periodes/presentation/periodes_screen.dart';
+import '../../features/planning/presentation/matrice_screen.dart';
 import '../env.dart';
 import '../session/email.dart';
 import '../session/etat_auth.dart';
@@ -77,6 +78,16 @@ abstract final class AppRoutes {
   /// Tout ce qui est réservé aux administrateurs de la caserne. La garde est
   /// dans `redirectionAuth` : ce préfixe **est** la règle.
   static const String prefixeAdmin = '/admin';
+
+  /// **La vue centrale de l'admin** : la matrice des disponibilités du mois
+  /// (ticket 016). C'est l'écran d'atterrissage de la destination « Admin » —
+  /// écart assumé à `DESIGN.md § Navigation`, qui la faisait tomber sur
+  /// l'annuaire : la destination doit tomber sur le travail. Les trois autres
+  /// écrans restent à un clic dans la barre d'application.
+  ///
+  /// Le mois voyage en `?mois=AAAA-MM` ([parametreMois]).
+  static const String planningAdmin = '/admin/planning';
+  static const String planningAdminName = 'planningAdmin';
 
   /// Administration de la caserne : les membres et les invitations
   /// (ticket 006).
@@ -254,6 +265,13 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: AppRoutes.planningAdmin,
+        name: AppRoutes.planningAdminName,
+        builder: (context, state) => MatriceScreen(
+          mois: state.uri.queryParameters[AppRoutes.parametreMois],
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.membres,
         name: AppRoutes.membresName,
         builder: (context, state) => const MembresScreen(),
@@ -323,8 +341,8 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
           redirect: (context, state) =>
               destinationInterne(
                 state.uri.path,
-                admin: ref.read(appartenanceCouranteProvider)?.estAdmin ??
-                    false,
+                admin:
+                    ref.read(appartenanceCouranteProvider)?.estAdmin ?? false,
               ) ??
               AppRoutes.accueil,
         ),

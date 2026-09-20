@@ -1036,16 +1036,14 @@ abstract final class AppStrings {
 
   // --- Confirmation -------------------------------------------------------
 
-  static String raccourciConfirmerEffacerTitre(int n) => n <= 1
-      ? 'Effacer 1 saisie ?'
-      : 'Effacer $n saisies ?';
+  static String raccourciConfirmerEffacerTitre(int n) =>
+      n <= 1 ? 'Effacer 1 saisie ?' : 'Effacer $n saisies ?';
   static const String raccourciConfirmerEffacerTexte =
       'Les cases redeviennent « non saisi ». Tu pourras annuler juste après.';
   static const String raccourciConfirmerEffacerAction = 'Effacer';
 
-  static String raccourciConfirmerCopieTitre(int n) => n <= 1
-      ? 'Remplacer 1 saisie ?'
-      : 'Remplacer $n saisies ?';
+  static String raccourciConfirmerCopieTitre(int n) =>
+      n <= 1 ? 'Remplacer 1 saisie ?' : 'Remplacer $n saisies ?';
   static const String raccourciConfirmerCopieTexte =
       'Le mois précédent prend la place de ce que tu as saisi. Tu pourras '
       'annuler juste après.';
@@ -1055,9 +1053,8 @@ abstract final class AppStrings {
 
   /// « 22 cases mises à jour ». Le même compte que la peinture, parce que
   /// c'est le même geste vu de plus loin.
-  static String raccourciResultat(int n) => n <= 1
-      ? '$n case mise à jour'
-      : '$n cases mises à jour';
+  static String raccourciResultat(int n) =>
+      n <= 1 ? '$n case mise à jour' : '$n cases mises à jour';
 
   /// L'annonce complète, pour le lecteur d'écran : le compte, le raccourci,
   /// et la sortie.
@@ -1241,8 +1238,7 @@ abstract final class AppStrings {
 
   static const String periodeActionVerrouiller = 'Verrouiller';
 
-  static String periodeVerrouillerTitre(String mois) =>
-      'Verrouiller $mois ?';
+  static String periodeVerrouillerTitre(String mois) => 'Verrouiller $mois ?';
 
   static const String periodeVerrouillerTexte =
       'Les membres ne pourront plus modifier leurs disponibilités. Toi, tu '
@@ -1446,9 +1442,8 @@ abstract final class AppStrings {
   /// mais le nombre réel est annoncé aux lecteurs d'écran.
   static const String centreOuvrir = 'Notifications';
 
-  static String centreNonLuesBadge(int n) => n <= 1
-      ? '$n notification non lue'
-      : '$n notifications non lues';
+  static String centreNonLuesBadge(int n) =>
+      n <= 1 ? '$n notification non lue' : '$n notifications non lues';
 
   /// Le compte de l'en-tête de liste. Il dit combien de lignes suivent, et
   /// combien restent à lire.
@@ -1485,4 +1480,164 @@ abstract final class AppStrings {
   /// Une notification dont le titre est vide. Le canal interne en garantit un,
   /// mais une ligne écrite à la main n'en aurait pas.
   static const String centreSansTitre = 'Notification';
+
+  // -------------------------------------------------------------------
+  // Matrice des disponibilités de l'admin (ticket 016)
+  // -------------------------------------------------------------------
+
+  // --- Écran et navigation ---------------------------------------------
+
+  static const String matriceTitre = 'Planning du mois';
+  static const String matriceRafraichir = 'Rafraîchir';
+  static const String matriceVersMembres = 'Membres de la caserne';
+  static const String matriceVersParametres = 'Réglages de la caserne';
+  static const String matriceVersPeriodes = 'Mois de saisie';
+  static const String matriceVersPlanning = 'Planning du mois';
+  static const String matriceReserveAdmin =
+      'Cet écran est réservé aux administrateurs de la caserne.';
+
+  // --- Barre de commande ------------------------------------------------
+
+  static const String matriceRechercheLibelle = 'Rechercher un membre';
+  static const String matriceRechercheEffacer = 'Effacer la recherche';
+  static const String matriceMasquerNonSaisis =
+      'Masquer ceux qui n\'ont rien saisi';
+  static const String matriceAfficherCommentaires = 'Commentaires';
+  static const String matriceTrier = 'Trier';
+  static const String matriceTriNom = 'Nom';
+  static const String matriceTriAstreintes = 'Astreintes restantes';
+  static const String matriceTriWeekends = 'Weekends restants';
+  static const String matriceToutAfficher = 'Tout afficher';
+  static const String matriceEcranLarge =
+      'La matrice complète s\'ouvre sur un écran large.';
+
+  /// « 47 membres sur 60 ». Affiché dès qu'un filtre masque quelqu'un.
+  static String matriceCompteFiltre(int n, int total) =>
+      '$n membre${n > 1 ? 's' : ''} sur $total';
+
+  // --- En-têtes et légende ----------------------------------------------
+
+  static const String matriceColonneMembre = 'Membre';
+  static const String matriceColonneAstreintes = 'Astr.';
+  static const String matriceColonneWeekends = 'W-E';
+  static const String matriceLigneDisponibles = 'Disponibles';
+  static const String matriceLegendeTitre = 'Légende';
+
+  // --- Quotas et commentaire --------------------------------------------
+
+  static String matriceQuotaAstreintes(int reste, int max) =>
+      '$reste astreinte${reste > 1 ? 's' : ''} restante${reste > 1 ? 's' : ''} '
+      'sur $max';
+
+  static String matriceQuotaAstreintesAtteint(int max) =>
+      'Quota d\'astreintes atteint : $max sur $max';
+
+  static String matriceQuotaAstreintesDepasse(int n) =>
+      '$n astreinte${n > 1 ? 's' : ''} au-delà de ce qu\'il acceptait';
+
+  static String matriceQuotaWeekends(int reste, int max) =>
+      '$reste weekend${reste > 1 ? 's' : ''} restant${reste > 1 ? 's' : ''} '
+      'sur $max';
+
+  static String matriceQuotaWeekendsAtteint(int max) =>
+      'Quota de weekends atteint : $max sur $max';
+
+  static String matriceQuotaWeekendsDepasse(int n) =>
+      '$n weekend${n > 1 ? 's' : ''} au-delà de ce qu\'il acceptait';
+
+  /// Aucun plafond déclaré : la charge se dit seule, sans barre de fraction.
+  static String matriceQuotaSansPlafond(int n) =>
+      '$n astreinte${n > 1 ? 's' : ''} ce mois, pas de plafond';
+
+  static String matriceQuotaWeekendsSansPlafond(int n) =>
+      '$n weekend${n > 1 ? 's' : ''} ce mois, pas de plafond';
+
+  static String matriceChargePrecedente(int n) =>
+      '$n astreinte${n > 1 ? 's' : ''} acceptée${n > 1 ? 's' : ''} sur les '
+      'trois mois précédents';
+
+  static const String matriceCommentaireVide = 'Pas de commentaire ce mois';
+
+  // --- Saisie à la place d'un membre ------------------------------------
+
+  static const String matriceModeSaisie = 'Saisir à la place d\'un membre';
+  static const String matriceModeSaisieActif =
+      'Tu saisis à la place des membres. Chaque modification est enregistrée '
+      'à ton nom.';
+  static const String matriceModeSaisieQuitter = 'Quitter le mode saisie';
+  static const String matriceConfirmationTitre =
+      'Saisir à la place d\'un membre';
+  static const String matriceConfirmationTexte =
+      'Tu vas modifier les disponibilités d\'un autre pompier. Chaque '
+      'modification est enregistrée à ton nom dans l\'historique de la '
+      'caserne. Le membre n\'est pas prévenu.';
+  static const String matriceConfirmationValider = 'Saisir à sa place';
+  static const String matriceConfirmationAnnuler = 'Annuler';
+  static const String matriceCaseSaisieParAdmin = 'Saisi par un administrateur';
+  static const String matriceSaisieIndisponibleTactile =
+      'Saisie possible sur écran large avec une souris, ou depuis la vue par '
+      'jour.';
+  static const String matriceSaisieIndisponibleSuspendue =
+      'Caserne suspendue : lecture seule.';
+  static const String matriceSaisieIndisponibleHorsLigne =
+      'Hors ligne : la saisie reprendra au retour du réseau.';
+
+  // --- États vides, erreurs, faits --------------------------------------
+
+  static const String matriceAucunePeriodeTitre = 'Aucun mois ouvert';
+  static const String matriceAucunePeriodeTexte =
+      'Ouvre un mois de saisie pour commencer à construire un planning.';
+  static const String matriceAucunePeriodeAction = 'Ouvrir un mois';
+  static const String matriceAucunMembreTitre = 'Aucun membre actif';
+  static const String matriceAucunMembreTexte =
+      'Invite des pompiers pour qu\'ils saisissent leurs disponibilités.';
+  static const String matriceAucunMembreAction = 'Inviter un membre';
+  static const String matriceAucunResultatTitre = 'Aucun membre ne correspond';
+  static const String matriceErreurTexte = 'Impossible de charger la matrice.';
+  static const String matriceErreurEcriture =
+      'Impossible d\'enregistrer cette case.';
+  static const String matriceMoisIntrouvable = 'Ce mois n\'existe plus.';
+
+  static String matriceMoisViergeTexte(String mois) =>
+      'Personne n\'a encore saisi $mois.';
+
+  static String matriceAucunResultatTexte(String recherche) =>
+      'Aucun membre ne correspond à « $recherche ».';
+
+  /// Le verrouillage **n'inerte pas** la matrice de l'admin : le PRD § 6.3 lui
+  /// donne explicitement le droit de saisir sur un mois fermé.
+  static String matriceVerrouilleTexte(String date) =>
+      'Saisie verrouillée depuis le $date. Tu peux encore saisir à la place '
+      'd\'un membre.';
+
+  // --- Sémantique --------------------------------------------------------
+
+  /// « Marie Lefebvre, samedi 4 octobre, nuit, disponible ».
+  static String matriceCaseSemantique({
+    required String membre,
+    required String jourEtDate,
+    required String creneau,
+    required String etat,
+  }) => '$membre, $jourEtDate, ${creneau.toLowerCase()}, ${etat.toLowerCase()}';
+
+  static String matriceCaseAction(String etatSuivant) =>
+      'Appuie pour le marquer ${etatSuivant.toLowerCase()}';
+
+  static String matriceDisponiblesSemantique({
+    required String jourEtDate,
+    required String creneau,
+    required int n,
+  }) =>
+      '$jourEtDate, ${creneau.toLowerCase()} : $n disponible${n > 1 ? 's' : ''}';
+
+  static String matriceDisponiblesAucun({
+    required String jourEtDate,
+    required String creneau,
+  }) => '$jourEtDate, ${creneau.toLowerCase()} : personne de disponible';
+
+  static String matriceLigneSemantique({
+    required String nom,
+    required String quotas,
+    required String commentaire,
+  }) => '$nom. $quotas. $commentaire';
 }

@@ -251,6 +251,13 @@ export type Database = {
             foreignKeyName: "availability_preferences_period_id_fkey"
             columns: ["period_id"]
             isOneToOne: false
+            referencedRelation: "v_member_load"
+            referencedColumns: ["period_id"]
+          },
+          {
+            foreignKeyName: "availability_preferences_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
             referencedRelation: "v_period_completion"
             referencedColumns: ["period_id"]
           },
@@ -671,6 +678,13 @@ export type Database = {
             foreignKeyName: "schedules_period_id_fkey"
             columns: ["period_id"]
             isOneToOne: false
+            referencedRelation: "v_member_load"
+            referencedColumns: ["period_id"]
+          },
+          {
+            foreignKeyName: "schedules_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
             referencedRelation: "v_period_completion"
             referencedColumns: ["period_id"]
           },
@@ -856,6 +870,38 @@ export type Database = {
           },
         ]
       }
+      v_member_load: {
+        Row: {
+          accepted_previous: number | null
+          max_shifts: number | null
+          max_weekends: number | null
+          month: number | null
+          period_id: string | null
+          shifts_count: number | null
+          shifts_left: number | null
+          station_id: string | null
+          user_id: string | null
+          weekend_units: number | null
+          weekends_left: number | null
+          year: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "periods_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_period_completion: {
         Row: {
           active_members: number | null
@@ -880,6 +926,25 @@ export type Database = {
       accept_invitation: {
         Args: { p_email: string; p_token: string; p_user_id: string }
         Returns: Json
+      }
+      availability_matrix: {
+        Args: { p_period: string; p_station: string }
+        Returns: {
+          accepted_previous: number
+          comment: string
+          day_slots: string
+          display_name: string
+          first_name: string
+          last_name: string
+          max_shifts: number
+          max_weekends: number
+          night_slots: string
+          shifts_count: number
+          shifts_left: number
+          user_id: string
+          weekend_units: number
+          weekends_left: number
+        }[]
       }
       create_invitation: {
         Args: {
@@ -924,9 +989,11 @@ export type Database = {
         Returns: number
       }
       cron_lock_periods: { Args: { p_reference?: string }; Returns: number }
+      est_jour_ferie: { Args: { p_date: string }; Returns: boolean }
       is_admin: { Args: { p_station: string }; Returns: boolean }
       is_member: { Args: { p_station: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      jours_feries_fr: { Args: { p_annee: number }; Returns: string[] }
       mask_email: { Args: { p_email: string }; Returns: string }
       notification_outbox_recipients_valides: {
         Args: { p_recipients: Json }
@@ -981,6 +1048,7 @@ export type Database = {
       notify_endpoint: { Args: never; Returns: Record<string, unknown> }
       notify_internal_secret: { Args: never; Returns: string }
       notify_post: { Args: { p_outbox: string }; Returns: boolean }
+      paques_gregorien: { Args: { p_annee: number }; Returns: string }
       period_deadline_at: {
         Args: {
           p_deadline_day: number
@@ -1004,6 +1072,7 @@ export type Database = {
       }
       station_settings_valid: { Args: { p_settings: Json }; Returns: boolean }
       station_writable: { Args: { p_station: string }; Returns: boolean }
+      unite_weekend: { Args: { p_date: string }; Returns: string }
     }
     Enums: {
       assignment_status:

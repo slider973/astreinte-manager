@@ -85,6 +85,9 @@ Une migration poussée sur `main` n'est jamais modifiée : on en crée une nouve
 | `0011_station_settings.sql` | ticket 010 : `station_settings_valid` et la contrainte `stations_settings_valide`, nom non vide, trigger `stations_check_timezone`, `period_deadline_at`, trigger `stations_recalcule_deadlines` |
 | `0012_cron_periodes.sql` | ticket 014 : `cron_create_periods`, `cron_lock_periods`, `create_period`, triggers `periods_guard_transition` et `periods_audit_reouverture`, `set_by` imposé sur `availabilities` et audit de la saisie pour autrui, tâches `pg_cron` `create_periods` et `lock_periods` |
 | `0013_periodes_completion_audit.sql` | revue du ticket 014 : vue `v_period_completion`, triggers `periods_audit_creation` / `periods_audit_suppression`, date limite qui ne recule plus dans le passé sur un mois ouvert |
+| `0014_notifications_envoi.sql` | ticket 025 : `notification_outbox`, `notify`, `notify_post`, `notify_claim`, `notify_complete`, `cron_dispatch_notifications`, secrets Vault et tâche `dispatch_notifications` |
+| `0016_cron_rappels_saisie.sql` | ticket 015 : `cron_availability_reminders` et la tâche `availability_reminders` (push J-3, courriel J-1) |
+| `0017_matrice_admin.sql` | ticket 016 : calendrier français calculé (`paques_gregorien`, `jours_feries_fr`, `est_jour_ferie`, `unite_weekend`), vue `v_member_load`, fonction `availability_matrix` |
 
 RLS est activé sur chaque table dès sa création et toutes les tables ont au moins une
 politique depuis `0007`. Les politiques sont posées `to authenticated` : `anon` ne lit rien,
@@ -155,6 +158,14 @@ destinataires, clé de dédoublonnage idempotente, relecture qui n'a lieu qu'une
 reprise qui respecte le verrou et abandonne au bout de cinq tentatives, fermeture de la
 file à tout client. `notify_post` y est remplacée le temps du test par une version sans
 appel HTTP : la CI n'a ni Edge Functions ni réseau sortant.
+
+`supabase/tests/matrice_admin_test.sql` couvre la matrice de l'admin (`0017`, ticket 016) :
+parité du calendrier français avec le Dart sur quinze années de fériés, les trois règles de
+l'unité de weekend, la forme de la matrice (une ligne par membre actif, deux chaînes d'un
+caractère par jour, longueur suivant le mois), `v_member_load` (proposé + accepté, unités de
+weekend, restes nuls ou négatifs, historique borné à trois mois, cloisonnement d'un pompier
+servant dans deux casernes), les droits des deux côtés, et une **mesure** de performance sur
+soixante membres × trente et un jours × deux créneaux.
 
 `deno test supabase/functions/tests/` couvre la logique pure des Edge Functions — libellés
 français par type, regroupement, liens profonds, classement des erreurs FCM, enchaînement

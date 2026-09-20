@@ -178,7 +178,13 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
 
   void _versDestination(int index, List<AppDestination> destinations) {
     final destination = destinations[index];
-    if (destination.route == _routeAdmin) return;
+    if (destination.route == _routeAdmin) {
+      // « Admin » ouvre la matrice du mois (ticket 016) : sans cela, la
+      // destination ne ferait rien depuis un écran admin, et la vue centrale
+      // serait inatteignable autrement que par la barre d'application.
+      context.goNamed(AppRoutes.planningAdminName);
+      return;
+    }
 
     // Les autres destinations vivent encore dans l'accueil (ticket 005) :
     // on y retourne en disant quel onglet ouvrir, pour ne pas ramener

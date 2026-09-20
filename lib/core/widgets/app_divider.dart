@@ -43,6 +43,17 @@ class AppDivider extends StatelessWidget {
       indent = 0,
       endIndent = 0;
 
+  /// Filet de colonne figée : 2 dp, porteur d'état, vertical. Il marque la
+  /// limite entre une colonne qui ne bouge pas et une grille qui défile
+  /// dessous (ticket 016). Jamais une ombre portée : la profondeur n'est pas
+  /// le matériau de ce système.
+  const AppDivider.colonneFigee({super.key})
+    : _axe = Axis.vertical,
+      _epaisseur = AppStroke.etat,
+      porteurEtat = true,
+      indent = 0,
+      endIndent = 0;
+
   final Axis _axe;
   final double _epaisseur;
 

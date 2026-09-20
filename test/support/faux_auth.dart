@@ -31,6 +31,8 @@ import 'package:astreinte_sp/features/parametres/data/parametres_repository.dart
 import 'package:astreinte_sp/features/parametres/domain/parametres_providers.dart';
 import 'package:astreinte_sp/features/periodes/data/periodes_repository.dart';
 import 'package:astreinte_sp/features/periodes/domain/periodes_providers.dart';
+import 'package:astreinte_sp/features/planning/data/matrice_repository.dart';
+import 'package:astreinte_sp/features/planning/domain/matrice_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -198,6 +200,7 @@ Future<AppMontee> monterApp(
   AuthErreur? erreurEnvoi,
   AuthErreur? erreurVerification,
   AuthErreur? erreurAppartenances,
+
   /// Simule un démarrage à froid : la session n'arrive qu'à l'appel de
   /// `faux.auth.ouvrirSession(...)`.
   bool sessionEnAttente = false,
@@ -206,6 +209,7 @@ Future<AppMontee> monterApp(
   ProfilRepository? profils,
   ParametresRepository? parametres,
   PeriodesRepository? periodes,
+  MatriceRepository? matrice,
   DisposRepository? dispos,
   FileLocale? fileLocale,
   Connectivite? reseau,
@@ -258,6 +262,8 @@ Future<AppMontee> monterApp(
           parametresRepositoryProvider.overrideWithValue(parametres),
         if (periodes != null)
           periodesRepositoryProvider.overrideWithValue(periodes),
+        if (matrice != null)
+          matriceRepositoryProvider.overrideWithValue(matrice),
         // L'onglet 0 est désormais « Mon mois » : sans faux dépôt, il
         // toucherait un client Supabase qui n'existe pas en test.
         disposRepositoryProvider.overrideWithValue(
@@ -313,6 +319,7 @@ Future<AppMontee> monterApp(
 Future<void> ouvrirRoute(
   WidgetTester tester,
   String chemin, {
+
   /// À passer à faux quand l'écran d'arrivée porte un squelette de
   /// chargement : son balayage tourne en boucle et `pumpAndSettle` ne rend
   /// jamais la main.

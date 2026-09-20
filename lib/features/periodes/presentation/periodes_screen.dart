@@ -128,7 +128,11 @@ class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
   }
 
   void _versDestination(int index, List<AppDestination> destinations) {
-    if (destinations[index].route == _routeAdmin) return;
+    if (destinations[index].route == _routeAdmin) {
+      // « Admin » ouvre la matrice du mois (ticket 016).
+      context.goNamed(AppRoutes.planningAdminName);
+      return;
+    }
     context.goNamed(
       AppRoutes.accueilName,
       queryParameters: <String, String>{AppRoutes.parametreOnglet: '$index'},
