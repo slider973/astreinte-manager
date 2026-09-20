@@ -769,18 +769,83 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
 
 ## 6. Vues
 
-### `v_availability_matrix` — matrice admin d'un mois
+### `availability_matrix(p_station, p_period)` — matrice admin d'un mois *(migration `0017`, ticket 016)*
 
-Une ligne par (membre actif, date, créneau) du mois, avec le statut de disponibilité
-(`available`, `absent`, `null` = non saisi), et les préférences du membre.
-Paramétrée via une fonction `availability_matrix(p_station uuid, p_period uuid)`
-plutôt qu'une vue pour porter les filtres.
+Une fonction `security definer` et non une vue : elle porte le contrôle d'accès (`forbidden`
+si l'appelant n'est pas admin de la caserne, `period_not_found` si la période n'est pas la
+sienne) et les filtres.
 
-### `v_member_load` — charge d'un membre
+**Une ligne par membre actif**, et non par cellule. Le document annonçait « une ligne par
+(membre actif, date, créneau) » ; la mesure a tranché autrement au ticket 016. À 60 membres ×
+31 jours × 2 créneaux, une ligne par cellule fait 3 720 objets JSON qui répètent chacun le
+membre, la date et le créneau — ~410 ko sur le fil et autant de `Map` à construire en Dart,
+pour une grille qui se relit ensuite cellule par cellule à chaque image. Le mois est donc
+encodé en **deux chaînes de longueur fixe**, un caractère par jour :
 
-Par (station, user, period) : nombre d'astreintes acceptées ou proposées, nombre de
-weekends distincts couverts, quotas déclarés, quotas restants, et nombre d'astreintes
-acceptées sur les 3 périodes précédentes (pour l'équilibrage).
+| Colonne | Type | Contenu |
+|---|---|---|
+| `user_id` | `uuid` | membre actif de la caserne |
+| `display_name` | `text` | surnom de la caserne, à défaut « prénom nom » |
+| `first_name`, `last_name` | `text` | le profil, pour trier ou chercher autrement |
+| `comment` | `text` | le commentaire du mois écrit par le membre (§ 2.7), `null` s'il n'en a pas |
+| `max_shifts`, `max_weekends` | `integer` | plafonds déclarés, `null` = illimité |
+| `shifts_count`, `weekend_units` | `integer` | charge du mois |
+| `shifts_left`, `weekends_left` | `integer` | restes, `null` si illimité, **négatifs** si dépassés |
+| `accepted_previous` | `integer` | astreintes acceptées sur les trois mois précédents |
+| `day_slots`, `night_slots` | `text` | un caractère par jour du mois : `.` non saisi, `D` disponible, `A` absent |
+
+La position `i` (0 en tête) de `day_slots` et `night_slots` est le jour `i + 1` ; leur longueur
+est le nombre de jours du mois. Les sept colonnes de quotas **viennent de `v_member_load`**,
+elles n'en sont pas une seconde écriture.
+
+La fonction ne saisit pas : l'admin qui touche une cellule écrit dans `availabilities` par
+l'upsert habituel, autorisé par `availabilities_*_admin` et tracé par `availabilities_trace_auteur`
+(§ 5).
+
+### `v_member_load` — charge d'un membre *(migration `0017`, ticket 016)*
+
+Par (station, user actif, period), toujours une ligne même sans attribution ni préférence :
+`shifts_count` (astreintes proposées **ou** acceptées du mois), `weekend_units` (unités de
+weekend distinctes couvertes), `max_shifts` / `max_weekends` (plafonds déclarés, `null` =
+illimité), `shifts_left` / `weekends_left` (plafond moins charge — `null` si illimité, négatif
+si dépassé, parce que le PRD § 5.3 autorise l'admin à passer outre avec avertissement) et
+`accepted_previous` (astreintes **acceptées** sur les trois mois calendaires précédents, pour
+le tri des candidats du ticket 017 et l'équilibrage du 018).
+
+« Les trois périodes précédentes » se lit « les trois mois calendaires précédents » : un mois
+qu'une caserne n'aurait pas ouvert n'a pas fait disparaître les astreintes tenues, et faire
+dépendre un historique de l'existence de lignes dans `periods` le rendrait faux au premier trou.
+
+`security_invoker = true`, comme les autres vues. Les nombres ne sont donc justes que pour un
+**admin** ; un membre y voit les lignes de ses collègues avec des plafonds `null` et des charges
+à zéro — vue partielle, pas fuite. **Lue directement par un client, elle coûte un ordre de
+grandeur de plus** que lue depuis `availability_matrix` : la RLS d'`assignments` et de `shifts`
+(trois politiques permissives, deux `exists`, `is_admin()` non inlinable) est réévaluée sur
+chaque ligne examinée. Les écrans qui en ont besoin passent par une fonction `security definer`
+qui contrôle l'admin en tête, ou par la clé de service.
+
+#### Le calendrier français, en base *(migration `0017`)*
+
+`weekend_units` suppose une définition de l'unité de weekend, et elle doit être **exactement**
+celle du client (`lib/features/dispos/domain/disponibilite_mois.dart`, ticket 013) : samedi et
+dimanche forment une seule unité désignée par son samedi, un férié du lundi au vendredi forme
+la sienne, un férié tombant un samedi ou un dimanche ne double pas l'unité.
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `paques_gregorien` | `(p_annee integer) returns date` `immutable` | Dimanche de Pâques, comput de Meeus/Butcher. Miroir de `paquesGregorien()`. |
+| `jours_feries_fr` | `(p_annee integer) returns date[]` `immutable` | Les onze fériés métropolitains. Alsace-Moselle non traitée, comme côté application. |
+| `est_jour_ferie` | `(p_date date) returns boolean` `immutable` | Miroir de `estJourFerie()`. |
+| `unite_weekend` | `(p_date date) returns date` `immutable` | L'unité de weekend d'une date, `null` si le jour n'en fait partie d'aucune. Miroir de `uniteWeekend()`. |
+
+**Calculées, jamais tabulées** : l'application ouvre des mois deux mois à l'avance,
+indéfiniment, et une table de fériés sur trois ans périmerait en silence — un weekend
+disparaîtrait du compteur sans qu'aucune requête n'échoue.
+
+Le même nombre étant produit des deux côtés, la parité est **testée** des deux côtés contre un
+corpus unique de quinze années : `supabase/tests/matrice_admin_test.sql § 1-2` et
+`test/core/l10n/jours_feries_parite_base_test.dart` portent la même table, et l'un des deux
+rougit dès que l'un des deux calculs bouge.
 
 ### `v_member_last_availability` — dernière saisie d'un membre *(migration `0010`, ticket 009)*
 
@@ -862,6 +927,16 @@ Les index listés dans les DDL couvrent :
 - l'écran propositions : `assignments (user_id, status)`,
 - le centre de notifications : `notifications (user_id) where read_at is null`.
 
+La matrice du ticket 016 n'a demandé **aucun index de plus** : mesurée sur soixante membres,
+trente et un jours, deux créneaux et toutes les cellules saisies, `availability_matrix` rend
+ses soixante lignes en ~25 ms (`supabase/tests/matrice_admin_test.sql § 6`). Ce qui manquait
+n'était pas un index mais un **prédicat** : les jointures latérales de `v_member_load` joignent
+`shifts` par sa clé primaire et restreignent la date ; sans `s.station_id = p.station_id`, le
+planificateur n'a aucune raison de se servir de `shifts (station_id, date)` et parcourt la table
+entière, toutes casernes confondues, une fois par membre. Le prédicat est redondant du point de
+vue des données (la RLS de `0008` impose déjà la cohérence des `station_id`) et déterminant du
+point de vue du plan.
+
 Realtime activé sur `assignments`, `schedules`, `notifications` uniquement, filtré par
 `station_id` côté client. Aucune table n'est encore dans la publication `supabase_realtime`
 (elle sera posée avec les plannings, ticket 017).
@@ -890,14 +965,22 @@ Ordre proposé :
 12. `0012_cron_periodes.sql` (ticket 014 : `cron_create_periods`, `cron_lock_periods`, `create_period`, transitions et audit des périodes, `set_by` imposé sur `availabilities`, les deux tâches `pg_cron` des périodes)
 13. `0013_periodes_completion_audit.sql` (revue du ticket 014 : vue `v_period_completion`, audit de la création et de la suppression d'une période, date limite qui ne recule plus dans le passé)
 14. `0014_notifications_envoi.sql` (ticket 025 : `notification_outbox`, `notify`, `notify_post`, `notify_claim`, `notify_complete`, `cron_dispatch_notifications`, secrets Vault et tâche `dispatch_notifications`)
-15. `0015_views.sql` (les trois vues restantes du § 6)
+15. ~~`0015_views.sql`~~ — rang resté vide, voir ci-dessous
 16. `0016_cron_rappels_saisie.sql` (ticket 015 : `cron_availability_reminders` et la tâche `availability_reminders`)
-17. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
+17. `0017_matrice_admin.sql` (ticket 016 : calendrier français en base, vue `v_member_load`, fonction `availability_matrix`)
+18. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
     `late_responders_report` (ticket 022), `archive_schedules` et `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
 poussée sur `main` ne se renumérote pas.
+
+**Le rang 15 restera vide.** Il annonçait « les trois vues restantes du § 6 » en un fichier ;
+elles appartiennent à trois tickets (016 pour la matrice et `v_member_load`, 017 pour
+`v_schedule_progress`), et `0016` a été poussée sur `main` avant que le 016 ne commence.
+Intercaler un `0015` après coup donnerait un dépôt dont l'ordre des fichiers n'est plus celui
+des applications — la CLI refuserait la migration en retard sur un projet hébergé. Le ticket
+016 prend donc le rang `0017`, et `v_schedule_progress` viendra avec les plannings.
 
 Le rang 16 annonçait « les cinq tâches restantes du § 8 » en une migration. Elles
 appartiennent à quatre tickets différents : les réunir obligerait soit à écrire du code
@@ -913,8 +996,9 @@ dès qu'une politique fuit). Les fonctions d'invitation de `0009` sont couvertes
 `supabase/tests/memberships_admin_test.sql`, les paramètres de caserne de `0011` par
 `supabase/tests/station_settings_test.sql` le cycle de vie des périodes de `0012` par
 `supabase/tests/periods_cron_test.sql` et le chemin d'appel des notifications de `0014`
-par `supabase/tests/notifications_test.sql` et les rappels de saisie de `0016` par
-`supabase/tests/availability_reminders_test.sql`, joués par le même script. La logique pure
+par `supabase/tests/notifications_test.sql`, les rappels de saisie de `0016` par
+`supabase/tests/availability_reminders_test.sql` et la matrice de `0017` par
+`supabase/tests/matrice_admin_test.sql`, joués par le même script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge
