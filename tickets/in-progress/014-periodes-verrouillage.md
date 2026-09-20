@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 008, 010
 - **Branche** : `feat/014-periodes-verrouillage`
+- **Statut** : en cours depuis 2026-09-20
 
 ## À faire
 - Migration 0009 (partie 1) : cron `create_periods` et `lock_periods`.
