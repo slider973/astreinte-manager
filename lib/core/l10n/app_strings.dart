@@ -1640,4 +1640,155 @@ abstract final class AppStrings {
     required String quotas,
     required String commentaire,
   }) => '$nom. $quotas. $commentaire';
+
+  // -------------------------------------------------------------------
+  // Construction du planning en brouillon (ticket 017)
+  // -------------------------------------------------------------------
+
+  // --- Création du planning ---------------------------------------------
+
+  static String planningCreer(String mois) => 'Créer le planning de $mois';
+
+  /// Ce que le bouton va faire, écrit avant qu'on l'actionne. Le nombre est
+  /// celui du mois affiché : 56, 60 ou 62, jamais un 62 supposé.
+  static String planningCreerDetail(int creneaux) =>
+      '$creneaux créneaux seront créés, un par jour et par créneau, avec '
+      'l\'effectif requis de tes réglages.';
+
+  static String planningCreeTexte(String mois, int creneaux) =>
+      'Planning de $mois créé : $creneaux créneaux.';
+
+  // --- La ligne des créneaux --------------------------------------------
+
+  static const String planningLigneCreneaux = 'Créneaux';
+  static const String planningAPourvoir = 'À pourvoir';
+  static const String planningPourvu = 'Pourvu';
+  static const String planningSurPourvu = 'Sur-pourvu';
+
+  /// « 0/1 ». Au-delà de 9 — impossible dans une caserne — le nombre est
+  /// tronqué plutôt que de déborder sa case de 28 px.
+  static String planningFraction(int pourvus, int requis) =>
+      '${_chiffreCase(pourvus)}/${_chiffreCase(requis)}';
+
+  static String _chiffreCase(int valeur) => valeur > 9 ? '9+' : '$valeur';
+
+  /// « 2 attribués sur 1 requis ».
+  static String planningCouvertureCompte(int pourvus, int requis) =>
+      '$pourvus attribué${pourvus > 1 ? 's' : ''} sur $requis requis';
+
+  static String planningCouvertureSemantique({
+    required String jourEtDate,
+    required String creneau,
+    required int pourvus,
+    required int requis,
+    required String etat,
+  }) =>
+      '$jourEtDate, ${creneau.toLowerCase()} : '
+      '${planningCouvertureCompte(pourvus, requis)}, ${etat.toLowerCase()}';
+
+  static const String planningCouvertureAction =
+      'Appuie pour voir les candidats';
+
+  // --- Le panneau du créneau --------------------------------------------
+
+  static const String planningPanneauFermer = 'Fermer le panneau du créneau';
+  static const String planningEffectifRequis = 'Effectif requis';
+  static const String planningEffectifDetail = 'Ne change que ce créneau.';
+  static const String planningEffectifMoins = 'Diminuer l\'effectif requis';
+  static const String planningEffectifPlus = 'Augmenter l\'effectif requis';
+  static const String planningEffectifMinimum =
+      'Zéro : aucune astreinte requise ce créneau.';
+  static const String planningEffectifMaximum =
+      'Cinquante au maximum, comme dans les réglages de la caserne.';
+
+  static String planningSectionAttribues(int n) => 'Attribués ($n)';
+  static String planningSectionDisponibles(int n) => 'Disponibles ($n)';
+  static String planningSectionNonDisponibles(int n) =>
+      'Non disponibles ($n)';
+
+  static const String planningAucunAttribue = 'Personne pour l\'instant.';
+  static const String planningAttribuer = 'Attribuer';
+  static const String planningAttribuerQuandMeme = 'Attribuer quand même';
+  static const String planningRetirer = 'Retirer';
+  static const String planningRetireeTexte = 'Attribution retirée';
+  static const String planningAnnulerRetrait = 'Annuler';
+  static const String planningQuotaAtteint = 'Quota atteint';
+  static const String planningQuotaDepasse = 'Quota dépassé';
+
+  /// La ligne de mesures d'un candidat : « 2/3 astr. · 1/1 w-e · 4 sur 3 mois ».
+  /// L'absence de barre de fraction dit l'illimité, comme dans la matrice.
+  static String planningCandidatMesures({
+    required int? astreintesRestantes,
+    required int? maxAstreintes,
+    required int astreintes,
+    required int? weekendsRestants,
+    required int? maxWeekends,
+    required int unitesWeekend,
+    required int accepteesPrecedentes,
+  }) => <String>[
+    maxAstreintes == null
+        ? '$astreintes astr.'
+        : '${astreintesRestantes ?? 0}/$maxAstreintes astr.',
+    maxWeekends == null
+        ? '$unitesWeekend w-e'
+        : '${weekendsRestants ?? 0}/$maxWeekends w-e',
+    '$accepteesPrecedentes sur 3 mois',
+  ].join(' · ');
+
+  static const String planningAucunDisponibleTitre =
+      'Personne n\'est disponible';
+  static const String planningAucunDisponibleTexte =
+      'Aucun pompier ne s\'est déclaré disponible sur ce créneau.';
+  static const String planningVoirNonDisponibles = 'Voir les non disponibles';
+
+  // --- Attribuer hors disponibilité --------------------------------------
+
+  static const String planningHorsDispoTitre =
+      'Attribuer hors des disponibilités';
+
+  /// Ne pas avoir répondu n'est pas avoir dit non : les deux phrases ne se
+  /// confondent jamais. C'est le mécanisme central du produit.
+  static String planningHorsDispoTexte({
+    required String membre,
+    required String jourEtDate,
+    required String creneau,
+    required bool absent,
+  }) =>
+      '$membre ${absent ? 's\'est déclaré absent' : 'n\'a pas saisi ses '
+                'disponibilités'} '
+      '$jourEtDate, ${creneau.toLowerCase()}. La proposition lui parviendra '
+      'comme aux autres et il pourra la refuser. Cette attribution est '
+      'enregistrée à ton nom dans l\'historique de la caserne.';
+
+  static const String planningHorsDispoValider = 'Attribuer quand même';
+  static const String planningHorsDispoAnnuler = 'Annuler';
+
+  // --- Le temps réel ------------------------------------------------------
+
+  static const String planningDirect = 'Direct';
+  static const String planningDirectDetail =
+      'Les modifications des autres administrateurs arrivent à l\'écran.';
+  static const String planningDirectInterrompu = 'Direct interrompu';
+  static const String planningDirectInterrompuDetail =
+      'Les modifications des autres administrateurs n\'arrivent plus. '
+      'Rafraîchis pour voir l\'état réel.';
+
+  static String planningModifieDistant(String qui) =>
+      'Modifié à l\'instant par $qui.';
+  static const String planningModifieDistantAnonyme =
+      'Modifié à l\'instant par un autre administrateur.';
+
+  // --- Erreurs et raisons -------------------------------------------------
+
+  static const String planningErreurTexte =
+      'Impossible de charger le planning.';
+  static const String planningDejaAttribue =
+      'Ce membre est déjà attribué à ce créneau.';
+  static const String planningPublieDetail =
+      'Planning publié : la modification d\'un créneau publié arrive avec la '
+      'publication.';
+  static const String planningSaisieHorsLigne =
+      'Hors ligne : l\'attribution reprendra au retour du réseau.';
+  static const String planningSaisieTactile =
+      'Ouvre un créneau depuis la vue par jour pour l\'attribuer.';
 }

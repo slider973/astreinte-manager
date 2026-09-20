@@ -9,9 +9,12 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_divider.dart';
 import '../../../../core/widgets/slot_chip.dart';
 import '../../domain/cle_cellule.dart';
+import '../../domain/creneau_planning.dart';
 import '../../domain/ligne_matrice.dart';
 import '../../domain/matrice_mois.dart';
+import '../../domain/planning_mois.dart';
 import 'entete_ligne_membre.dart';
+import 'ligne_creneaux.dart';
 import 'ligne_disponibles.dart';
 
 /// **La vue par jour** — ce que le chef voit sur son téléphone.
@@ -34,6 +37,9 @@ class VueJour extends StatefulWidget {
     required this.erreurs,
     required this.saisieActive,
     required this.onCase,
+    required this.planning,
+    required this.creneauSelectionne,
+    required this.onCreneau,
     super.key,
     this.enTete,
   });
@@ -60,6 +66,14 @@ class VueJour extends StatefulWidget {
   final Set<CleCellule> erreurs;
   final bool saisieActive;
   final ValueChanged<CleCellule> onCase;
+
+  /// Le planning du mois. Sur un téléphone, ses deux créneaux du jour sont des
+  /// **cibles de 48 dp**, pas des cases de 28 px : la matrice n'existe pas
+  /// ici, le panneau s'ouvre d'ici.
+  final PlanningMois planning;
+
+  final String? creneauSelectionne;
+  final ValueChanged<String> onCreneau;
 
   /// La barre de commande, posée en tête du défilement. Sur un téléphone,
   /// elle défile avec le reste : la fixer ne laisserait plus de place aux
@@ -129,6 +143,16 @@ class _VueJourState extends State<VueJour> {
           ),
         ),
         const SliverToBoxAdapter(child: AppDivider()),
+        if (widget.planning.existe)
+          SliverToBoxAdapter(
+            child: BlocCreneauxJour(
+              planning: widget.planning,
+              jour: _jour,
+              date: date,
+              selectionne: widget.creneauSelectionne,
+              onCreneau: widget.onCreneau,
+            ),
+          ),
         SliverPersistentHeader(
           pinned: true,
           delegate: _EnteteCreneaux(
@@ -493,6 +517,155 @@ class _Case extends StatelessWidget {
             )
           : null,
       onTap: saisieActive ? () => onCase(cle) : null,
+    );
+  }
+}
+
+/// Les deux créneaux du jour affiché, en cibles de **48 dp**.
+///
+/// C'est le seul accès au panneau des candidats sous 840 dp, et il est en
+/// pleine cible tactile : attribuer est un geste court, sur un objet unique,
+/// avec une liste — exactement ce qu'un téléphone fait bien. Un chef qui reçoit
+/// un refus le samedi soir doit pouvoir réattribuer depuis sa cuisine.
+class BlocCreneauxJour extends StatelessWidget {
+  const BlocCreneauxJour({
+    required this.planning,
+    required this.jour,
+    required this.date,
+    required this.selectionne,
+    required this.onCreneau,
+    super.key,
+  });
+
+  final PlanningMois planning;
+  final int jour;
+  final DateTime date;
+  final String? selectionne;
+  final ValueChanged<String> onCreneau;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: _BoutonCreneau(
+              couverture: planning.couverture(jour, CreneauType.jour),
+              creneau: CreneauType.jour,
+              date: date,
+              selectionne: selectionne,
+              onCreneau: onCreneau,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.entreCibles),
+          Expanded(
+            child: _BoutonCreneau(
+              couverture: planning.couverture(jour, CreneauType.nuit),
+              creneau: CreneauType.nuit,
+              date: date,
+              selectionne: selectionne,
+              onCreneau: onCreneau,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BoutonCreneau extends StatelessWidget {
+  const _BoutonCreneau({
+    required this.couverture,
+    required this.creneau,
+    required this.date,
+    required this.selectionne,
+    required this.onCreneau,
+  });
+
+  final ({CreneauPlanning creneau, int pourvus, EtatCouverture etat})?
+  couverture;
+  final CreneauType creneau;
+  final DateTime date;
+  final String? selectionne;
+  final ValueChanged<String> onCreneau;
+
+  @override
+  Widget build(BuildContext context) {
+    final valeur = couverture;
+    if (valeur == null) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final descripteurCreneau = context.statuts.creneau(creneau);
+    final descripteur = descripteurCouverture(
+      context,
+      valeur.etat,
+      personne: valeur.pourvus == 0 && valeur.etat == EtatCouverture.aPourvoir,
+    );
+    final choisi = selectionne == valeur.creneau.id;
+
+    return Semantics(
+      key: ValueKey<String>('creneau-${valeur.creneau.id}'),
+      button: true,
+      selected: choisi,
+      label: AppStrings.planningCouvertureSemantique(
+        jourEtDate: dateAvecJourSemaine(date),
+        creneau: descripteurCreneau.libelle,
+        pourvus: valeur.pourvus,
+        requis: valeur.creneau.effectifRequis,
+        etat: descripteur.libelle,
+      ),
+      onTapHint: AppStrings.planningCouvertureAction,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: () => onCreneau(valeur.creneau.id),
+        borderRadius: AppRadius.controleRadius,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: AppTouch.cible),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.controleRadius,
+            border: Border.all(
+              color: choisi
+                  ? theme.colorScheme.primary
+                  : context.statuts.filetDecoratif,
+              width: choisi ? AppStroke.etat : AppStroke.filet,
+            ),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                descripteurCreneau.icone,
+                size: AppTouch.icone,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  descripteurCreneau.libelle,
+                  style: AppTextStyles.corpsSecondaire,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              PastilleCouverture(
+                descripteur: descripteur,
+                pourvus: valeur.pourvus,
+                requis: valeur.creneau.effectifRequis,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
