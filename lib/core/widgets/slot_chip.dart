@@ -92,6 +92,7 @@ class SlotChip extends StatelessWidget {
     this.erreur = false,
     this.onTap,
     this.onDragEnter,
+    this.onRefus,
     this.actionSemantique,
   });
 
@@ -123,6 +124,14 @@ class SlotChip extends StatelessWidget {
 
   final VoidCallback? onTap;
 
+  /// Appelé quand la case est **verrouillée** et qu'on appuie dessus.
+  ///
+  /// La case reste non modifiable : elle ne prend pas le focus, n'a pas
+  /// d'état pressé et ne s'annonce pas comme une bascule. Mais elle
+  /// **répond** — une case inerte qui ne dit rien laisse croire à une panne,
+  /// et le doigt recommence (ticket 014).
+  final VoidCallback? onRefus;
+
   /// Appelé quand un glissement de sélection entre dans la case.
   ///
   /// La case ne démarre **jamais** un glissement elle-même : elle publie ce
@@ -146,6 +155,7 @@ class SlotChip extends StatelessWidget {
     );
 
     final actionnable = _actionnable(context);
+    final refus = verrouille ? onRefus : null;
     final apparence = _Apparence.resoudre(
       context,
       etat: etat,
@@ -193,12 +203,22 @@ class SlotChip extends StatelessWidget {
       enabled: actionnable,
       toggled: etat == DisponibiliteEtat.disponible,
       selected: selectionne,
+      // Une case verrouillée reste activable par un lecteur d'écran : c'est
+      // par là qu'arrive l'explication du refus, comme au doigt.
+      onTap: refus,
       excludeSemantics: true,
       // Hors interaction, il ne reste que le Semantics et la peinture : pas de
-      // Focus, pas de MouseRegion, pas de GestureDetector.
+      // Focus, pas de MouseRegion, pas de GestureDetector — et pour une case
+      // verrouillée qui explique son refus, un seul détecteur d'appui.
       child: actionnable
           ? _Actionnable(onTap: onTap!, dessiner: dessiner)
-          : dessiner(focalise: false),
+          : refus == null
+          ? dessiner(focalise: false)
+          : GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: refus,
+              child: dessiner(focalise: false),
+            ),
     );
   }
 }

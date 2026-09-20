@@ -97,6 +97,7 @@ class EtatSaisie {
     this.raccourciEnCours,
     this.messageRaccourci,
     this.preferences = const EtatPreferences(),
+    this.refusSaisie = 0,
   });
 
   final PeriodeSaisie periode;
@@ -163,6 +164,15 @@ class EtatSaisie {
   /// faire. La moitié du produit qui manquait (ticket 013).
   final EtatPreferences preferences;
 
+  /// Le nombre d'appuis refusés parce que le mois est verrouillé ou la
+  /// caserne en lecture seule (ticket 014).
+  ///
+  /// Un **compteur** et non un message : la phrase se compose à l'écran, qui
+  /// connaît déjà le mois et la cause. Ce qu'il faut publier ici, c'est
+  /// l'événement — et deux appuis de suite doivent rejouer la phrase, donc un
+  /// booléen ne suffirait pas.
+  final int refusSaisie;
+
   bool get enPeinture => pinceau != null;
 
   /// Vrai quand la grille accepte une saisie.
@@ -206,6 +216,7 @@ class EtatSaisie {
     PorteeRaccourci? Function()? raccourciEnCours,
     String? Function()? messageRaccourci,
     EtatPreferences? preferences,
+    int? refusSaisie,
   }) => EtatSaisie(
     periode: periode ?? this.periode,
     mois: mois ?? this.mois,
@@ -230,6 +241,7 @@ class EtatSaisie {
         ? this.messageRaccourci
         : messageRaccourci(),
     preferences: preferences ?? this.preferences,
+    refusSaisie: refusSaisie ?? this.refusSaisie,
   );
 }
 
@@ -553,6 +565,21 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   // -------------------------------------------------------------------
   // La touche
   // -------------------------------------------------------------------
+
+  /// **Un appui sur une case qu'on ne peut plus changer.**
+  ///
+  /// La grille du ticket 011 rendait ces cases inertes : l'appui ne faisait
+  /// rien du tout. Le critère d'acceptation du ticket 014 demande une erreur
+  /// claire, et un doigt qui n'obtient rien n'apprend rien — il recommence.
+  ///
+  /// Rien n'est envoyé au serveur : la période lue dit déjà que c'est fermé,
+  /// et un aller-retour pour se faire dire non par la RLS n'apprendrait rien
+  /// de plus, tout en faisant attendre.
+  void refuserSaisie() {
+    final etat = _etat;
+    if (etat == null || etat.modifiable) return;
+    _publier(etat.copyWith(refusSaisie: etat.refusSaisie + 1));
+  }
 
   /// Fait avancer une case d'un cran :
   /// `non saisi → disponible → absent → non saisi`.
