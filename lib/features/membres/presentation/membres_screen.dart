@@ -23,8 +23,13 @@ import 'widgets/ligne_membre.dart';
 /// L'écran « Membres » de la destination Admin.
 ///
 /// Deux listes qui ne se confondent pas : qui est dans la caserne, et qui a
-/// été invité sans avoir encore rejoint. Les invitations ne sont pas répliquées
-/// en temps réel (`docs/SCHEMA.md § 9`) : chaque action relit la liste.
+/// été invité sans avoir encore rejoint.
+///
+/// Les invitations ne sont pas répliquées en temps réel
+/// (`docs/SCHEMA.md § 9`) : **personne ne prévient l'admin quand un invité
+/// accepte**. L'écran relit donc à son ouverture (le provider est
+/// auto-disposé), au retour de l'application au premier plan, et après chaque
+/// action.
 class MembresScreen extends ConsumerStatefulWidget {
   const MembresScreen({super.key});
 
@@ -36,6 +41,31 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
   /// L'invitation sur laquelle une action est en cours : ses deux boutons
   /// sont inertes le temps de l'aller-retour.
   String? _occupee;
+
+  /// Le retour de l'application au premier plan relit les deux listes.
+  ///
+  /// C'est le seul moment où l'écran peut apprendre qu'un invité a accepté
+  /// pendant qu'il était rangé : rien ne pousse cette information (voir
+  /// `MembresController`). L'ouverture de l'écran, elle, est couverte par
+  /// l'auto-disposition du provider.
+  late final AppLifecycleListener _cycleDeVie;
+
+  @override
+  void initState() {
+    super.initState();
+    _cycleDeVie = AppLifecycleListener(onResume: _relire);
+  }
+
+  @override
+  void dispose() {
+    _cycleDeVie.dispose();
+    super.dispose();
+  }
+
+  void _relire() {
+    if (!mounted) return;
+    unawaited(ref.read(membresControllerProvider.notifier).rafraichir());
+  }
 
   Future<void> _agir(
     Invitation invitation,
@@ -103,9 +133,7 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
       onDestination: (int index) => _versDestination(index, destinations),
       actions: <Widget>[
         IconButton(
-          onPressed: () => unawaited(
-            ref.read(membresControllerProvider.notifier).rafraichir(),
-          ),
+          onPressed: _relire,
           icon: const Icon(Icons.refresh),
           tooltip: AppStrings.membresRafraichir,
         ),
@@ -118,9 +146,7 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
               variante: AppBannerVariante.erreur,
               texte: AppStrings.membresErreurTexte,
               libelleAction: AppStrings.actionReessayer,
-              onAction: () => unawaited(
-                ref.read(membresControllerProvider.notifier).rafraichir(),
-              ),
+              onAction: _relire,
             )
           : null,
       filActions: admin
@@ -151,9 +177,7 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
       return etat.hasError
           ? EmptyState.erreur(
               texte: AppStrings.membresErreurTexte,
-              onAction: () => unawaited(
-                ref.read(membresControllerProvider.notifier).rafraichir(),
-              ),
+              onAction: _relire,
             )
           : const _SqueletteMembres();
     }

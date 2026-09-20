@@ -41,7 +41,15 @@ class ResultatAction {
 ///
 /// **Pas de temps réel sur les invitations** : `docs/SCHEMA.md § 9` les tient
 /// hors de la réplication, parce que le canal ne saurait pas masquer le jeton.
-/// Chaque action relit donc les deux listes.
+/// La fraîcheur est donc portée par trois relectures, et non par un
+/// abonnement :
+///
+/// 1. **à l'ouverture de l'écran** — le provider est auto-disposé, donc son
+///    état meurt avec le dernier écran qui l'observe et [build] rejoue la
+///    lecture au retour. C'est le point qui compte : personne côté admin
+///    n'est prévenu quand un invité accepte ;
+/// 2. **au retour de l'application au premier plan** (`MembresScreen`) ;
+/// 3. **après chaque action** — envoi, renvoi, annulation.
 class MembresController extends AsyncNotifier<EtatMembres> {
   @override
   Future<EtatMembres> build() async {
@@ -138,10 +146,14 @@ class MembresController extends AsyncNotifier<EtatMembres> {
   }
 }
 
+/// Auto-disposé : sans cela, l'état survivrait à la navigation et l'écran
+/// rouvert montrerait la liste d'il y a dix minutes — avec l'invitation d'une
+/// personne déjà entrée dans la caserne.
 final AsyncNotifierProvider<MembresController, EtatMembres>
 membresControllerProvider =
     AsyncNotifierProvider<MembresController, EtatMembres>(
       MembresController.new,
+      isAutoDispose: true,
     );
 
 /// Vrai si l'utilisateur courant administre une caserne. L'écran « Membres »

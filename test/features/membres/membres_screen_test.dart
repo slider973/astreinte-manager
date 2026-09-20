@@ -4,6 +4,7 @@ import 'package:astreinte_sp/features/membres/domain/invitation.dart';
 import 'package:astreinte_sp/features/membres/domain/membre_caserne.dart';
 import 'package:astreinte_sp/features/membres/presentation/membres_screen.dart';
 import 'package:astreinte_sp/features/membres/presentation/widgets/ligne_invitation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -178,6 +179,64 @@ void main() {
       expect(depot.annulations, <String>['i-1']);
       expect(find.text(AppStrings.invitationAnnulee), findsOneWidget);
       expect(find.text('recrue@exemple.fr'), findsNothing);
+    });
+
+    testWidgets('revenir sur l\'écran relit les deux listes', (tester) async {
+      final depot = FauxMembresRepository(
+        membresActifs: const <MembreCaserne>[membreJean],
+        invitations: <Invitation>[invitationEnAttente()],
+      );
+      await _ouvrirMembres(tester, depot: depot);
+      expect(find.text('recrue@exemple.fr'), findsOneWidget);
+      final lecturesInitiales = depot.lectures;
+
+      // L'invité accepte pendant que l'admin est ailleurs : personne ne
+      // prévient l'écran, seule la relecture le fera savoir.
+      depot
+        ..invitations = <Invitation>[]
+        ..membresActifs = const <MembreCaserne>[membreJean, membreMarie];
+
+      await ouvrirRoute(tester, '/');
+      expect(find.byType(MembresScreen), findsNothing);
+
+      await ouvrirRoute(tester, _cheminMembres);
+
+      expect(depot.lectures, greaterThan(lecturesInitiales));
+      expect(find.text('recrue@exemple.fr'), findsNothing);
+      expect(find.text('Marie Lefebvre'), findsOneWidget);
+    });
+
+    testWidgets('le retour au premier plan relit les deux listes', (
+      tester,
+    ) async {
+      final depot = FauxMembresRepository(
+        membresActifs: const <MembreCaserne>[membreJean],
+        invitations: <Invitation>[invitationEnAttente()],
+      );
+      await _ouvrirMembres(tester, depot: depot);
+      final lecturesInitiales = depot.lectures;
+
+      depot
+        ..invitations = <Invitation>[]
+        ..membresActifs = const <MembreCaserne>[membreJean, membreMarie];
+
+      // La suite complète d'un rangement puis d'un retour, telle que la
+      // plateforme l'envoie : sauter une étape casse l'assertion du framework.
+      for (final etat in <AppLifecycleState>[
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(etat);
+      }
+      await tester.pumpAndSettle();
+
+      expect(depot.lectures, greaterThan(lecturesInitiales));
+      expect(find.text('recrue@exemple.fr'), findsNothing);
+      expect(find.text('Marie Lefebvre'), findsOneWidget);
     });
 
     testWidgets('une annulation refusée ne ment pas', (tester) async {
