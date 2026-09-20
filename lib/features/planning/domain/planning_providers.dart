@@ -46,6 +46,28 @@ creneauSelectionneProvider = NotifierProvider<CreneauSelectionne, String?>(
   CreneauSelectionne.new,
 );
 
+/// L'attribution que la prochaine réattribution vient réparer, ou `null`.
+///
+/// Elle est posée quand le panneau s'ouvre **depuis une ligne du suivi** : le
+/// chef a montré du doigt un refus précis, et le lien `replaced_by` doit
+/// pointer celui-là. Ouvert depuis la matrice, où aucune attribution n'est
+/// désignée, l'état reste nul et c'est la base qui rattache la nouvelle
+/// attribution au plus ancien refus non encore couvert (migration 0020).
+/// **Elle se pose à chaque ouverture, y compris à `null`.** Un `ref.watch` sur
+/// le créneau sélectionné remettrait l'état à zéro à contretemps — le notifier
+/// se reconstruit après la frame, donc après l'écriture de l'écran. Ouvrir un
+/// panneau est un geste : il dit ce qu'il répare, ou il dit qu'il ne répare
+/// rien.
+class CibleReattribution extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void viser(String? attributionId) => state = attributionId;
+}
+
+final NotifierProvider<CibleReattribution, String?> cibleReattributionProvider =
+    NotifierProvider<CibleReattribution, String?>(CibleReattribution.new);
+
 /// Un changement arrivé par le canal temps réel, sur le créneau ouvert.
 ///
 /// [auteurId] est nul quand on ne peut pas le savoir : une suppression ne
@@ -469,6 +491,96 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
     }
   }
 
+  /// Réattribue un créneau d'un planning publié.
+  ///
+  /// **Le geste le plus lourd de l'écran après la publication** : il fait
+  /// sonner un téléphone et il ne se défait pas. Rien n'est donc posé par
+  /// avance — pas d'attribution locale optimiste comme en brouillon : une ligne
+  /// qui apparaît puis disparaît laisserait croire qu'une notification est
+  /// partie.
+  ///
+  /// Rend le compte rendu, ou `null` en cas d'échec : c'est l'écran qui choisit
+  /// la surface.
+  Future<ResultatReattribution?> reattribuer({
+    required String creneauId,
+    required String userId,
+    String? ancienneId,
+  }) async {
+    final courant = state.value;
+    if (courant == null) return null;
+
+    state = AsyncValue<EtatPlanning?>.data(
+      courant.copie(
+        sync: SyncEtat.enregistrement,
+        effacerMessage: true,
+        effacerDistant: true,
+      ),
+    );
+
+    try {
+      final resultat = await ref
+          .read(planningRepositoryProvider)
+          .reattribuer(
+            creneauId: creneauId,
+            userId: userId,
+            ancienneId: ancienneId,
+          );
+
+      final apres = state.value;
+      if (!ref.mounted || apres == null) return resultat;
+      state = AsyncValue<EtatPlanning?>.data(
+        apres.copie(
+          planning: apres.planning.avecAttribution(resultat.attribution),
+          sync: SyncEtat.enregistre,
+        ),
+      );
+      return resultat;
+    } on EchecPlanning catch (echec) {
+      _echouer(echec);
+      // Une course perdue — l'adjoint a réattribué le premier — se répare en
+      // relisant, pas en gardant une image fausse à l'écran.
+      if (echec.erreur == ErreurPlanning.dejaRemplacee ||
+          echec.erreur == ErreurPlanning.dejaAttribue) {
+        unawaited(rafraichir());
+      }
+      return null;
+    }
+  }
+
+  /// Annule une attribution d'un planning publié.
+  ///
+  /// Rend `true` quand le membre a été prévenu, `false` quand il n'y avait rien
+  /// à lui apprendre, `null` en cas d'échec.
+  Future<bool?> annuler({required String attributionId, String? motif}) async {
+    final courant = state.value;
+    if (courant == null) return null;
+
+    state = AsyncValue<EtatPlanning?>.data(
+      courant.copie(sync: SyncEtat.enregistrement, effacerMessage: true),
+    );
+
+    try {
+      final prevenu = await ref
+          .read(planningRepositoryProvider)
+          .annuler(attributionId: attributionId, motif: motif);
+
+      final apres = state.value;
+      if (!ref.mounted || apres == null) return prevenu;
+      // L'attribution quitte les statuts actifs : elle libère sa place à
+      // l'écran comme en base, et le suivi la garde barrée dans l'historique.
+      state = AsyncValue<EtatPlanning?>.data(
+        apres.copie(
+          planning: apres.planning.sansAttribution(attributionId),
+          sync: SyncEtat.enregistre,
+        ),
+      );
+      return prevenu;
+    } on EchecPlanning catch (echec) {
+      _echouer(echec);
+      return null;
+    }
+  }
+
   /// Publie le planning : `publish-schedule`, et rien d'autre.
   ///
   /// **Le geste le plus lourd du produit** : il fait vibrer trente téléphones
@@ -539,7 +651,12 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
     // d'erreur dirait deux fois la même chose. Un doublon d'attribution non
     // plus : il se dit d'une phrase passagère, à l'endroit du geste.
     final suspendue = echec.erreur == ErreurPlanning.lectureSeule;
-    final passagere = echec.erreur == ErreurPlanning.dejaAttribue;
+    // Trois refus qui ne sont pas des pannes mais l'autre administrateur : ils
+    // se disent d'une phrase passagère, à l'endroit du geste.
+    final passagere =
+        echec.erreur == ErreurPlanning.dejaAttribue ||
+        echec.erreur == ErreurPlanning.dejaRemplacee ||
+        echec.erreur == ErreurPlanning.membreInactif;
     state = AsyncValue<EtatPlanning?>.data(
       courant.copie(
         sync: SyncEtat.echec,
@@ -620,6 +737,16 @@ final Provider<PanneauCandidats?> panneauCandidatsProvider =
       final membres = ref.watch(lignesAvecChargeProvider);
       if (membres.isEmpty) return null;
 
+      // **Le mode vient du planning, pas de l'écran.** Un brouillon se
+      // construit, un planning publié ou validé se réattribue, un planning
+      // archivé se lit. Les trois écrans qui montent ce panneau lisent donc la
+      // même règle.
+      final mode = switch (etat.planning.planning?.etat) {
+        PlanningEtat.brouillon => ModePanneau.construction,
+        PlanningEtat.publie || PlanningEtat.valide => ModePanneau.reattribution,
+        _ => ModePanneau.lecture,
+      };
+
       return PanneauCandidats.construire(
         creneau: creneau,
         jour: DateTime(etat.periode.annee, etat.periode.mois, creneau.jour),
@@ -628,6 +755,7 @@ final Provider<PanneauCandidats?> panneauCandidatsProvider =
         // candidats des autres créneaux.
         membres: membres,
         planning: etat.planning,
-        modifiable: etat.planning.modifiable && !etat.lectureSeule,
+        modifiable: mode != ModePanneau.lecture && !etat.lectureSeule,
+        mode: mode,
       );
     });

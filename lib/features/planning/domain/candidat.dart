@@ -79,6 +79,25 @@ int comparerCandidats(Candidat a, Candidat b) {
   );
 }
 
+/// Ce que le panneau fait quand on touche un nom.
+///
+/// Même panneau, même tri, mêmes trois listes : ce qui change, c'est la
+/// **conséquence**, et elle se dit dans le libellé du bouton comme dans le
+/// bandeau de l'en-tête (`design/020 § 5.2`).
+enum ModePanneau {
+  /// Planning en brouillon : attribuer et retirer, réversible en un geste,
+  /// sans confirmation et sans notification.
+  construction,
+
+  /// Planning publié ou validé : attribuer **notifie**, retirer **annule** et
+  /// laisse une trace. Les deux gestes demandent confirmation.
+  reattribution,
+
+  /// Planning archivé, caserne suspendue, membre non administrateur : le
+  /// panneau se lit, il ne s'écrit pas.
+  lecture,
+}
+
 /// Ce que le panneau d'un créneau affiche : le créneau, sa couverture, et ses
 /// trois listes.
 @immutable
@@ -91,6 +110,7 @@ class PanneauCandidats {
     required this.disponibles,
     required this.nonDisponibles,
     required this.modifiable,
+    this.mode = ModePanneau.construction,
   });
 
   /// Construit les trois listes depuis la matrice et le planning.
@@ -104,6 +124,7 @@ class PanneauCandidats {
     required List<LigneMatrice> membres,
     required PlanningMois planning,
     required bool modifiable,
+    ModePanneau mode = ModePanneau.construction,
   }) {
     final attribues = <Candidat>[];
     final disponibles = <Candidat>[];
@@ -144,6 +165,7 @@ class PanneauCandidats {
       disponibles: List<Candidat>.unmodifiable(disponibles),
       nonDisponibles: List<Candidat>.unmodifiable(nonDisponibles),
       modifiable: modifiable,
+      mode: mode,
     );
   }
 
@@ -158,10 +180,17 @@ class PanneauCandidats {
   final List<Candidat> disponibles;
   final List<Candidat> nonDisponibles;
 
-  /// Faux quand la caserne est suspendue, le réseau absent ou le planning
-  /// déjà publié. **Un contrôle désactivé porte sa raison** : elle est passée
-  /// à part, par l'écran.
+  /// Faux quand la caserne est suspendue, le réseau absent, le planning
+  /// archivé ou l'appelant non administrateur. **Un contrôle désactivé porte
+  /// sa raison** : elle est passée à part, par l'écran.
   final bool modifiable;
+
+  /// Ce que coûte un appui : rien, ou une notification (`design/020 § 5.2`).
+  final ModePanneau mode;
+
+  /// Vrai quand attribuer fait sonner un téléphone. Le geste demande alors une
+  /// confirmation, parce qu'il est irréversible et qu'il sort de l'application.
+  bool get notifie => mode == ModePanneau.reattribution;
 
   int get pourvus => attribues.length;
 

@@ -22,6 +22,7 @@ class AttributionSuivi {
     this.motifRefus,
     this.relances = 0,
     this.derniereRelance,
+    this.remplaceParId,
   });
 
   /// [nom] vient de `memberships.display_name`, lu à part : **le nom d'usage
@@ -42,6 +43,7 @@ class AttributionSuivi {
       motifRefus: (ligne['decline_reason'] as String?)?.trim(),
       relances: (ligne['reminder_count'] as int?) ?? 0,
       derniereRelance: _instant(ligne['last_reminder_at']),
+      remplaceParId: ligne['replaced_by'] as String?,
     );
   }
 
@@ -49,7 +51,7 @@ class AttributionSuivi {
   /// colonne de plus sur le fil.
   static const String colonnes =
       'id, shift_id, user_id, status, proposed_at, responded_at, '
-      'decline_reason, reminder_count, last_reminder_at';
+      'decline_reason, reminder_count, last_reminder_at, replaced_by';
 
   /// Les colonnes de `memberships` qui donnent le nom d'usage d'un membre, et
   /// son repli quand il n'en a pas choisi.
@@ -79,18 +81,34 @@ class AttributionSuivi {
 
   final DateTime? repondueLe;
 
-  /// Le motif écrit par le membre en refusant. C'est l'information la plus
-  /// utile de l'écran : elle dit s'il faut chercher quelqu'un d'autre.
+  /// Le motif écrit par le membre en refusant, ou celui écrit par
+  /// l'administrateur en annulant (`docs/SCHEMA.md § 2.10`). C'est
+  /// l'information la plus utile de l'écran : elle dit s'il faut chercher
+  /// quelqu'un d'autre.
   final String? motifRefus;
 
   final int relances;
   final DateTime? derniereRelance;
+
+  /// L'attribution qui a couvert celle-ci, quand il y en a une
+  /// (`assignments.replaced_by`, posé par `reassign_shift`). Elle existe aussi
+  /// sur un **refus**, qui reste un refus : c'est le fil qui dit « ce trou-là a
+  /// été bouché par cette attribution-là ».
+  final String? remplaceParId;
 
   /// Vrai pour les deux statuts qui occupent une place sur un créneau.
   bool get active =>
       etat == AttributionEtat.propose || etat == AttributionEtat.accepte;
 
   bool get enAttente => etat == AttributionEtat.propose;
+
+  /// Vrai pour les trois états qui laissent un trou à boucher : un refus, un
+  /// remplacement, une annulation. C'est ce qui rend une ligne du suivi
+  /// **actionnable** plutôt que seulement lisible.
+  bool get close =>
+      etat == AttributionEtat.refuse ||
+      etat == AttributionEtat.remplace ||
+      etat == AttributionEtat.annule;
 
   bool get aUnMotif => (motifRefus ?? '').isNotEmpty;
 
@@ -103,15 +121,19 @@ class AttributionSuivi {
     return maintenant.difference(depuis).inHours >= delaiHeures;
   }
 
-  /// `assignment_status` : quatre valeurs d'affichage pour cinq valeurs SQL.
+  /// `assignment_status` : cinq valeurs SQL, cinq états d'affichage depuis le
+  /// ticket 020, qui est le premier à produire `replaced` et `cancelled`.
   ///
-  /// `cancelled` et `replaced` partagent la marque barrée d'« annulé » : les
-  /// deux disent « cette attribution ne compte plus », et le ticket 020 leur
-  /// donnera leur libellé propre quand il les produira.
+  /// Les deux partagent la marque barrée et l'encre atténuée — ils disent tous
+  /// deux « cette attribution ne compte plus » — mais pas l'icône ni le
+  /// libellé : « Remplacé » dit que la garde a changé de main, « Annulé » dit
+  /// qu'elle n'existe plus. Un statut inconnu se lit comme annulé : le côté sûr
+  /// est celui qui ne compte pas dans la couverture.
   static AttributionEtat etatDepuisSql(String? valeur) => switch (valeur) {
     'proposed' => AttributionEtat.propose,
     'accepted' => AttributionEtat.accepte,
     'declined' => AttributionEtat.refuse,
+    'replaced' => AttributionEtat.remplace,
     _ => AttributionEtat.annule,
   };
 
@@ -138,7 +160,8 @@ class AttributionSuivi {
           other.repondueLe == repondueLe &&
           other.motifRefus == motifRefus &&
           other.relances == relances &&
-          other.derniereRelance == derniereRelance;
+          other.derniereRelance == derniereRelance &&
+          other.remplaceParId == remplaceParId;
 
   @override
   int get hashCode => Object.hash(
@@ -152,6 +175,7 @@ class AttributionSuivi {
     motifRefus,
     relances,
     derniereRelance,
+    remplaceParId,
   );
 }
 
@@ -313,6 +337,48 @@ class CreneauSuivi {
 
   bool contient(AttributionEtat etat) =>
       attributions.any((AttributionSuivi a) => a.etat == etat);
+
+  /// Le nom de celui qui a repris la garde de [attribution], ou `null`.
+  ///
+  /// Tout est déjà là : les attributions d'un créneau voyagent ensemble, et
+  /// `replaced_by` pointe l'une d'entre elles. Sans cette phrase, l'historique
+  /// montrerait une sortie sans montrer l'entrée, et le chef recompterait à la
+  /// main.
+  String? remplacantDe(AttributionSuivi attribution) {
+    final cible = attribution.remplaceParId;
+    if (cible == null) return null;
+    for (final autre in attributions) {
+      if (autre.id == cible) return autre.nom.isEmpty ? null : autre.nom;
+    }
+    return null;
+  }
+
+  /// Vrai quand ce créneau porte une décision à prendre : quelqu'un a refusé,
+  /// une attribution a été annulée ou remplacée, ou la place manque.
+  ///
+  /// **C'est la seule condition qui rend une ligne du suivi actionnable.** Un
+  /// créneau entièrement accepté et pourvu n'a rien à réparer, et un élément
+  /// qui a l'air cliquable sans servir est pire qu'un élément inerte.
+  bool get aReparer =>
+      nonPourvu ||
+      attributions.any((AttributionSuivi a) => a.close);
+
+  /// Vrai quand le créneau porte au moins une attribution close : le geste se
+  /// nomme alors « Réattribuer » plutôt que « Pourvoir ».
+  bool get porteUnRefus =>
+      attributions.any((AttributionSuivi a) => a.close);
+
+  /// La dernière attribution close de ce créneau qui n'a pas encore été
+  /// couverte — celle que la réattribution vient réparer, et à laquelle la base
+  /// posera le lien.
+  AttributionSuivi? get aRemplacer {
+    for (final attribution in attributions) {
+      if (attribution.close && attribution.remplaceParId == null) {
+        return attribution;
+      }
+    }
+    return null;
+  }
 
   /// Vrai quand le créneau répond à au moins l'un des filtres retenus.
   bool correspond(Set<FiltreSuivi> filtres) {

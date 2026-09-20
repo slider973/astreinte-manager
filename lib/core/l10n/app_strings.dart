@@ -65,6 +65,10 @@ abstract final class AppStrings {
   static const String attributionProposeMembre = 'En attente de ta réponse';
   static const String attributionAccepte = 'Accepté';
   static const String attributionRefuse = 'Refusé';
+
+  /// Le créneau a été confié à quelqu'un d'autre (ticket 020). Distinct
+  /// d'« Annulé » : la garde existe toujours, elle a changé de main.
+  static const String attributionRemplace = 'Remplacé';
   static const String attributionAnnule = 'Annulé';
 
   // -------------------------------------------------------------------
@@ -2007,6 +2011,142 @@ abstract final class AppStrings {
       'Impossible de charger le suivi du planning.';
   static const String suiviReserveAdmin =
       'Le suivi du planning est réservé aux administrateurs de la caserne.';
+
+  // -------------------------------------------------------------------
+  // Réattribution d'un créneau refusé (ticket 020)
+  // -------------------------------------------------------------------
+
+  // --- L'action sur la ligne du suivi -----------------------------------
+
+  static const String reattribuerAction = 'Réattribuer';
+  static const String pourvoirAction = 'Pourvoir';
+
+  /// L'étiquette annoncée au lecteur d'écran : **la personne et le créneau**,
+  /// jamais « Réattribuer » seul. Une liste de douze boutons homonymes est
+  /// inutilisable.
+  static String reattribuerSemantique({
+    required String jourEtDate,
+    required String creneau,
+  }) => 'Réattribuer le créneau $creneau du $jourEtDate';
+
+  static String pourvoirSemantique({
+    required String jourEtDate,
+    required String creneau,
+  }) => 'Pourvoir le créneau $creneau du $jourEtDate';
+
+  /// « remplacé par Chloé C. » — l'historique montre la sortie **et** l'entrée.
+  static String suiviRemplacePar(String qui) => 'remplacé par $qui';
+
+  // --- Le bandeau du panneau -------------------------------------------
+
+  static const String reattributionBandeau =
+      'Planning publié : la personne choisie sera notifiée tout de suite.';
+
+  static String reattributionBandeauRefus(String qui) =>
+      '$qui a refusé ce créneau. La personne choisie sera notifiée tout de '
+      'suite.';
+
+  // --- La confirmation --------------------------------------------------
+
+  static const String reattribuerTitre = 'Réattribuer ce créneau';
+
+  static String reattribuerTexte({
+    required String membre,
+    required String jourEtDate,
+    required String creneau,
+  }) =>
+      '$membre recevra une notification pour le $jourEtDate, $creneau. '
+      'Personne d\'autre n\'est prévenu.';
+
+  /// L'avertissement de disponibilité, dans la **même** feuille : une
+  /// confirmation par sujet apprendrait à cliquer sans lire.
+  static String reattribuerHorsDispo(String membre) =>
+      '$membre s\'est déclaré indisponible ce jour-là.';
+
+  static String reattribuerRemplace(String qui) =>
+      'L\'astreinte de $qui est annulée et $qui en est prévenu.';
+
+  static const String reattribuerConfirmer = 'Réattribuer et notifier';
+  static const String reattribuerAnnuler = 'Annuler';
+
+  static String reattribuerFaite(String membre) => '$membre est prévenu.';
+
+  static String reattribuerFaiteEtAncien(String membre, String ancien) =>
+      '$membre est prévenu, $ancien aussi.';
+
+  // --- L'annulation d'une astreinte -------------------------------------
+
+  static const String annulerAstreinteAction = 'Annuler';
+
+  static String annulerAstreinteSemantique(String membre) =>
+      'Annuler l\'astreinte de $membre';
+
+  static const String annulerAstreinteTitre = 'Annuler cette astreinte';
+
+  static String annulerAstreinteTexte({
+    required String membre,
+    required String jourEtDate,
+    required String creneau,
+  }) =>
+      '$membre sera prévenu que son astreinte du $jourEtDate, $creneau, est '
+      'annulée.';
+
+  /// La proposition n'avait pas encore de réponse : rien n'était acquis, donc
+  /// personne n'est prévenu. L'écran le dit plutôt que de le taire.
+  static String annulerPropositionTexte({
+    required String membre,
+    required String jourEtDate,
+    required String creneau,
+  }) =>
+      'La proposition faite à $membre pour le $jourEtDate, $creneau, sera '
+      'retirée. $membre n\'a pas encore répondu : il n\'est pas prévenu.';
+
+  static const String annulerMotifLibelle = 'Motif (facultatif)';
+  static const String annulerMotifAide =
+      'Il part avec la notification. « Annulée » sans raison, c\'est un coup '
+      'de téléphone de plus.';
+  static const String annulerMotifExemple = 'Manœuvre annulée';
+
+  static const String annulerConfirmer = 'Annuler l\'astreinte';
+  static const String annulerRenoncer = 'Revenir';
+
+  static String annulerFaite(String membre) =>
+      'Astreinte annulée. $membre est prévenu.';
+
+  static String annulerFaiteSansEnvoi(String membre) =>
+      'Proposition retirée. $membre n\'avait pas répondu : rien n\'est parti.';
+
+  // --- Le panneau chargé depuis le suivi --------------------------------
+
+  static const String reattributionChargement = 'Chargement des candidats';
+
+  // --- Les refus ---------------------------------------------------------
+
+  static const String reattribuerHorsLigne =
+      'Sans réseau, impossible de réattribuer : la notification partirait trop '
+      'tard, pour un créneau peut-être déjà pourvu.';
+
+  static const String reattribuerBrouillon =
+      'Ce planning est encore en brouillon : les attributions s\'y posent et '
+      's\'y retirent directement.';
+
+  static const String reattribuerArchive =
+      'Ce planning est archivé : le mois est passé.';
+
+  static const String reattribuerDejaAttribue =
+      'Ce pompier tient déjà ce créneau.';
+
+  static const String reattribuerDejaRemplacee =
+      'Cette attribution a déjà été remplacée. L\'écran se remet à jour.';
+
+  static const String reattribuerMembreInactif =
+      'Ce pompier n\'est plus membre actif de la caserne.';
+
+  static const String reattribuerErreur =
+      'La réattribution n\'a pas abouti. Le planning n\'a pas bougé.';
+
+  static const String annulerErreur =
+      'L\'annulation n\'a pas abouti. L\'astreinte n\'a pas bougé.';
 
   // -------------------------------------------------------------------
   // Les propositions du membre (ticket 021)

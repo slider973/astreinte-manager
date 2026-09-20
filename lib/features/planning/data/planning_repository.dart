@@ -28,6 +28,17 @@ enum ErreurPlanning {
   /// publiée est filtrée par la politique, sans lever.
   planningPublie(AppStrings.planningPublieDetail),
 
+  /// `schedule_not_published` : on ne réattribue pas un brouillon — on y pose
+  /// et on y retire.
+  brouillon(AppStrings.reattribuerBrouillon),
+
+  /// `member_not_active` : le pompier visé a quitté la caserne entre l'image
+  /// et le geste.
+  membreInactif(AppStrings.reattribuerMembreInactif),
+
+  /// `assignment_not_replaceable` : l'adjoint a réattribué le premier.
+  dejaRemplacee(AppStrings.reattribuerDejaRemplacee),
+
   reseau(AppStrings.erreurReseauTexte),
 
   inconnue(AppStrings.planningErreurTexte);
@@ -35,6 +46,45 @@ enum ErreurPlanning {
   const ErreurPlanning(this.message);
 
   final String message;
+
+  /// Le code métier rendu par `reassign-shift` ou `cancel_assignment`
+  /// (`supabase/functions/README.md`), traduit une fois.
+  static ErreurPlanning depuisCode(String? code) => switch (code) {
+    'not_admin' => ErreurPlanning.reserveAdmin,
+    'station_suspended' => ErreurPlanning.lectureSeule,
+    'schedule_not_published' => ErreurPlanning.brouillon,
+    'member_not_active' => ErreurPlanning.membreInactif,
+    'already_assigned' => ErreurPlanning.dejaAttribue,
+    'assignment_not_replaceable' => ErreurPlanning.dejaRemplacee,
+    'assignment_not_active' => ErreurPlanning.dejaRemplacee,
+    'shift_not_found' => ErreurPlanning.moisIntrouvable,
+    'assignment_not_found' => ErreurPlanning.dejaRemplacee,
+    _ => ErreurPlanning.inconnue,
+  };
+}
+
+/// Ce que la réattribution rend à l'administrateur qui vient de confirmer.
+///
+/// [ancienPrevenu] est vrai **seulement** quand la garde remplacée était
+/// acceptée : c'est la seule personne à qui on retire quelque chose. Celui qui
+/// avait refusé sait déjà.
+class ResultatReattribution {
+  const ResultatReattribution({
+    required this.attribution,
+    this.ancienUserId,
+    this.ancienPrevenu = false,
+    this.planningPublie = false,
+  });
+
+  final Attribution attribution;
+
+  final String? ancienUserId;
+  final bool ancienPrevenu;
+
+  /// Vrai quand le planning est repassé de « validé » à « publié » : une
+  /// acceptation vient de disparaître, et l'écran doit cesser de dire
+  /// « Validé ».
+  final bool planningPublie;
 }
 
 /// Un accès au planning refusé, avec sa phrase déjà en français.
@@ -121,6 +171,25 @@ abstract interface class PlanningRepository {
     required String creneauId,
     required int effectif,
   });
+
+  /// Réattribue un créneau d'un planning **publié** : Edge Function
+  /// `reassign-shift`.
+  ///
+  /// Le geste fait sonner un téléphone et ne se défait pas. [ancienneId]
+  /// désigne l'attribution remplacée quand l'écran la connaît ; laissée nulle,
+  /// la base rattache la nouvelle au plus ancien refus non encore couvert.
+  Future<ResultatReattribution> reattribuer({
+    required String creneauId,
+    required String userId,
+    String? ancienneId,
+  });
+
+  /// Annule une attribution d'un planning publié : `cancel_assignment`.
+  ///
+  /// Rend `true` quand le membre a été prévenu — c'est-à-dire quand sa garde
+  /// était **acceptée**. Une proposition retirée avant réponse ne prévient
+  /// personne, et l'écran le dit plutôt que de le taire.
+  Future<bool> annuler({required String attributionId, String? motif});
 
   /// Le canal temps réel des attributions de la caserne.
   Stream<EvenementPlanning> ecouter({required String stationId});
@@ -268,6 +337,96 @@ class SupabasePlanningRepository implements PlanningRepository {
     }
   }
 
+  /// Réattribuer : **une seule requête**, et elle sort de PostgREST.
+  ///
+  /// L'Edge Function appelle `reassign_shift`, qui écrit la nouvelle
+  /// attribution, le statut et le lien de l'ancienne, l'audit et les demandes
+  /// de notification **dans une transaction** (migration 0020). Le client ne
+  /// compose rien : il nomme un créneau, un pompier, et l'attribution qu'il
+  /// répare.
+  @override
+  Future<ResultatReattribution> reattribuer({
+    required String creneauId,
+    required String userId,
+    String? ancienneId,
+  }) async {
+    try {
+      final reponse = await _client.functions.invoke(
+        'reassign-shift',
+        body: <String, dynamic>{
+          'shift_id': creneauId,
+          'user_id': userId,
+          // Omise plutôt que nulle : la fonction SQL a une valeur par défaut,
+          // et un `null` explicite l'écraserait.
+          'previous_assignment_id': ?ancienneId,
+        },
+      );
+
+      final corps = reponse.data;
+      if (corps is! Map<String, dynamic>) {
+        throw const EchecPlanning(ErreurPlanning.inconnue);
+      }
+
+      final ancienne = corps['previous'];
+      final planning = corps['schedule'];
+
+      return ResultatReattribution(
+        // La réponse ne rend pas la ligne entière : elle rend ce qui la
+        // caractérise. `was_available` vient de la base, qui l'a relu dans les
+        // disponibilités — jamais de ce que l'écran croyait savoir.
+        attribution: Attribution(
+          id: corps['assignment_id']! as String,
+          creneauId: creneauId,
+          userId: userId,
+          etaitDisponible: (corps['was_available'] as bool?) ?? true,
+        ),
+        ancienUserId: ancienne is Map<String, dynamic>
+            ? ancienne['user_id'] as String?
+            : null,
+        ancienPrevenu: ancienne is Map<String, dynamic> &&
+            (ancienne['notified'] as bool?) == true,
+        planningPublie: planning is Map<String, dynamic> &&
+            planning['status'] == 'published',
+      );
+    } on FunctionException catch (echec) {
+      throw EchecPlanning(_traduireFonction(echec));
+    } on Object catch (echec) {
+      throw EchecPlanning(_traduire(echec));
+    }
+  }
+
+  @override
+  Future<bool> annuler({
+    required String attributionId,
+    String? motif,
+  }) async {
+    try {
+      final reponse = await _client.rpc<dynamic>(
+        'cancel_assignment',
+        params: <String, dynamic>{
+          'p_assignment': attributionId,
+          'p_reason': motif,
+        },
+      );
+
+      if (reponse is! Map<String, dynamic>) {
+        throw const EchecPlanning(ErreurPlanning.inconnue);
+      }
+      if ((reponse['ok'] as bool?) != true) {
+        throw EchecPlanning(
+          ErreurPlanning.depuisCode(reponse['code'] as String?),
+        );
+      }
+
+      // **La base dit si quelqu'un a été prévenu.** Le déduire du statut
+      // d'avant serait le déduire de ce que l'écran croyait, et l'écran peut
+      // avoir une image de retard.
+      return (reponse['notified'] as bool?) ?? false;
+    } on Object catch (echec) {
+      throw EchecPlanning(_traduire(echec));
+    }
+  }
+
   /// Le canal des attributions.
   ///
   /// **Aucun filtre de colonne côté serveur, et c'est voulu.** Un filtre
@@ -334,9 +493,27 @@ class SupabasePlanningRepository implements PlanningRepository {
     }
   }
 
+  /// Traduit le refus métier d'une Edge Function.
+  static ErreurPlanning _traduireFonction(FunctionException echec) {
+    // Aucune réponse n'est parvenue : c'est le réseau, pas le serveur.
+    if (echec.status == 0) return ErreurPlanning.reseau;
+
+    final details = echec.details;
+    if (details is Map) {
+      final erreur = details['error'];
+      if (erreur is Map) {
+        return ErreurPlanning.depuisCode(erreur['code'] as String?);
+      }
+    }
+    return echec.status == 401
+        ? ErreurPlanning.reserveAdmin
+        : ErreurPlanning.inconnue;
+  }
+
   /// Traduit ce que le SDK a levé.
   static ErreurPlanning _traduire(Object echec) {
     if (echec is EchecPlanning) return echec.erreur;
+    if (echec is FunctionException) return _traduireFonction(echec);
     if (echec is PostgrestException) {
       final message = echec.message.toLowerCase();
       // `23505` sur `assignments_active_uniq` : le seul doublon possible ici.
