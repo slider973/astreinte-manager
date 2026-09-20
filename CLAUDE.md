@@ -93,6 +93,7 @@ ne doit être ajouté sans équivalent web.
 
 - Coder une fonctionnalité qui n'est pas dans le ticket en cours.
 - Inventer une colonne ou une table absente de `docs/SCHEMA.md`.
-- Fusionner, fermer ou supprimer une PR ou une branche.
+- Fermer ou supprimer une PR ou une branche. La fusion n'est permise qu'en squash, après une revue
+  sans bloquant (voir « Fusion » plus haut).
 - Pousser sur `main` autrement que via `scripts/ticket.sh`.
 - Passer `--force` au démarrage d'un ticket sans demande explicite.
