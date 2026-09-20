@@ -4,7 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 001
 - **Branche** : `feat/004-design-system`
-- **Statut** : en cours depuis 2026-09-20
+- **PR** : https://github.com/slider973/astreinte-manager/pull/4
+- **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte
 L'app doit être lisible d'un coup d'œil sur téléphone, avec de grandes cibles tactiles. Public : pompiers volontaires, usage rapide entre deux activités.

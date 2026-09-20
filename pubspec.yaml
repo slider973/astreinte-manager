@@ -22,3 +22,22 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Polices embarquées, jamais chargées depuis un CDN : la PWA doit s'ouvrir
+  # vite en 4G rurale et un FOUT sur une grille d'états est un défaut de
+  # lecture. Provenance, sous-ensemble et poids : assets/fonts/README.md.
+  fonts:
+    - family: AtkinsonHyperlegibleNext
+      fonts:
+        - asset: assets/fonts/AtkinsonHyperlegibleNext-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/AtkinsonHyperlegibleNext-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/AtkinsonHyperlegibleNext-Bold.ttf
+          weight: 700
+    - family: AtkinsonHyperlegibleMono
+      fonts:
+        - asset: assets/fonts/AtkinsonHyperlegibleMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/AtkinsonHyperlegibleMono-Bold.ttf
+          weight: 700

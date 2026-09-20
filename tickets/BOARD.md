@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 004 | [Thème et composants de base](in-progress/004-design-system.md) | P1 | 001 |  |
 
 ## À faire
 
@@ -44,6 +43,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 034 | [RGPD : export et suppression des données](backlog/034-rgpd-export.md) | P1 | 007 |  |
 | 035 | [Tests d'intégration bout en bout](backlog/035-tests-e2e.md) | P1 | 021 020 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
+| 037 | [Supprimer la dépendance à fonts.gstatic.com au démarrage](backlog/037-canvaskit-autoheberge.md) | P1 | 004 032 |  |
 
 ## Terminés
 
@@ -51,5 +51,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 |---|---|---|---|---|
 | 001 | [Initialiser le projet Flutter et l'architecture](done/001-setup-flutter.md) | P0 |  | https://github.com/slider973/astreinte-manager/pull/1 |
 | 002 | [Créer le projet Supabase et les migrations initiales](done/002-supabase-migrations.md) | P0 |  | https://github.com/slider973/astreinte-manager/pull/2 |
+| 004 | [Thème et composants de base](done/004-design-system.md) | P1 | 001 | https://github.com/slider973/astreinte-manager/pull/4 |
 | 008 | [Row Level Security et fonctions d'accès](done/008-rls-multi-tenant.md) | P0 | 002 | https://github.com/slider973/astreinte-manager/pull/3 |
 

@@ -22,20 +22,11 @@ class HelloScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: <Widget>[
-            Text(
-              AppStrings.helloTitle,
-              style: textTheme.headlineMedium,
-            ),
+            Text(AppStrings.helloTitle, style: textTheme.headlineMedium),
             const SizedBox(height: 8),
-            Text(
-              AppStrings.helloSubtitle,
-              style: textTheme.bodyLarge,
-            ),
+            Text(AppStrings.helloSubtitle, style: textTheme.bodyLarge),
             const SizedBox(height: 24),
-            _EnvValueRow(
-              label: AppStrings.appEnvLabel,
-              value: env.appEnv,
-            ),
+            _EnvValueRow(label: AppStrings.appEnvLabel, value: env.appEnv),
             const SizedBox(height: 12),
             _EnvValueRow(
               label: AppStrings.supabaseUrlLabel,
