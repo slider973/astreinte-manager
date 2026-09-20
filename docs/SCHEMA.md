@@ -285,6 +285,17 @@ create index on assignments (station_id, status);
 Un membre ne peut avoir qu'une attribution active par créneau. Les attributions
 `declined`, `replaced`, `cancelled` restent pour l'historique.
 
+**`was_available` et `created_by` sont posés par la base**, jamais déclarés par le client
+(déclencheur `assignments_trace_disponibilite`, migration `0018`, ticket 017). `was_available`
+est relu à l'insertion dans `availabilities` : sans cela, il suffirait d'envoyer `true` pour
+faire disparaître une attribution forcée du journal de la caserne. Même raisonnement que
+`availabilities.set_by` (§ 5) — une trace ne se choisit pas.
+
+**En brouillon, retirer une attribution la supprime** : `proposed_at` est nul, rien n'est parti,
+il n'y a rien à conserver (`docs/WORKFLOWS.md § 3`). Après publication, la même attribution
+s'annule ou se remplace et **reste** : la politique `assignments_delete_admin` (durcie en `0018`)
+n'autorise la suppression que si le planning est encore `draft`.
+
 ### 2.11 `push_tokens`
 
 ```sql
@@ -559,6 +570,21 @@ Trois points qui font la justesse de cette tâche :
 - **Une saisie, quelle qu'elle soit, dispense du rappel.** Une ligne `absent` compte comme
   une ligne `available` : le membre a répondu. Même définition que `v_period_completion`.
 
+### Construction du planning (migration `0018`, ticket 017)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `station_required_count` | `(p_settings jsonb, p_date date, p_slot slot_type) returns integer` `immutable` | L'effectif requis d'un créneau : **surcharge datée**, sinon **surcharge de jour de semaine**, sinon `required_day` / `required_night` (§ 2.1). Une surcharge qui ne fixe qu'un créneau laisse l'autre au défaut. Fonction pure, exécution ouverte à `authenticated`. La clé ISO est construite par `lpad`, jamais par `to_char`, qui dépend de `DateStyle` et ne serait pas immuable. |
+| `create_schedule` | `(p_station uuid, p_period uuid) returns schedules` | Action « créer le planning du mois ». Vérifie `is_admin` puis `station_writable`, refuse une période étrangère (`period_not_found`), crée le planning en `draft` et **tous ses créneaux** (chaque jour du mois × `slot_type`), `required_count` copié par `station_required_count`. Idempotente aux deux niveaux : rejouée, elle ne crée ni second planning ni créneau en double, et **ne réécrit aucun effectif existant**. |
+
+L'ordre de résolution des surcharges n'est pas arbitraire : une surcharge datée est une
+décision prise pour ce jour-là (le réveillon, une manifestation) et doit gagner contre la
+règle hebdomadaire, sans quoi elle ne servirait jamais un samedi.
+
+**`create_schedule` est le seul endroit où `settings` devient `required_count`.** Ensuite,
+chaque créneau porte son propre effectif et rien en base ne le réécrit : c'est le critère du
+ticket 010, vérifié par `supabase/tests/planning_brouillon_test.sql § 2`.
+
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
 Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
@@ -606,7 +632,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `availability_preferences` | idem availabilities | idem |
 | `schedules` | membre si `status <> 'draft'` ; admin toujours | admin |
 | `shifts` | membre si le schedule est publié ou validé ; admin toujours | admin |
-| `assignments` | membre : les siennes si schedule publié ; tous les membres si validé ; admin toutes | membre : `status` uniquement, de `proposed` vers `accepted` ou `declined`, sur les siennes ; admin : tout |
+| `assignments` | membre : les siennes si schedule publié ; tous les membres si validé ; admin toutes | membre : `status` uniquement, de `proposed` vers `accepted` ou `declined`, sur les siennes ; admin : tout, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0018`) |
 | `push_tokens` | soi-même | soi-même |
 | `notifications` | soi-même | soi-même (`read_at` uniquement, imposé par un grant de colonne : `revoke update on notifications from authenticated` puis `grant update (read_at)`) ; insert par service role |
 | `subscriptions` | admin de la caserne | service role uniquement (webhook Stripe) |
@@ -752,7 +778,18 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   `availabilities_audit_effacement_admin` (`after delete … when (auth.uid() is distinct from old.user_id)`)
   → `availability.cleared_for_member`, parce que décocher une case est une suppression de
   ligne (§ 2.6) et qu'un effacement fait pour autrui doit laisser autant de trace qu'une
-  saisie. Le volet `assignments` viendra avec les plannings.
+  saisie. Le volet `assignments` est arrivé avec les plannings (migration `0018`, ticket 017) :
+  `assignments_audit_hors_dispo` (`after insert … when (new.was_available is false)`) →
+  `assignment.force`, avec la date et le créneau dans `data`. Il ne couvre que l'insertion :
+  publier ou répondre ne force rien.
+- `assignments_trace_disponibilite` (migration `0018`, ticket 017) : `before insert` sur
+  `assignments`. Impose `created_by = auth.uid()` et **calcule `was_available`** depuis les
+  lignes `availabilities` du créneau, pour toute écriture client. Les écritures serveur gardent
+  ce qu'elles fournissent (`current_user not in ('authenticated', 'anon')`). **Security
+  invoker, et c'est structurel** : en `security definer`, `current_user` vaudrait le
+  propriétaire de la fonction, le test « écriture serveur ? » répondrait oui pour tout le monde
+  et la trace ne serait jamais posée. Le même piège vaut pour `availabilities_trace_auteur` et
+  `assignments_member_transition`, qui sont invoker pour la même raison.
 - `periods_audit_creation` et `periods_audit_suppression` (migration `0013`, revue du
   ticket 014) : `after insert` / `after delete` sur `periods`, `period.created` et
   `period.deleted`. Sans elles, la trace de réouverture se contournait sans rien laisser —
@@ -880,10 +917,27 @@ une réponse à mille lignes et rend `200` sans en-tête d'alerte. À ~62 lignes
 disponibilités par membre et par mois, le compte devenait faux dès dix-sept membres et
 plafonnait vers seize — « 16 membres sur 60 ont saisi » alors que les 60 avaient saisi.
 
-### `v_schedule_progress` — avancement d'un planning
+### `v_schedule_progress` — avancement d'un planning *(migration `0018`, ticket 017)*
 
-Par schedule : créneaux totaux, créneaux pourvus, attributions en attente, acceptées,
-refusées, retardataires (proposées depuis plus de `late_report_hours`).
+Une ligne par planning. `security_invoker`, comme `v_member_load` : la vue n'accorde aucun
+droit.
+
+| Colonne | Sens |
+|---|---|
+| `schedule_id`, `station_id`, `period_id`, `status` | la clé et l'état du planning |
+| `shifts_total` | créneaux du planning |
+| `shifts_filled` | créneaux dont les attributions **actives** (`proposed` + `accepted`) atteignent `required_count` |
+| `assignments_pending` / `_accepted` / `_declined` | attributions par statut |
+| `assignments_late` | attributions `proposed` dont `proposed_at` dépasse `late_report_hours` |
+
+**`shifts_filled` se compte sur les attributions actives, pas sur les seules acceptations.**
+C'est le sens de la construction : en brouillon, rien n'est accepté et un planning complet doit
+se voir complet. La **validation**, elle, se juge sur les acceptations seules
+(`schedule_auto_validate`, § 5) et ne se lit pas ici — deux questions différentes, deux
+chiffres, jamais l'un pour l'autre.
+
+`assignments_late` ignore tout le brouillon : `proposed_at is null` n'est jamais en retard,
+même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 
 ## 7. Edge Functions
 
@@ -965,8 +1019,29 @@ de disponibilités ; et décomposer le comput de Pâques en fonctions SQL élém
 3 720 appels).
 
 Realtime activé sur `assignments`, `schedules`, `notifications` uniquement, filtré par
-`station_id` côté client. Aucune table n'est encore dans la publication `supabase_realtime`
-(elle sera posée avec les plannings, ticket 017).
+`station_id` côté client. **`assignments` y est entrée la première** (migration `0018`,
+ticket 017) : deux adjoints qui construisent le même mois doivent voir le travail de l'autre.
+Les deux autres tables suivront avec les tickets qui en ont besoin ; `shifts` n'y entrera pas,
+un changement d'effectif requis étant un événement rare que « Rafraîchir » rattrape.
+
+Trois vérifications ont conditionné cette inscription, et elles valent pour toute table qu'on
+y ajoutera :
+
+1. **Aucun `grant` de colonne restrictif** sur `assignments` : ce que `authenticated` peut lire
+   par `select`, il peut le recevoir par ce canal. C'est exactement ce qui manque à
+   `invitations` (ci-dessous).
+2. **Les événements sont filtrés ligne à ligne** par les politiques de `select` : un membre ne
+   reçoit rien d'un planning en brouillon, puisqu'aucune politique ne lui en donne la lecture.
+   Le brouillon reste invisible, y compris par ce canal.
+3. **L'identité de réplique reste `default`.** La charge utile d'un `delete` n'est pas filtrée
+   par les politiques : en `replica identity full`, chaque retrait d'attribution diffuserait
+   toutes les colonnes de la ligne supprimée à tous les abonnés. En `default`, il ne diffuse
+   que la clé primaire — un `uuid` opaque, sans caserne, sans membre et sans date. Conséquence
+   assumée côté client : les attributions y sont indexées par identifiant, seule façon de
+   savoir quel créneau redessiner. L'instruction `alter table assignments replica identity
+   default` est écrite dans la migration bien qu'elle soit le défaut de PostgreSQL : c'est une
+   décision de sécurité, elle doit se voir et être testée
+   (`supabase/tests/planning_brouillon_test.sql § 6`).
 
 `invitations` **n'y entrera pas**, et c'est une décision de sécurité, pas un oubli : la
 charge utile de `postgres_changes` porte toutes les colonnes publiées. Les politiques RLS
@@ -995,7 +1070,8 @@ Ordre proposé :
 15. ~~`0015_views.sql`~~ — rang resté vide, voir ci-dessous
 16. `0016_cron_rappels_saisie.sql` (ticket 015 : `cron_availability_reminders` et la tâche `availability_reminders`)
 17. `0017_matrice_admin.sql` (ticket 016 : calendrier français en base, vue `v_member_load`, fonction `availability_matrix`)
-18. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
+18. `0018_planning_brouillon.sql` (ticket 017 : `station_required_count`, `create_schedule`, `assignments_trace_disponibilite`, `assignments_audit_hors_dispo`, suppression d'attribution réservée au brouillon, vue `v_schedule_progress`, inscription d'`assignments` dans `supabase_realtime`)
+19. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
     `late_responders_report` (ticket 022), `archive_schedules` et `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
@@ -1007,7 +1083,8 @@ elles appartiennent à trois tickets (016 pour la matrice et `v_member_load`, 01
 `v_schedule_progress`), et `0016` a été poussée sur `main` avant que le 016 ne commence.
 Intercaler un `0015` après coup donnerait un dépôt dont l'ordre des fichiers n'est plus celui
 des applications — la CLI refuserait la migration en retard sur un projet hébergé. Le ticket
-016 prend donc le rang `0017`, et `v_schedule_progress` viendra avec les plannings.
+016 prend donc le rang `0017`, et `v_schedule_progress` est venue avec les plannings, au
+rang `0018`.
 
 Le rang 16 annonçait « les cinq tâches restantes du § 8 » en une migration. Elles
 appartiennent à quatre tickets différents : les réunir obligerait soit à écrire du code
