@@ -13,7 +13,11 @@ class SqueletteSuivi extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LoadingSkeleton(
-    child: Padding(
+    // Défilable et **inerte** : un squelette plus haut que l'écran se coupe
+    // proprement au lieu de déborder, et il ne se défile pas — il n'y a rien à
+    // lire dessous.
+    child: SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

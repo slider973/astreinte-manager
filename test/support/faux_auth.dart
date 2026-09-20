@@ -33,8 +33,10 @@ import 'package:astreinte_sp/features/periodes/data/periodes_repository.dart';
 import 'package:astreinte_sp/features/periodes/domain/periodes_providers.dart';
 import 'package:astreinte_sp/features/planning/data/matrice_repository.dart';
 import 'package:astreinte_sp/features/planning/data/planning_repository.dart';
+import 'package:astreinte_sp/features/planning/data/suivi_repository.dart';
 import 'package:astreinte_sp/features/planning/domain/matrice_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/planning_providers.dart';
+import 'package:astreinte_sp/features/planning/domain/suivi_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -44,6 +46,7 @@ import 'faux_invitations.dart';
 import 'faux_notifications.dart';
 import 'faux_planning.dart';
 import 'faux_push.dart';
+import 'faux_suivi.dart';
 
 /// Environnement de test : configuration Supabase présente, mais aucun réseau
 /// n'est jamais joint — les dépôts sont faux.
@@ -214,6 +217,7 @@ Future<AppMontee> monterApp(
   PeriodesRepository? periodes,
   MatriceRepository? matrice,
   PlanningRepository? planning,
+  SuiviRepository? suivi,
   DisposRepository? dispos,
   FileLocale? fileLocale,
   Connectivite? reseau,
@@ -272,6 +276,12 @@ Future<AppMontee> monterApp(
         // faux, il toucherait un client Supabase qui n'existe pas en test.
         planningRepositoryProvider.overrideWithValue(
           planning ?? FauxPlanningRepository(),
+        ),
+        // Le suivi (ticket 019) est lu par l'écran de suivi et par le bouton
+        // « Publier » de la matrice : sans faux, les deux toucheraient un
+        // client Supabase qui n'existe pas en test.
+        suiviRepositoryProvider.overrideWithValue(
+          suivi ?? FauxSuiviRepository(),
         ),
         // L'onglet 0 est désormais « Mon mois » : sans faux dépôt, il
         // toucherait un client Supabase qui n'existe pas en test.
