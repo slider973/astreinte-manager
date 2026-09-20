@@ -37,10 +37,39 @@ Une migration poussée sur `main` n'est jamais modifiée : on en crée une nouve
 | `0004_schedules_shifts_assignments.sql` | `schedules`, `shifts`, `assignments` |
 | `0005_notifications_push_tokens.sql` | `push_tokens`, `notifications` |
 | `0006_subscriptions_audit_super_admins.sql` | `subscriptions`, `audit_log`, `super_admins` |
+| `0007_functions_rls.sql` | `is_member`, `is_admin`, `is_super_admin`, `station_writable`, toutes les politiques RLS, trigger `assignments_member_transition` |
+| `0008_rls_durcissement.sql` | revue du ticket 008 : `search_path = public, pg_temp`, liste blanche des colonnes dans le trigger, cohérence du `station_id` avec la ligne parente, `invitations.token` retiré du grant de select |
 
-RLS est activé sur chaque table dès sa création. Sans politique, une table est fermée aux
-rôles `anon` et `authenticated` : c'est voulu jusqu'au ticket 008 (`0007_functions_rls.sql`).
-Les vues arrivent au ticket 016 (`0008_views.sql`), le cron au ticket 022 (`0009_cron.sql`).
+RLS est activé sur chaque table dès sa création et toutes les tables ont au moins une
+politique depuis `0007`. Les politiques sont posées `to authenticated` : `anon` ne lit rien,
+`service_role` et `postgres` ont `bypassrls`. Les vues arrivent au ticket 016
+(`0009_views.sql`), le cron au ticket 022 (`0010_cron.sql`).
+
+Deux pièges à ne pas rouvrir, documentés dans `docs/SCHEMA.md` section 3 :
+
+- toute fonction du schéma `public` porte `set search_path = public, pg_temp`. Omettre
+  `pg_temp` laisse un rôle `authenticated` masquer `memberships` par une table temporaire et
+  faire répondre `true` à `is_admin()` ;
+- un `update` sans clause `where` citant une colonne ne sollicite pas les politiques de
+  `select`. Les conditions de visibilité doivent être répétées dans le `using` de la
+  politique d'`update`.
+
+`invitations.token` n'est pas dans le grant de select du rôle `authenticated` : côté client,
+énumérer les colonnes, ne jamais faire `select *` sur cette table.
+
+## Tests RLS
+
+```sh
+scripts/test_rls.sh        # joue supabase/tests/*.sql contre la base locale
+DB_URL=postgresql://… scripts/test_rls.sh
+```
+
+`supabase/tests/rls_test.sql` simule un utilisateur connecté comme le fait PostgREST
+(`set local role authenticated` + `set local request.jwt.claims`), vérifie le cloisonnement
+entre les deux casernes du seed, les périodes verrouillées, la visibilité des attributions
+selon le statut du planning, les transitions d'attribution et le passage en lecture seule
+d'une caserne suspendue. Tout tourne dans une transaction annulée à la fin : la base reste
+dans l'état du seed. Le script rend un code non nul au premier test rouge.
 
 ## Seed (`seed.sql`)
 
