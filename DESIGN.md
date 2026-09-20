@@ -781,6 +781,19 @@ la raison ; ils sont désormais **la** référence.
 | `SyncEtat` | quatre états | cinq, avec `repos` | `SaveIndicator` doit exister sur un écran où rien n'est en cours. |
 | Écrans métier de remplacement | « chaque destination pointe sur un écran de remplacement neutre » | non livrés | Le ticket ne livre que le socle et `/dev/components` ; les destinations sont démontrées dans le catalogue. Les routes arrivent avec leurs tickets. |
 
+## Écarts d'implémentation (ticket 011)
+
+| Point | Ce que disait le document | Ce que fait le code | Pourquoi |
+|---|---|---|---|
+| Forme de la grille en `compact` | « grille mensuelle 7 colonnes × 2 créneaux » | **registre à trois colonnes**, une ligne par jour ; le calendrier à sept colonnes reprend dès `expanded` | `7 × 48 + 6 × 8 = 384 dp` contre 328 dp disponibles sur un téléphone de 360. La contrainte tactile gagne (`design/011 § 3`). |
+| Icône de créneau par case | « moitié haute / moitié basse », une icône par case | en orientation `ligne`, l'icône vit dans l'en-tête de colonnes épinglé | La position en colonne et l'en-tête épinglé portent la distinction ; soixante-deux icônes répétées sont du bruit sur un registre. La sémantique de chaque case dit toujours « nuit ». |
+| `SlotChip.enEnregistrement` | prévu pour la grille du mois | non employé par « Mon mois » | L'enregistrement y est global par construction : la file part en bloc. Quarante contours qui pulsent sont un jeu de lumière, pas une information. La pulsation reste au catalogue pour un écran qui enregistrerait une case isolée. |
+| Contour de la case sur un mois verrouillé | non traité | le filet prend l'encre du **verrouillage**, y compris pour « absent » | Un filet vermillon sur un mois verrouillé se lit comme une alarme alors que le verrouillage est un fait (§ Do's). La valeur reste portée par le glyphe et la texture. |
+| Compteur `CountStat` sans plafond | « `null` signifie illimité, et c'est écrit en toutes lettres » | le mot « illimité » devient optionnel (`plafondAttendu`) | Un total de mois n'est pas un quota : « 12 illimité » ne veut rien dire, et le mot coûte la largeur de trois colonnes sur un téléphone. Le ticket 013 remplira le plafond et le mot disparaîtra. |
+| Zone de bannière d'`AppScaffold` | enfant conditionnel | **toujours présente**, vide quand il n'y a rien à dire | Un enfant conditionnel décalait tous les suivants d'un cran à l'apparition d'une bannière : Flutter n'appariait plus les éléments, jetait le contenu et le reconstruisait. La grille y perdait sa position de défilement. |
+| État pressé de `SlotChip` | non décrit | 8 % de l'encre d'état versés dans le fond, **rien d'autre** ne bouge | Rien ne doit se déplacer sous un doigt ganté, sous peine de rater la case voisine. Le `State` n'existe que sur une case actionnable. |
+| Route `/mois` | annoncée dans § Navigation | onglet 0 de la coquille d'accueil + paramètre `?mois=AAAA-MM` | La coquille n'éclate pas en routes dans ce ticket ; l'URL reste néanmoins porteuse d'état. **Limite connue** : le paramètre ne survit pas à un démarrage à froid, l'écran de restauration de session réécrivant l'URL. |
+
 ### Coût de la case dense, mesuré
 
 Le brief exige une case `dense` « sans état, sans animation, `const` autant que possible ». La
