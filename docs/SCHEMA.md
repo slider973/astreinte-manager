@@ -65,12 +65,29 @@ create table stations (
 );
 ```
 
-`settings` est validé côté Edge Function et côté app. Clés :
-- `day_start`, `day_end` : affichage uniquement.
-- `required_day`, `required_night` : effectif par défaut d'un créneau.
-- `required_overrides` (optionnel) : `{"sat": {"day": 2}, "2026-12-31": {"night": 3}}`.
-- `availability_deadline_day` : jour du mois précédent où la saisie se verrouille.
-- Délais de relance en heures.
+`settings` est validé **en base** par la contrainte `stations_settings_valide`, appuyée sur
+`station_settings_valid(jsonb)` (migration `0011`, ticket 010), et à l'identique côté
+application (`lib/features/parametres/domain/validation_parametres.dart`). La validation
+côté app donne la phrase avant l'envoi ; la contrainte est ce qui rend la règle vraie.
+
+Clés, types et bornes — **la liste est une liste blanche, une clé inconnue est refusée** :
+
+| Clé | Type | Bornes | Rôle |
+|---|---|---|---|
+| `day_start`, `day_end` | `"HH:MM"` | 00:00–23:59, et différentes l'une de l'autre | affichage uniquement |
+| `required_day`, `required_night` | entier | 0–50 | effectif par défaut d'un créneau |
+| `required_overrides` | objet, **optionnel** | voir ci-dessous | exceptions à l'effectif |
+| `availability_deadline_day` | entier | 1–28 (le jour doit exister en février) | jour du mois précédent où la saisie se verrouille |
+| `response_reminder_hours`, `response_email_hours`, `late_report_hours` | entier | 1–336 (deux semaines) | délais de relance, en heures |
+
+`required_overrides` : `{"sat": {"day": 2}, "2026-12-31": {"night": 3}}`. Les clés sont soit
+`mon`…`sun`, soit une date ISO **réelle** (le 30 février est refusé) ; les valeurs sont des
+objets non vides dont les seules sous-clés sont `day` et `night`, entiers 0–50.
+
+Deux garde-fous complètent la table :
+- `stations_name_non_vide` : nom non blanc, 80 caractères au maximum.
+- `stations_check_timezone` (trigger) : le fuseau doit exister dans `pg_timezone_names`.
+  Un fuseau inventé n'échouerait sinon qu'au premier `make_timestamptz`, dans le cron.
 
 ### 2.2 `profiles` — extension de `auth.users`
 
@@ -148,7 +165,14 @@ create table periods (
 ```
 
 Créée automatiquement (cron mensuel ou à la demande) pour M+1 et M+2. `deadline_at` est
-calculée depuis `settings.availability_deadline_day` dans le fuseau de la caserne.
+calculée depuis `settings.availability_deadline_day` dans le fuseau de la caserne, par
+`period_deadline_at(year, month, jour_limite, fuseau)` (migration `0011`) : le jour limite du
+mois **précédent**, à 23:59:59.
+
+**La date limite suit le réglage.** Quand un admin change `availability_deadline_day` ou le
+fuseau de sa caserne, le déclencheur `stations_recalcule_deadlines` réécrit `deadline_at` des
+périodes **encore `open`** (§ 5). Les périodes `locked` ne bougent pas : elles ont déjà produit
+leur planning, et leur réécrire leur date limite réécrirait l'histoire.
 
 ### 2.6 `availabilities`
 
@@ -224,6 +248,12 @@ create index on shifts (station_id, date);
 
 Générés à la création du planning (tous les jours du mois × 2 créneaux) avec
 `required_count` déduit des settings. L'admin peut modifier `required_count` par créneau.
+
+**`required_count` est une copie, pas une référence.** Les settings de la caserne sont lus une
+fois, à la création du planning ; ensuite, chaque créneau porte son propre effectif. Changer
+`required_day` ou `required_night` ne touche donc **aucun créneau déjà créé** — c'est le critère
+du ticket 010, et rien dans la base ne réécrit cette colonne
+(`supabase/tests/station_settings_test.sql § 6`).
 
 ### 2.10 `assignments` — attribution d'un membre à un créneau
 
@@ -385,6 +415,25 @@ language sql stable security definer set search_path = public, pg_temp as $$
 $$;
 ```
 
+### Fonctions des paramètres de caserne (migration `0011`, ticket 010)
+
+Quatre fonctions **pures** : elles ne lisent aucune table, ne révèlent rien, et leur exécution
+reste ouverte à `authenticated` — une contrainte `check` est évaluée sous l'identité de qui
+écrit, et une fonction non exécutable rendrait toute mise à jour impossible.
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `station_settings_valid` | `(p_settings jsonb) returns boolean` `immutable` | Support de la contrainte `stations_settings_valide` : liste blanche de clés, clés obligatoires, types, bornes, format des heures, structure des surcharges (§ 2.1). |
+| `station_settings_heure_valide` | `(p_valeur jsonb) returns boolean` `immutable` | Une chaîne `"HH:MM"` de 00:00 à 23:59. |
+| `station_settings_entier_valide` | `(p_valeur jsonb, p_min integer, p_max integer) returns boolean` `immutable` | Un entier **sans partie décimale** dans ses bornes : `jsonb_typeof` dit « number » pour 1.5 comme pour 1. |
+| `station_settings_cle_surcharge_valide` | `(p_cle text) returns boolean` `immutable` | `mon`…`sun`, ou une date ISO réelle. La date passe par `make_date` et non par un cast : le cast `text -> date` dépend de `DateStyle`, donc n'est pas immuable, et un simple motif accepterait le 30 février. |
+
+Et une fonction de calcul, `stable` parce qu'elle dépend de la base des fuseaux :
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `period_deadline_at` | `(p_year integer, p_month integer, p_deadline_day integer, p_timezone text) returns timestamptz` | La date limite d'une période : le jour limite du mois précédent, 23:59:59, dans le fuseau de la caserne. Une seule écriture de la règle, partagée par le déclencheur de recalcul, le seed et le cron de création des périodes. |
+
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
 Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
@@ -529,6 +578,19 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   moins une ligne qui… » : c'est une contrainte sur l'ensemble de la table. Le déclencheur
   laisse passer le rôle de service (`current_user not in ('authenticated', 'anon')`), comme
   `assignments_member_transition`, et tient `disabled_at` à jour pour tout le monde.
+- `stations_check_timezone` (migration `0011`, ticket 010) : `before insert or update of
+  timezone` sur `stations`. Refuse un fuseau absent de `pg_timezone_names`
+  (`station_timezone_unknown`). Sans lui, un fuseau inventé s'écrit sans bruit et n'échoue
+  qu'au premier `make_timestamptz`, dans le cron de verrouillage.
+- `stations_recalcule_deadlines` (migration `0011`, ticket 010) : `after update` sur
+  `stations`. Recalcule `periods.deadline_at` des périodes `open` de la caserne quand
+  `availability_deadline_day` ou le fuseau a changé, et journalise le changement dans
+  `audit_log` (`station.settings_updated`, avec l'avant, l'après et le nombre de périodes
+  déplacées). **`security definer`, contrairement à `memberships_guard_admin`** : il n'y a ici
+  aucun test « est-ce une écriture serveur ? » à fausser, `deadline_at` est une valeur dérivée
+  et non une décision d'administration, et laisser la RLS de `periods` rejouer l'arbitrage
+  aurait une conséquence absurde — `periods_update_admin` exige `station_writable()` alors que
+  l'update de `stations` en est volontairement dispensé (§ 4).
 - `schedule_auto_validate` : après update d'un `assignment`, si tous les créneaux du
   planning ont `count(accepted) >= required_count`, passe le planning en `validated` et
   insère une notification `schedule_validated` (via `pg_net` vers l'Edge Function, ou via
