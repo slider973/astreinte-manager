@@ -792,10 +792,12 @@ encodé en **deux chaînes de longueur fixe**, un caractère par jour :
 | `shifts_count`, `weekend_units` | `integer` | charge du mois |
 | `shifts_left`, `weekends_left` | `integer` | restes, `null` si illimité, **négatifs** si dépassés |
 | `accepted_previous` | `integer` | astreintes acceptées sur les trois mois précédents |
-| `day_slots`, `night_slots` | `text` | un caractère par jour du mois : `.` non saisi, `D` disponible, `A` absent |
+| `day_slots`, `night_slots` | `text` | un caractère par jour du mois : `.` non saisi, `D`/`d` disponible, `A`/`a` absent — **minuscule si la case a été saisie par un administrateur** (`set_by <> user_id`) |
 
 La position `i` (0 en tête) de `day_slots` et `night_slots` est le jour `i + 1` ; leur longueur
-est le nombre de jours du mois. Les sept colonnes de quotas **viennent de `v_member_load`**,
+est le nombre de jours du mois. **La casse est la seule différence** : qui l'ignore retrouve
+exactement les trois états du § 2.6, et le test le vérifie. Une ligne sans `set_by` — antérieure
+au déclencheur `availabilities_trace_auteur` (`0012`) — compte comme saisie par le membre. Les sept colonnes de quotas **viennent de `v_member_load`**,
 elles n'en sont pas une seconde écriture.
 
 La fonction ne saisit pas : l'admin qui touche une cellule écrit dans `availabilities` par
@@ -929,13 +931,38 @@ Les index listés dans les DDL couvrent :
 
 La matrice du ticket 016 n'a demandé **aucun index de plus** : mesurée sur soixante membres,
 trente et un jours, deux créneaux et toutes les cellules saisies, `availability_matrix` rend
-ses soixante lignes en ~25 ms (`supabase/tests/matrice_admin_test.sql § 6`). Ce qui manquait
+ses soixante lignes en **~14 ms**, sous le rôle `authenticated` comme sous celui du
+propriétaire, et ~20 ms de bout en bout par PostgREST pour 22 ko de réponse
+(`supabase/tests/matrice_admin_test.sql § 6`). Ce qui manquait
 n'était pas un index mais un **prédicat** : les jointures latérales de `v_member_load` joignent
 `shifts` par sa clé primaire et restreignent la date ; sans `s.station_id = p.station_id`, le
 planificateur n'a aucune raison de se servir de `shifts (station_id, date)` et parcourt la table
 entière, toutes casernes confondues, une fois par membre. Le prédicat est redondant du point de
 vue des données (la RLS de `0008` impose déjà la cohérence des `station_id`) et déterminant du
 point de vue du plan.
+
+**Le coût dominant n'était ensuite ni un index ni un plan, mais une fonction appelée par
+ligne.** `est_jour_ferie` construisait les onze dates de l'année à chaque appel, donc calculait
+Pâques trois fois, pour répondre « non » à un mardi de novembre : 30 µs par date, 110 ms pour
+3 720 dates, la moitié du coût de la matrice. Réécrite pour tester d'abord les huit fériés
+fixes et ne calculer Pâques que dans sa fenêtre (23 mars – 14 juin), elle coûte 6,8 fois moins,
+et la matrice est passée de ~25 ms à ~14 ms. La contrepartie — la liste des fériés écrite à
+deux endroits — est vérifiée jour par jour de 1900 à 2100 par le test.
+
+**Une mesure se fait sous le rôle de l'application.** `availability_matrix` est
+`security definer` : appelée par `postgres`, `auth.uid()` est nul, `is_admin()` répond faux et
+la fonction sort en trois millisecondes **par la porte du refus** — chronométrer ce chemin, ce
+n'est pas chronométrer une matrice. Le test mesure donc les deux rôles et **exige qu'ils soient
+du même ordre** : c'est ce qui attraperait une refonte qui abandonnerait `security definer` et
+ferait redescendre la RLS dans la boucle sans qu'aucun test fonctionnel ne bronche.
+
+Trois pistes ont été essayées et **rejetées sur mesure** ; elles n'ont pas à être reprises :
+réécrire la fonction en SQL pur (aucun effet — une fonction `security definer` n'est jamais
+*inlinée*, le plan reste un `Function Scan` opaque : 23,5 ms contre 26,4 ms) ; forcer un plan
+personnalisé (`plan_cache_mode`), le plan générique coûtant déjà la même chose à 266 000 lignes
+de disponibilités ; et décomposer le comput de Pâques en fonctions SQL élémentaires
+*inlinables*, dont l'expansion combinatoire multiplie le coût par vingt (2 000 ms pour
+3 720 appels).
 
 Realtime activé sur `assignments`, `schedules`, `notifications` uniquement, filtré par
 `station_id` côté client. Aucune table n'est encore dans la publication `supabase_realtime`

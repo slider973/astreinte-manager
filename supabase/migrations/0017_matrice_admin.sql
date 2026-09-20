@@ -159,18 +159,67 @@ $$;
 comment on function jours_feries_fr(integer) is
   'Les onze jours fériés français métropolitains d''une année, calculés et non tabulés. Miroir de joursFeriesDeLAnnee() côté application. Alsace-Moselle non traitée (ce serait un réglage de caserne, absent du schéma).';
 
+-- Écrite pour être appelée **par ligne**, ce qui change tout.
+--
+-- La forme évidente — `p_date = any (jours_feries_fr(année))` — construit les
+-- onze dates de l'année à chaque appel, donc calcule Pâques **trois fois** (les
+-- trois fériés mobiles), donc paye trois invocations de `paques_gregorien` pour
+-- répondre « non » à un mardi de novembre. Mesuré : 110 ms pour 3 720 appels,
+-- soit 30 µs par date, et c'était à soi seul la moitié du coût de la matrice de
+-- soixante membres (`supabase/tests/matrice_admin_test.sql § 6`).
+--
+-- L'ordre ci-dessous renverse le raisonnement : huit des onze fériés sont à date
+-- fixe et se reconnaissent à une comparaison d'entiers ; les trois autres, tous
+-- adossés à Pâques, ne peuvent tomber qu'entre le 23 mars et le 14 juin (lundi
+-- de Pâques au plus tôt, lundi de Pentecôte au plus tard, Pâques grégorienne
+-- allant du 22 mars au 25 avril). Hors de cette fenêtre — les trois quarts de
+-- l'année — la réponse est connue sans comput. Mesuré : 16 ms pour les mêmes
+-- 3 720 appels, 6,8 fois moins.
+--
+-- Le prix de cette accélération est que la liste des fériés est maintenant
+-- écrite à deux endroits, ici et dans `jours_feries_fr`. C'est exactement la
+-- faute que cette migration reproche au reste du monde, et elle n'est tolérable
+-- que parce qu'elle est **vérifiée** : le test compare les deux formes jour par
+-- jour de 1900 à 2100, soit 73 414 dates, et refuse le moindre désaccord.
 create function est_jour_ferie(p_date date) returns boolean
-language sql
+language plpgsql
 immutable
 strict
 parallel safe
 set search_path = public, pg_temp
 as $$
-  select p_date = any (jours_feries_fr(extract(year from p_date)::integer));
-$$;
+declare
+  -- Mois × 100 + jour : « 1225 » se lit Noël, et se compare en un cycle.
+  mois_jour integer := extract(month from p_date)::integer * 100
+                     + extract(day   from p_date)::integer;
+  paques    date;
+begin
+  -- Les huit fériés à date fixe.
+  if mois_jour in (101,   -- Jour de l'an
+                   501,   -- Fête du Travail
+                   508,   -- Victoire 1945
+                   714,   -- Fête nationale
+                   815,   -- Assomption
+                   1101,  -- Toussaint
+                   1111,  -- Armistice 1918
+                   1225)  -- Noël
+  then
+    return true;
+  end if;
+
+  -- Hors de la fenêtre des fériés mobiles : inutile de calculer Pâques.
+  if mois_jour < 322 or mois_jour > 614 then
+    return false;
+  end if;
+
+  paques := paques_gregorien(extract(year from p_date)::integer);
+  return p_date in (paques + 1,    -- Lundi de Pâques
+                    paques + 39,   -- Ascension
+                    paques + 50);  -- Lundi de Pentecôte
+end $$;
 
 comment on function est_jour_ferie(date) is
-  'Vrai si la date est un jour férié français métropolitain. Miroir de estJourFerie() côté application.';
+  'Vrai si la date est un jour férié français métropolitain. Miroir de estJourFerie() côté application. Écrite pour l''appel par ligne : les huit fériés fixes d''abord, Pâques seulement dans sa fenêtre (23 mars – 14 juin). L''accord avec jours_feries_fr est vérifié jour par jour de 1900 à 2100 par le test.';
 
 -- L'unité de weekend à laquelle appartient une date, ou NULL.
 --

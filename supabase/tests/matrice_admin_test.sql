@@ -8,13 +8,15 @@
 --    commun : les dates de Pâques du test Dart `test/core/l10n/jours_feries_test.dart`
 --    et les quinze années de fériés que reprend, caractère pour caractère,
 --    `test/core/l10n/jours_feries_parite_base_test.dart`. Si l'un des deux
---    calculs bouge, l'un des deux tests rougit.
+--    calculs bouge, l'un des deux tests rougit. Et, en base, l'accord des deux
+--    formes de `est_jour_ferie` sur deux siècles.
 -- 2. L'unité de weekend : samedi + dimanche = une unité, férié en semaine = une
 --    unité à lui seul, férié un samedi ou un dimanche = pas de doublon, et le
 --    dimanche du 1er d'un mois rattaché au samedi du mois précédent.
 -- 3. La forme de la matrice : une ligne par membre actif, deux chaînes d'un
 --    caractère par jour, longueur = nombre de jours du mois (28, 29, 30, 31),
---    alphabet « . D A », position = jour, et le commentaire du mois du membre.
+--    alphabet « . D A » plus « d a » pour une case saisie par un admin,
+--    position = jour, et le commentaire du mois du membre.
 -- 4. v_member_load : proposé + accepté, refusé exclu, unités de weekend au sens
 --    du client, restes NULL quand le plafond est illimité et négatifs quand il
 --    est dépassé, historique borné aux trois mois précédents, cloisonnement par
@@ -22,8 +24,11 @@
 -- 5. Les droits : un admin voit tout de sa caserne et rien de la caserne
 --    voisine ; un membre n'obtient pas la matrice et ne lit dans v_member_load
 --    rien de plus qu'aujourd'hui ; `anon` n'appelle rien.
--- 6. La performance, mesurée : 60 membres × 31 jours × 2 créneaux, tous saisis,
---    avec un mois d'attributions et trois mois d'historique.
+-- 6. La performance, mesurée **sous le rôle de l'application** : 60 membres
+--    × 31 jours × 2 créneaux, tous saisis, avec un mois d'attributions et trois
+--    mois d'historique. Et la comparaison avec le rôle propriétaire, parce que
+--    la fonction est `security definer` et que les deux ne sont pas la même
+--    chose — sous `postgres`, elle sort par la porte du refus en 3 ms.
 --
 -- Méthode identique aux autres fichiers du dossier : pas de pgTAP, une exception
 -- fait sortir psql avec un code non nul, le tout dans une transaction annulée.
@@ -163,6 +168,27 @@ begin
   end loop;
 end $$;
 
+-- `est_jour_ferie` ne se sert plus de `jours_feries_fr` : elle teste les huit
+-- fériés fixes avant de calculer Pâques, et s'en dispense entièrement hors de la
+-- fenêtre du 23 mars au 14 juin (migration 0017 § 1). C'est ce qui l'a rendue
+-- 6,8 fois plus rapide — et c'est aussi une **seconde écriture de la liste**.
+--
+-- Une liste écrite deux fois n'est acceptable que vérifiée. Les deux formes sont
+-- donc comparées jour par jour sur deux siècles : 73 414 dates, aucun désaccord
+-- toléré. Un férié ajouté d'un côté et pas de l'autre fait rougir ce test à la
+-- première seconde, et non le jour où un pompier compte un weekend de trop.
+do $$
+declare
+  desaccords integer;
+begin
+  select count(*) into desaccords
+    from generate_series(date '1900-01-01', date '2100-12-31', interval '1 day') g(d)
+   where est_jour_ferie(d::date)
+      <> (d::date = any (jours_feries_fr(extract(year from d)::integer)));
+  perform tests_mat.egal(desaccords, 0,
+    'est_jour_ferie et jours_feries_fr s''accordent sur 1900-2100');
+end $$;
+
 release savepoint s1;
 
 -- ===========================================================================
@@ -276,7 +302,17 @@ insert into availabilities (station_id, user_id, date, slot, status, set_by) val
   ('11111111-0000-4000-8000-000000000001', '11111111-0000-4000-8000-000000000101', '2027-06-01', 'day',   'available', '11111111-0000-4000-8000-000000000101'),
   ('22222222-0000-4000-8000-000000000001', '11111111-0000-4000-8000-000000000101', '2027-05-10', 'day',   'available', '11111111-0000-4000-8000-000000000101'),
   -- Le membre désactivé a saisi de son vivant : sa ligne ne doit pas reparaître.
-  ('11111111-0000-4000-8000-000000000001', '11111111-0000-4000-8000-000000000104', '2027-05-04', 'day',   'available', '11111111-0000-4000-8000-000000000104');
+  ('11111111-0000-4000-8000-000000000001', '11111111-0000-4000-8000-000000000104', '2027-05-04', 'day',   'available', '11111111-0000-4000-8000-000000000104'),
+  -- Nadia n'a rien saisi ; l'admin a saisi **pour elle**. `set_by` diffère du
+  -- titulaire : la matrice doit le dire en minuscules, et cette marque doit
+  -- survivre au rechargement — sinon elle ne vit que dans la session qui a fait
+  -- la saisie, et l'admin suivant ne voit plus qui a écrit quoi.
+  ('11111111-0000-4000-8000-000000000001', '11111111-0000-4000-8000-000000000102', '2027-05-02', 'day',   'available', '11111111-0000-4000-8000-000000000100'),
+  ('11111111-0000-4000-8000-000000000001', '11111111-0000-4000-8000-000000000102', '2027-05-04', 'night', 'absent',    '11111111-0000-4000-8000-000000000100'),
+  -- Et une ligne ancienne, d'avant le déclencheur `availabilities_trace_auteur`
+  -- (0012) : `set_by` est nul. Elle compte comme saisie par le membre — le cas
+  -- le plus probable et le moins alarmant des deux.
+  ('11111111-0000-4000-8000-000000000001', '11111111-0000-4000-8000-000000000102', '2027-05-06', 'day',   'available', null);
 
 -- Préférences du mois : M1 plafonné et bavard, M3 plafonné et muet, M2 sans rien.
 insert into availability_preferences (station_id, user_id, period_id, max_shifts, max_weekends, comment) values
@@ -406,13 +442,40 @@ begin
   perform tests_mat.egal(ligne.night_slots,
     'A' || repeat('.', 29) || 'D', 'grille de nuit de Bruno B.');
 
-  -- Rien d'autre que « . D A » ne sort de la fonction.
+  -- Rien d'autre que « . D A d a » ne sort de la fonction.
   perform tests_mat.check(
-    (select bool_and(day_slots ~ '^[.DA]+$' and night_slots ~ '^[.DA]+$')
+    (select bool_and(day_slots ~ '^[.DAda]+$' and night_slots ~ '^[.DAda]+$')
        from availability_matrix(
          '11111111-0000-4000-8000-000000000001',
          '11111111-0000-4000-8000-000000000205')),
-    'alphabet limité à « . D A »');
+    'alphabet limité à « . D A d a »');
+
+  -- Saisie par un administrateur pour un membre : minuscules. Nadia n'a rien
+  -- écrit elle-même ; sa grille porte « d » le 2 (l'admin l'a dite disponible),
+  -- « a » le 4 en nuit (l'admin l'a dite absente), et « D » le 6 — ligne sans
+  -- `set_by`, donc attribuée au membre.
+  perform tests_mat.egal(
+    (select day_slots from availability_matrix(
+       '11111111-0000-4000-8000-000000000001',
+       '11111111-0000-4000-8000-000000000205')
+      where user_id = '11111111-0000-4000-8000-000000000102'),
+    '.d...D' || repeat('.', 25), 'grille de jour de Nadia C. (saisie admin)');
+  perform tests_mat.egal(
+    (select night_slots from availability_matrix(
+       '11111111-0000-4000-8000-000000000001',
+       '11111111-0000-4000-8000-000000000205')
+      where user_id = '11111111-0000-4000-8000-000000000102'),
+    '...a' || repeat('.', 27), 'grille de nuit de Nadia C. (saisie admin)');
+
+  -- La casse est **la seule** différence : qui ignore la casse retrouve les
+  -- trois états du schéma (docs/SCHEMA.md § 2.6). C'est le contrat donné à
+  -- l'application, et il se vérifie.
+  perform tests_mat.check(
+    (select bool_and(upper(day_slots) ~ '^[.DA]+$' and upper(night_slots) ~ '^[.DA]+$')
+       from availability_matrix(
+         '11111111-0000-4000-8000-000000000001',
+         '11111111-0000-4000-8000-000000000205')),
+    'en ignorant la casse, trois états et pas un de plus');
 
   -- Un membre qui n'a rien saisi : deux chaînes pleines de points, jamais NULL.
   -- C'est le sens de « absence de ligne = non saisi » (docs/SCHEMA.md § 2.6).
@@ -420,7 +483,7 @@ begin
     (select day_slots from availability_matrix(
        '11111111-0000-4000-8000-000000000001',
        '11111111-0000-4000-8000-000000000205')
-      where user_id = '11111111-0000-4000-8000-000000000102'),
+      where user_id = '11111111-0000-4000-8000-000000000103'),
     repeat('.', 31), 'membre sans aucune saisie : 31 points');
 
   -- Le commentaire du mois, lu par l'admin (critère du ticket 016).
@@ -832,19 +895,58 @@ analyze shifts;
 analyze memberships;
 analyze availability_preferences;
 
-set local role authenticated;
+-- La mesure se fait **sous le rôle de l'application**, pas sous celui du
+-- propriétaire de la fonction, et c'est le point de tout ce bloc.
+--
+-- `availability_matrix` est `security definer` : appelée par `postgres`, elle
+-- n'est pas la même chose qu'appelée par `authenticated`. Le piège est double.
+--
+--   1. Sous `postgres`, `auth.uid()` est nul, `is_admin()` répond faux, et la
+--      fonction sort en trois millisecondes **par la porte du refus**. Chronomé-
+--      trer ce chemin-là, c'est chronométrer une exception, pas une matrice. La
+--      confusion a déjà été faite une fois en revue du ticket 016 ; elle ne doit
+--      pas pouvoir se refaire sans que ce fichier le dise.
+--   2. Une refonte qui abandonnerait `security definer` — une vue lue sous la
+--      RLS de l'appelant, par exemple — rendrait exactement les mêmes lignes et
+--      passerait tous les tests fonctionnels, en coûtant dix fois plus cher à
+--      l'application et rien du tout au propriétaire.
+--
+-- D'où les deux mesures ci-dessous et, surtout, la comparaison des deux.
 set local request.jwt.claims = '{"sub":"33333333-0000-4000-8000-000000000001","role":"authenticated"}';
+
+-- Premier temps : le rôle propriétaire, avec les mêmes claims. C'est le
+-- plancher — le coût du travail lui-même, RLS mise à part. Le résultat est
+-- rangé dans un réglage de session pour être relu après le changement de rôle.
+do $$
+declare
+  depart        timestamptz;
+  duree_ms      double precision;
+  proprietaire  double precision := 1e9;
+begin
+  for i in 1..5 loop
+    depart := clock_timestamp();
+    perform count(*) from availability_matrix(
+      '33333333-0000-4000-8000-000000000001',
+      '33333333-0000-4000-8000-000000000210');
+    duree_ms := extract(epoch from (clock_timestamp() - depart)) * 1000;
+    proprietaire := least(proprietaire, duree_ms);
+  end loop;
+  raise notice '  matrice 60 × 31 × 2 — rôle propriétaire : % ms', round(proprietaire::numeric, 1);
+  perform set_config('tests_mat.proprietaire_ms', proprietaire::text, true);
+end $$;
+
+-- Second temps : `authenticated`, ce que fait vraiment l'application.
+set local role authenticated;
 
 do $$
 declare
-  depart      timestamptz;
-  duree_ms    double precision;
-  meilleure   double precision := 1e9;
-  lignes      integer;
-  cellules    integer;
+  depart        timestamptz;
+  duree_ms      double precision;
+  meilleure     double precision := 1e9;
+  proprietaire  double precision := current_setting('tests_mat.proprietaire_ms')::double precision;
+  lignes        integer;
+  cellules      integer;
 begin
-  -- Cinq passages : le premier paie le plan et les pages froides, les suivants
-  -- disent ce que vit le chef de centre qui change de mois.
   for i in 1..5 loop
     depart := clock_timestamp();
     select count(*), sum(length(day_slots) + length(night_slots))
@@ -853,7 +955,7 @@ begin
         '33333333-0000-4000-8000-000000000001',
         '33333333-0000-4000-8000-000000000210');
     duree_ms := extract(epoch from (clock_timestamp() - depart)) * 1000;
-    raise notice '  matrice 60 × 31 × 2 — passage % : % ms', i, round(duree_ms::numeric, 1);
+    raise notice '  matrice 60 × 31 × 2 — authenticated, passage % : % ms', i, round(duree_ms::numeric, 1);
     meilleure := least(meilleure, duree_ms);
   end loop;
 
@@ -861,10 +963,19 @@ begin
   perform tests_mat.egal(cellules, 60 * 31 * 2, 'cellules rendues');
 
   -- Le seuil est large à dessein : il est là pour attraper une régression d'un
-  -- ordre de grandeur (un index perdu, une jointure devenue corrélée), pas pour
-  -- mesurer la machine de CI. Le chiffre réel est imprimé juste au-dessus.
+  -- ordre de grandeur (un index perdu, une jointure devenue corrélée, une RLS
+  -- qui redescend dans la boucle), pas pour mesurer la machine de CI. Le chiffre
+  -- réel est imprimé juste au-dessus.
   perform tests_mat.check(meilleure < 1000,
-    format('matrice sous la seconde (meilleur passage : %s ms)', round(meilleure::numeric, 1)));
+    format('matrice sous la seconde, rôle applicatif (meilleur passage : %s ms)',
+           round(meilleure::numeric, 1)));
+
+  -- Et le rapport entre les deux : le rôle de l'appelant ne doit rien changer au
+  -- coût. Un facteur trois laisse passer le bruit d'une machine partagée et
+  -- attrape le jour où la RLS revient se payer à chaque ligne.
+  perform tests_mat.check(meilleure < 3 * greatest(proprietaire, 1),
+    format('le rôle de l''appelant ne change pas le coût (%s ms contre %s ms)',
+           round(meilleure::numeric, 1), round(proprietaire::numeric, 1)));
 end $$;
 
 -- `v_member_load` lue **directement** par un admin, c'est-à-dire par PostgREST,
