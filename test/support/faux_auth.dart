@@ -24,6 +24,8 @@ import 'package:astreinte_sp/features/onboarding/data/profil_repository.dart';
 import 'package:astreinte_sp/features/onboarding/domain/profil_providers.dart';
 import 'package:astreinte_sp/features/parametres/data/parametres_repository.dart';
 import 'package:astreinte_sp/features/parametres/domain/parametres_providers.dart';
+import 'package:astreinte_sp/features/periodes/data/periodes_repository.dart';
+import 'package:astreinte_sp/features/periodes/domain/periodes_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -182,6 +184,7 @@ Future<AppMontee> monterApp(
   InvitationRepository? invitations,
   ProfilRepository? profils,
   ParametresRepository? parametres,
+  PeriodesRepository? periodes,
   DisposRepository? dispos,
   FileLocale? fileLocale,
   Connectivite? reseau,
@@ -219,6 +222,8 @@ Future<AppMontee> monterApp(
           profilRepositoryProvider.overrideWithValue(profils),
         if (parametres != null)
           parametresRepositoryProvider.overrideWithValue(parametres),
+        if (periodes != null)
+          periodesRepositoryProvider.overrideWithValue(periodes),
         // L'onglet 0 est désormais « Mon mois » : sans faux dépôt, il
         // toucherait un client Supabase qui n'existe pas en test.
         disposRepositoryProvider.overrideWithValue(

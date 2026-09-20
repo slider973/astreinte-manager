@@ -391,6 +391,61 @@ void main() {
       );
     });
 
+    // --- Le refus d'un mois fermé (ticket 014) ------------------------
+
+    testWidgets(
+      'mois verrouillé : un appui sur une case dit pourquoi, sans rien tenter',
+      (tester) async {
+        final depot = FauxDisposRepository(
+          periodes: <PeriodeSaisie>[periodeVerrouillee(annee: 2026, mois: 10)],
+        );
+        await ouvrirMois(tester, depot: depot);
+
+        await tester.ensureVisible(caseDe(0, CreneauType.jour));
+        await tester.tap(caseDe(0, CreneauType.jour));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(
+          find.text(
+            AppStrings.moisRefusVerrouille(
+              AppStrings.moisNomEtAnnee(10, 2026),
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          depot.requetes,
+          0,
+          reason: 'la période lue dit déjà non : rien ne part au serveur',
+        );
+        expect(
+          tester.widget<SlotChip>(caseDe(0, CreneauType.jour)).etat,
+          DisponibiliteEtat.nonSaisi,
+          reason: 'la case ne bouge pas pour autant',
+        );
+      },
+    );
+
+    testWidgets('caserne suspendue : la phrase du refus est celle-là', (
+      tester,
+    ) async {
+      final depot = FauxDisposRepository()
+        ..erreurEcriture = ErreurDispos.verrouille;
+      await ouvrirMois(tester, depot: depot);
+
+      // Le mois reste ouvert, mais le serveur refuse : la caserne est passée
+      // en lecture seule pendant la session.
+      await tester.tap(caseDe(0, CreneauType.jour));
+      await tester.pump(const Duration(seconds: 2));
+
+      await tester.tap(caseDe(1, CreneauType.jour));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text(AppStrings.moisRefusLectureSeule), findsOneWidget);
+    });
+
     testWidgets('aucune période : un état vide sans bouton mort', (
       tester,
     ) async {
