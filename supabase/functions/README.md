@@ -7,6 +7,7 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
 | ------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation |
 | `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                   |
+| `publish-schedule`  | 019    | Publie un planning : statut, `proposed_at` de chaque attribution, puis **une** notification par membre                                                |
 | `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                  |
 
 ## Règles qui ne se négocient pas
@@ -32,7 +33,7 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
 ```sh
 supabase start
 supabase functions serve          # dans un second terminal, rechargement à chaud
-scripts/test_functions.sh         # 110 assertions de bout en bout
+scripts/test_functions.sh         # 131 assertions de bout en bout
 ```
 
 Sans Docker ni base, la logique pure des fonctions se vérifie seule :
@@ -249,6 +250,82 @@ Erreurs :
 `station` et `inviter` accompagnent les erreurs qui méritent une sortie de secours : l'écran peut
 nommer la caserne et proposer d'écrire à l'administrateur plutôt que de laisser l'invité dans un
 cul-de-sac.
+
+---
+
+## `publish-schedule`
+
+Le geste qui fait sortir le planning du bureau du chef de centre. Référence :
+`docs/WORKFLOWS.md § 2, 3 et 4`, `docs/SCHEMA.md § 7`, migration `0019`.
+
+```
+POST /functions/v1/publish-schedule
+apikey: <clé anon>
+Authorization: Bearer <access_token de l'admin>
+Content-Type: application/json
+
+{ "schedule_id": "uuid" }
+```
+
+### Deux temps, dans cet ordre
+
+1. **`publish_schedule(p_schedule, p_actor)`** — fonction SQL `security definer`, réservée au rôle
+   de service. Elle vérifie le droit de l'appelant, passe le planning en `published`, horodate
+   `proposed_at` sur chaque attribution du brouillon et journalise `schedule.published`, **le tout
+   dans une transaction**. Une publication à moitié faite — des attributions horodatées sur un
+   planning resté en brouillon — ne se rattrape par aucune reprise.
+2. **`send-notification`**, forme groupée, avec la clé de service en jeton porteur. La fonction SQL
+   rend les destinataires **déjà groupés par membre** : sept créneaux font une entrée, pas sept.
+   L'envoi vient après la transaction et **ne peut donc pas la défaire** — une notification perdue
+   se rattrape (relance manuelle, crons du ticket 022), une publication à moitié faite, non.
+
+Réponse `200` :
+
+```jsonc
+{
+  "ok": true,
+  "schedule_id": "uuid",
+  "station_id": "uuid",
+  "status": "published",
+  "published_at": "2026-09-18T19:04:11.204Z",
+  "period": "2026-10",
+  "assignments": 9,   // attributions horodatées par cette publication
+  "notified": 2,      // **membres**, pas attributions
+  "notification": {   // le compte rendu de send-notification, tel quel
+    "ok": true, "type": "assignment_proposed", "recipients": 2,
+    "delivered": 2, "failed": 0, "results": [ /* … */ ]
+  }
+}
+```
+
+Un planning sans aucune attribution se publie : c'est en ouvrir la lecture aux membres. Il n'y a
+alors personne à prévenir, et `notification` porte `"skipped": "no_recipients"`.
+
+Un envoi en échec **n'annule pas** la publication : `ok` reste vrai pour le planning et
+`notification` porte `"error": "send_failed"` ou `"unreachable"`.
+
+Erreurs, forme `{"error": {"code", "message"}}` :
+
+| Statut | `code`               | Quand                                                                        |
+| ------ | -------------------- | ---------------------------------------------------------------------------- |
+| 400    | `invalid_body`       | JSON invalide, `schedule_id` absent                                          |
+| 401    | `unauthenticated`    | Pas de jeton porteur, ou jeton qui n'identifie pas un utilisateur            |
+| 403    | `not_admin`          | L'appelant n'est pas admin **actif** de la caserne du planning              |
+| 403    | `station_suspended`  | Abonnement suspendu : la caserne est en lecture seule                        |
+| 404    | `schedule_not_found` | Planning inconnu                                                             |
+| 405    | `method_not_allowed` | Autre verbe que POST                                                         |
+| 409    | `schedule_not_draft` | Déjà publié — l'adjoint a été plus rapide. `status` accompagne l'erreur      |
+| 500    | `internal_error`     | Incident serveur                                                             |
+
+### Ce qui n'est pas ici, et pourquoi
+
+- **La validation** n'est pas une action : le déclencheur `schedule_auto_validate` (migration
+  `0019`) passe le planning en `validated` dès que chaque créneau atteint son effectif requis en
+  attributions **acceptées**, et notifie `schedule_validated` à tous les membres actifs. Aucune
+  Edge Function n'y participe.
+- **La relance** des retardataires est une fonction SQL appelable par un admin
+  (`remind_schedule(p_schedule)`), pas une Edge Function : elle passe par `notify(...)` et sa file,
+  comme les crons du ticket 022 le feront.
 
 ---
 
@@ -472,7 +549,8 @@ Erreurs, forme `{"error": {"code", "message"}}` : `method_not_allowed` (405), `u
 | Quoi                                                                         | Où                                                                      | En CI ? |
 | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------- |
 | Fonctions SQL `create_invitation` / `accept_invitation`                      | `supabase/tests/invitations_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
-| Couche HTTP des trois Edge Functions                                         | `scripts/test_functions.sh`                                             | non     |
+| Couche HTTP des quatre Edge Functions                                        | `scripts/test_functions.sh`                                             | non     |
+| Publication, gardes de transition, validation automatique, relance           | `supabase/tests/publication_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
 | File d'attente et `notify(...)` (migration `0014`)                           | `supabase/tests/notifications_test.sql`, joué par `scripts/test_rls.sh` | oui     |
 | Rappels de saisie (migration `0016`)                                         | `supabase/tests/availability_reminders_test.sql`, même script           | oui     |
 | Libellés, regroupement, liens profonds, erreurs FCM, enchaînement d'un envoi | `deno test supabase/functions/tests/`                                   | oui     |

@@ -423,6 +423,13 @@ verify_jwt = true
 enabled = true
 verify_jwt = true
 
+# Edge Function du ticket 019. `verify_jwt = true` comme les deux fonctions du 006 :
+# elle est appelée par l'administrateur connecté, avec son jeton. Le portier ne dit
+# rien du rôle — c'est `publish_schedule` (migration 0019) qui l'établit en base.
+[functions.publish-schedule]
+enabled = true
+verify_jwt = true
+
 # Edge Function du ticket 025. `verify_jwt = false`, et c'est raisonné : cette
 # fonction n'est jamais appelée par un client, mais par pg_net (migration 0014) et
 # par d'autres Edge Functions. pg_net ne porte aucun JWT, et lui en donner un

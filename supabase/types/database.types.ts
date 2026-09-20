@@ -1129,6 +1129,11 @@ export type Database = {
         }
         Returns: string
       }
+      publish_schedule: {
+        Args: { p_actor: string; p_schedule: string }
+        Returns: Json
+      }
+      remind_schedule: { Args: { p_schedule: string }; Returns: Json }
       station_required_count: {
         Args: {
           p_date: string
