@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 019
 - **Branche** : `feat/020-reattribution`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/22
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
