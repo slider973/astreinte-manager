@@ -6,12 +6,12 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 005 | [Connexion par email et code OTP](in-progress/005-auth-otp.md) | P0 | 001 002 |  |
 
 ## À faire
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 005 | [Connexion par email et code OTP](backlog/005-auth-otp.md) | P0 | 001 002 |  |
 | 006 | [Invitations et onboarding des membres](backlog/006-invitations-onboarding.md) | P0 | 005 008 |  |
 | 007 | [Profil utilisateur](backlog/007-profil.md) | P1 | 005 |  |
 | 009 | [Gestion des membres par l'admin](backlog/009-gestion-membres.md) | P0 | 006 008 |  |

@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 001, 002
 - **Branche** : `feat/005-auth-otp`
+- **Statut** : en cours depuis 2026-09-20
 
 ## À faire
 - Écran de connexion : email, envoi du code à 6 chiffres via Supabase Auth (`signInWithOtp`), écran de saisie du code, renvoi du code avec compte à rebours.
