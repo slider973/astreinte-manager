@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 001, 002
 - **Branche** : `feat/003-ci-github-actions`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/5
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
