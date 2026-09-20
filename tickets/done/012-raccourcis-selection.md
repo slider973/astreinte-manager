@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 011
 - **Branche** : `feat/012-raccourcis-selection`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/11
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
