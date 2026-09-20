@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 001, 005
 - **Branche** : `feat/024-fcm-setup`
-- **Statut** : en cours depuis 2026-09-20
+- **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
 - Projet Firebase, `firebase_messaging` configuré pour le Web : service worker `firebase-messaging-sw.js`, clé VAPID, `firebase_options.dart` limité à la plateforme web. Pas de configuration APNs ni Android à ce ticket (voir 036).
