@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 025
 - **Branche** : `feat/026-centre-notifications`
-- **Statut** : en cours depuis 2026-09-20
+- **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
 - Écran « Notifications » : liste des lignes `inapp`, non lues en évidence, touche = deep link + `read_at`.
