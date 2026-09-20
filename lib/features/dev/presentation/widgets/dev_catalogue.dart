@@ -268,7 +268,7 @@ class _SectionCases extends StatelessWidget {
                 ),
               ])
                 SizedBox(
-                  width: 132,
+                  width: 160,
                   child: DevSpecimen(nom: nom, child: chip),
                 ),
             ],
