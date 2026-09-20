@@ -7,6 +7,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TICKETS="$ROOT/tickets"
 BOARD="$TICKETS/BOARD.md"
 TODAY="$(date +%Y-%m-%d)"
+# Ligne d'attribution des commits générés par ce script. Le modèle de la session
+# la fournit ; CLAUDE.md l'exige sur tout commit. Surchargeable par l'environnement.
+ATTRIBUTION="${TICKET_COAUTHOR:-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>}"
 
 die() { echo "erreur : $*" >&2; exit 1; }
 
@@ -108,7 +111,7 @@ start() {
   set_meta "$dest" "Statut" "en cours depuis $TODAY"
   board
   git -C "$ROOT" add "$TICKETS"
-  git -C "$ROOT" commit -q -m "chore(tickets): $(num_of "$dest") en cours — $(title_of "$dest")"
+  git -C "$ROOT" commit -q -m "chore(tickets): $(num_of "$dest") en cours — $(title_of "$dest")" -m "$ATTRIBUTION"
   git -C "$ROOT" push -q origin main
   git -C "$ROOT" checkout -q -b "$branch"
   echo "ticket $(num_of "$dest") → in-progress, branche $branch créée"
@@ -127,7 +130,7 @@ pr() {
   set_meta "$dest" "Statut" "terminé le $TODAY (PR créée)"
   board
   git -C "$ROOT" add "$TICKETS"
-  git -C "$ROOT" commit -q -m "chore(tickets): $(num_of "$dest") terminé — $(title_of "$dest")"
+  git -C "$ROOT" commit -q -m "chore(tickets): $(num_of "$dest") terminé — $(title_of "$dest")" -m "$ATTRIBUTION"
   git -C "$ROOT" push -q -u origin "$branch"
   local body
   body="$(printf 'Ticket : `tickets/done/%s`\n\n%s\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)' \
@@ -141,7 +144,7 @@ pr() {
   set_meta "$dest" "PR" "$url"
   board
   git -C "$ROOT" add "$TICKETS"
-  git -C "$ROOT" commit -q -m "chore(tickets): lien PR pour $(num_of "$dest")"
+  git -C "$ROOT" commit -q -m "chore(tickets): lien PR pour $(num_of "$dest")" -m "$ATTRIBUTION"
   git -C "$ROOT" push -q origin "$branch"
   echo "ticket $(num_of "$dest") → done, PR : $url"
 }
