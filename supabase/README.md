@@ -80,11 +80,13 @@ Une migration poussée sur `main` n'est jamais modifiée : on en crée une nouve
 | `0006_subscriptions_audit_super_admins.sql` | `subscriptions`, `audit_log`, `super_admins` |
 | `0007_functions_rls.sql` | `is_member`, `is_admin`, `is_super_admin`, `station_writable`, toutes les politiques RLS, trigger `assignments_member_transition` |
 | `0008_rls_durcissement.sql` | revue du ticket 008 : `search_path = public, pg_temp`, liste blanche des colonnes dans le trigger, cohérence du `station_id` avec la ligne parente, `invitations.token` retiré du grant de select |
+| `0009_invitation_functions.sql` | ticket 006 : `mask_email`, `create_invitation`, `accept_invitation`, exécution réservée à `service_role` |
 
 RLS est activé sur chaque table dès sa création et toutes les tables ont au moins une
 politique depuis `0007`. Les politiques sont posées `to authenticated` : `anon` ne lit rien,
 `service_role` et `postgres` ont `bypassrls`. Les vues arrivent au ticket 016
-(`0009_views.sql`), le cron au ticket 022 (`0010_cron.sql`).
+(`0010_views.sql`), le cron au ticket 022 (`0011_cron.sql`) : `0009` a pris le numéro des
+vues au ticket 006, `docs/SCHEMA.md` section 10 a été décalé en conséquence.
 
 Deux pièges à ne pas rouvrir, documentés dans `docs/SCHEMA.md` section 3 :
 
@@ -98,11 +100,20 @@ Deux pièges à ne pas rouvrir, documentés dans `docs/SCHEMA.md` section 3 :
 `invitations.token` n'est pas dans le grant de select du rôle `authenticated` : côté client,
 énumérer les colonnes, ne jamais faire `select *` sur cette table.
 
-## Tests RLS
+Troisième piège, ouvert au ticket 006 : `revoke execute … from public` ne suffit pas à
+fermer une fonction. `api.auto_expose_new_tables` (vrai par défaut, comme sur le projet
+hébergé) pose des privilèges par défaut qui accordent explicitement `execute` à `anon` et
+`authenticated` sur toute fonction créée dans `public` par `postgres`. Une fonction
+réservée au serveur doit révoquer nommément ces deux rôles, sinon elle est appelable en
+RPC PostgREST par n'importe quel client.
+
+## Tests
 
 ```sh
 scripts/test_rls.sh        # joue supabase/tests/*.sql contre la base locale
 DB_URL=postgresql://… scripts/test_rls.sh
+
+scripts/test_functions.sh  # Edge Functions, exige « supabase functions serve »
 ```
 
 `supabase/tests/rls_test.sql` simule un utilisateur connecté comme le fait PostgREST
@@ -111,6 +122,16 @@ entre les deux casernes du seed, les périodes verrouillées, la visibilité des
 selon le statut du planning, les transitions d'attribution et le passage en lecture seule
 d'une caserne suspendue. Tout tourne dans une transaction annulée à la fin : la base reste
 dans l'état du seed. Le script rend un code non nul au premier test rouge.
+
+`supabase/tests/invitations_test.sql` couvre les fonctions `create_invitation` et
+`accept_invitation` de `0009` : droit d'inviter, renvoi sans doublon, adresse déjà membre,
+token inconnu, invitation expirée ou déjà acceptée, adresse de session différente de
+l'adresse invitée, et fermeture des deux fonctions au rôle `authenticated`.
+
+`scripts/test_functions.sh` exerce les deux Edge Functions en HTTP contre la pile locale
+(69 assertions, base rendue à l'état du seed). Il n'est pas dans la CI : le workflow
+démarre la pile sans `edge-runtime` ni `kong`. Voir
+[`functions/README.md`](functions/README.md).
 
 ## Seed (`seed.sql`)
 
@@ -140,6 +161,8 @@ Flutter. Identifiants fixes.
 - Préférences (`availability_preferences`) pour `membre1` à `membre4` de chaque caserne, sur
   les deux périodes.
 - Aucun planning, créneau ni attribution : ticket 017. Aucun super-admin : ticket 031.
+- Aucune invitation en attente : le parcours du ticket 006 se déroule depuis une base
+  vierge d'invitations, et `supabase/tests/invitations_test.sql` s'appuie sur ce fait.
 
 ## Types
 
@@ -163,6 +186,17 @@ exactement comme dans `docs/SCHEMA.md`) et les enums Postgres de la section 1 da
 
 Régénérer les types TypeScript après chaque migration et relire le diff : c'est le moyen
 le plus simple de repérer une colonne oubliée dans un modèle Dart.
+
+## Edge Functions
+
+`supabase/functions/`, une par fonction de `docs/SCHEMA.md` section 7. Variables
+d'environnement attendues, contrat HTTP des fonctions et règles de sécurité :
+[`functions/README.md`](functions/README.md).
+
+```sh
+supabase functions serve                 # sert toutes les fonctions, rechargement à chaud
+supabase functions deploy invite-member  # projet lié uniquement
+```
 
 ## Projet distant
 
