@@ -16,6 +16,7 @@ import '../../features/onboarding/presentation/guide_screen.dart';
 import '../../features/onboarding/presentation/installation_screen.dart';
 import '../../features/onboarding/presentation/profil_accueil_screen.dart';
 import '../../features/parametres/presentation/parametres_screen.dart';
+import '../../features/periodes/presentation/periodes_screen.dart';
 import '../env.dart';
 import '../session/email.dart';
 import '../session/etat_auth.dart';
@@ -80,6 +81,12 @@ abstract final class AppRoutes {
   /// barre d'application, sans empiler.
   static const String parametres = '/admin/parametres';
   static const String parametresName = 'parametresCaserne';
+
+  /// Les mois de saisie de la caserne (ticket 014). Troisième écran de la
+  /// destination « Admin », au même niveau que « Membres » et « Paramètres » :
+  /// on y va et on en revient par la barre d'application, sans empiler.
+  static const String periodes = '/admin/periodes';
+  static const String periodesName = 'periodesCaserne';
 
   /// Le lien reçu par courriel. **Il ne porte que le jeton** : ni l'adresse
   /// invitée, ni le nom de la caserne (`supabase/functions/README.md`).
@@ -188,6 +195,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.parametres,
         name: AppRoutes.parametresName,
         builder: (context, state) => const ParametresScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.periodes,
+        name: AppRoutes.periodesName,
+        builder: (context, state) => const PeriodesScreen(),
       ),
       GoRoute(
         path: AppRoutes.invitation,
