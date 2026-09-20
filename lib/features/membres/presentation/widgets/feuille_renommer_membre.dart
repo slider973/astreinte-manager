@@ -92,7 +92,7 @@ class _FeuilleRenommerState extends State<_FeuilleRenommer> {
               ),
               const SizedBox(height: AppSpacing.entreCibles),
               PrimaryButton(
-                libelle: AppStrings.membreRenommerAnnuler,
+                libelle: AppStrings.actionAnnuler,
                 variante: PrimaryButtonVariante.secondaire,
                 onPressed: () => Navigator.of(context).pop(),
               ),

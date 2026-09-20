@@ -451,7 +451,6 @@ abstract final class AppStrings {
   static const String membreRole = 'Rôle';
   static const String membreStatut = 'Statut';
   static const String membreDispos = 'Dernière saisie';
-  static const String membreFermer = 'Fermer';
   static const String membreActionRenommer = 'Modifier le nom affiché';
   static const String membreActionPromouvoir = 'Nommer administrateur';
   static const String membreActionRetrograder =
@@ -475,7 +474,6 @@ abstract final class AppStrings {
       'Ce nom remplace le prénom et le nom dans les plannings de la caserne. '
       'Laisse le champ vide pour revenir au nom du profil.';
   static const String membreRenommerEnregistrer = 'Enregistrer le nom';
-  static const String membreRenommerAnnuler = 'Annuler';
 
   // --- Confirmation de désactivation ------------------------------------
 

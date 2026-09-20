@@ -24,7 +24,7 @@ Future<bool> confirmerDesactivation({
       actionsOverflowButtonSpacing: AppSpacing.entreCibles,
       actions: <Widget>[
         PrimaryButton(
-          libelle: AppStrings.membreRenommerAnnuler,
+          libelle: AppStrings.actionAnnuler,
           variante: PrimaryButtonVariante.secondaire,
           pleineLargeur: false,
           onPressed: () => Navigator.of(context).pop(false),
