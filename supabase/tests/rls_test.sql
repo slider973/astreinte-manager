@@ -781,12 +781,37 @@ begin
   where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity;
   perform tests.check(manquantes is null, coalesce('tables sans RLS : ' || manquantes, 'toutes les tables ont RLS'));
 
+  -- Une table sans politique n'est pas une table sans protection : RLS activée
+  -- sans aucune politique refuse *tout* à qui ne contourne pas la RLS. Ce qui
+  -- serait un oubli, c'est une table à laquelle `anon` ou `authenticated` a
+  -- encore un privilège alors qu'aucune politique ne dit ce qu'il a le droit d'y
+  -- voir. C'est donc ça qu'on cherche, et pas l'absence de politique en soi.
+  --
+  -- Une seule table est dans ce cas et c'est voulu : `notification_outbox`
+  -- (migration 0014) porte les charges utiles de toutes les casernes à la fois
+  -- et n'est lue que par le rôle de service. Ses privilèges sont retirés à
+  -- `anon` et `authenticated`, et le test le vérifie ci-dessous.
   select string_agg(c.relname, ', ' order by c.relname) into manquantes
   from pg_class c
   join pg_namespace n on n.oid = c.relnamespace
   where n.nspname = 'public' and c.relkind = 'r'
-    and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
-  perform tests.check(manquantes is null, coalesce('tables sans politique : ' || manquantes, 'toutes les tables ont au moins une politique'));
+    and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+    and exists (
+      select 1 from unnest(array['anon', 'authenticated']) as r(role)
+      where has_table_privilege(r.role, c.oid, 'select')
+         or has_table_privilege(r.role, c.oid, 'insert')
+         or has_table_privilege(r.role, c.oid, 'update')
+         or has_table_privilege(r.role, c.oid, 'delete'));
+  perform tests.check(
+    manquantes is null,
+    coalesce('tables sans politique mais encore ouvertes à un client : ' || manquantes,
+             'toute table sans politique est aussi sans privilège client'));
+
+  perform tests.check(
+    not exists (select 1 from pg_policy where polrelid = 'public.notification_outbox'::regclass)
+    and not has_table_privilege('authenticated', 'public.notification_outbox', 'select')
+    and not has_table_privilege('anon', 'public.notification_outbox', 'select'),
+    'la file des notifications est fermée à tout client, sans politique à maintenir');
 end $$;
 
 rollback to savepoint s9;
