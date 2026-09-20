@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 006, 008
 - **Branche** : `feat/009-gestion-membres`
+- **Statut** : en cours depuis 2026-09-20
 
 ## À faire
 - Écran admin « Membres » : liste avec statut, rôle, dernière saisie, recherche.
