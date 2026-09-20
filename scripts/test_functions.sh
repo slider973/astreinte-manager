@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests de bout en bout des Edge Functions : invitations (ticket 006) et envoi de
-# notifications (ticket 025).
+# Tests de bout en bout des Edge Functions : invitations (ticket 006), envoi de
+# notifications (ticket 025) et publication d'un planning (ticket 019).
 #
 #   supabase start
 #   supabase functions serve          # dans un autre terminal
@@ -103,6 +103,10 @@ connexion() { # connexion <email> -> jeton d'accès
 MEMBRE1_A="aaaaaaaa-0000-4000-8000-000000000101"
 MEMBRE2_A="aaaaaaaa-0000-4000-8000-000000000102"
 
+# Le mois M+2 de la caserne A, celui sur lequel le test de publication travaille :
+# le seed le crée et rien d'autre ne s'en sert.
+PERIODE_A="aaaaaaaa-0000-4000-8000-000000000202"
+
 nettoyer() {
   sql "delete from audit_log where action like 'invitation.%';
        delete from notifications where type = 'invitation';
@@ -113,6 +117,14 @@ nettoyer() {
        delete from notification_outbox;
        delete from push_tokens where token like 'jeton-test-%';
        update profiles set push_enabled = true where push_enabled = false;" >/dev/null
+
+  # Le planning du test de publication. Depuis la migration 0019, un planning
+  # publié ne se supprime plus — pas même par le rôle de service, et c'est tout
+  # l'intérêt. Le nettoyage d'un jeu d'essai est le seul endroit qui ait le droit
+  # d'écarter le déclencheur, et il le remet aussitôt.
+  sql "alter table schedules disable trigger schedules_guard_suppression;
+       delete from schedules where period_id = '$PERIODE_A';
+       alter table schedules enable trigger schedules_guard_suppression;" >/dev/null
 }
 
 nettoyer
@@ -512,6 +524,101 @@ verifier "rien n'est renvoyé une seconde fois" "already_processed" \
   "$(jq -r '.skipped' <<<"$CORPS")"
 verifier "toujours une seule notification interne" "1" \
   "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp'")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 14. publish-schedule : identité, rôle et corps de requête'
+# ---------------------------------------------------------------------------
+sql "delete from notifications; delete from notification_outbox" >/dev/null
+
+# Un planning de brouillon pour le mois M+2, avec neuf attributions : sept pour
+# membre1 — **le** cas du ticket — et deux pour membre2.
+# `create_schedule` exige un `auth.uid()` d'administrateur : psql n'en a pas. Le
+# planning et ses créneaux sont donc posés directement, exactement comme la
+# fonction les pose — elle est couverte de son côté par
+# `supabase/tests/planning_brouillon_test.sql`.
+PLANNING="$(sql "
+  insert into schedules (station_id, period_id, created_by)
+  values ('$STATION_A', '$PERIODE_A', 'aaaaaaaa-0000-4000-8000-000000000100')
+  returning id")"
+
+sql "insert into shifts (station_id, schedule_id, date, slot, required_count)
+     select '$STATION_A', '$PLANNING', j::date, s.slot, 1
+       from periods p
+       cross join lateral generate_series(
+         make_date(p.year, p.month, 1),
+         (make_date(p.year, p.month, 1) + interval '1 month - 1 day')::date,
+         interval '1 day') j
+       cross join (select unnest(enum_range(null::slot_type)) as slot) s
+      where p.id = '$PERIODE_A'" >/dev/null
+
+sql "insert into assignments (station_id, shift_id, user_id, created_by)
+     select '$STATION_A', sh.id,
+            case when row_number() over (order by sh.date, sh.slot) <= 7
+                 then '$MEMBRE1_A'::uuid else '$MEMBRE2_A'::uuid end,
+            'aaaaaaaa-0000-4000-8000-000000000100'
+       from shifts sh
+      where sh.schedule_id = '$PLANNING'
+      order by sh.date, sh.slot
+      limit 9" >/dev/null
+
+appeler publish-schedule - "{\"schedule_id\": \"$PLANNING\"}"
+verifier "sans jeton : 401" "401" "$STATUT"
+
+appeler publish-schedule "$MEMBRE_A" "{\"schedule_id\": \"$PLANNING\"}"
+verifier "un membre ne publie pas : 403" "403" "$STATUT"
+verifier "et le code le dit" "not_admin" "$(jq -r '.error.code' <<<"$CORPS")"
+
+appeler publish-schedule "$ADMIN_B" "{\"schedule_id\": \"$PLANNING\"}"
+verifier "l'admin de la caserne voisine ne publie pas : 403" "403" "$STATUT"
+
+appeler publish-schedule "$ADMIN_A" '{}'
+verifier "sans schedule_id : 400" "400" "$STATUT"
+
+appeler publish-schedule "$ADMIN_A" "{\"schedule_id\": \"$STATION_INCONNUE\"}"
+verifier "planning inconnu : 404" "404" "$STATUT"
+
+verifier "rien n'est publié tant que rien n'est accepté" "draft" \
+  "$(sql "select status from schedules where id = '$PLANNING'")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 15. publish-schedule : une notification par membre, pas une par créneau'
+# ---------------------------------------------------------------------------
+appeler publish-schedule "$ADMIN_A" "{\"schedule_id\": \"$PLANNING\"}"
+verifier "la publication réussit : 200" "200" "$STATUT"
+verifier "le planning est publié" "published" "$(jq -r '.status' <<<"$CORPS")"
+verifier "neuf attributions horodatées" "9" "$(jq -r '.assignments' <<<"$CORPS")"
+verifier "deux membres notifiés pour neuf créneaux" "2" "$(jq -r '.notified' <<<"$CORPS")"
+verifier "send-notification a servi les deux" "2" \
+  "$(jq -r '.notification.delivered' <<<"$CORPS")"
+
+verifier "la base dit la même chose" "published" \
+  "$(sql "select status from schedules where id = '$PLANNING'")"
+verifier "proposed_at est posé sur chaque attribution" "0" \
+  "$(sql "select count(*) from assignments a join shifts sh on sh.id = a.shift_id
+           where sh.schedule_id = '$PLANNING' and a.proposed_at is null")"
+
+# **Le critère d'acceptation**, vu depuis la table des notifications.
+verifier "membre1 : une seule notification interne" "1" \
+  "$(sql "select count(*) from notifications
+           where user_id = '$MEMBRE1_A' and type = 'assignment_proposed' and channel = 'inapp'")"
+verifier "et elle résume ses sept créneaux" "7 astreintes proposées" \
+  "$(sql "select left(title, 22) from notifications
+           where user_id = '$MEMBRE1_A' and type = 'assignment_proposed' and channel = 'inapp'")"
+verifier "membre2 : une seule notification interne" "1" \
+  "$(sql "select count(*) from notifications
+           where user_id = '$MEMBRE2_A' and type = 'assignment_proposed' and channel = 'inapp'")"
+verifier "le lien profond mène aux propositions" "/proposals" \
+  "$(sql "select data ->> 'route' from notifications
+           where user_id = '$MEMBRE1_A' and channel = 'inapp' limit 1")"
+verifier "l'audit garde la trace de la publication" "1" \
+  "$(sql "select count(*) from audit_log
+           where action = 'schedule.published' and entity_id = '$PLANNING'")"
+
+appeler publish-schedule "$ADMIN_A" "{\"schedule_id\": \"$PLANNING\"}"
+verifier "republier : 409" "409" "$STATUT"
+verifier "et le code le dit" "schedule_not_draft" "$(jq -r '.error.code' <<<"$CORPS")"
 
 # ---------------------------------------------------------------------------
 echo ''

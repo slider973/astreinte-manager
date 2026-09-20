@@ -16,12 +16,14 @@ import '../../../core/theme/app_status.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/slot_chip.dart';
 import '../../dispos/domain/dispos_providers.dart';
 import '../../dispos/domain/periode_saisie.dart';
 import '../../membres/domain/membres_providers.dart';
 import '../data/matrice_repository.dart';
 import '../data/planning_repository.dart';
+import '../data/suivi_repository.dart';
 import '../domain/candidat.dart';
 import '../domain/cle_cellule.dart';
 import '../domain/ligne_matrice.dart';
@@ -29,11 +31,14 @@ import '../domain/matrice_filtres.dart';
 import '../domain/matrice_providers.dart';
 import '../domain/planning_mois.dart';
 import '../domain/planning_providers.dart';
+import '../domain/recapitulatif_publication.dart';
+import '../domain/suivi_providers.dart';
 import 'widgets/barre_commande_matrice.dart';
 import 'widgets/confirmation_hors_dispo.dart';
 import 'widgets/confirmation_saisie_admin.dart';
 import 'widgets/grille_matrice.dart';
 import 'widgets/panneau_creneau.dart';
+import 'widgets/recapitulatif_publication.dart';
 import 'widgets/squelette_matrice.dart';
 import 'widgets/vue_jour.dart';
 
@@ -286,6 +291,130 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     );
   }
 
+  // -------------------------------------------------------------------
+  // Publier — le geste qui fait sortir le planning du bureau
+  // -------------------------------------------------------------------
+
+  /// Ouvre le récapitulatif, puis publie si le chef confirme.
+  ///
+  /// **Le bordereau avant l'envoi** : créneaux non pourvus, membres au-delà de
+  /// leur quota, membres attribués hors disponibilité. Il avertit, il ne bloque
+  /// jamais (`docs/PRD.md § 7.4`).
+  Future<void> _publier(EtatPlanning etat) async {
+    final recapitulatif = RecapitulatifPublication.construire(
+      planning: etat.planning,
+      lignes: ref.read(lignesAvecChargeProvider),
+      annee: etat.periode.annee,
+      mois: etat.periode.mois,
+    );
+
+    final publie = await ouvrirRecapitulatif(
+      context,
+      recapitulatif: recapitulatif,
+      mois: AppStrings.moisLongs[etat.periode.mois - 1],
+      onPublier: _envoyer,
+    );
+    if (!publie || !mounted) return;
+
+    // Le planning vient de quitter le bureau : c'est ici qu'on va le suivre.
+    ref.invalidate(suiviControllerProvider);
+    context.goNamed(
+      AppRoutes.suiviName,
+      queryParameters: <String, String>{
+        AppRoutes.parametreMois: etat.periode.cle,
+      },
+    );
+  }
+
+  /// L'envoi proprement dit. Rend `true` quand la publication a abouti : la
+  /// feuille ne se ferme qu'à ce moment-là.
+  Future<bool> _envoyer() async {
+    try {
+      final resultat = await _planning.publier();
+      if (resultat == null) return false;
+      final etat = ref.read(planningControllerProvider).value;
+      final planning = etat?.planning.planning;
+
+      // **La publication est acquise, l'envoi ne l'est pas toujours**, et le
+      // compte rendu du serveur le dit. Annoncer « 18 pompiers notifiés » quand
+      // aucun téléphone n'a sonné, c'est retirer au chef la seule raison qu'il
+      // aurait d'aller relancer.
+      if (!resultat.envoiComplet && planning != null) {
+        ref.read(alerteEnvoiProvider.notifier).signaler(planning.id);
+      }
+
+      if (mounted && etat != null) {
+        final mois = AppStrings.moisLongs[etat.periode.mois - 1];
+        _annoncer(
+          resultat.envoiComplet
+              ? AppStrings.publiePourMois(mois, resultat.membres)
+              : AppStrings.publiePourMoisSansEnvoi(mois),
+        );
+      }
+      return true;
+    } on EchecSuivi catch (echec) {
+      // « Déjà publié » n'est pas une panne : c'est l'adjoint qui a été plus
+      // rapide. On le dit d'une phrase, on ferme, et l'écran de suivi montrera
+      // l'état réel.
+      if (echec.erreur == ErreurSuivi.dejaPublie) {
+        if (mounted) _annoncer(AppStrings.publierDejaFait);
+        return true;
+      }
+      return false;
+    }
+  }
+
+  /// Pourquoi la publication est impossible, ou `null`.
+  String? _raisonPublication(EtatPlanning etat) {
+    if (etat.lectureSeule) return AppStrings.matriceSaisieIndisponibleSuspendue;
+    if (!(ref.watch(enLigneProvider).value ?? true)) {
+      return AppStrings.publierHorsLigne;
+    }
+    return null;
+  }
+
+  /// La barre d'actions du bas : le bouton « Publier », et rien d'autre.
+  ///
+  /// `AppScaffold.filActions` est la seule zone de l'ossature qui ne défile pas
+  /// avec la matrice. Un bouton « Publier » perdu sous soixante-deux colonnes
+  /// serait un bouton qu'on cherche. Le 016 la lui avait réservée, le 017 l'a
+  /// laissée vide : la voici occupée.
+  Widget? _filActions(EtatPlanning? etat) {
+    if (etat == null || !etat.planning.modifiable) return null;
+
+    final membres = <String>{
+      for (final creneau in etat.planning.creneaux)
+        for (final attribution in etat.planning.attributionsDe(creneau.id))
+          attribution.userId,
+    }.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        PrimaryButton(
+          libelle: AppStrings.publierAction,
+          icone: Icons.campaign,
+          chargement: etat.publication,
+          raisonDesactivation: _raisonPublication(etat),
+          onPressed: _raisonPublication(etat) != null || etat.publication
+              ? null
+              : () => unawaited(_publier(etat)),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        // Le nombre de **téléphones qui vont sonner**, pas le nombre
+        // d'attributions : c'est la seule grandeur que le chef ait besoin de
+        // sentir avant d'appuyer.
+        Text(
+          AppStrings.publierDetail(membres),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Pourquoi la création du planning est impossible, ou `null`.
   String? _raisonCreation(EtatPlanning etat) {
     if (etat.lectureSeule) return AppStrings.matriceSaisieIndisponibleSuspendue;
@@ -363,9 +492,10 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       ],
       banniere: _banniere(etat, asynchrone),
       // Le panneau du créneau prend la place que le brief du 016 lui avait
-      // réservée. `filActions` reste vide : c'est celle du bouton « Publier »
-      // du ticket 019.
+      // réservée ; `filActions` reçoit enfin le bouton « Publier » que le 016
+      // avait annoncé et que le 017 a laissé vide.
       panneauLateral: panneau == null ? null : _panneau(panneau),
+      filActions: _filActions(ref.watch(planningControllerProvider).value),
       child: _corps(admin: admin, asynchrone: asynchrone, etat: etat),
     );
   }

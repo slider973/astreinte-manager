@@ -400,8 +400,15 @@ rollback to savepoint s3;
 \echo ''
 \echo '--- 3b. Planning draft : rien n''est visible pour un membre'
 savepoint s3b;
-update schedules set status = 'draft'
+-- Rembobinage de **fixture**, pas un scénario du produit : depuis la migration
+-- 0019, aucun chemin ne ramène un planning publié en brouillon
+-- (`schedules_guard_transition`, vérifié par `publication_test.sql § 1`). Le
+-- déclencheur est donc écarté le temps de reconstruire l'état initial, et
+-- remis aussitôt.
+alter table schedules disable trigger schedules_guard_transition;
+update schedules set status = 'draft', published_at = null
 where id = '11111111-0000-4000-8000-000000000003';
+alter table schedules enable trigger schedules_guard_transition;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000101","role":"authenticated"}';
@@ -421,7 +428,9 @@ rollback to savepoint s3b;
 \echo ''
 \echo '--- 3c. Planning validated : un membre voit les attributions de toute la caserne'
 savepoint s3c;
-update schedules set status = 'validated', validated_at = now()
+-- `validated_at` n'est plus une colonne libre : le déclencheur de la migration
+-- 0019 la pose avec le statut.
+update schedules set status = 'validated'
 where id = '11111111-0000-4000-8000-000000000003';
 
 set local role authenticated;
@@ -442,8 +451,15 @@ rollback to savepoint s3c;
 \echo ''
 \echo '--- 3d. Un admin voit tout, quel que soit le statut du planning'
 savepoint s3d;
-update schedules set status = 'draft'
+-- Rembobinage de **fixture**, pas un scénario du produit : depuis la migration
+-- 0019, aucun chemin ne ramène un planning publié en brouillon
+-- (`schedules_guard_transition`, vérifié par `publication_test.sql § 1`). Le
+-- déclencheur est donc écarté le temps de reconstruire l'état initial, et
+-- remis aussitôt.
+alter table schedules disable trigger schedules_guard_transition;
+update schedules set status = 'draft', published_at = null
 where id = '11111111-0000-4000-8000-000000000003';
+alter table schedules enable trigger schedules_guard_transition;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
@@ -1084,8 +1100,15 @@ rollback to savepoint s13;
 \echo ''
 \echo '--- 14. Un membre ne répond pas à l''aveugle à un planning draft'
 savepoint s14;
+-- Rembobinage de **fixture**, pas un scénario du produit : depuis la migration
+-- 0019, aucun chemin ne ramène un planning publié en brouillon
+-- (`schedules_guard_transition`, vérifié par `publication_test.sql § 1`). Le
+-- déclencheur est donc écarté le temps de reconstruire l'état initial, et
+-- remis aussitôt.
+alter table schedules disable trigger schedules_guard_transition;
 update schedules set status = 'draft', published_at = null
 where id = '11111111-0000-4000-8000-000000000003';
+alter table schedules enable trigger schedules_guard_transition;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000101","role":"authenticated"}';

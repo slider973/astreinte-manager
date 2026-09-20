@@ -4,6 +4,13 @@
 #   scripts/test_rls.sh              # base locale (supabase start)
 #   DB_URL=postgresql://… scripts/test_rls.sh
 #
+# Les fichiers de supabase/tests/ passent en premier, chacun dans une transaction
+# annulée à la fin. Vient ensuite scripts/test_concurrence.sh, qui a besoin de
+# **deux sessions simultanées** : aucun fichier psql unique ne sait produire deux
+# instantanés concurrents, et c'est précisément ce que la validation automatique
+# d'un planning doit savoir arbitrer (migration 0019). Il pose ses propres
+# fixtures, les valide, et les retire lui-même.
+#
 # En CI (.github/workflows/ci.yml) : même commande, DB_URL fourni par le workflow.
 # Le script n'a besoin que d'un Postgres joignable — soit via `psql`, soit via le
 # conteneur de la stack locale quand `psql` n'est pas installé.
@@ -51,6 +58,12 @@ for fichier in "${fichiers[@]}"; do
     echo "ÉCHEC : $(basename "$fichier")" >&2
   fi
 done
+
+echo ""
+if ! "$racine/scripts/test_concurrence.sh"; then
+  code=1
+  echo "ÉCHEC : test_concurrence.sh" >&2
+fi
 
 if [ "$code" -eq 0 ]; then
   echo "Tests RLS : OK"
