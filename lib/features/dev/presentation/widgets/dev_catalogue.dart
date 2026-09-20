@@ -423,6 +423,39 @@ class _SectionJours extends StatelessWidget {
               ),
           ],
         ),
+        // L'orientation ligne : la composition de référence du registre sur
+        // téléphone (ticket 011). Même donnée, même règle de geste.
+        DevSpecimen(
+          nom: 'orientation ligne — le registre (ticket 011)',
+          child: Column(
+            children: <Widget>[
+              for (final (numero, nom, weekend, ferie, aujourdhui)
+                  in <(int, String, bool, String?, bool)>[
+                    (2, 'ven.', false, null, false),
+                    (3, 'sam.', true, null, false),
+                    (4, 'dim.', true, null, true),
+                    (11, 'mer.', true, 'Armistice', false),
+                  ])
+                DayCell(
+                  numero: numero,
+                  nomJour: nom,
+                  dateLongue: 'Jour $numero novembre',
+                  orientation: DayCellOrientation.ligne,
+                  weekend: weekend,
+                  nomJourFerie: ferie,
+                  aujourdhui: aujourdhui,
+                  jour: const DaySlot(
+                    etat: DisponibiliteEtat.disponible,
+                    onTap: _rien,
+                  ),
+                  nuit: const DaySlot(
+                    etat: DisponibiliteEtat.nonSaisi,
+                    onTap: _rien,
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }

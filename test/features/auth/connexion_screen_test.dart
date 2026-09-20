@@ -23,7 +23,10 @@ void main() {
     ) async {
       await monterApp(tester);
 
-      final bouton = find.widgetWithText(FilledButton, AppStrings.connexionEnvoyer);
+      final bouton = find.widgetWithText(
+        FilledButton,
+        AppStrings.connexionEnvoyer,
+      );
       expect(tester.getSize(bouton).height, greaterThanOrEqualTo(44));
     });
 

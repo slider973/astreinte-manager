@@ -25,4 +25,5 @@ quelle caserne, avec quel rôle).
 | `membres/` | 006 | Côté admin : les membres actifs, les invitations en attente, l'envoi d'un lot d'invitations. |
 | `invitation/` | 006 | Côté invité : le lien `/invite/<jeton>` et l'échange du jeton contre une place dans la caserne. |
 | `onboarding/` | 006 | L'accueil d'un nouveau membre : complément de profil, guide de trois écrans, aide « Ajouter à l'écran d'accueil ». |
+| `dispos/` | 011 | « Mon mois » : le registre de saisie, la peinture au glissement, la file d'écriture coalescée et les compteurs. L'écran le plus ouvert du produit. |
 | `dev/` | 004 | Le catalogue des composants, absent des builds de production. |

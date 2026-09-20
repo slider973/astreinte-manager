@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 011 | [Grille de saisie des disponibilités](in-progress/011-saisie-dispos-grille.md) | P0 | 004 008 |  |
 
 ## À faire
 
@@ -40,6 +39,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 037 | [Supprimer la dépendance à fonts.gstatic.com au démarrage](backlog/037-canvaskit-autoheberge.md) | P1 | 004 032 |  |
 | 038 | [Limiter le débit des invitations](backlog/038-limite-debit-invitations.md) | P1 | 006 |  |
+| 039 | [Conserver la destination d'un lien profond au démarrage à froid](backlog/039-deep-links-demarrage-froid.md) | P0 | 005 011 |  |
 
 ## Terminés
 
@@ -54,4 +54,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 008 | [Row Level Security et fonctions d'accès](done/008-rls-multi-tenant.md) | P0 | 002 | https://github.com/slider973/astreinte-manager/pull/3 |
 | 009 | [Gestion des membres par l'admin](done/009-gestion-membres.md) | P0 | 006 008 | https://github.com/slider973/astreinte-manager/pull/8 |
 | 010 | [Paramètres de la caserne](done/010-parametres-caserne.md) | P1 | 008 | https://github.com/slider973/astreinte-manager/pull/9 |
+| 011 | [Grille de saisie des disponibilités](done/011-saisie-dispos-grille.md) | P0 | 004 008 | https://github.com/slider973/astreinte-manager/pull/10 |
 

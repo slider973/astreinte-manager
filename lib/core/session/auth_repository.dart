@@ -45,15 +45,16 @@ class SupabaseAuthRepository implements AuthRepository {
   /// L'origine de la PWA (`https://astreintes.example`), seule cible que le
   /// lien magique doit rouvrir. Hors du web, il n'y a pas d'origine : le lien
   /// magique n'est pas proposé (voir `tickets/.../005`).
-  static String? urlRedirectionParDefaut() =>
-      kIsWeb ? Uri.base.origin : null;
+  static String? urlRedirectionParDefaut() => kIsWeb ? Uri.base.origin : null;
 
   @override
   Stream<SessionUtilisateur?> get sessions async* {
     // La session restaurée est déjà là après `Supabase.initialize` : on
     // l'émet tout de suite pour ne pas faire clignoter l'écran de connexion.
     yield sessionCourante;
-    yield* _auth.onAuthStateChange.map((evenement) => _depuis(evenement.session));
+    yield* _auth.onAuthStateChange.map(
+      (evenement) => _depuis(evenement.session),
+    );
   }
 
   @override
@@ -87,11 +88,7 @@ class SupabaseAuthRepository implements AuthRepository {
     required String code,
   }) async {
     try {
-      await _auth.verifyOTP(
-        email: email,
-        token: code,
-        type: OtpType.email,
-      );
+      await _auth.verifyOTP(email: email, token: code, type: OtpType.email);
     } on Object catch (erreur) {
       throw AuthEchec(
         traduireErreurAuth(erreur, etape: AuthEtape.verification),

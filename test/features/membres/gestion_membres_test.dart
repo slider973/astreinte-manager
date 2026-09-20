@@ -125,10 +125,7 @@ void main() {
         ),
       );
 
-      await tester.enterText(
-        find.byType(TextField).first,
-        'girard',
-      );
+      await tester.enterText(find.byType(TextField).first, 'girard');
       await tester.pumpAndSettle();
 
       expect(find.text('Camille Girard'), findsOneWidget);
@@ -296,25 +293,26 @@ void main() {
   });
 
   group('Garde-fous à l\'écran', () {
-    testWidgets('le dernier admin ne peut pas se rétrograder, et on dit pourquoi', (
-      tester,
-    ) async {
-      final depot = FauxMembresRepository(
-        membresActifs: const <MembreCaserne>[moiAdmin, membreMarie],
-      );
-      await _ouvrir(tester, depot);
-      await _ouvrirActions(tester, moiAdmin);
+    testWidgets(
+      'le dernier admin ne peut pas se rétrograder, et on dit pourquoi',
+      (tester) async {
+        final depot = FauxMembresRepository(
+          membresActifs: const <MembreCaserne>[moiAdmin, membreMarie],
+        );
+        await _ouvrir(tester, depot);
+        await _ouvrirActions(tester, moiAdmin);
 
-      expect(find.text(AppStrings.membreRefusDernierAdmin), findsNWidgets(2));
+        expect(find.text(AppStrings.membreRefusDernierAdmin), findsNWidgets(2));
 
-      await tester.tap(find.text(AppStrings.membreActionRetrograder));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text(AppStrings.membreActionRetrograder));
+        await tester.pumpAndSettle();
 
-      // La feuille est toujours là, et rien n'a été écrit.
-      expect(find.text(AppStrings.membreActionRetrograder), findsOneWidget);
-      expect(depot.roles, isEmpty);
-      expect(depot.statuts, isEmpty);
-    });
+        // La feuille est toujours là, et rien n'a été écrit.
+        expect(find.text(AppStrings.membreActionRetrograder), findsOneWidget);
+        expect(depot.roles, isEmpty);
+        expect(depot.statuts, isEmpty);
+      },
+    );
 
     testWidgets('à deux admins, on ne se retire pas soi-même', (tester) async {
       final depot = FauxMembresRepository(
@@ -349,48 +347,49 @@ void main() {
   });
 
   group('Effet d\'une désactivation', () {
-    testWidgets('à la connexion suivante, le membre désactivé n\'a plus de caserne', (
-      tester,
-    ) async {
-      // Ce que la base rend après le passage de l'admin : la même
-      // appartenance, mais désactivée.
-      await monterApp(
-        tester,
-        session: sessionMembre,
-        appartenances: const <Appartenance>[appartenanceDesactivee],
-      );
+    testWidgets(
+      'à la connexion suivante, le membre désactivé n\'a plus de caserne',
+      (tester) async {
+        // Ce que la base rend après le passage de l'admin : la même
+        // appartenance, mais désactivée.
+        await monterApp(
+          tester,
+          session: sessionMembre,
+          appartenances: const <Appartenance>[appartenanceDesactivee],
+        );
 
-      expect(find.text(AppStrings.caserneDesactiveeTitre), findsOneWidget);
-      expect(
-        find.text(AppStrings.caserneDesactiveeTexte('CIS Saint-Martin')),
-        findsOneWidget,
-      );
+        expect(find.text(AppStrings.caserneDesactiveeTitre), findsOneWidget);
+        expect(
+          find.text(AppStrings.caserneDesactiveeTexte('CIS Saint-Martin')),
+          findsOneWidget,
+        );
 
-      // Sans le nom : la politique de `stations` n'ouvre la lecture qu'aux
-      // membres actifs, un compte désactivé ne lit donc plus le nom de sa
-      // caserne. Vérifié en vrai contre la base locale.
-      await monterApp(
-        tester,
-        session: sessionMembre,
-        appartenances: const <Appartenance>[
-          Appartenance(
-            id: 'm-2',
-            stationId: 'aaaaaaaa-0000-4000-8000-000000000001',
-            nomCaserne: '',
-            role: RoleMembre.membre,
-            statut: StatutMembre.desactive,
-          ),
-        ],
-      );
-      expect(
-        find.text(AppStrings.caserneDesactiveeTexteSansNom),
-        findsOneWidget,
-      );
+        // Sans le nom : la politique de `stations` n'ouvre la lecture qu'aux
+        // membres actifs, un compte désactivé ne lit donc plus le nom de sa
+        // caserne. Vérifié en vrai contre la base locale.
+        await monterApp(
+          tester,
+          session: sessionMembre,
+          appartenances: const <Appartenance>[
+            Appartenance(
+              id: 'm-2',
+              stationId: 'aaaaaaaa-0000-4000-8000-000000000001',
+              nomCaserne: '',
+              role: RoleMembre.membre,
+              statut: StatutMembre.desactive,
+            ),
+          ],
+        );
+        expect(
+          find.text(AppStrings.caserneDesactiveeTexteSansNom),
+          findsOneWidget,
+        );
 
-      // Et l'écran d'administration lui reste fermé, même en tapant l'adresse.
-      await ouvrirRoute(tester, _cheminMembres);
-      expect(find.text(AppStrings.membresTitre), findsNothing);
-      expect(find.text(AppStrings.caserneDesactiveeTitre), findsOneWidget);
-    });
+        // Et l'écran d'administration lui reste fermé, même en tapant l'adresse.
+        await ouvrirRoute(tester, _cheminMembres);
+        expect(find.text(AppStrings.membresTitre), findsNothing);
+        expect(find.text(AppStrings.caserneDesactiveeTitre), findsOneWidget);
+      },
+    );
   });
 }

@@ -156,9 +156,11 @@ class SlotChip extends StatelessWidget {
       pulse: enEnregistrement && !AppMotion.reduit(context),
     );
 
-    Widget dessiner({required bool focalise}) {
+    Widget dessiner({required bool focalise, bool presse = false}) {
       final case_ = _Case(
-        apparence: apparence.avecFocus(context, focalise: focalise),
+        apparence: apparence
+            .avecFocus(context, focalise: focalise)
+            .avecAppui(presse: presse),
         tailleGlyphe: densite.glyphe,
       );
 
@@ -203,15 +205,35 @@ class SlotChip extends StatelessWidget {
 
 /// La couche d'interaction : focus clavier, curseur, appui.
 ///
-/// Elle n'introduit aucun `State` propre. Le halo de focus est relu depuis le
-/// `Focus` englobant via un `Builder` : `Focus` publie son nœud dans un
-/// `InheritedNotifier`, donc le `Builder` se reconstruit seul quand le focus
-/// entre ou sort.
-class _Actionnable extends StatelessWidget {
+/// Le halo de focus est relu depuis le `Focus` englobant via un `Builder` :
+/// `Focus` publie son nœud dans un `InheritedNotifier`, donc le `Builder` se
+/// reconstruit seul quand le focus entre ou sort.
+///
+/// Le seul `State` de cette couche porte l'**état pressé** (brief 011 § 6.1) :
+/// la case s'assombrit sous le doigt dès le contact, sans que rien ne bouge —
+/// ni taille, ni bordure. Il n'existe que sur une case actionnable : une
+/// matrice en lecture seule n'en paie pas un seul.
+///
+/// `onTapCancel` est ce qui rend l'effet honnête pendant un défilement : le
+/// doigt posé sur une case puis tiré rend la case à son état normal au moment
+/// exact où le `Scrollable` gagne l'arène.
+class _Actionnable extends StatefulWidget {
   const _Actionnable({required this.onTap, required this.dessiner});
 
   final VoidCallback onTap;
-  final Widget Function({required bool focalise}) dessiner;
+  final Widget Function({required bool focalise, bool presse}) dessiner;
+
+  @override
+  State<_Actionnable> createState() => _ActionnableState();
+}
+
+class _ActionnableState extends State<_Actionnable> {
+  bool _presse = false;
+
+  void _marquer({required bool presse}) {
+    if (_presse == presse) return;
+    setState(() => _presse = presse);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +242,7 @@ class _Actionnable extends StatelessWidget {
         // Entrée et Espace activent la case comme un clic.
         ActivateIntent: CallbackAction<ActivateIntent>(
           onInvoke: (_) {
-            onTap();
+            widget.onTap();
             return null;
           },
         ),
@@ -231,8 +253,14 @@ class _Actionnable extends StatelessWidget {
             cursor: SystemMouseCursors.click,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: dessiner(focalise: Focus.of(context).hasFocus),
+              onTap: widget.onTap,
+              onTapDown: (_) => _marquer(presse: true),
+              onTapUp: (_) => _marquer(presse: false),
+              onTapCancel: () => _marquer(presse: false),
+              child: widget.dessiner(
+                focalise: Focus.of(context).hasFocus,
+                presse: _presse,
+              ),
             ),
           ),
         ),
@@ -285,6 +313,12 @@ class _Apparence {
     final descripteur = statuts.disponibilite(etat);
     final verrouillee = statuts.periode(PeriodeEtat.verrouillee);
 
+    // Sur un mois verrouillé, **le contour devient gris comme le reste**.
+    // Le filet vermillon d'« absent » y serait lu comme une alarme alors que
+    // le verrouillage est un fait (`DESIGN.md § Do's`) ; la valeur, elle,
+    // reste parfaitement lisible, portée par son glyphe et par sa texture.
+    final filetEtat = verrouille ? verrouillee.encre : descripteur.filet;
+
     // Un seul contour à la fois, par ordre de priorité : erreur, puis
     // sélection, puis le filet propre à l'état.
     final (
@@ -301,12 +335,12 @@ class _Apparence {
         true,
       ),
       _ when etat == DisponibiliteEtat.nonSaisi => (
-        descripteur.filet,
+        filetEtat,
         AppStroke.filet,
         true,
         false,
       ),
-      _ => (descripteur.filet, AppStroke.etat, false, false),
+      _ => (filetEtat, AppStroke.etat, false, false),
     };
 
     // Le créneau ne porte aucune teinte : il ne se voit que là où l'état ne
@@ -349,6 +383,25 @@ class _Apparence {
       encreGlyphe: encreGlyphe,
       pulse: pulse,
       contourImpose: true,
+    );
+  }
+
+  /// L'état pressé : **8 % de l'encre d'état versés dans le fond**, et rien
+  /// d'autre. Ni taille, ni bordure, ni ombre : rien ne doit bouger sous un
+  /// doigt ganté, sous peine de rater la case voisine.
+  _Apparence avecAppui({required bool presse}) {
+    if (!presse) return this;
+    return _Apparence(
+      fond: Color.alphaBlend(encreGlyphe.withValues(alpha: 0.08), fond),
+      filet: filet,
+      epaisseurFilet: epaisseurFilet,
+      tirete: tirete,
+      hachure: hachure,
+      encreHachure: encreHachure,
+      glyphe: glyphe,
+      encreGlyphe: encreGlyphe,
+      pulse: pulse,
+      contourImpose: contourImpose,
     );
   }
 
