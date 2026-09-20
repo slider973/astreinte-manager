@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/session/auth_erreur.dart';
+import '../../../../core/session/email.dart';
 import '../../../../core/session/session_providers.dart';
-import '../../domain/email.dart';
 
 /// L'état de l'écran de saisie de l'adresse e-mail.
 @immutable

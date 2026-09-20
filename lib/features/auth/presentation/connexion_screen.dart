@@ -7,10 +7,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/session/email.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/primary_button.dart';
-import '../domain/email.dart';
 import 'controllers/connexion_controller.dart';
 import 'widgets/auth_layout.dart';
 import 'widgets/champ_auth.dart';

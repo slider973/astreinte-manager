@@ -1,4 +1,5 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
@@ -6,6 +7,7 @@ import 'package:astreinte_sp/features/auth/presentation/code_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/connexion_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/controllers/code_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -141,6 +143,37 @@ void main() {
 
       await demonter(tester);
     });
+
+    testWidgets(
+      'la route du code sans adresse renvoie à la connexion, elle ne montre '
+      'pas un écran vide',
+      (tester) async {
+        await monterApp(tester);
+        final routeur = ProviderScope.containerOf(
+          tester.element(find.byType(ConnexionScreen)),
+        ).read(appRouterProvider);
+
+        routeur.go(AppRoutes.code);
+        await tester.pumpAndSettle();
+        expect(find.byType(ConnexionScreen), findsOneWidget);
+        expect(find.byType(CodeScreen), findsNothing);
+
+        // Une adresse présente mais tronquée ne vaut pas mieux qu'une absence.
+        routeur.go('${AppRoutes.code}?${AppRoutes.parametreEmail}=membre1');
+        await tester.pumpAndSettle();
+        expect(find.byType(ConnexionScreen), findsOneWidget);
+        expect(find.byType(CodeScreen), findsNothing);
+
+        routeur.go(
+          '${AppRoutes.code}?${AppRoutes.parametreEmail}='
+          'membre1@caserne-a.test',
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(CodeScreen), findsOneWidget);
+
+        await demonter(tester);
+      },
+    );
 
     testWidgets('« Changer d\'adresse » revient à l\'étape précédente', (
       tester,

@@ -4,8 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/session/auth_erreur.dart';
+import '../../../../core/session/email.dart';
 import '../../../../core/session/session_providers.dart';
-import '../../domain/email.dart';
 
 /// Longueur du code envoyé par Supabase (`supabase/config.toml`,
 /// `auth.email.otp_length`).

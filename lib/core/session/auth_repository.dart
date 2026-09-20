@@ -67,6 +67,12 @@ class SupabaseAuthRepository implements AuthRepository {
         // Les comptes naissent d'une invitation (ticket 006), jamais d'un
         // écran de connexion : une adresse inconnue reçoit un refus explicite
         // plutôt qu'un compte fantôme.
+        //
+        // Ce drapeau est une politesse, pas une garantie : la clé anon est
+        // publique, donc quiconque peut appeler /auth/v1/otp sans lui. Ce qui
+        // ferme vraiment la porte, c'est `auth.enable_signup = false` dans
+        // `supabase/config.toml`, qui répond alors `signup_disabled` — traduit
+        // ici en « Aucun compte pour cette adresse ».
         shouldCreateUser: false,
         emailRedirectTo: _urlRedirection,
       );

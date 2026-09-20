@@ -10,6 +10,7 @@ import '../../features/demarrage/presentation/configuration_absente_screen.dart'
 import '../../features/demarrage/presentation/demarrage_screen.dart';
 import '../../features/dev/presentation/dev_components_screen.dart';
 import '../env.dart';
+import '../session/email.dart';
 import '../session/etat_auth.dart';
 import '../session/session_providers.dart';
 import '../supabase/supabase_bootstrap.dart';
@@ -79,11 +80,25 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             ? null
             : AppRoutes.configuration;
       }
-      return redirectionAuth(
+      final redirection = redirectionAuth(
         etat: ref.read(etatAuthProvider),
         chemin: state.matchedLocation,
         outilsDevAutorises: env.isDev,
       );
+      if (redirection != null) return redirection;
+
+      // L'écran du code n'existe que pour une adresse : sans elle, il annonce
+      // « un code part vers  » et vérifie dans le vide. Le contrôle est ici et
+      // non dans `redirectionAuth`, qui ne voit que le chemin : l'adresse est
+      // dans la chaîne de requête.
+      if (state.matchedLocation == AppRoutes.code &&
+          !emailValide(
+            state.uri.queryParameters[AppRoutes.parametreEmail] ?? '',
+          )) {
+        return AppRoutes.connexion;
+      }
+
+      return null;
     },
     routes: <RouteBase>[
       GoRoute(
