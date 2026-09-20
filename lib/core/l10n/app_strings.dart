@@ -10,16 +10,8 @@
 abstract final class AppStrings {
   static const String appTitle = 'Astreinte SP';
 
-  // -------------------------------------------------------------------
-  // Écran Hello (ticket 001)
-  // -------------------------------------------------------------------
-
-  static const String helloTitle = 'Bonjour';
-  static const String helloSubtitle =
-      'Le socle Flutter est en place. Cet écran lit la configuration '
-      'fournie à la compilation.';
-  static const String appEnvLabel = 'Environnement';
-  static const String supabaseUrlLabel = 'URL Supabase';
+  /// Valeur attendue mais absente. Jamais un champ vide : le vide ne se lit
+  /// pas.
   static const String valueUndefined = 'Non définie';
 
   // -------------------------------------------------------------------
@@ -172,6 +164,95 @@ abstract final class AppStrings {
       '$valeur sur $plafond';
 
   static String compteurSansPlafond(int valeur) => '$valeur, $compteurIllimite';
+
+  // -------------------------------------------------------------------
+  // Connexion (ticket 005)
+  // -------------------------------------------------------------------
+
+  static const String connexionTitre = 'Connexion';
+  static const String connexionIntro =
+      'Entre ton adresse e-mail. On t\'envoie un code à six chiffres pour te '
+      'connecter, sans mot de passe.';
+  static const String connexionEmailLabel = 'Adresse e-mail';
+  static const String connexionEmailExemple = 'prenom.nom@exemple.fr';
+  static const String connexionEnvoyer = 'Recevoir mon code';
+  static const String connexionEnvoiEnCours = 'Envoi du code…';
+
+  static const String codeTitre = 'Ton code';
+  static const String codeLabel = 'Code à six chiffres';
+  static const String codeValider = 'Me connecter';
+  static const String codeRenvoyer = 'Renvoyer un code';
+  static const String codeChangerEmail = 'Changer d\'adresse';
+  static const String codeLienAlternative =
+      'L\'e-mail contient aussi un lien : ouvre-le sur cet appareil au lieu de '
+      'recopier le code.';
+  static const String codeRenvoye = 'Nouveau code envoyé. Regarde tes e-mails.';
+
+  static String codeIntro(String email) =>
+      'Un code à six chiffres part vers $email. Il est valable une heure.';
+
+  /// Raison affichée sous le bouton « Renvoyer un code » tant que le délai
+  /// n'est pas écoulé. Un bouton désactivé dit toujours pourquoi.
+  static String codeRenvoiDans(int secondes) =>
+      'Nouveau code possible dans $secondes\u00a0s';
+
+  // --- Erreurs d'authentification ------------------------------------
+
+  static const String authEmailInvalide =
+      'Adresse e-mail incomplète. Écris-la en entier, par exemple '
+      'prenom.nom@exemple.fr.';
+  static const String authCompteInconnu =
+      'Aucun compte pour cette adresse. Demande une invitation à ton chef de '
+      'centre.';
+  static const String authCodeIncomplet =
+      'Il manque des chiffres. Le code en compte six.';
+  static const String authCodeInvalide =
+      'Code incorrect. Vérifie les 6 chiffres ou demande un nouveau code.';
+  static const String authCodeExpire =
+      'Ce code a expiré. Demande un nouveau code.';
+  static const String authTropDeTentatives =
+      'Trop d\'essais. Attends quelques minutes, puis redemande un code.';
+  static const String authEnvoiImpossible =
+      'Impossible d\'envoyer le code. Vérifie ta connexion, puis réessaie.';
+
+  // --- Compte sans caserne -------------------------------------------
+
+  static const String aucuneCaserneTitre = 'Aucune caserne';
+  static const String aucuneCaserneTexte =
+      'Ton compte existe, mais il n\'est rattaché à aucune caserne. Demande '
+      'une invitation à ton chef de centre : il t\'ajoutera avec cette adresse '
+      'e-mail.';
+  static const String caserneDesactiveeTitre = 'Accès désactivé';
+
+  static String caserneDesactiveeTexte(String caserne) =>
+      'Ton accès à $caserne a été désactivé. Contacte ton chef de centre pour '
+      'le rouvrir.';
+
+  // --- Accueil --------------------------------------------------------
+
+  static const String accueilTitre = 'Accueil';
+  static const String accueilCaserneLabel = 'Ta caserne';
+  static const String accueilRoleLabel = 'Ton rôle';
+  static const String accueilAVenirTitre = 'Écran à venir';
+  static const String accueilAVenirTexte =
+      'Cet écran arrive dans une prochaine version. Pour l\'instant, l\'accueil '
+      'te montre ta caserne et ton rôle.';
+  static const String accueilRetour = 'Revenir à l\'accueil';
+  static const String accueilTexte =
+      'Ta connexion fonctionne. La saisie des disponibilités et le planning '
+      'arrivent dans les prochaines versions.';
+  static const String roleMembre = 'Membre';
+  static const String roleAdmin = 'Admin de caserne';
+  static const String seDeconnecter = 'Se déconnecter';
+  static const String deconnexionEnCours = 'Déconnexion…';
+
+  // --- Démarrage et configuration ------------------------------------
+
+  static const String demarrageSemantique = 'Connexion à ton compte en cours';
+  static const String configurationTitre = 'Application non configurée';
+  static const String configurationTexte =
+      'L\'application n\'a pas reçu l\'adresse de son serveur. Elle ne peut pas '
+      'te connecter. Signale-le à la personne qui l\'a installée.';
 
   // -------------------------------------------------------------------
   // Écran de démonstration (build de développement)

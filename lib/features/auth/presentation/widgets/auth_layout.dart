@@ -1,0 +1,82 @@
+import 'package:flutter/material.dart';
+
+import '../../../../core/theme/app_breakpoints.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/app_banner.dart';
+
+/// L'ossature des écrans d'avant-connexion.
+///
+/// Ce n'est pas un composant du système : `AppScaffold` porte une navigation
+/// à cinq destinations qu'un visiteur non connecté n'a pas le droit d'avoir.
+/// On reprend donc ses règles — bannière pleine largeur sous le haut d'écran,
+/// zones sûres, marge de page selon la classe de fenêtre — sans sa navigation.
+///
+/// La colonne est bornée à 420 dp : une adresse e-mail et six chiffres n'ont
+/// jamais besoin de la largeur d'un écran de bureau.
+class AuthLayout extends StatelessWidget {
+  const AuthLayout({
+    required this.titre,
+    required this.children,
+    super.key,
+    this.banniere,
+    this.enTete,
+  });
+
+  /// Le titre de l'écran, en `titre-ecran`. Le premier élément lu.
+  final String titre;
+
+  /// Le corps, empilé sous le titre.
+  final List<Widget> children;
+
+  /// Au plus une bannière, pleine largeur, au-dessus du contenu.
+  final AppBanner? banniere;
+
+  /// Élément placé entre la bannière et le titre (un retour, par exemple).
+  final Widget? enTete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final marge = AppWindowClass.of(context).margePage;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: <Widget>[
+            ?banniere,
+            Expanded(
+              child: SingleChildScrollView(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: marge,
+                        vertical: AppSpacing.xl,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          ?enTete,
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              titre,
+                              style: theme.textTheme.headlineMedium,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sousTitre),
+                          ...children,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
