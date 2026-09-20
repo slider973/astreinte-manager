@@ -18,3 +18,17 @@
 - Une invitation expirée affiche un message clair et propose de contacter l'admin.
 - Un email déjà membre ne peut pas être réinvité (index unique).
 - L'invitation acceptée apparaît en temps réel côté admin.
+
+  **Écart assumé : la relecture remplace le temps réel.** `invitations` est
+  volontairement hors de la réplication temps réel (`docs/SCHEMA.md § 9`) : le
+  canal Realtime ne sait pas masquer une colonne, et `invitations.token` est un
+  porteur de droits qui ne doit jamais sortir. Publier la table donnerait le
+  jeton à tout admin connecté, et le premier trou de politique le donnerait à
+  tout le monde. L'écran « Membres » relit donc les deux listes à trois
+  moments : à son ouverture (`membresControllerProvider` est auto-disposé, son
+  état ne survit pas à la navigation), au retour de l'application au premier
+  plan, et après chaque action — envoi, renvoi, annulation. Un admin resté sur
+  l'écran pendant qu'un invité accepte voit la liste à jour dès qu'il y revient
+  ou qu'il rouvre l'application ; le bouton « Relire la liste » reste la sortie
+  immédiate. Si un vrai temps réel devient nécessaire, il passera par une vue
+  sans jeton, à ouvrir dans un ticket dédié.
