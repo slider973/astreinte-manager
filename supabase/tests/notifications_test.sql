@@ -9,8 +9,9 @@
 --    insertion directe mal formée est refusée comme un appel mal formé.
 -- 3. `p_dedupe_key` rend l'appel idempotent : « un rappel par membre et par
 --    échéance » (ticket 015), « un rapport par jour et par planning » (ticket 022).
--- 4. `notify_claim` ne rend une demande qu'une fois : un rejeu de la tâche de
---    reprise sur une demande déjà traitée n'envoie rien.
+-- 4. `notify_claim` ne rend une demande qu'une fois : deux prises en charge
+--    concurrentes ne produisent pas deux notifications, et un rejeu de la tâche
+--    de reprise sur une demande déjà close n'envoie rien.
 -- 5. `notify_complete` clôt la demande, en réussite comme en échec.
 -- 6. `cron_dispatch_notifications` : elle laisse les demandes fraîches à la
 --    tentative immédiate, reprend les autres, respecte le verrou et abandonne au
@@ -249,11 +250,20 @@ select tests.check(
 
 select tests.check(
   (select (notify_claim(:'id_validation')).id is not null),
-  'la première relecture rend la demande');
+  'la première prise en charge rend la demande');
 
 select tests.check(
-  (select (notify_claim(:'id_validation')).locked_until > now() + interval '1 minute'),
-  'la relecture pose un verrou : la reprise ne marche pas dessus');
+  (select status = 'sending' and locked_until > now() + interval '1 minute'
+     from notification_outbox where id = :'id_validation'),
+  'elle passe la demande en « sending » et pose le verrou');
+
+-- Le point que la revue a relevé : sans changement de statut, une seconde prise
+-- en charge — la reprise qui n'a pas vu le verrou, ou deux requêtes arrivées
+-- ensemble — rendait la demande une deuxième fois, et le membre recevait la
+-- notification en double.
+select tests.check(
+  (select (notify_claim(:'id_validation')).id is null),
+  'une seconde prise en charge ne rend rien : la première l''a bien prise');
 
 select notify_complete(:'id_validation', true, null,
   jsonb_build_object('recipients', 2, 'delivered', 2, 'failed', 0));
@@ -309,9 +319,25 @@ values
    '[{"user_id":"aaaaaaaa-0000-4000-8000-000000000101"}]'::jsonb,
    now() - interval '1 hour', 5, now() - interval '1 minute');
 
+-- Prise en charge par une Edge Function qui n'a jamais rendu sa réponse
+-- (redémarrage, dépassement de délai) : son verrou a expiré.
+insert into notification_outbox (id, station_id, type, recipients, created_at, attempts, status, locked_until)
+values
+  ('cccccccc-0000-4000-8000-000000000005',
+   'aaaaaaaa-0000-4000-8000-000000000001', 'schedule_validated',
+   '[{"user_id":"aaaaaaaa-0000-4000-8000-000000000101"}]'::jsonb,
+   now() - interval '10 minutes', 1, 'sending', now() - interval '3 minutes'),
+  -- prise en charge en cours, verrou encore valide : on n'y touche pas
+  ('cccccccc-0000-4000-8000-000000000006',
+   'aaaaaaaa-0000-4000-8000-000000000001', 'schedule_validated',
+   '[{"user_id":"aaaaaaaa-0000-4000-8000-000000000101"}]'::jsonb,
+   now() - interval '10 seconds', 1, 'sending', now() + interval '2 minutes');
+
+-- Deux demandes reposées : celle restée en plan, et celle dont la prise en charge
+-- a été abandonnée et qui vient de revenir en attente.
 select tests.check(
-  cron_dispatch_notifications() = 1,
-  'la reprise ne repose que la demande vieille et non verrouillée');
+  cron_dispatch_notifications() = 2,
+  'la reprise repose la demande restée en plan et celle dont la prise en charge a expiré');
 
 select tests.check(
   (select attempts = 0 and status = 'pending'
@@ -332,17 +358,30 @@ select tests.check(
      from notification_outbox where id = 'cccccccc-0000-4000-8000-000000000004'),
   'au bout de cinq tentatives la demande est abandonnée, avec une erreur lisible');
 
+-- Sans ce retour en arrière, une demande restée en `sending` ne serait jamais
+-- reprise : la file aurait un trou noir, et la notification disparaîtrait.
+select tests.check(
+  (select status = 'pending' and attempts = 2 and locked_until > now()
+     from notification_outbox where id = 'cccccccc-0000-4000-8000-000000000005'),
+  'une prise en charge sans réponse revient en attente, puis repart');
+
+select tests.check(
+  (select status = 'sending' and attempts = 1
+     from notification_outbox where id = 'cccccccc-0000-4000-8000-000000000006'),
+  'une prise en charge en cours n''est pas dérangée');
+
 -- Idempotence : rejouée aussitôt, la tâche ne touche plus rien (tout est verrouillé).
 select tests.check(
   cron_dispatch_notifications() = 0,
   'rejouée dans la foulée, la reprise ne repose rien');
 
--- Trois minutes plus tard, les verrous ont expiré et la demande fraîche a vieilli :
--- les trois demandes encore en attente repartent. C'est ce qui garantit qu'une
--- Edge Function indisponible retarde une notification sans jamais la perdre.
+-- Trois minutes plus tard, tous les verrous ont expiré, la demande fraîche a
+-- vieilli et la prise en charge encore valide est devenue caduque : les cinq
+-- demandes non closes repartent. C'est ce qui garantit qu'une Edge Function
+-- indisponible retarde une notification sans jamais la perdre.
 select tests.check(
-  cron_dispatch_notifications(now() + interval '3 minutes') = 3,
-  'les verrous expirés, la reprise reprend la main sur tout ce qui est en attente');
+  cron_dispatch_notifications(now() + interval '3 minutes') = 5,
+  'les verrous expirés, la reprise reprend la main sur tout ce qui n''est pas clos');
 
 rollback to savepoint avant_reprise;
 

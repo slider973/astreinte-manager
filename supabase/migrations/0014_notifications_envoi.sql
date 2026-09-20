@@ -57,7 +57,7 @@ create table notification_outbox (
   channels      text[],
   dedupe_key    text,
   status        text not null default 'pending'
-                  check (status in ('pending', 'sent', 'failed')),
+                  check (status in ('pending', 'sending', 'sent', 'failed')),
   attempts      int not null default 0,
   locked_until  timestamptz,
   last_error    text,
@@ -72,6 +72,8 @@ comment on column notification_outbox.recipients is
   'Tableau JSON [{"user_id": uuid, "payload": {…}}]. Une entrée par destinataire, avec sa charge utile propre : c''est le support du regroupement.';
 comment on column notification_outbox.channels is
   'Canaux forcés par l''appelant (push, email, inapp). NULL = canaux par défaut du type (docs/WORKFLOWS.md § 8).';
+comment on column notification_outbox.status is
+  'pending : en attente. sending : une Edge Function l''a prise en charge (verrou locked_until). sent / failed : close. Une prise en charge abandonnée revient à pending quand son verrou expire (cron_dispatch_notifications).';
 comment on column notification_outbox.dedupe_key is
   'Clé d''unicité métier. Deux appels de même type et même clé ne produisent qu''une ligne : « un rappel par membre et par échéance » (015), « un rapport par jour et par planning » (022).';
 
@@ -109,7 +111,7 @@ alter table notification_outbox
 -- en attente sont lues, et elles sont rares au regard de l'historique.
 create index notification_outbox_pending_idx
   on notification_outbox (created_at)
-  where status = 'pending';
+  where status in ('pending', 'sending');
 
 -- « Un seul envoi par membre et par échéance » (ticket 015), « une fois par jour
 -- et par planning » (docs/WORKFLOWS.md § 8, late_responders) : la règle est ici,
@@ -350,10 +352,21 @@ revoke execute on function notify(notification_type, uuid[], uuid, jsonb, text[]
 -- ===========================================================================
 -- 5. Les deux fonctions que l'Edge Function appelle
 -- ===========================================================================
--- `notify_claim` : relit la demande et pose un verrou de deux minutes. Elle
--- renvoie NULL si la ligne est déjà traitée — c'est l'idempotence du rejeu : la
--- tâche de reprise peut reposter une ligne qui vient d'aboutir, l'Edge Function
--- verra qu'il n'y a plus rien à faire et repartira sans rien envoyer.
+-- `notify_claim` : prend la demande en charge, une fois et une seule.
+--
+-- La prise en charge **change le statut** (`pending` → `sending`) au lieu de se
+-- contenter de repousser le verrou : c'est ce qui rend l'appel exclusif. Deux
+-- requêtes qui arrivent ensemble — la tentative immédiate de `notify()` et la
+-- reprise qui n'a pas vu le verrou — n'obtiennent la demande qu'une fois, la
+-- seconde reçoit NULL et repart sans rien envoyer. Avec un simple verrou repoussé,
+-- les deux l'obtenaient, et le membre recevait la notification en double.
+--
+-- `update … returning` prend un verrou de ligne : la course est arbitrée par
+-- PostgreSQL, pas par la chronologie des appels.
+--
+-- Une Edge Function qui meurt après avoir pris la demande en charge la laisse en
+-- `sending` : `cron_dispatch_notifications` la ramène à `pending` quand son verrou
+-- expire. Une panne coûte deux minutes de retard, pas une notification.
 create function notify_claim(p_outbox uuid)
 returns notification_outbox
 language plpgsql
@@ -364,7 +377,8 @@ declare
   ligne notification_outbox;
 begin
   update notification_outbox
-     set locked_until = greatest(coalesce(locked_until, now()), now() + interval '2 minutes')
+     set status       = 'sending',
+         locked_until = now() + interval '2 minutes'
    where id = p_outbox
      and status = 'pending'
   returning * into ligne;
@@ -373,7 +387,7 @@ begin
 end $$;
 
 comment on function notify_claim(uuid) is
-  'Relit une demande de notification et pose un verrou. Renvoie NULL si la ligne n''est plus en attente : le rejeu n''envoie rien deux fois.';
+  'Prend une demande de notification en charge (pending -> sending) et pose un verrou. Renvoie NULL si elle est déjà prise ou close : un rejeu n''envoie rien deux fois.';
 
 revoke execute on function notify_claim(uuid) from public, anon, authenticated;
 grant execute on function notify_claim(uuid) to service_role;
@@ -412,6 +426,10 @@ grant execute on function notify_complete(uuid, boolean, text, jsonb) to service
 -- ===========================================================================
 -- Trois règles, dans cet ordre :
 --
+--   0. une prise en charge dont le verrou a expiré revient à `pending` : l'Edge
+--      Function qui l'avait prise n'a jamais rendu sa réponse (redémarrage,
+--      dépassement de délai). Sans ce retour en arrière, une demande restée en
+--      `sending` ne serait jamais reprise — la file aurait un trou noir ;
 --   1. au-delà de `p_max_attempts` tentatives, la ligne passe `failed` avec sa
 --      dernière erreur : on arrête de marteler une Edge Function en panne, et
 --      l'incident devient visible en base plutôt que d'être un silence ;
@@ -436,6 +454,15 @@ declare
   ligne   record;
   postees integer := 0;
 begin
+  -- 0. Les prises en charge abandonnées redeviennent des demandes en attente.
+  update notification_outbox
+     set status     = 'pending',
+         last_error = coalesce(
+                        last_error,
+                        'prise en charge sans réponse, demande remise en attente')
+   where status = 'sending'
+     and locked_until <= instant;
+
   update notification_outbox
      set status       = 'failed',
          processed_at = instant,
