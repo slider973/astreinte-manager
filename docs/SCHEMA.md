@@ -341,10 +341,19 @@ create table super_admins (
 
 ## 3. Fonctions utilitaires (SQL, `security definer`)
 
+`pg_temp` est **nommé explicitement et en dernier** dans le `search_path` de toutes les
+fonctions. Omis, PostgreSQL le consulte en premier : un rôle `authenticated` crée
+`pg_temp.memberships`, y insère une ligne `admin` et `is_admin()` lui répond `true` pour
+n'importe quelle caserne. La faille a été trouvée en revue du ticket 008 et corrigée par la
+migration `0008`.
+
+Les expressions des politiques RLS, elles, sont analysées à la création et stockées avec
+les OID résolus, comme une vue : elles ne sont pas sensibles au `search_path` de l'appelant.
+
 ```sql
 -- Vrai si l'utilisateur courant est membre actif de la caserne.
 create function is_member(p_station uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select exists (
     select 1 from memberships
     where station_id = p_station and user_id = auth.uid() and status = 'active'
@@ -353,7 +362,7 @@ $$;
 
 -- Vrai si l'utilisateur courant est admin actif de la caserne.
 create function is_admin(p_station uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select exists (
     select 1 from memberships
     where station_id = p_station and user_id = auth.uid()
@@ -362,13 +371,13 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create function is_super_admin() returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select exists (select 1 from super_admins where user_id = auth.uid());
 $$;
 
 -- Vrai si la caserne n'est pas suspendue (écriture autorisée).
 create function station_writable(p_station uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, pg_temp as $$
   select coalesce(
     (select status in ('trialing', 'active', 'past_due') from subscriptions where station_id = p_station),
     true
@@ -391,7 +400,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `stations` | membre de la caserne ou super-admin | admin de la caserne ou super-admin (update), super-admin (insert), pas de delete |
 | `profiles` | soi-même, et les profils des membres de ses casernes | soi-même |
 | `memberships` | membre de la caserne, et toujours ses propres lignes (un compte `invited` ou `disabled` doit pouvoir constater son état) | admin de la caserne, sauf son propre rôle. Aucune politique d'update pour un membre sur sa propre ligne : elle ouvrirait une escalade de privilèges |
-| `invitations` | admin de la caserne | admin de la caserne |
+| `invitations` | admin de la caserne, **sauf `token`** (retiré du grant de select : c'est un porteur de droits, réservé au service role). Ne jamais faire `select *` sur cette table | admin de la caserne |
 | `periods` | membre | admin |
 | `availabilities` | membre : les siennes ; admin : toutes celles de la caserne | membre : les siennes si période `open` et caserne writable ; admin : toutes |
 | `availability_preferences` | idem availabilities | idem |
@@ -435,9 +444,16 @@ premier garde-fou laisse passer les écritures serveur : sans lui, `publish-sche
 `reassign-shift`, qui passent par le service role, seraient rejetées par
 « invalid transition ».
 
+Le gel des colonnes est une **liste blanche** : un membre ne fait varier que `status`,
+`responded_at`, `decline_reason` et `updated_at`. Une liste noire limitée à `shift_id` et
+`user_id` laissait passer `station_id` (déplacement de l'attribution vers une autre
+caserne), `was_available`, `reminder_count`, `proposed_at` et `replaced_by`.
+
 ```sql
 create function assignments_member_transition() returns trigger
-language plpgsql set search_path = public as $$
+language plpgsql set search_path = public, pg_temp as $$
+declare
+  colonnes_libres constant text[] := array['status', 'responded_at', 'decline_reason', 'updated_at'];
 begin
   -- écritures serveur : service_role, postgres, cron, Edge Functions
   if current_user not in ('authenticated', 'anon') then return new; end if;
@@ -446,14 +462,29 @@ begin
   if old.status <> 'proposed' or new.status not in ('accepted', 'declined') then
     raise exception 'invalid transition';
   end if;
-  -- un membre ne modifie rien d'autre que status, responded_at, decline_reason
-  if new.shift_id <> old.shift_id or new.user_id <> old.user_id then
+  if new.station_id <> old.station_id
+     or new.shift_id <> old.shift_id
+     or new.user_id <> old.user_id then
     raise exception 'forbidden';
   end if;
   new.responded_at := now();
+  if to_jsonb(new) - colonnes_libres is distinct from to_jsonb(old) - colonnes_libres then
+    raise exception 'forbidden';
+  end if;
   return new;
 end $$;
 ```
+
+Toute politique d'écriture qui porte une clé étrangère vers une autre table de la caserne
+contrôle en outre que la ligne parente a le **même `station_id`** : `shifts.schedule_id`,
+`assignments.shift_id` et `assignments.user_id`, `schedules.period_id`,
+`availabilities.user_id`, `availability_preferences.period_id` et `.user_id`. Sans ce
+contrôle, un admin de A insère un créneau dans un planning de B.
+
+Attention enfin : un `update` sans clause `where` citant une colonne ne sollicite pas les
+politiques de `select`. Les conditions de visibilité (statut du planning, par exemple)
+doivent donc être répétées dans le `using` de la politique d'`update`, jamais déduites de
+la politique de lecture.
 
 Les fonctions trigger (`set_updated_at`, `handle_new_user`, `assignments_member_transition`)
 voient leur `execute` révoqué pour `public`, `anon` et `authenticated` : elles n'apparaissent
@@ -539,8 +570,9 @@ Ordre proposé :
 5. `0005_notifications_push_tokens.sql`
 6. `0006_subscriptions_audit_super_admins.sql`
 7. `0007_functions_rls.sql`
-8. `0008_views.sql`
-9. `0009_cron.sql`
+8. `0008_rls_durcissement.sql` (revue du ticket 008 : `pg_temp`, liste blanche du trigger, cohérence du `station_id` avec la ligne parente, token d'invitation)
+9. `0009_views.sql`
+10. `0010_cron.sql`
 
 Chaque migration est rejouable sur un projet vide et testée en local avec `supabase start`.
 

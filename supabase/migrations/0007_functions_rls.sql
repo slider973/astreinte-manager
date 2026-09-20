@@ -152,7 +152,8 @@ create policy "memberships_delete_admin"
 -- ---------------------------------------------------------------------------
 -- invitations — admin de la caserne en lecture comme en écriture.
 -- L'acceptation d'une invitation passe par l'Edge Function accept-invitation
--- (service role) : le token n'est jamais lisible par le rôle authenticated.
+-- (service role). Cette politique expose toutes les colonnes, token compris :
+-- la colonne token est retirée du grant de select en 0008.
 -- ---------------------------------------------------------------------------
 create policy "invitations_select_admin"
   on invitations for select to authenticated
