@@ -50,12 +50,14 @@ abstract final class AppStrings {
 
   /// Phrase complète annoncée par un `SlotChip` : jamais un code.
   /// Exemple : « Samedi 4 octobre, nuit, disponible ».
+  ///
+  /// [jourEtDate] arrive déjà composé (« Samedi 4 octobre ») : le formatage
+  /// des dates appartient à la grille mensuelle (ticket 011), pas au socle.
   static String slotSemantique({
-    required String jour,
-    required String date,
+    required String jourEtDate,
     required String creneau,
     required String etat,
-  }) => '$jour $date, ${creneau.toLowerCase()}, ${etat.toLowerCase()}';
+  }) => '$jourEtDate, ${creneau.toLowerCase()}, ${etat.toLowerCase()}';
 
   static const String slotActionMarquerDisponible =
       'Appuie pour te marquer disponible';
