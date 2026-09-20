@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 024 | [Push web via Firebase Cloud Messaging (PWA)](in-progress/024-fcm-setup.md) | P0 | 001 005 |  |
 
 ## À faire
 
@@ -21,7 +22,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 021 | [Écran des propositions pour le membre](backlog/021-ecran-propositions.md) | P0 | 008 024 |  |
 | 022 | [Relances automatiques](backlog/022-relances-auto.md) | P0 | 019 025 |  |
 | 023 | [Vue du planning de la caserne pour les membres](backlog/023-planning-caserne.md) | P1 | 019 |  |
-| 024 | [Push web via Firebase Cloud Messaging (PWA)](backlog/024-fcm-setup.md) | P0 | 001 005 |  |
 | 025 | [Edge Function send-notification](backlog/025-edge-send-notification.md) | P0 | 002 024 |  |
 | 026 | [Centre de notifications in-app](backlog/026-centre-notifications.md) | P1 | 025 |  |
 | 027 | [Écran Mes astreintes](backlog/027-mes-astreintes.md) | P0 | 021 |  |
