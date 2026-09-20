@@ -346,7 +346,6 @@ abstract final class AppStrings {
       'prenom.nom@exemple.fr\nautre.pompier@exemple.fr';
   static const String inviterRoleLabel = 'Rôle dans la caserne';
   static const String inviterEnvoyer = 'Envoyer les invitations';
-  static const String inviterEnvoyerUne = 'Envoyer l\'invitation';
   static const String inviterAucuneAdresse =
       'Écris au moins une adresse e-mail.';
   static const String inviterResultatsTitre = 'Résultat par adresse';
@@ -415,7 +414,6 @@ abstract final class AppStrings {
   // -------------------------------------------------------------------
 
   static const String invitationTitre = 'Ton invitation';
-  static const String invitationRejoindre = 'Rejoindre la caserne';
   static const String invitationSeConnecter = 'Me connecter pour accepter';
   static const String invitationVerification = 'Vérification du lien…';
   static const String invitationConnexionIntro =
@@ -424,13 +422,7 @@ abstract final class AppStrings {
   static const String invitationChangerCompte = 'Utiliser une autre adresse';
   static const String invitationAccepteeTitre = 'Bienvenue';
 
-  static String invitationIntro(String caserne) =>
-      'Tu es invité à rejoindre $caserne sur Astreinte SP.';
-
   static String invitationParQui(String nom) => 'Invitation envoyée par $nom.';
-
-  static String invitationConnecteComme(String email) =>
-      'Tu es connecté avec $email.';
 
   static String invitationRejointe(String caserne) =>
       'Tu fais maintenant partie de $caserne.';
