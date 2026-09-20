@@ -83,7 +83,12 @@ class _ReglageNotificationsState extends ConsumerState<ReglageNotifications> {
               ),
             ],
             const SizedBox(height: AppSpacing.lg),
-            SwitchListTile.adaptive(
+            // `SwitchListTile`, jamais `.adaptive` : le projet a **une seule
+            // apparence** (`DESIGN.md`, plateforme enregistrée `web`), et la
+            // version adaptative rendrait un commutateur iOS sur Safari et un
+            // commutateur Material ailleurs. Elle tirait au passage la police
+            // Cupertino dans le bundle.
+            SwitchListTile(
               value: nonCritiques,
               // Un interrupteur sans autorisation ne réglerait rien : il est
               // désactivé, et la raison est écrite juste en dessous
