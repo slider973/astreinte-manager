@@ -22,4 +22,7 @@ quelle caserne, avec quel rôle).
 | `auth/` | 005 | Les écrans de connexion : adresse e-mail, code à six chiffres, compte sans caserne. L'état de session, lui, est transverse et vit dans `core/session`. |
 | `accueil/` | 005 | L'accueil d'après-connexion. Remplacé par les écrans métier aux tickets suivants. |
 | `demarrage/` | 005 | Le temps de restaurer la session, et l'écran « application non configurée ». |
+| `membres/` | 006 | Côté admin : les membres actifs, les invitations en attente, l'envoi d'un lot d'invitations. |
+| `invitation/` | 006 | Côté invité : le lien `/invite/<jeton>` et l'échange du jeton contre une place dans la caserne. |
+| `onboarding/` | 006 | L'accueil d'un nouveau membre : complément de profil, guide de trois écrans, aide « Ajouter à l'écran d'accueil ». |
 | `dev/` | 004 | Le catalogue des composants, absent des builds de production. |

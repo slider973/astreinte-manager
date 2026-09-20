@@ -227,6 +227,7 @@ abstract final class AppStrings {
   static const String authCompteInconnu =
       'Aucun compte pour cette adresse. Demande une invitation à ton chef de '
       'centre.';
+
   /// Couvre le code faux **et** le code périmé : le serveur ne les distingue
   /// pas (voir `AuthErreur.codeInvalide`). La phrase nomme donc les deux
   /// causes et les deux sorties.
@@ -350,11 +351,17 @@ abstract final class AppStrings {
       'Écris au moins une adresse e-mail.';
   static const String inviterResultatsTitre = 'Résultat par adresse';
   static const String inviterTerminer = 'Revenir aux membres';
-  static const String inviterReessayerEchecs = 'Réessayer les adresses en échec';
+  static const String inviterReessayerEchecs =
+      'Réessayer les adresses en échec';
+
+  /// Rappel neutre, sous le formulaire : il dit la règle **avant** qu'on la
+  /// franchisse. Le refus, lui, est [inviterPlafond].
+  static const String inviterPlafondRappel =
+      'Vingt adresses au maximum par envoi.';
 
   static String inviterPlafond(int max) =>
       'Vingt adresses au maximum par envoi. Tu en as $max : retire les '
-      'adresses en trop ou envoie en deux fois.';
+      'adresses en trop, ou envoie en deux fois.';
 
   static String inviterAdresseInvalide(String email) =>
       'Adresse incomplète : $email.';

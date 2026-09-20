@@ -1,8 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'detection_stub.dart'
-    if (dart.library.js_interop) 'detection_web.dart';
+import 'detection_stub.dart' if (dart.library.js_interop) 'detection_web.dart';
 
 /// Le navigateur, vu sous le seul angle qui nous intéresse : comment on y
 /// ajoute l'application à l'écran d'accueil.

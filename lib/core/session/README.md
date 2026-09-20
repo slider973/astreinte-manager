@@ -14,6 +14,7 @@ fonctionnalité d'en importer une autre.
 | `auth_repository.dart` | Interface + implémentation Supabase : envoi du code, vérification, flux de sessions, déconnexion. |
 | `membership_repository.dart` | Interface + implémentation Supabase : les appartenances de l'utilisateur. |
 | `session_providers.dart` | Les providers Riverpod. C'est le seul point d'entrée des écrans. |
+| `jeton_invitation.dart` | Le jeton du lien d'invitation, gardé **en mémoire** le temps du parcours. Le routeur s'en sert pour ramener l'invité sur son invitation dès que la session s'ouvre (ticket 006). |
 | `deconnexion.dart` | Le contrôleur de déconnexion et le bouton `BoutonDeconnexion`, avec son état et son erreur. Partagé par l'accueil et l'écran « aucune caserne ». |
 
 Les écrans de connexion vivent dans `lib/features/auth/presentation/` : ils sont l'interface

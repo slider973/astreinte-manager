@@ -12,3 +12,6 @@ autre fonctionnalité : ce qui est partagé remonte ici.
 | `supabase/` | Initialisation du client, providers d'accès | 002 |
 | `notifications/` | Firebase Messaging, tokens, deep links | 024 |
 | `widgets/` | Composants réutilisables (`SlotChip`, `StatusBadge`, …) | 004 |
+| `session/` | Qui est connecté, dans quelle caserne, avec quel rôle | 005 |
+| `preferences/` | Les repères locaux vus une fois (guide, aide à l'installation) | 006 |
+| `plateforme/` | Navigateur et mode autonome de la PWA, derrière un import conditionnel | 006 |

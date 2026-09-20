@@ -18,6 +18,8 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `count_stat.dart` | `CountStat` | Un compteur en chiffres tabulaires, avec ou sans plafond. |
 | `save_indicator.dart` | `SaveIndicator` | Où en est l'enregistrement automatique. |
 | `hachures.dart` | `Hachures`, `HachuresPainter` | Primitive de dessin, pas un composant : le motif à 45° partagé par `SlotChip` et `AppBanner`. |
+| `champ_texte.dart` | `ChampTexte` | Champ rempli M3 : libellé au-dessus, erreur annoncée sous le champ, une ou plusieurs lignes. |
+| `ecran_simple.dart` | `EcranSimple` | L'ossature des écrans sans navigation : connexion, invitation, accueil d'un nouveau membre. |
 
 ## Ce qu'aucun de ces widgets ne fait
 
