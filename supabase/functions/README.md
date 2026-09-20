@@ -277,6 +277,26 @@ La demande est écrite dans `notification_outbox` **dans la transaction métier*
 pg_net. Si la fonction ne répond pas, la tâche `dispatch_notifications` reprend chaque minute. C'est
 le chemin des tickets 015 et 022.
 
+Le rappel de saisie du ticket 015 (`cron_availability_reminders`, migration `0016`) en est le
+premier appelant réel, un appel par membre relancé :
+
+```sql
+select public.notify(
+  'availability_reminder',
+  p_user_ids   => array['<uuid membre>']::uuid[],
+  p_station    => '<uuid caserne>',
+  p_payload    => jsonb_build_object(
+                    'period', '2026-10',
+                    'deadline_at', '2026-09-15T21:59:59Z'),
+  p_channels   => array['push', 'inapp'],        -- J-1 : array['email', 'inapp']
+  p_dedupe_key => 'availability_reminder:<uuid caserne>:2026-10:j-3:<uuid membre>');
+```
+
+`p_dedupe_key` est ce qui tient la promesse « un seul envoi par membre et par échéance » : l'index
+`notification_outbox_dedupe_uniq` refuse la seconde ligne, et `notify` rend alors l'identifiant de
+celle qui est déjà en file, sans rien reposter. La caserne fait partie de la clé — un pompier peut
+servir dans deux casernes et doit être relancé par chacune.
+
 **Depuis une autre Edge Function** — `publish-schedule` (019), `reassign-shift` (020) :
 
 ```
@@ -454,6 +474,7 @@ Erreurs, forme `{"error": {"code", "message"}}` : `method_not_allowed` (405), `u
 | Fonctions SQL `create_invitation` / `accept_invitation`                      | `supabase/tests/invitations_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
 | Couche HTTP des trois Edge Functions                                         | `scripts/test_functions.sh`                                             | non     |
 | File d'attente et `notify(...)` (migration `0014`)                           | `supabase/tests/notifications_test.sql`, joué par `scripts/test_rls.sh` | oui     |
+| Rappels de saisie (migration `0016`)                                         | `supabase/tests/availability_reminders_test.sql`, même script           | oui     |
 | Libellés, regroupement, liens profonds, erreurs FCM, enchaînement d'un envoi | `deno test supabase/functions/tests/`                                   | oui     |
 
 La CI (`.github/workflows/ci.yml`) démarre la pile sans `edge-runtime` ni `kong` : les Edge

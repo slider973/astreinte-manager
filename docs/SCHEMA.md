@@ -538,6 +538,27 @@ Exécution révoquée de `public`, `anon` et `authenticated` pour toutes : écri
 notification à qui l'on veut, dans la caserne que l'on veut, n'est pas un bouton de
 client.
 
+### Rappels de saisie (migration `0016`, ticket 015)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `cron_availability_reminders` | `(p_reference timestamptz default null) returns integer` | Corps de la tâche `availability_reminders` (§ 8). Pour chaque période **ouverte** d'une caserne **non suspendue**, relance les membres **actifs** qui n'ont aucune ligne `availabilities` sur le mois : push à J-3, courriel à J-1. Renvoie le nombre de rappels mis en file. |
+
+Trois points qui font la justesse de cette tâche :
+
+- **Les jours se comptent dans le fuseau de la caserne**, comme le mois de référence de
+  `cron_create_periods`. `deadline_at` est un `timestamptz` : sans cette conversion, une
+  caserne d'outre-mer serait relancée un jour trop tôt ou un jour trop tard selon le signe
+  de son décalage. Le tir quotidien à 09:00 fait avancer la date locale de chaque caserne
+  d'exactement un jour : aucune ne saute une échéance, aucune n'en voit deux.
+- **« Un seul envoi par membre et par échéance » est la clé de dédoublonnage de `notify`**,
+  `availability_reminder:<caserne>:<AAAA-MM>:<j-3|j-1>:<membre>`, pas une colonne d'état.
+  L'unicité est celle de l'index `notification_outbox_dedupe_uniq` (`0014`) : un rejeu de
+  l'ordonnanceur ne coûte rien. La caserne fait partie de la clé parce qu'un pompier peut
+  servir dans deux casernes (`docs/PRD.md § 6.1`) et doit être relancé par chacune.
+- **Une saisie, quelle qu'elle soit, dispense du rappel.** Une ligne `absent` compte comme
+  une ligne `available` : le membre a répondu. Même définition que `v_period_completion`.
+
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
 Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
@@ -819,7 +840,7 @@ refusées, retardataires (proposées depuis plus de `late_report_hours`).
 | `create_periods` | 1er du mois, 02:00 | `select public.cron_create_periods();` — crée les périodes M+1 et M+2 manquantes pour chaque caserne *(migration `0012`)* |
 | `lock_periods` | toutes les heures | `select public.cron_lock_periods();` — passe en `locked` les périodes dont `deadline_at < now()` *(migration `0012`)* |
 | `dispatch_notifications` | chaque minute | `select public.cron_dispatch_notifications();` — repose les demandes de `notification_outbox` restées en attente, abandonne au bout de cinq tentatives *(migration `0014`)* |
-| `availability_reminders` | tous les jours 09:00 | Push J-3 et email J-1 aux membres sans saisie |
+| `availability_reminders` | tous les jours 09:00 | `select public.cron_availability_reminders();` — push J-3 et email J-1 aux membres actifs sans aucune ligne `availabilities` sur le mois d'une période ouverte *(migration `0016`)* |
 | `assignment_reminders` | toutes les heures | Rappel push à `response_reminder_hours`, email à `response_email_hours` |
 | `late_responders_report` | toutes les heures | Notifie les admins des attributions en attente depuis `late_report_hours` |
 | `archive_schedules` | 1er du mois | Archive les plannings des mois passés |
@@ -870,11 +891,18 @@ Ordre proposé :
 13. `0013_periodes_completion_audit.sql` (revue du ticket 014 : vue `v_period_completion`, audit de la création et de la suppression d'une période, date limite qui ne recule plus dans le passé)
 14. `0014_notifications_envoi.sql` (ticket 025 : `notification_outbox`, `notify`, `notify_post`, `notify_claim`, `notify_complete`, `cron_dispatch_notifications`, secrets Vault et tâche `dispatch_notifications`)
 15. `0015_views.sql` (les trois vues restantes du § 6)
-16. `0016_cron_notifications.sql` (les cinq tâches restantes du § 8)
+16. `0016_cron_rappels_saisie.sql` (ticket 015 : `cron_availability_reminders` et la tâche `availability_reminders`)
+17. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
+    `late_responders_report` (ticket 022), `archive_schedules` et `prune_notifications`
 
-Les deux dernières ont glissé d'un rang au ticket 025 : le chemin d'appel des
+Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
 poussée sur `main` ne se renumérote pas.
+
+Le rang 16 annonçait « les cinq tâches restantes du § 8 » en une migration. Elles
+appartiennent à quatre tickets différents : les réunir obligerait soit à écrire du code
+sans ticket, soit à modifier plus tard une migration déjà poussée. Le fichier est donc
+scindé par sujet au ticket 015, conformément à la règle « une migration par sujet ».
 
 Chaque migration est rejouable sur un projet vide et testée en local avec `supabase start`.
 
@@ -885,7 +913,8 @@ dès qu'une politique fuit). Les fonctions d'invitation de `0009` sont couvertes
 `supabase/tests/memberships_admin_test.sql`, les paramètres de caserne de `0011` par
 `supabase/tests/station_settings_test.sql` le cycle de vie des périodes de `0012` par
 `supabase/tests/periods_cron_test.sql` et le chemin d'appel des notifications de `0014`
-par `supabase/tests/notifications_test.sql`, joués par le même script. La logique pure
+par `supabase/tests/notifications_test.sql` et les rappels de saisie de `0016` par
+`supabase/tests/availability_reminders_test.sql`, joués par le même script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge

@@ -910,6 +910,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cron_availability_reminders: {
+        Args: { p_reference?: string }
+        Returns: number
+      }
       cron_create_periods: { Args: { p_reference?: string }; Returns: number }
       cron_dispatch_notifications: {
         Args: {

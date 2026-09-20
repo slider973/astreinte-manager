@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 015 | [Rappels de saisie des disponibilités](in-progress/015-rappels-saisie.md) | P1 | 014 025 |  |
 
 ## À faire
 
@@ -34,6 +33,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 037 | [Supprimer la dépendance à fonts.gstatic.com au démarrage](backlog/037-canvaskit-autoheberge.md) | P1 | 004 032 |  |
 | 038 | [Limiter le débit des invitations](backlog/038-limite-debit-invitations.md) | P1 | 006 |  |
 | 040 | [Rendre visible une notification définitivement perdue](backlog/040-ligne-interne-echec-definitif.md) | P0 | 025 026 |  |
+| 041 | [Envoyer les rappels à une heure décente dans chaque fuseau](backlog/041-heure-locale-rappels.md) | P1 | 015 |  |
 
 ## Terminés
 
@@ -52,6 +52,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 012 | [Raccourcis de sélection](done/012-raccourcis-selection.md) | P0 | 011 | https://github.com/slider973/astreinte-manager/pull/11 |
 | 013 | [Préférences de charge par mois](done/013-preferences-quotas.md) | P0 | 011 | https://github.com/slider973/astreinte-manager/pull/12 |
 | 014 | [Périodes, date limite et verrouillage](done/014-periodes-verrouillage.md) | P0 | 008 010 | https://github.com/slider973/astreinte-manager/pull/13 |
+| 015 | [Rappels de saisie des disponibilités](done/015-rappels-saisie.md) | P1 | 014 025 | https://github.com/slider973/astreinte-manager/pull/17 |
 | 024 | [Push web via Firebase Cloud Messaging (PWA)](done/024-fcm-setup.md) | P0 | 001 005 | https://github.com/slider973/astreinte-manager/pull/14 |
 | 025 | [Edge Function send-notification](done/025-edge-send-notification.md) | P0 | 002 024 | https://github.com/slider973/astreinte-manager/pull/15 |
 | 026 | [Centre de notifications in-app](done/026-centre-notifications.md) | P1 | 025 | https://github.com/slider973/astreinte-manager/pull/16 |
