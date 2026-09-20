@@ -185,4 +185,12 @@ abstract final class AppStrings {
   static const String devThemeSombre = 'Sombre';
   static const String devThemeLesDeux = 'Les deux';
   static const String devEchelleTexte = 'Taille du texte';
+
+  /// Libellé d'un cran d'échelle de texte : « ×1 », « ×1.3 », « ×2 ».
+  static String devEchelleValeur(double facteur) =>
+      '×${facteur == facteur.roundToDouble() ? facteur.toStringAsFixed(0) : facteur}';
+
+  /// Le même cran, annoncé en entier : « Taille du texte ×1.3 ».
+  static String devEchelleSemantique(double facteur) =>
+      '$devEchelleTexte ${devEchelleValeur(facteur)}';
 }

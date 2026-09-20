@@ -16,11 +16,16 @@ abstract final class AppFonts {
 
   /// Replis système, dans l'ordre. Utilisés si un glyphe manque au
   /// sous-ensemble embarqué ou si le chargement échoue.
+  ///
+  /// **`Roboto` n'y figure pas volontairement.** Sur Flutter web, nommer une
+  /// famille que le moteur ne connaît pas localement déclenche son
+  /// téléchargement depuis `fonts.gstatic.com` : 63 Ko pris chez un tiers, sur
+  /// une 4G rurale, pour une police de repli qu'on n'affichera jamais. Les
+  /// replis listés ici sont tous résolus par le système.
   static const List<String> replis = <String>[
     'system-ui',
     '-apple-system',
     'Segoe UI',
-    'Roboto',
     'sans-serif',
   ];
 }

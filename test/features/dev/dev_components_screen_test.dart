@@ -122,7 +122,7 @@ void main() {
     ) async {
       await _monter(tester);
 
-      await tester.tap(find.text('×2.0'));
+      await tester.tap(find.text(AppStrings.devEchelleValeur(2)));
       await tester.pump();
 
       expect(tester.takeException(), isNull);

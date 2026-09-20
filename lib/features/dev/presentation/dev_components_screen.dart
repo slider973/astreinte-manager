@@ -224,8 +224,8 @@ class _Controles extends StatelessWidget {
                 for (final valeur in echelles)
                   ButtonSegment<double>(
                     value: valeur,
-                    label: Text('×$valeur'),
-                    tooltip: '${AppStrings.devEchelleTexte} ×$valeur',
+                    label: Text(AppStrings.devEchelleValeur(valeur)),
+                    tooltip: AppStrings.devEchelleSemantique(valeur),
                   ),
               ],
               selected: <double>{echelle},
