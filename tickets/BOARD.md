@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 011 | [Grille de saisie des disponibilités](in-progress/011-saisie-dispos-grille.md) | P0 | 004 008 |  |
 
 ## À faire
 
@@ -55,4 +54,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 008 | [Row Level Security et fonctions d'accès](done/008-rls-multi-tenant.md) | P0 | 002 | https://github.com/slider973/astreinte-manager/pull/3 |
 | 009 | [Gestion des membres par l'admin](done/009-gestion-membres.md) | P0 | 006 008 | https://github.com/slider973/astreinte-manager/pull/8 |
 | 010 | [Paramètres de la caserne](done/010-parametres-caserne.md) | P1 | 008 | https://github.com/slider973/astreinte-manager/pull/9 |
+| 011 | [Grille de saisie des disponibilités](done/011-saisie-dispos-grille.md) | P0 | 004 008 |  |
 
