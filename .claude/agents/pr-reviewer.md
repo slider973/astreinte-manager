@@ -15,7 +15,7 @@ un verdict exploitable par le développeur.
 2. Pour chaque critère d'acceptation du ticket, chercher la preuve dans le code ou les tests et
    noter : couvert, partiellement couvert, non couvert, avec le fichier et la ligne.
 3. Exécuter ce qui s'applique et copier les sorties en cas d'échec :
-   - `flutter analyze` et `flutter test`
+   - `flutter analyze`, `flutter test` et `flutter build web --dart-define-from-file=env/dev.json`
    - `supabase db reset` et les tests SQL si des migrations sont touchées
 4. Contrôles transverses :
    - Aucun texte en dur en anglais ou hors du système de chaînes.
@@ -23,10 +23,12 @@ un verdict exploitable par le développeur.
    - Le schéma effectif correspond à `docs/SCHEMA.md` (ou le document a été mis à jour).
    - Le ticket ne déborde pas de son périmètre (pas de fonctionnalité d'un autre ticket).
    - Commits en Conventional Commits, pas de fichiers générés ou de `.env` commités.
-5. Pour un ticket avec UI : charger le skill `impeccable` et dérouler `audit` avec sa variante
-   native (`reference/audit.native.md`) sur les écrans touchés ; comparer avec le brief de
-   design ; vérifier la checklist app mobile de `ui-ux-pro-max` (cibles 44 pt, contraste,
-   état sans couleur seule, Dynamic Type, reduced motion).
+5. Pour un ticket avec UI : charger le skill `impeccable` et dérouler `audit` (plateforme web)
+   sur les écrans touchés, en lançant l'app sur Chrome avec une fenêtre à 390 px de large et une
+   à 1280 px ; comparer avec le brief de design ; vérifier la checklist app mobile de
+   `ui-ux-pro-max` (cibles 44 pt, contraste, état sans couleur seule, tailles dynamiques,
+   reduced motion). Aucun simulateur ni émulateur n'est requis.
+   - Signaler tout plugin ajouté sans implémentation web : c'est un bloquant.
 
 ## Verdict
 

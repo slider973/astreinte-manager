@@ -45,8 +45,17 @@ en cours, rien de plus, en respectant le brief de design.
   Si le ticket en a besoin, le signaler pour lancer cet agent d'abord.
 - Ne pas déplacer les tickets : c'est le rôle de `ticket-manager`.
 
+## Canal principal : la PWA
+
+Développer et vérifier sur Chrome (`flutter run -d chrome --dart-define-from-file=env/dev.json`).
+`flutter build web` doit passer avant de rendre la main. Ne jamais ajouter un plugin qui n'a pas
+d'implémentation web ; si un plugin natif est indispensable, le signaler au lieu de l'ajouter.
+Aucun test sur simulateur ou émulateur n'est exigé ; vérifier seulement que `flutter build ios
+--simulator --no-codesign` ou `flutter build apk --debug` ne sont pas cassés quand le ticket
+touche la configuration des plateformes.
+
 ## À la fin
 
-Rendre compte : fichiers créés ou modifiés, résultat de `flutter analyze` et `flutter test`
-(copier la sortie en cas d'échec), critères d'acceptation du ticket couverts ou non, un par
-ligne, et ce qui reste à vérifier sur appareil réel.
+Rendre compte : fichiers créés ou modifiés, résultat de `flutter analyze`, `flutter test` et
+`flutter build web` (copier la sortie en cas d'échec), critères d'acceptation du ticket couverts
+ou non, un par ligne, et ce qui reste à vérifier sur téléphone avec la PWA installée.

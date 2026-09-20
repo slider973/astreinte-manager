@@ -7,15 +7,16 @@ du produit le 20 septembre 2026 (plateforme, usage admin, marque, méthode de co
 
 ## Platform
 
-android
+web
 
 ## Stack
 
-Flutter 3.x, une base de code pour iOS, Android et Web (PWA). Langage de design : Material 3
-partout, une seule apparence sur les trois cibles (décision confirmée). Sur iPhone, l'app doit
-tout de même respecter les garanties iOS : zones sûres, geste retour depuis le bord, Reduce Motion,
-Dynamic Type. Sur le web, la même UI rendue en PWA mobile-first, avec une disposition grand écran
-pour l'admin. Backend Supabase. Choix confirmé par le propriétaire du produit après comparaison avec Next.js + Capacitor,
+Flutter 3.x. Canal principal : la PWA web, installée sur l'écran d'accueil des téléphones,
+mobile-first, avec une disposition grand écran pour l'admin (décision confirmée le 20 septembre
+2026). Les builds iOS et Android natifs existent dans le même code mais ne sont produits qu'à la
+demande explicite d'une caserne ; ils ne conditionnent aucun ticket du MVP. Langage de design :
+Material 3, une seule apparence partout. Sur iPhone en PWA, respecter les zones sûres, le geste
+retour et Reduce Motion. Backend Supabase. Choix confirmé par le propriétaire du produit après comparaison avec Next.js + Capacitor,
 Expo et Appwrite.
 
 ## Users

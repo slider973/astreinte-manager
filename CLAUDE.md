@@ -52,10 +52,10 @@ Les tickets ne se déplacent jamais à la main. La fusion des PR est faite par u
 ## Design
 
 - Skill `impeccable` (plugin) : `init` a produit `PRODUCT.md`. `shape` pour les briefs, `craft-floor`
-  avant d'écrire des widgets, `audit` (variante native) en revue, `document` pour `DESIGN.md`.
-  Plateforme enregistrée : `android` (Material 3 partout, une seule apparence ; sur iPhone respecter
-  zones sûres, geste retour, Reduce Motion, Dynamic Type ; web en PWA). Méthode : code d'abord
-  (`.impeccable/config.json`). Le monde visuel n'existe pas encore : `new-work` au ticket 004.
+  avant d'écrire des widgets, `audit` en revue, `document` pour `DESIGN.md`.
+  Plateforme enregistrée : `web` (PWA mobile-first, Material 3 partout, une seule apparence).
+  Méthode : code d'abord (`.impeccable/config.json`). Le monde visuel n'existe pas encore :
+  `new-work` au ticket 004.
 - Skill `ui-ux-pro-max` (`.claude/skills/ui-ux-pro-max/`) : données de design interrogeables.
   `python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<besoin en anglais>" --stack flutter`
   ou `--domain ux|web|color|typography|icons`. Mots-clés métier, jamais génériques.
@@ -63,12 +63,20 @@ Les tickets ne se déplacent jamais à la main. La fusion des PR est faite par u
   extérieur, parfois avec des gants. Lisibilité, cibles tactiles 44 pt, états jamais portés par la
   couleur seule. Mode Impeccable : Operate. Pas d'emoji comme icônes.
 
+## Canal principal : la PWA
+
+La PWA web est le produit. Développer et vérifier sur Chrome (`flutter run -d chrome
+--dart-define-from-file=env/dev.json`) et, pour les écrans clés, sur un téléphone avec la PWA
+installée. Les builds iOS et Android natifs ne sont produits qu'à la demande d'une caserne :
+aucun ticket du MVP ne doit exiger un simulateur ou un émulateur, et aucun plugin uniquement natif
+ne doit être ajouté sans équivalent web.
+
 ## Conventions de code
 
 - Flutter 3.x, Riverpod, go_router, supabase_flutter, firebase_messaging.
 - `lib/features/<feature>/{data,domain,presentation}`, transverse dans `lib/core/`.
 - Textes centralisés, jamais en dur dans les widgets.
-- `flutter analyze` sans avertissement et `flutter test` verts avant toute PR.
+- `flutter analyze` sans avertissement, `flutter test` verts et `flutter build web` qui passe avant toute PR.
 - Migrations dans `supabase/migrations/`, rejouables avec `supabase db reset`. RLS sur chaque table.
   Jamais de clé service côté app, jamais de secret dans le dépôt.
 - Commits : Conventional Commits, sujet en français, scope = feature (`feat(dispos): …`,

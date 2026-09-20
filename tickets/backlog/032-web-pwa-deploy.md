@@ -1,8 +1,8 @@
 # 032 — Build web PWA et déploiement
 
 - **Épopée** : E9 Release
-- **Priorité** : P0
-- **Dépend de** : 001, 024
+- **Priorité** : P0 (canal principal, à faire dès le jalon 2 pour tester la PWA sur téléphone)
+- **Dépend de** : 001
 - **Branche** : `feat/032-web-pwa-deploy`
 
 ## À faire

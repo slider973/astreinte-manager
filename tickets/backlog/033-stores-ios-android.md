@@ -1,9 +1,13 @@
-# 033 — Publication sur les stores
+# 033 — Publication sur les stores (à la demande d'une caserne)
 
 - **Épopée** : E9 Release
-- **Priorité** : P1
+- **Priorité** : P2 — ne pas démarrer sans demande explicite d'une caserne
 - **Dépend de** : 024, 032
 - **Branche** : `feat/033-stores-ios-android`
+
+## Contexte
+La PWA est le canal principal. Ce ticket n'existe que pour le cas où une caserne exige une app sur
+les stores. Il dépend aussi du ticket 036 (push natives).
 
 ## À faire
 - Compte Apple Developer, App Store Connect, identifiants, signature, TestFlight.

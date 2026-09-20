@@ -66,7 +66,7 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 - Relances automatiques.
 - Vue « mes astreintes » et export calendrier (ICS).
 - Abonnement Stripe par caserne avec période d'essai.
-- PWA web installable, apps iOS et Android.
+- PWA web installable, canal principal et unique du MVP.
 
 ### 4.2 v1.1
 - Échange d'astreinte entre deux membres avec validation admin.
@@ -75,6 +75,8 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 - Import des membres par CSV.
 
 ### 4.3 Hors périmètre (pour l'instant)
+- Apps iOS et Android sur les stores : uniquement à la demande explicite d'une caserne. Le code
+  Flutter les permet, mais aucun ticket du MVP n'en dépend.
 - Gestion des interventions, du matériel, des formations.
 - Feuilles de temps ou paie.
 - SMS (coût par message incompatible avec un abonnement bon marché).
@@ -238,7 +240,8 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 - **Accessibilité** : contrastes conformes, cibles tactiles de 44 pt minimum, tailles de
   police dynamiques.
 - **Web** : Flutter web avec renderer CanvasKit, manifeste PWA, service worker par défaut.
-  Écran d'aide pour l'installation sur iOS.
+  Écran d'aide pour l'installation sur iOS. La PWA est le canal principal : chaque écran est
+  vérifié sur Chrome et sur un téléphone avec la PWA installée, jamais seulement en natif.
 - **Coût** : un seul projet Supabase pour toutes les casernes. Objectif < 3 €/mois par
   caserne en charge d'infrastructure.
 
@@ -246,11 +249,11 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 
 | Couche | Choix | Notes |
 |---|---|---|
-| Front | Flutter 3.x, une base de code | iOS, Android, Web |
+| Front | Flutter 3.x, une base de code | Web/PWA en priorité ; iOS et Android natifs à la demande |
 | État | Riverpod | Voir ticket 004 |
 | Navigation | go_router | Deep links pour les notifications |
 | Backend | Supabase | Postgres, Auth, Realtime, Storage, Edge Functions |
-| Push | FCM via `firebase_messaging` | Tokens stockés dans `push_tokens` |
+| Push | FCM Web (VAPID) via `firebase_messaging` | Natif APNs/Android seulement si une caserne demande l'app. Tokens dans `push_tokens` |
 | Email | Resend | Appelé depuis les Edge Functions |
 | Cron | pg_cron | Relances, verrouillage, rappels |
 | Paiement | Stripe | Checkout, Customer Portal, webhooks vers Edge Function |
@@ -261,7 +264,7 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 
 | Risque | Impact | Mitigation |
 |---|---|---|
-| Push iOS web peu fiables | Membres ne voient pas les propositions | Email de secours systématique, badge in-app, apps natives pour les casernes qui le demandent |
+| Push iOS web peu fiables (PWA non installée, réglages) | Membres ne voient pas les propositions | Email de secours systématique, badge in-app, guide d'installation insistant ; app native uniquement pour une caserne qui la réclame |
 | Flutter web lourd au premier chargement | Abandon sur mobile | PWA installée charge une fois, écran de chargement soigné, mesure du temps de premier rendu |
 | Admin qui refuse le changement d'outil | Pas d'adoption | Import des membres par CSV en v1.1, période d'essai longue, accompagnement |
 | Projet Supabase gratuit en pause | Service indisponible | Passer en Pro dès le premier client payant |
