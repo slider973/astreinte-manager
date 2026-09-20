@@ -997,6 +997,10 @@ export type Database = {
           weekends_left: number
         }[]
       }
+      cancel_assignment: {
+        Args: { p_assignment: string; p_reason?: string }
+        Returns: Json
+      }
       create_invitation: {
         Args: {
           p_email: string
@@ -1131,6 +1135,15 @@ export type Database = {
       }
       publish_schedule: {
         Args: { p_actor: string; p_schedule: string }
+        Returns: Json
+      }
+      reassign_shift: {
+        Args: {
+          p_actor: string
+          p_previous?: string
+          p_shift: string
+          p_user: string
+        }
         Returns: Json
       }
       remind_schedule: {
