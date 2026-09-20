@@ -13,6 +13,8 @@ import '../../../core/widgets/empty_state.dart';
 import '../../dispos/presentation/mois_screen.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../notifications/presentation/widgets/reglage_notifications.dart';
+import '../../propositions/domain/propositions_providers.dart';
+import '../../propositions/presentation/propositions_screen.dart';
 
 /// La coquille des destinations de premier niveau.
 ///
@@ -45,6 +47,10 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
   /// L'onglet qui porte l'identité et la sortie, en attendant son écran.
   static const String _routeProfil = 'profil';
 
+  /// L'onglet des propositions (ticket 021). C'est là que mène le lien public
+  /// `/proposals` d'une notification, traduit par `destinationInterne`.
+  static const String _routePropositions = 'propositions';
+
   void _choisir(int index, List<AppDestination> destinations) {
     if (destinations[index].route == _routeAdmin) {
       // La destination « Admin » tombe sur **le travail**, pas sur
@@ -71,8 +77,12 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
   @override
   Widget build(BuildContext context) {
     final appartenance = ref.watch(appartenanceCouranteProvider);
+    // La pastille est construite **une fois pour toute la coquille** : la
+    // barre du bas et le rail latéral la partagent, et « Mon mois » l'affiche
+    // sans savoir ce qu'est une proposition (ticket 021).
     final destinations = AppDestination.pour(
       admin: appartenance?.estAdmin ?? false,
+      propositionsEnAttente: ref.watch(propositionsEnAttenteProvider),
     );
     final index = _destination.clamp(0, destinations.length - 1);
     final route = destinations[index].route;
@@ -84,6 +94,15 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
         onDestination: (nouvelle) => _choisir(nouvelle, destinations),
         moisInitial: widget.mois,
         onMoisChange: _changerMois,
+      );
+    }
+
+    if (route == _routePropositions) {
+      return PropositionsScreen(
+        destinations: destinations,
+        indexSelectionne: index,
+        onDestination: (nouvelle) => _choisir(nouvelle, destinations),
+        onVersMonMois: () => setState(() => _destination = 0),
       );
     }
 

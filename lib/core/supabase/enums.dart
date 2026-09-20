@@ -49,6 +49,28 @@ extension DisponibiliteSql on DisponibiliteEtat {
   };
 }
 
+/// `schedule_status` : `draft` / `published` / `validated` / `archived`.
+///
+/// Un statut inconnu est lu comme **publié** : c'est le côté sûr. Un planning
+/// qu'on ne comprend pas ne se laisse pas modifier comme un brouillon, et il
+/// ne se donne pas non plus pour validé.
+extension PlanningSql on PlanningEtat {
+  String get valeurSql => switch (this) {
+    PlanningEtat.brouillon => 'draft',
+    PlanningEtat.publie => 'published',
+    PlanningEtat.valide => 'validated',
+    PlanningEtat.archive => 'archived',
+  };
+
+  static PlanningEtat depuisSql(String? valeur) => switch (valeur) {
+    'draft' => PlanningEtat.brouillon,
+    'published' => PlanningEtat.publie,
+    'validated' => PlanningEtat.valide,
+    'archived' => PlanningEtat.archive,
+    _ => PlanningEtat.publie,
+  };
+}
+
 /// `period_status` : `open` / `locked`.
 extension PeriodeSql on PeriodeEtat {
   String get valeurSql => switch (this) {

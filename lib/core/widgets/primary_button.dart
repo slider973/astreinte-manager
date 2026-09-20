@@ -35,11 +35,22 @@ class PrimaryButton extends StatelessWidget {
     this.icone,
     this.chargement = false,
     this.raisonDesactivation,
+    this.raisonVisible = true,
     this.pleineLargeur,
+    this.libelleAnnonce,
   });
 
   /// Libellé de l'action. Reste visible pendant le chargement.
   final String libelle;
+
+  /// Ce que le lecteur d'écran annonce à la place de [libelle].
+  ///
+  /// Réservé aux listes où le même verbe se répète : quatre boutons
+  /// « Accepter » sur un écran ne se distinguent pas à l'oreille. Le libellé
+  /// visible reste court, l'annoncé porte la phrase entière — « Accepter
+  /// samedi 12 octobre, nuit » (`DESIGN.md § Chips`, même règle que
+  /// `SlotChip`).
+  final String? libelleAnnonce;
 
   /// `null` désactive le bouton — et exige alors [raisonDesactivation].
   final VoidCallback? onPressed;
@@ -61,6 +72,14 @@ class PrimaryButton extends StatelessWidget {
   /// Phrase courte affichée **sous** le bouton quand il est désactivé.
   /// Elle dit pourquoi, et si possible comment en sortir.
   final String? raisonDesactivation;
+
+  /// La raison s'écrit sous le bouton. À passer à faux pour le **second** de
+  /// deux boutons appairés, qui partagent la même raison : l'écrire deux fois
+  /// sous une même ligne est du bruit, pas une explication.
+  ///
+  /// La raison reste obligatoire et reste **annoncée** (`hint`) dans les deux
+  /// cas : ce qui change est l'affichage, pas l'invariant.
+  final bool raisonVisible;
 
   /// Pleine largeur. Par défaut : vrai en `compact`, faux au-delà, où le
   /// bouton prend sa largeur intrinsèque avec un plancher de 160 dp.
@@ -139,13 +158,15 @@ class PrimaryButton extends StatelessWidget {
     final semantique = Semantics(
       button: true,
       enabled: _actif,
-      label: libelle,
+      label: libelleAnnonce ?? libelle,
       hint: _actif ? null : raisonDesactivation,
       excludeSemantics: true,
       child: dimensionne,
     );
 
-    if (_actif || raisonDesactivation == null) return semantique;
+    if (_actif || raisonDesactivation == null || !raisonVisible) {
+      return semantique;
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,

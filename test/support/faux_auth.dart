@@ -37,6 +37,8 @@ import 'package:astreinte_sp/features/planning/data/suivi_repository.dart';
 import 'package:astreinte_sp/features/planning/domain/matrice_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/planning_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/suivi_providers.dart';
+import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
+import 'package:astreinte_sp/features/propositions/domain/propositions_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,6 +47,7 @@ import 'faux_dispos.dart';
 import 'faux_invitations.dart';
 import 'faux_notifications.dart';
 import 'faux_planning.dart';
+import 'faux_propositions.dart';
 import 'faux_push.dart';
 import 'faux_suivi.dart';
 
@@ -218,6 +221,7 @@ Future<AppMontee> monterApp(
   MatriceRepository? matrice,
   PlanningRepository? planning,
   SuiviRepository? suivi,
+  PropositionsRepository? propositions,
   DisposRepository? dispos,
   FileLocale? fileLocale,
   Connectivite? reseau,
@@ -282,6 +286,12 @@ Future<AppMontee> monterApp(
         // client Supabase qui n'existe pas en test.
         suiviRepositoryProvider.overrideWithValue(
           suivi ?? FauxSuiviRepository(),
+        ),
+        // La pastille des propositions (ticket 021) est construite par la
+        // coquille d'accueil, donc lue par **tous** les écrans : sans faux,
+        // chaque test toucherait un client Supabase qui n'existe pas en test.
+        propositionsRepositoryProvider.overrideWithValue(
+          propositions ?? FauxPropositionsRepository(),
         ),
         // L'onglet 0 est désormais « Mon mois » : sans faux dépôt, il
         // toucherait un client Supabase qui n'existe pas en test.
