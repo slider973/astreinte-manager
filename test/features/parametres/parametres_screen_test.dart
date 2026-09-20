@@ -109,14 +109,17 @@ void main() {
       );
     });
 
-    testWidgets('un membre ordinaire ne règle rien', (tester) async {
+    testWidgets('un membre ordinaire n\'ouvre pas les réglages', (tester) async {
       final depot = await _ouvrir(
         tester,
         depot: FauxParametresRepository(),
         appartenance: appartenanceMembre,
       );
 
-      expect(find.text(AppStrings.parametresReserveAdmin), findsOneWidget);
+      // Depuis le ticket 024, le routeur ferme la porte avant l'écran. La
+      // phrase de l'écran (`AppStrings.parametresReserveAdmin`) reste en
+      // seconde ligne.
+      expect(find.byType(ParametresScreen), findsNothing);
       expect(find.byType(ChampTexte), findsNothing);
       expect(depot.lectures, 0);
     });

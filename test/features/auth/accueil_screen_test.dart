@@ -24,6 +24,13 @@ Future<void> ouvrirProfil(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// L'onglet « Profil » défile depuis que le réglage des notifications s'y est
+/// posé (ticket 024) : la sortie est sous la ligne de flottaison.
+Future<void> faireDefilerJusqua(WidgetTester tester, Finder cible) async {
+  await tester.scrollUntilVisible(cible, 200);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('AccueilScreen', () {
     testWidgets('une session existante mène directement à l\'accueil', (
@@ -82,6 +89,7 @@ void main() {
         appartenances: const <Appartenance>[appartenanceMembre],
       );
       await ouvrirProfil(tester);
+      await faireDefilerJusqua(tester, find.text(AppStrings.seDeconnecter));
 
       await tester.tap(find.text(AppStrings.seDeconnecter));
       await tester.pumpAndSettle();
@@ -98,6 +106,7 @@ void main() {
         appartenances: const <Appartenance>[appartenanceMembre],
       );
       await ouvrirProfil(tester);
+      await faireDefilerJusqua(tester, find.text(AppStrings.seDeconnecter));
       faux.auth.erreurDeconnexion = AuthErreur.reseau;
 
       await tester.tap(find.text(AppStrings.seDeconnecter));

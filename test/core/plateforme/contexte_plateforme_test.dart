@@ -91,4 +91,43 @@ void main() {
       expect(ContextePlateforme.natif.aideUtile, isFalse);
     });
   });
+  group('Libellé d\'appareil (push_tokens.device_label)', () {
+    test('nomme l\'appareil et le navigateur, rien de plus', () {
+      expect(
+        ContextePlateforme.depuisAgent(userAgent: _safariIphone).libelleAppareil,
+        'iPhone · Safari',
+      );
+      expect(
+        ContextePlateforme.depuisAgent(
+          userAgent: _chromeAndroid,
+        ).libelleAppareil,
+        'Pixel 7 · Chrome',
+      );
+      expect(
+        ContextePlateforme.depuisAgent(userAgent: _chromeBureau).libelleAppareil,
+        'Mac · Chrome',
+      );
+      expect(
+        ContextePlateforme.depuisAgent(
+          userAgent: _samsungAndroid,
+        ).libelleAppareil,
+        'SM-S911B · Samsung Internet',
+      );
+      expect(
+        ContextePlateforme.depuisAgent(userAgent: _chromeIphone).libelleAppareil,
+        'iPhone · Chrome',
+      );
+    });
+
+    test('un agent illisible ne se devine pas', () {
+      expect(
+        ContextePlateforme.depuisAgent(userAgent: 'inconnu/1.0').libelleAppareil,
+        'Appareil',
+      );
+    });
+
+    test('hors du web, il n\'y a pas d\'appareil à nommer', () {
+      expect(ContextePlateforme.natif.libelleAppareil, 'Appareil');
+    });
+  });
 }

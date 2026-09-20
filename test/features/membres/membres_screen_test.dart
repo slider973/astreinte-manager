@@ -126,14 +126,18 @@ void main() {
       expect(find.byType(LigneInvitation), findsNothing);
     });
 
-    testWidgets('un membre simple n\'a rien à administrer ici', (tester) async {
+    testWidgets('un membre simple n\'entre pas ici', (tester) async {
       await _ouvrirMembres(
         tester,
         depot: FauxMembresRepository(),
         appartenance: appartenanceMembre,
       );
 
-      expect(find.text(AppStrings.membresReserveAdmin), findsOneWidget);
+      // Depuis le ticket 024, le routeur ferme la porte avant l'écran : ni
+      // liste vide, ni formulaire d'invitation qui échouerait à l'envoi. La
+      // phrase de l'écran (`AppStrings.membresReserveAdmin`) reste en seconde
+      // ligne.
+      expect(find.byType(MembresScreen), findsNothing);
       expect(find.text(AppStrings.membresInviter), findsNothing);
     });
 

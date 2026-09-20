@@ -10,6 +10,13 @@ environment:
   sdk: ^3.10.9
 
 dependencies:
+  # Notifications push (ticket 024). Web d'abord : le SDK JavaScript n'est
+  # téléchargé qu'au premier `Firebase.initializeApp`, donc sans les variables
+  # `FIREBASE_*` l'application ne joint jamais Google (`docs/FIREBASE.md`).
+  # Les deux paquets compilent pour iOS et Android sans configuration native ;
+  # leur activation là-bas est le ticket 036.
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
   flutter:
     sdk: flutter
   flutter_riverpod: ^3.3.2

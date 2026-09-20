@@ -615,6 +615,22 @@ class _SectionBannieres extends StatelessWidget {
             texte: AppStrings.periodeOuverteJusquAu('15 septembre'),
           ),
         ),
+        // La seule bannière fermable : un **événement**, pas un état. Deux
+        // lignes, une icône qui lui est propre, une action nommée et une
+        // sortie (ticket 024).
+        DevSpecimen(
+          nom: 'événement (notification reçue)',
+          child: AppBanner(
+            variante: AppBannerVariante.information,
+            icone: Icons.notifications_active_outlined,
+            texte: 'Astreinte proposée',
+            detail: 'Samedi 4 octobre, nuit',
+            libelleAction: AppStrings.notifBanniereVoir,
+            onAction: () {},
+            onFermer: () {},
+            libelleFermer: AppStrings.notifBanniereFermer,
+          ),
+        ),
       ],
     );
   }

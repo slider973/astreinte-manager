@@ -47,10 +47,9 @@ void main() {
     });
 
     test('la configuration d\'environnement ne porte que la clé anon', () {
-      const env = Env(
+      const env = Env.sansPush(
         supabaseUrl: 'https://exemple.supabase.co',
         supabaseAnonKey: 'anon',
-        firebaseProjectId: '',
         appEnv: Env.devEnv,
       );
 

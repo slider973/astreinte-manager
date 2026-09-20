@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/l10n/app_strings.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/notifications/presentation/couche_notifications.dart';
 
 /// Racine de l'application : les deux thèmes du système de design (ticket 004)
 /// et la navigation go_router.
@@ -25,6 +26,11 @@ class AstreinteApp extends ConsumerWidget {
       theme: AppTheme.clair,
       darkTheme: AppTheme.sombre,
       routerConfig: router,
+      // Les notifications se branchent **au-dessus des routes** : un push ne
+      // choisit pas l'écran sur lequel il tombe, et sa bannière ne peut donc
+      // pas vivre dans un écran (ticket 024).
+      builder: (context, child) =>
+          CoucheNotifications(child: child ?? const SizedBox.shrink()),
     );
   }
 }

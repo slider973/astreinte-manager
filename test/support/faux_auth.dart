@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:astreinte_sp/app.dart';
 import 'package:astreinte_sp/core/env.dart';
+import 'package:astreinte_sp/core/firebase/firebase_bootstrap.dart';
 import 'package:astreinte_sp/core/plateforme/contexte_plateforme.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
@@ -20,6 +21,8 @@ import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart
 import 'package:astreinte_sp/features/invitation/domain/invitation_providers.dart';
 import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
 import 'package:astreinte_sp/features/membres/domain/membres_providers.dart';
+import 'package:astreinte_sp/features/notifications/data/jeton_local.dart';
+import 'package:astreinte_sp/features/notifications/domain/notifications_providers.dart';
 import 'package:astreinte_sp/features/onboarding/data/profil_repository.dart';
 import 'package:astreinte_sp/features/onboarding/domain/profil_providers.dart';
 import 'package:astreinte_sp/features/parametres/data/parametres_repository.dart';
@@ -31,13 +34,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'faux_dispos.dart';
+import 'faux_invitations.dart';
+import 'faux_push.dart';
 
 /// Environnement de test : configuration Supabase présente, mais aucun réseau
 /// n'est jamais joint — les dépôts sont faux.
-const Env envDeTest = Env(
+const Env envDeTest = Env.sansPush(
   supabaseUrl: 'http://127.0.0.1:54321',
   supabaseAnonKey: 'cle-anon-de-test',
-  firebaseProjectId: '',
   appEnv: Env.devEnv,
 );
 
@@ -70,7 +74,16 @@ class FauxAuthRepository implements AuthRepository {
     SessionUtilisateur? session,
     this.erreurEnvoi,
     this.erreurVerification,
+    this.enAttente = false,
   }) : _session = session;
+
+  /// Le flux ne dit rien tant que [ouvrirSession] n'a pas été appelée.
+  ///
+  /// C'est le **démarrage à froid** : le SDK Supabase relit son stockage local
+  /// et l'application reste en `EtatAuth.chargement` quelques instants. Sans
+  /// cette attente, un faux répond tout de suite et aucun test ne peut voir
+  /// l'écran de restauration ni ce qui s'y joue (ticket 039).
+  bool enAttente;
 
   /// Erreur levée par [envoyerCode], ou `null` pour réussir.
   AuthErreur? erreurEnvoi;
@@ -92,7 +105,7 @@ class FauxAuthRepository implements AuthRepository {
 
   @override
   Stream<SessionUtilisateur?> get sessions async* {
-    yield _session;
+    if (!enAttente) yield _session;
     yield* _controleur.stream;
   }
 
@@ -163,6 +176,8 @@ class FauxMembershipRepository implements MembershipRepository {
 typedef AppMontee = ({
   FauxAuthRepository auth,
   FauxMembershipRepository memberships,
+  FauxMessageriePush push,
+  FauxPushTokensRepository jetons,
 });
 
 /// Monte l'application entière avec des dépôts faux.
@@ -180,6 +195,9 @@ Future<AppMontee> monterApp(
   AuthErreur? erreurEnvoi,
   AuthErreur? erreurVerification,
   AuthErreur? erreurAppartenances,
+  /// Simule un démarrage à froid : la session n'arrive qu'à l'appel de
+  /// `faux.auth.ouvrirSession(...)`.
+  bool sessionEnAttente = false,
   MembresRepository? membres,
   InvitationRepository? invitations,
   ProfilRepository? profils,
@@ -190,6 +208,10 @@ Future<AppMontee> monterApp(
   Connectivite? reseau,
   ReperesLocaux? reperes,
   ContextePlateforme? plateforme,
+  FirebaseDemarrage firebase = FirebaseDemarrage.configurationAbsente,
+  FauxMessageriePush? messagerie,
+  FauxPushTokensRepository? jetons,
+  JetonLocal? jetonLocal,
   Size taille = const Size(390, 844),
   bool stabiliser = true,
 }) async {
@@ -200,12 +222,16 @@ Future<AppMontee> monterApp(
     session: session,
     erreurEnvoi: erreurEnvoi,
     erreurVerification: erreurVerification,
+    enAttente: sessionEnAttente,
   );
   addTearDown(auth.fermer);
   final memberships = FauxMembershipRepository(
     appartenances: appartenances,
     erreur: erreurAppartenances,
   );
+  final push = messagerie ?? FauxMessageriePush();
+  addTearDown(push.fermer);
+  final depotJetons = jetons ?? FauxPushTokensRepository();
 
   await tester.pumpWidget(
     ProviderScope(
@@ -218,8 +244,12 @@ Future<AppMontee> monterApp(
           membresRepositoryProvider.overrideWithValue(membres),
         if (invitations != null)
           invitationRepositoryProvider.overrideWithValue(invitations),
-        if (profils != null)
-          profilRepositoryProvider.overrideWithValue(profils),
+        // Le profil est lu par le réglage des notifications, présent sur
+        // l'onglet « Profil » : sans faux, il toucherait un client Supabase
+        // qui n'existe pas en test.
+        profilRepositoryProvider.overrideWithValue(
+          profils ?? FauxProfilRepository(),
+        ),
         if (parametres != null)
           parametresRepositoryProvider.overrideWithValue(parametres),
         if (periodes != null)
@@ -240,6 +270,12 @@ Future<AppMontee> monterApp(
         contextePlateformeProvider.overrideWithValue(
           plateforme ?? ContextePlateforme.natif,
         ),
+        // Notifications (ticket 024). Par défaut : aucune configuration
+        // Firebase, exactement l'état du projet tant qu'il n'y en a pas.
+        firebaseDemarrageProvider.overrideWithValue(firebase),
+        messageriePushProvider.overrideWithValue(push),
+        pushTokensRepositoryProvider.overrideWithValue(depotJetons),
+        jetonLocalProvider.overrideWithValue(jetonLocal ?? JetonLocalMemoire()),
       ],
       child: const AstreinteApp(),
     ),
@@ -254,19 +290,47 @@ Future<AppMontee> monterApp(
     await tester.pump();
   }
 
-  return (auth: auth, memberships: memberships);
+  return (
+    auth: auth,
+    memberships: memberships,
+    push: push,
+    jetons: depotJetons,
+  );
 }
 
 /// Ouvre un chemin comme le ferait un lien reçu par courriel ou une barre
 /// d'adresse : c'est le routeur réel de l'application qui décide de la suite.
-Future<void> ouvrirRoute(WidgetTester tester, String chemin) async {
+Future<void> ouvrirRoute(
+  WidgetTester tester,
+  String chemin, {
+  /// À passer à faux quand l'écran d'arrivée porte un squelette de
+  /// chargement : son balayage tourne en boucle et `pumpAndSettle` ne rend
+  /// jamais la main.
+  bool stabiliser = true,
+}) async {
   final conteneur = ProviderScope.containerOf(
     tester.element(find.byType(AstreinteApp)),
   );
   conteneur.read(appRouterProvider).go(chemin);
-  await tester.pumpAndSettle();
+  if (stabiliser) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump();
+  }
 }
 
 /// Démonte l'arbre pour libérer les minuteries des contrôleurs.
 Future<void> demonter(WidgetTester tester) =>
     tester.pumpWidget(const SizedBox.shrink());
+
+/// L'emplacement servi par le routeur, chaîne de requête comprise.
+///
+/// C'est ce que la barre d'adresse affiche : les tests de liens profonds
+/// vérifient la destination réelle, pas l'écran qui se trouve dessus.
+String emplacementCourant(WidgetTester tester) {
+  final conteneur = ProviderScope.containerOf(
+    tester.element(find.byType(AstreinteApp)),
+  );
+  return conteneur.read(appRouterProvider).state.uri.toString();
+}

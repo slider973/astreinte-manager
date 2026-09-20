@@ -12,6 +12,8 @@ import '../../features/dev/presentation/dev_components_screen.dart';
 import '../../features/invitation/presentation/invitation_screen.dart';
 import '../../features/membres/presentation/inviter_screen.dart';
 import '../../features/membres/presentation/membres_screen.dart';
+import '../../features/notifications/domain/destination_push.dart';
+import '../../features/notifications/presentation/activation_notifications_screen.dart';
 import '../../features/onboarding/presentation/guide_screen.dart';
 import '../../features/onboarding/presentation/installation_screen.dart';
 import '../../features/onboarding/presentation/profil_accueil_screen.dart';
@@ -24,12 +26,17 @@ import '../session/jeton_invitation.dart';
 import '../session/session_providers.dart';
 import '../supabase/supabase_bootstrap.dart';
 import 'auth_redirection.dart';
+import 'destination_initiale.dart';
 
 /// Chemins et noms de routes de l'application.
 ///
-/// Les deep links des notifications (docs/WORKFLOWS.md, section 8) viendront
-/// s'ajouter ici au fil des tickets. Toujours naviguer par nom
-/// (`context.goNamed`) pour ne pas dupliquer les chemins.
+/// Les deep links des notifications (`docs/WORKFLOWS.md § 8`) sont déclarés
+/// ici depuis le ticket 024 : ce sont des **liens publics**, ils partent dans
+/// des notifications et doivent s'ouvrir même si l'écran qu'ils visent n'a pas
+/// encore sa route à lui. Chacun se contente de rediriger vers l'écran qui
+/// existe, via `destinationInterne` (`features/notifications/domain`).
+/// Toujours naviguer par nom (`context.goNamed`) pour ne pas dupliquer les
+/// chemins.
 abstract final class AppRoutes {
   /// L'accueil, une fois connecté et rattaché à une caserne.
   static const String accueil = '/';
@@ -66,6 +73,10 @@ abstract final class AppRoutes {
   /// coquille d'accueil éclate en routes.
   static const String parametreMois = 'mois';
 
+  /// Tout ce qui est réservé aux administrateurs de la caserne. La garde est
+  /// dans `redirectionAuth` : ce préfixe **est** la règle.
+  static const String prefixeAdmin = '/admin';
+
   /// Administration de la caserne : les membres et les invitations
   /// (ticket 006).
   static const String membres = '/admin/membres';
@@ -98,7 +109,9 @@ abstract final class AppRoutes {
   /// Le chemin d'un jeton donné, tel que le construit l'Edge Function.
   static String cheminInvitation(String jeton) => '$prefixeInvitation$jeton';
 
-  /// L'accueil d'un nouveau membre : profil, guide, aide à l'installation.
+  /// L'accueil d'un nouveau membre : profil, guide, aide à l'installation,
+  /// puis la proposition d'activer les notifications (ticket 024). Dans cet
+  /// ordre, et jamais au premier lancement.
   static const String prefixeBienvenue = '/bienvenue';
   static const String profilAccueil = '$prefixeBienvenue/profil';
   static const String profilAccueilName = 'profilAccueil';
@@ -106,6 +119,30 @@ abstract final class AppRoutes {
   static const String guideName = 'guideAccueil';
   static const String installation = '$prefixeBienvenue/installation';
   static const String installationName = 'installation';
+  static const String activationNotifications =
+      '$prefixeBienvenue/notifications';
+  static const String activationNotificationsName = 'activationNotifications';
+
+  // --- Liens publics des notifications (docs/WORKFLOWS.md § 8) -------------
+
+  /// Le mois visé par un lien de notification, au format `AAAA-MM`.
+  static const String parametrePeriode = 'periode';
+
+  /// `/proposals` — les propositions en attente.
+  static const String lienPropositions = '/proposals';
+  static const String lienPropositionsName = 'lienPropositions';
+
+  /// `/schedule/<period>` — le planning de la caserne.
+  static const String lienPlanning = '/schedule/:$parametrePeriode';
+  static const String lienPlanningName = 'lienPlanning';
+
+  /// `/admin/schedule/<period>` — le suivi côté admin.
+  static const String lienSuiviAdmin = '/admin/schedule/:$parametrePeriode';
+  static const String lienSuiviAdminName = 'lienSuiviAdmin';
+
+  /// `/availability/<period>` — la saisie du mois.
+  static const String lienSaisie = '/availability/:$parametrePeriode';
+  static const String lienSaisieName = 'lienSaisie';
 
   /// L'app n'a pas reçu son URL Supabase à la compilation.
   static const String configuration = '/configuration';
@@ -133,6 +170,8 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
   final rafraichissement = _RafraichissementRouteur(ref);
   ref.onDispose(rafraichissement.dispose);
 
+  final destinationInitiale = ref.watch(destinationInitialeProvider);
+
   final routeur = GoRouter(
     initialLocation: AppRoutes.demarrage,
     refreshListenable: rafraichissement,
@@ -143,15 +182,34 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             : AppRoutes.configuration;
       }
       final jeton = ref.read(jetonInvitationProvider);
+      final etat = ref.read(etatAuthProvider);
+
+      // Une session qui se ferme efface la destination en attente. Le cas
+      // n'est pas théorique : sur un téléphone prêté ou dans un véhicule
+      // partagé (`core/session/deconnexion.dart`), la personne suivante
+      // atterrirait sur l'écran que la précédente venait de quitter.
+      if (etat == EtatAuth.deconnecte) destinationInitiale.oublier();
+
       final redirection = redirectionAuth(
-        etat: ref.read(etatAuthProvider),
+        etat: etat,
         chemin: state.matchedLocation,
         outilsDevAutorises: env.isDev,
+        estAdmin: ref.read(appartenanceCouranteProvider)?.estAdmin ?? false,
         cheminInvitationEnAttente: jeton == null
             ? null
             : AppRoutes.cheminInvitation(jeton),
       );
-      if (redirection != null) return redirection;
+      if (redirection != null) {
+        // **Uniquement pendant la restauration à froid.** C'est le seul moment
+        // où l'emplacement demandé vient du dehors — une URL ouverte, une
+        // notification touchée — et non d'un écran que l'application affichait
+        // déjà. Mémoriser à la déconnexion rejouerait l'écran de la personne
+        // précédente pour la suivante.
+        if (etat == EtatAuth.chargement) {
+          destinationInitiale.memoriser(state.uri.toString());
+        }
+        return redirection;
+      }
 
       // L'écran du code n'existe que pour une adresse : sans elle, il annonce
       // « un code part vers  » et vérifie dans le vide. Le contrôle est ici et
@@ -162,6 +220,13 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             state.uri.queryParameters[AppRoutes.parametreEmail] ?? '',
           )) {
         return AppRoutes.connexion;
+      }
+
+      // La session est prête et l'emplacement courant est permis : si une
+      // destination attendait, c'est le moment d'y aller.
+      if (etat == EtatAuth.connecte) {
+        final reprise = destinationInitiale.reprendre(state.uri.toString());
+        if (reprise != null) return reprise;
       }
 
       return null;
@@ -223,6 +288,32 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.installationName,
         builder: (context, state) => const InstallationScreen(),
       ),
+      GoRoute(
+        path: AppRoutes.activationNotifications,
+        name: AppRoutes.activationNotificationsName,
+        builder: (context, state) => const ActivationNotificationsScreen(),
+      ),
+
+      // Les quatre liens publics des notifications. Ils n'ont pas d'écran à
+      // eux : ils traduisent et redirigent. Le lien reste stable quand les
+      // écrans bougent (tickets 019, 021, 023).
+      for (final chemin in <String, String>{
+        AppRoutes.lienPropositions: AppRoutes.lienPropositionsName,
+        AppRoutes.lienPlanning: AppRoutes.lienPlanningName,
+        AppRoutes.lienSuiviAdmin: AppRoutes.lienSuiviAdminName,
+        AppRoutes.lienSaisie: AppRoutes.lienSaisieName,
+      }.entries)
+        GoRoute(
+          path: chemin.key,
+          name: chemin.value,
+          redirect: (context, state) =>
+              destinationInterne(
+                state.uri.path,
+                admin: ref.read(appartenanceCouranteProvider)?.estAdmin ??
+                    false,
+              ) ??
+              AppRoutes.accueil,
+        ),
       GoRoute(
         path: AppRoutes.demarrage,
         name: AppRoutes.demarrageName,

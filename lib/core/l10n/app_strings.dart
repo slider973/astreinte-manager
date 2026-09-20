@@ -1335,4 +1335,93 @@ abstract final class AppStrings {
   /// Le même cran, annoncé en entier : « Taille du texte ×1.3 ».
   static String devEchelleSemantique(double facteur) =>
       '$devEchelleTexte ${devEchelleValeur(facteur)}';
+
+  // -------------------------------------------------------------------
+  // Notifications push (ticket 024)
+  // -------------------------------------------------------------------
+
+  // --- Accueil d'un nouveau membre : la demande d'autorisation ---------
+
+  static const String notifAccueilTitre = 'Reçois les propositions';
+  static const String notifAccueilIntro =
+      'Quand un chef te propose une astreinte, ton téléphone te prévient. '
+      'Sans ça, il faut ouvrir l\'application pour le savoir.';
+  static const String notifAccueilListeTitre = 'Ce que tu recevras';
+  static const String notifAccueilItemProposition =
+      'Une astreinte t\'est proposée';
+  static const String notifAccueilItemPlanning =
+      'Le planning de ton mois est validé';
+  static const String notifAccueilItemRappel =
+      'Un rappel avant la date limite de saisie';
+
+  /// Annoncé une ligne avant que la fenêtre du navigateur s'ouvre : elle
+  /// arrive sans prévenir et un refus ne se rattrape pas.
+  static const String notifAccueilAvantDemande =
+      'Le navigateur va te demander l\'autorisation.';
+
+  static const String notifActiver = 'Activer les notifications';
+  static const String notifPlusTard = 'Plus tard';
+  static const String notifContinuer = 'Continuer';
+
+  // --- Les cas où les notifications sont impossibles -------------------
+
+  static const String notifIosBanniere =
+      'Sur iPhone, les notifications n\'arrivent que si l\'application est sur '
+      'ton écran d\'accueil.';
+  static const String notifIosTexte =
+      'Ajoute-la à ton écran d\'accueil, puis reviens activer les '
+      'notifications depuis ton profil.';
+  static const String notifIosAction = 'Comment l\'installer';
+
+  static const String notifNonSupporteBanniere =
+      'Ton navigateur ne sait pas recevoir de notifications.';
+  static const String notifNonConfigureBanniere =
+      'Les notifications ne sont pas disponibles sur cette installation.';
+
+  /// La suite, dans les deux cas : rien n'est perdu, c'est juste moins
+  /// confortable.
+  static const String notifSansPushTexte =
+      'Tu verras tes propositions en ouvrant l\'application. Pense à la '
+      'regarder avant chaque début de mois.';
+
+  // --- Réglage dans le profil ------------------------------------------
+
+  static const String notifReglageTitre = 'Notifications';
+  static const String notifReglageBascule = 'Rappels et infos';
+  static const String notifReglageBasculeAide =
+      'Rappels de saisie, planning validé, changement de créneau.';
+
+  /// Exigence produit (`docs/PRD.md § 6.5`) : les propositions d'astreinte ne
+  /// sont jamais désactivables, et le produit le dit au lieu de le cacher.
+  static const String notifReglageToujours =
+      'Les propositions d\'astreinte arrivent toujours. Elles ne se coupent '
+      'pas.';
+  static const String notifReglageRaisonInactive =
+      'Active d\'abord les notifications sur cet appareil.';
+  static const String notifReglageEchec =
+      'Réglage non enregistré. Réessaie dans un instant.';
+
+  static const String notifEtatActive = 'Activées sur cet appareil';
+  static const String notifEtatADemander = 'Pas encore activées';
+  static const String notifEtatRefusee = 'Refusées dans ton navigateur';
+  static const String notifEtatRefuseeSortie =
+      'Rouvre l\'autorisation dans les réglages de ton navigateur, puis '
+      'reviens ici.';
+  static const String notifEtatInstallation =
+      'Ajoute l\'application à ton écran d\'accueil pour les recevoir';
+  static const String notifEtatNonSupporte =
+      'Ton navigateur ne sait pas les recevoir';
+  static const String notifEtatNonConfigure =
+      'Indisponibles sur cette installation';
+  static const String notifEtatHorsWeb =
+      'Indisponibles dans cette version de l\'application';
+
+  // --- Bannière d'un message reçu au premier plan -----------------------
+
+  static const String notifBanniereVoir = 'Voir';
+  static const String notifBanniereFermer = 'Fermer la notification';
+
+  /// Une notification sans titre : le canal a au moins un corps, sinon rien
+  /// ne s'affiche.
+  static const String notifBanniereSansTitre = 'Nouvelle notification';
 }

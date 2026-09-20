@@ -51,17 +51,44 @@ class AppBanner extends StatelessWidget {
     required this.variante,
     required this.texte,
     super.key,
+    this.detail,
+    this.icone,
     this.libelleAction,
     this.onAction,
-  });
+    this.onFermer,
+    this.libelleFermer,
+  }) : assert(
+         onFermer == null || variante == AppBannerVariante.information,
+         'Une bannière qui décrit un état persistant ne se ferme pas : la '
+         'fermer mentirait sur l\'état de l\'écran.',
+       ),
+       assert(
+         onFermer == null || libelleFermer != null,
+         'Le bouton de fermeture doit être nommé pour les lecteurs d\'écran.',
+       );
 
   final AppBannerVariante variante;
 
   /// Une phrase, courte, qui dit le fait et sa conséquence.
   final String texte;
 
+  /// Seconde ligne, en retrait typographique, quand le fait a un détail qui ne
+  /// tient pas dans la première. Deux lignes au plus au total.
+  final String? detail;
+
+  /// Remplace l'icône de la variante. Réservé à un événement que l'icône de
+  /// famille décrirait mal (une notification reçue, ticket 024).
+  final IconData? icone;
+
   final String? libelleAction;
   final VoidCallback? onAction;
+
+  /// Ferme la bannière. **Interdit sur un état persistant** : seule la
+  /// variante `information` peut décrire un événement passager.
+  final VoidCallback? onFermer;
+
+  /// Le nom du bouton de fermeture, annoncé aux lecteurs d'écran.
+  final String? libelleFermer;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +99,7 @@ class AppBanner extends StatelessWidget {
     final (
       Color fond,
       Color encre,
-      IconData icone,
+      IconData iconeVariante,
       bool hachure,
     ) = switch (variante) {
       AppBannerVariante.erreur => (
@@ -134,12 +161,37 @@ class AppBanner extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Icon(icone, size: AppTouch.icone, color: encre),
+                  Icon(
+                    icone ?? iconeVariante,
+                    size: AppTouch.icone,
+                    color: encre,
+                  ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
-                    child: Text(
-                      texte,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: encre),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          texte,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: encre,
+                            fontWeight: detail == null
+                                ? null
+                                : FontWeight.w600,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (detail != null)
+                          Text(
+                            detail!,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: encre,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
                     ),
                   ),
                   if (onAction != null && libelleAction != null) ...<Widget>[
@@ -148,6 +200,23 @@ class AppBanner extends StatelessWidget {
                       onPressed: onAction,
                       style: TextButton.styleFrom(foregroundColor: encre),
                       child: Text(libelleAction!),
+                    ),
+                  ],
+                  if (onFermer != null) ...<Widget>[
+                    const SizedBox(width: AppSpacing.xs),
+                    // Pas d'info-bulle : la bannière peut être posée
+                    // au-dessus du navigateur de l'application (ticket 024),
+                    // où aucun `Overlay` n'existe. Le nom du bouton passe par
+                    // la sémantique, qui n'en demande pas.
+                    IconButton(
+                      onPressed: onFermer,
+                      icon: Icon(Icons.close, semanticLabel: libelleFermer),
+                      iconSize: AppTouch.icone,
+                      color: encre,
+                      constraints: const BoxConstraints(
+                        minWidth: AppTouch.cible,
+                        minHeight: AppTouch.cible,
+                      ),
                     ),
                   ],
                 ],

@@ -13,10 +13,18 @@ import 'app_router.dart';
 /// gardé en mémoire par `core/session/jeton_invitation.dart`. Il change une
 /// seule chose : un compte qui vient de se connecter sans caserne retourne à
 /// son invitation au lieu d'être envoyé sur « aucune caserne ».
+///
+/// [estAdmin] ferme les écrans d'administration à qui n'administre pas la
+/// caserne. Les **données** sont déjà protégées par les politiques RLS
+/// (`docs/SCHEMA.md § 4`), mais sans cette garde l'interface s'ouvre quand
+/// même : un membre arrivant sur `/admin/membres` verrait des listes vides et
+/// un formulaire d'invitation qui échoue à l'envoi. Une porte fermée vaut
+/// mieux qu'une porte ouverte sur une pièce vide.
 String? redirectionAuth({
   required EtatAuth etat,
   required String chemin,
   bool outilsDevAutorises = false,
+  bool estAdmin = false,
   String? cheminInvitationEnAttente,
 }) {
   // Le catalogue de composants du ticket 004 reste joignable en build de
@@ -42,8 +50,15 @@ String? redirectionAuth({
     EtatAuth.connecte =>
       surLaConnexion ||
               chemin == AppRoutes.demarrage ||
-              chemin == AppRoutes.aucuneCaserne
+              chemin == AppRoutes.aucuneCaserne ||
+              (_sousAdministration(chemin) && !estAdmin)
           ? AppRoutes.accueil
           : null,
   };
 }
+
+/// Vrai pour `/admin` et tout ce qui est en dessous : les membres, les
+/// paramètres, les périodes, et le lien public de suivi du planning.
+bool _sousAdministration(String chemin) =>
+    chemin == AppRoutes.prefixeAdmin ||
+    chemin.startsWith('${AppRoutes.prefixeAdmin}/');

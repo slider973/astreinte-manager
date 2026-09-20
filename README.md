@@ -11,6 +11,7 @@ et de validation du planning.
 | [docs/PRD.md](docs/PRD.md) | Product Requirements Document : vision, rôles, fonctionnalités, règles métier, stack |
 | [docs/SCHEMA.md](docs/SCHEMA.md) | Schéma Supabase : tables, enums, RLS, fonctions, vues, cron |
 | [docs/WORKFLOWS.md](docs/WORKFLOWS.md) | Machines à états et séquences (planning, attribution, notifications) |
+| [docs/FIREBASE.md](docs/FIREBASE.md) | Ce que le propriétaire doit créer chez Firebase pour activer les notifications, et comment le vérifier |
 | [tickets/](tickets/README.md) | Tickets de développement, un par PR, regroupés par épopée |
 
 ## Stack
@@ -42,8 +43,12 @@ flutter test             # doit être vert
 
 L'app lit sa configuration à la compilation via `--dart-define` (voir `lib/core/env.dart` et
 [env/README.md](env/README.md)) : `APP_ENV`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-`FIREBASE_PROJECT_ID`. Le fichier `env/dev.json` est versionné (Supabase local, aucune clé
-sensible) ; `env/prod.json` se crée à partir de `env/prod.json.example` et n'est jamais commité.
+et les cinq variables `FIREBASE_*`. Le fichier `env/dev.json` est versionné (Supabase local, aucune
+clé sensible) ; `env/prod.json` se crée à partir de `env/prod.json.example` et n'est jamais commité.
+
+Les variables `FIREBASE_*` sont **facultatives** : laissées vides, l'application démarre et
+fonctionne normalement, sans notifications, et le dit dans l'écran « Profil ». La marche à suivre
+pour les obtenir est dans [docs/FIREBASE.md](docs/FIREBASE.md).
 
 ### Lancer sur chaque cible
 
