@@ -200,13 +200,18 @@ void main() {
       final depot = FauxDisposRepository();
       await ouvrirMois(tester, depot: depot);
 
+      // Quatre rangs, et non cinq : la bande de raccourcis du ticket 012
+      // occupe une soixantaine de dp entre le sélecteur et l'en-tête, donc
+      // une ligne de jour de moins est construite sur un écran de 390 × 844.
+      // Ce que le test prouve — un geste vertical coche une colonne entière
+      // sans toucher l'autre — ne dépend pas du nombre de rangs.
       await peindre(
         tester,
         depart: caseDe(0, CreneauType.nuit),
-        arrivee: caseDe(4, CreneauType.nuit),
+        arrivee: caseDe(3, CreneauType.nuit),
       );
 
-      for (var rang = 0; rang <= 4; rang++) {
+      for (var rang = 0; rang <= 3; rang++) {
         expect(
           tester.widget<SlotChip>(caseDe(rang, CreneauType.nuit)).etat,
           DisponibiliteEtat.disponible,
@@ -220,8 +225,8 @@ void main() {
       }
 
       await tester.pump(const Duration(seconds: 1));
-      expect(depot.requetes, 1, reason: 'cinq cases, une requête');
-      expect(depot.ecritures.single, hasLength(5));
+      expect(depot.requetes, 1, reason: 'quatre cases, une requête');
+      expect(depot.ecritures.single, hasLength(4));
     });
 
     testWidgets('pendant le geste, la barre annonce le pinceau', (
