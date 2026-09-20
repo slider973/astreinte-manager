@@ -41,7 +41,8 @@ dernière saisie, et agit sur lui sans jamais pouvoir décapiter sa propre caser
   avec sa raison écrite à côté** dans l'interface, et refusée par la base si on la contourne.
 - Un admin ne peut ni se rétrograder ni se désactiver lui-même, même règle, même double barrière.
 - Un membre désactivé ne voit plus la caserne à sa prochaine connexion : il arrive sur « Accès
-  désactivé », avec le nom de la caserne et de quoi se déconnecter.
+  désactivé », avec le nom de la caserne quand il peut encore le lire (§ 5.4) et de quoi se
+  déconnecter.
 - Chaque membre affiche sa dernière saisie de disponibilités, ou dit qu'il n'en a aucune.
 - La recherche filtre sur le nom **et** sur l'adresse, sans accent ni casse.
 - Chaque cible tactile ≥ 48 dp, chaque état lisible en niveaux de gris.
@@ -100,8 +101,9 @@ reste dans la liste : on ne réactive pas quelqu'un qu'on ne voit plus.
 
 **Recherche.** Un champ du système (`ChampTexte`, libellé « Rechercher un membre », texte d'invite
 « Nom ou adresse e-mail », icône `search` en préfixe, croix « Effacer la recherche » en suffixe dès
-qu'on a tapé), posé sous l'en-tête de section dès qu'il y a au moins un membre. Filtre local, sans requête réseau : la liste est déjà en mémoire, et un chef de
-centre qui tape doit voir la liste fondre à chaque lettre. Comparaison sans accent ni casse, sur le
+qu'on a tapé), posé sous l'en-tête de section dès qu'il y a au moins un membre. Filtre local, sans
+requête réseau : la liste est déjà en mémoire, et un chef de centre qui tape doit voir la liste
+fondre à chaque lettre. Comparaison sans accent ni casse, sur le
 nom, le nom affiché et l'adresse. Le compte de la section suit le filtre : « 2 membres sur 9 ».
 
 **La ligne d'un membre**, dans cet ordre :
@@ -122,7 +124,7 @@ dernière date disponible », c'est « la dernière fois qu'il a rempli son mois
 | Aucune saisie | « Aucune saisie de disponibilités » — un fait gris, pas un reproche |
 | Recherche sans résultat | « Aucun membre ne correspond à « durand ». » + « Effacer la recherche » |
 | Membre désactivé | Marqueur `block` + « Désactivé », nom et adresse inchangés |
-| Après une action | Snackbar : « Marie Lefebvre est administratrice de la caserne. », etc. (§ 5.3) |
+| Après une action | Snackbar : « Marie Lefebvre administre maintenant la caserne. », etc. (§ 5.3) |
 
 Le reste de l'écran — squelette, vide, erreur de première lecture, bannière de relecture, réservé
 aux admins — est celui du 006, inchangé.

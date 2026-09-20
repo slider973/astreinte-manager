@@ -487,8 +487,11 @@ abstract final class AppStrings {
 
   // --- Confirmation de désactivation ------------------------------------
 
+  /// L'espace avant le « ? » est **insécable** (`\u00A0`) : la typographie
+  /// française l'exige, et sans lui le point d'interrogation part seul à la
+  /// ligne suivante quand le nom est long. Vu en vrai sur « Lucas Bernard ».
   static String membreDesactiverTitre(String nom) =>
-      'Désactiver l\'accès de $nom ?';
+      'Désactiver l\'accès de $nom\u00A0?';
   static const String membreDesactiverTexte =
       'La personne ne verra plus la caserne à sa prochaine connexion. Son '
       'historique d\'astreintes est conservé, et tu peux la réactiver quand '

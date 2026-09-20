@@ -107,7 +107,9 @@ class _Fait extends StatelessWidget {
         TextSpan(
           children: <InlineSpan>[
             TextSpan(
-              text: '$libelle : ',
+              // Espace insécable avant le deux-points : règle française, et
+              // un « : » orphelin en début de ligne se remarque.
+              text: '$libelle\u00A0: ',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
