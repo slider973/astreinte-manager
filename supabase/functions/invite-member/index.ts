@@ -164,7 +164,6 @@ async function inviterUneAdresse(
   // Le compte de l'invité. auth.enable_signup = false : personne ne peut se créer
   // un compte depuis l'écran de connexion, c'est ici que les comptes naissent.
   let inviteeId = resultat.invitee_id ?? null;
-  let accountCreated = false;
   if (!inviteeId) {
     const { data: cree, error: erreurCompte } = await admin.auth.admin.createUser(
       {
@@ -191,7 +190,6 @@ async function inviterUneAdresse(
       };
     }
     inviteeId = cree.user.id;
-    accountCreated = true;
   }
 
   const courriel = renderInvitationEmail({

@@ -1,8 +1,9 @@
 # Intégration continue d'Astreinte SP.
 #
-# Deux tâches en parallèle, chacune autosuffisante :
-#   - « flutter »      : analyse, tests unitaires et de widgets, build web (le canal principal) ;
-#   - « base-donnees » : rejeu complet des migrations, tests RLS et lint du schéma.
+# Trois tâches en parallèle, chacune autosuffisante :
+#   - « flutter »        : analyse, tests unitaires et de widgets, build web (le canal principal) ;
+#   - « base-donnees »   : rejeu complet des migrations, tests RLS et lint du schéma ;
+#   - « edge-functions » : types, lint, format et tests unitaires des fonctions Deno.
 #
 # Budget visé : moins de dix minutes de bout en bout. Toute étape lente ou instable doit
 # être retirée plutôt que tolérée : une CI qui échoue au hasard ne protège plus rien.
@@ -99,3 +100,44 @@ jobs:
 
       - name: Lint du schéma
         run: supabase db lint --local --fail-on error
+
+  # Les Edge Functions ne sont pas joignables dans la tâche ci-dessus : la pile y
+  # démarre sans `edge-runtime` ni `kong`, pour ne pas télécharger 4 Go d'images.
+  # Leur logique de décision vit donc dans des modules purs (`_shared/`), testables
+  # sans base, sans réseau et sans clés Firebase. C'est ce que cette tâche vérifie,
+  # en moins d'une minute et sans Docker.
+  #
+  # Ce qui reste hors CI : la couche HTTP (`scripts/test_functions.sh`), qui a besoin
+  # de `supabase functions serve` et se lance à la main avant de pousser.
+  edge-functions:
+    name: Edge Functions — types, lint, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: supabase/functions
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Vérifier le format
+        run: deno fmt --check
+
+      - name: Linter
+        run: deno lint
+
+      # Chaque fonction est typée contre `supabase/types/database.types.ts`, versionné
+      # exprès (docs/SCHEMA.md § 10) : une migration oubliée dans les types se voit ici.
+      - name: Vérifier les types
+        run: |
+          deno check send-notification/index.ts
+          deno check invite-member/index.ts
+          deno check accept-invitation/index.ts
+
+      - name: Tester
+        run: deno test tests/ --allow-env
