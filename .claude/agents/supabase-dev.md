@@ -39,7 +39,7 @@ document et tu expliques pourquoi dans le commit.
 ## Commits
 
 Conventional Commits en français : `feat(db): tables periods et availabilities avec RLS`.
-Terminer par `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+Terminer par la ligne `Co-Authored-By:` du modèle de la session, fournie par le harnais.
 
 ## À la fin
 

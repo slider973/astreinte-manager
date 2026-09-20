@@ -37,7 +37,11 @@ Le déroulé de `/ticket N` (défini dans `.claude/skills/ticket/SKILL.md`) :
 5. `pr-reviewer` vérifie chaque critère d'acceptation, au plus deux tours de correction.
 6. `ticket-manager` déplace le ticket en `done`, pousse la branche et crée la PR avec `gh`. Le lien de la PR est écrit dans le ticket.
 
-Les tickets ne se déplacent jamais à la main. La fusion des PR est faite par un humain.
+Les tickets ne se déplacent jamais à la main : toujours via `scripts/ticket.sh`.
+
+Fusion : depuis le 20 septembre 2026, le propriétaire autorise la fusion automatique en squash
+d'une PR dont la revue n'a relevé aucun bloquant, afin d'enchaîner les tickets. Une revue avec
+bloquants non résolus reste en brouillon et attend un humain.
 
 ## Agents
 
@@ -80,8 +84,8 @@ ne doit être ajouté sans équivalent web.
 - Migrations dans `supabase/migrations/`, rejouables avec `supabase db reset`. RLS sur chaque table.
   Jamais de clé service côté app, jamais de secret dans le dépôt.
 - Commits : Conventional Commits, sujet en français, scope = feature (`feat(dispos): …`,
-  `feat(db): …`, `chore(tickets): …`). Terminer par
-  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+  `feat(db): …`, `chore(tickets): …`). Terminer par la ligne `Co-Authored-By:` du modèle de la
+  session en cours, telle que le harnais la fournit.
 - PR : titre `N — Titre du ticket`, corps généré par le script, terminé par
   `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 

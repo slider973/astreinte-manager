@@ -40,7 +40,7 @@ scripts/ticket.sh status          # compte par état
 ## Règles
 
 - Commits : Conventional Commits en français pour le sujet (`feat(dispos): grille de saisie`), terminés par
-  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` uniquement si tu es l'auteur du commit.
+  la ligne `Co-Authored-By:` du modèle de la session, fournie par le harnais uniquement si tu es l'auteur du commit.
 - Ne jamais pousser sur `main` autrement que via le script.
 - Ne jamais fermer, fusionner ou supprimer une PR ou une branche sans demande explicite.
 - Si `gh` ou `git` échoue, rapporter la sortie exacte au lieu de réessayer à l'aveugle.

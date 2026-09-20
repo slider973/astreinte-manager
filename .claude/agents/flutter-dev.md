@@ -40,7 +40,7 @@ en cours, rien de plus, en respectant le brief de design.
 
 - Commits petits et fréquents, Conventional Commits en français :
   `feat(dispos): grille mensuelle avec sélection par glissement`.
-  Terminer chaque message par `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+  Terminer chaque message par la ligne `Co-Authored-By:` du modèle de la session, fournie par le harnais.
 - Ne pas toucher aux migrations Supabase ni aux Edge Functions : c'est le rôle de `supabase-dev`.
   Si le ticket en a besoin, le signaler pour lancer cet agent d'abord.
 - Ne pas déplacer les tickets : c'est le rôle de `ticket-manager`.
