@@ -616,7 +616,12 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   l'idempotence du cron : sans lui, « rouvrir » est une action que la tâche horaire défait
   dans l'heure, et l'admin en accuse le logiciel. Rouvrir, c'est nécessairement dire jusqu'à
   quand. Security invoker : aucune lecture privilégiée, et la règle vaut aussi pour le rôle
-  de service.
+  de service. Étendu par `0013` : une date limite ne peut pas non plus **reculer dans le
+  passé** sur un mois déjà `open` (`period_deadline_in_past`), même symptôme et même refus.
+  Cette dernière règle ne s'applique qu'aux écritures clients — le recalcul de `0011` est
+  `security definer`, donc `current_user` y vaut le propriétaire de la fonction et il passe
+  à travers : un admin qui avance le jour limite de sa caserne décide de fermer les mois en
+  cours, et refuser son réglage entier pour une date dérivée serait un contresens.
 - `availabilities_trace_auteur` (migration `0012`, ticket 014) : `before insert or update`
   sur `availabilities`. Impose `set_by = auth.uid()` pour toute écriture client. La trace de
   l'auteur ne se choisit pas : laissée au client, un admin y écrirait l'identifiant du membre
@@ -637,6 +642,19 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   → `availability.cleared_for_member`, parce que décocher une case est une suppression de
   ligne (§ 2.6) et qu'un effacement fait pour autrui doit laisser autant de trace qu'une
   saisie. Le volet `assignments` viendra avec les plannings.
+- `periods_audit_creation` et `periods_audit_suppression` (migration `0013`, revue du
+  ticket 014) : `after insert` / `after delete` sur `periods`, `period.created` et
+  `period.deleted`. Sans elles, la trace de réouverture se contournait sans rien laisser —
+  supprimer la période, la recréer par `create_period`, repousser sa date limite, et le mois
+  était rouvert avec un `audit_log` vide. Rien ne rattachant les disponibilités à la période
+  (`availabilities` porte une date, pas un `period_id`), la manœuvre ne coûtait même pas les
+  données saisies : la trace de suppression compte donc les disponibilités du mois qui lui
+  survivent. La création n'est journalisée que `when (auth.uid() is not null)` — la tâche
+  `create_periods` et le seed en créent par dizaines sans acteur humain, et `audit_log` est
+  le journal des administrateurs (§ 2.14), pas celui de la machine. La suppression, elle, est
+  journalisée sans condition : c'est une perte de données. Elle s'abstient dans un seul cas,
+  la cascade d'une caserne supprimée, où la ligne d'audit référencerait une caserne déjà
+  disparue et ferait échouer la suppression sur une clé étrangère.
 
 ## 6. Vues
 
@@ -661,6 +679,28 @@ Déclarée `with (security_invoker = true)` : elle n'accorde aucun droit, elle e
 de `availabilities` — un admin y voit sa caserne, un membre n'y voit que lui-même. Elle existe
 parce que les agrégats PostgREST sont désactivés sur ce projet (`PGRST123`) : sans elle, l'app
 rapatrierait toutes les lignes du mois pour n'en garder qu'une par membre.
+
+### `v_period_completion` — taux de saisie d'un mois *(migration `0013`, revue du ticket 014)*
+
+Une ligne par période : `period_id`, `station_id`, `year`, `month`, `active_members`
+(les appartenances `active` de la caserne) et `members_with_availability` (ceux qui ont **au
+moins une** ligne de `availabilities` sur le mois). Une période d'une caserne sans membre
+actif y figure avec `0` et `0` : l'écran doit pouvoir dire « aucun membre actif » plutôt
+qu'afficher « 0 % ».
+
+Le numérateur se construit à partir du même ensemble que le dénominateur : un membre
+désactivé depuis qu'il a saisi ne produit pas « 10 membres sur 9 ».
+
+Déclarée `with (security_invoker = true)`, comme `v_member_last_availability`. Les deux
+nombres ne sont donc justes que pour un **admin**, seul à lire toutes les disponibilités de
+sa caserne (`availabilities_select_own_or_admin`) ; un membre ordinaire y lit un numérateur
+de 0 ou 1 — une vue partielle, pas une fuite, et l'écran qui la consomme lui est de toute
+façon fermé.
+
+Elle existe parce que compter côté client était **faux sans le dire** : PostgREST plafonne
+une réponse à mille lignes et rend `200` sans en-tête d'alerte. À ~62 lignes de
+disponibilités par membre et par mois, le compte devenait faux dès dix-sept membres et
+plafonnait vers seize — « 16 membres sur 60 ont saisi » alors que les 60 avaient saisi.
 
 ### `v_schedule_progress` — avancement d'un planning
 
@@ -736,8 +776,9 @@ Ordre proposé :
 10. `0010_memberships_administration.sql` (ticket 009 : déclencheur `memberships_guard_admin`, vue `v_member_last_availability`)
 11. `0011_station_settings.sql` (ticket 010 : validation de `settings`, garde-fou de fuseau, `period_deadline_at`, recalcul des dates limites)
 12. `0012_cron_periodes.sql` (ticket 014 : `cron_create_periods`, `cron_lock_periods`, `create_period`, transitions et audit des périodes, `set_by` imposé sur `availabilities`, les deux tâches `pg_cron` des périodes)
-13. `0013_views.sql`
-14. `0014_cron_notifications.sql` (les cinq tâches restantes du § 8)
+13. `0013_periodes_completion_audit.sql` (revue du ticket 014 : vue `v_period_completion`, audit de la création et de la suppression d'une période, date limite qui ne recule plus dans le passé)
+14. `0014_views.sql` (les trois vues restantes du § 6)
+15. `0015_cron_notifications.sql` (les cinq tâches restantes du § 8)
 
 Chaque migration est rejouable sur un projet vide et testée en local avec `supabase start`.
 

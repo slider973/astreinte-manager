@@ -1,8 +1,8 @@
--- Tests du cycle de vie des périodes (migration 0012, ticket 014).
+-- Tests du cycle de vie des périodes (migrations 0012 et 0013, ticket 014).
 -- Lancement : scripts/test_rls.sh (ou psql -v ON_ERROR_STOP=1 -f ce fichier).
 --
--- Ce qui est vérifié
--- ------------------
+-- Ce qui est vérifié, section par section
+-- ---------------------------------------
 -- 1. `period_deadline_at` (0011, réutilisée telle quelle) tient debout sur un
 --    mois court : un jour limite de 30 ne peut pas tomber le 30 février.
 -- 2. `cron_create_periods` crée M+1 et M+2 pour chaque caserne, et une seconde
@@ -12,16 +12,22 @@
 -- 4. `cron_lock_periods` verrouille ce qui est échu, ne verrouille pas ce qui ne
 --    l'est pas, et le fuseau de la caserne décide de l'instant exact.
 -- 5. Une période rouverte dont la date limite a été repoussée n'est pas
---    reverrouillée par la tâche suivante ; et rouvrir sans repousser la date
---    limite est refusé plutôt qu'annulé une heure plus tard.
--- 6. La réouverture est tracée dans `audit_log` (règle 7 du produit).
--- 7. `create_period` : réservée aux admins de la caserne, idempotente, refuse un
+--    reverrouillée par la tâche suivante ; rouvrir sans repousser la date limite
+--    est refusé plutôt qu'annulé une heure plus tard ; et la réouverture est
+--    tracée dans `audit_log` (règle 7 du produit).
+-- 6. `create_period` : réservée aux admins de la caserne, idempotente, refuse un
 --    mois écoulé.
--- 8. Saisie d'un admin pour un membre : `set_by` imposé à l'auteur réel (même
+-- 7. Saisie d'un admin pour un membre : `set_by` imposé à l'auteur réel (même
 --    s'il tente d'écrire autre chose) et entrée d'audit ; saisie d'un membre
 --    pour lui-même : aucune entrée.
--- 9. Les deux tâches sont planifiées, et leurs fonctions ne sont pas appelables
+-- 8. Les deux tâches sont planifiées, et leurs fonctions ne sont pas appelables
 --    par un client.
+-- 9. `v_period_completion` (0013) : une ligne par période quel que soit le
+--    volume de saisies, un membre désactivé ne gonfle ni le dénominateur ni le
+--    numérateur, et la vue est lue sous la RLS de qui la lit.
+-- 10. Création et suppression d'une période journalisées (0013) : le
+--    contournement « supprimer, recréer, repousser » ne passe plus en silence.
+--    Et une date limite ne recule pas dans le passé sur un mois ouvert.
 --
 -- Rien ici n'attend l'ordonnanceur : les deux fonctions sont appelées
 -- directement avec un instant de référence. La CI (.github/workflows/ci.yml)
@@ -716,6 +722,353 @@ select tests.check(
         'availabilities_trace_auteur', 'availabilities_audit_saisie_admin')
       and not coalesce(p.proconfig, '{}') @> array['search_path=public, pg_temp']) = 0,
   'les sept fonctions figent search_path = public, pg_temp');
+
+-- ===========================================================================
+-- 9. v_period_completion — le taux de saisie, compté en base (0013)
+-- ===========================================================================
+\echo ''
+\echo '== 9. v_period_completion'
+
+savepoint avant_completion;
+
+insert into periods (id, station_id, year, month, status, deadline_at)
+values ('eeeeeeee-0000-4000-8000-000000000001',
+        'aaaaaaaa-0000-4000-8000-000000000001',
+        2033, 6, 'open', make_timestamptz(2033, 5, 15, 23, 59, 59, 'Europe/Paris'));
+
+select tests.check(
+  (select count(*) from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001') = 1,
+  'une ligne par période, même sans aucune saisie');
+
+select tests.check(
+  (select active_members from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001') = 9,
+  'le dénominateur est l''effectif actif de la caserne (1 admin + 8 membres)');
+
+select tests.check(
+  (select members_with_availability from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001') = 0,
+  'personne n''a saisi juin 2033');
+
+insert into availabilities (station_id, user_id, date, slot, status, set_by) values
+  ('aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000101',
+   '2033-06-03', 'day', 'available', 'aaaaaaaa-0000-4000-8000-000000000101'),
+  ('aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000101',
+   '2033-06-04', 'night', 'absent', 'aaaaaaaa-0000-4000-8000-000000000101');
+
+select tests.check(
+  (select members_with_availability from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001') = 1,
+  'deux créneaux du même membre comptent pour un membre, pas pour deux');
+
+-- Une ligne posée le mois suivant ne doit pas compter pour juin.
+insert into availabilities (station_id, user_id, date, slot, status, set_by)
+values ('aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000102',
+        '2033-07-01', 'day', 'available', 'aaaaaaaa-0000-4000-8000-000000000102');
+
+select tests.check(
+  (select members_with_availability from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001') = 1,
+  'le 1er juillet ne compte pas dans le mois de juin');
+
+insert into availabilities (station_id, user_id, date, slot, status, set_by)
+values ('aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000102',
+        '2033-06-30', 'night', 'available', 'aaaaaaaa-0000-4000-8000-000000000102');
+
+select tests.check(
+  (select members_with_availability from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001') = 2,
+  'le 30 juin compte, lui : deux membres sur neuf');
+
+-- Un membre désactivé ne gonfle ni le dénominateur ni le numérateur. C'était le
+-- second piège du comptage côté client : « 10 membres sur 9 ».
+update memberships set status = 'disabled'
+  where station_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+    and user_id = 'aaaaaaaa-0000-4000-8000-000000000103';
+
+select tests.check(
+  (select active_members from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001') = 8,
+  'désactiver un membre qui n''avait pas saisi : huit actifs');
+
+update memberships set status = 'disabled'
+  where station_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+    and user_id = 'aaaaaaaa-0000-4000-8000-000000000102';
+
+select tests.check(
+  (select active_members = 7 and members_with_availability = 1
+     from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001'),
+  'désactiver un membre qui avait saisi le retire des deux nombres');
+
+-- Le volume : c'est tout l'objet de la vue. Un mois complet pour les membres
+-- restants pèse des centaines de lignes ; la vue en rend toujours **une**.
+-- Le comptage côté client demandait ~62 lignes par membre, et la réponse
+-- PostgREST était tronquée à mille sans le dire dès le dix-septième membre.
+insert into availabilities (station_id, user_id, date, slot, status, set_by)
+select 'aaaaaaaa-0000-4000-8000-000000000001', m.user_id, d::date, sl, 'available', m.user_id
+from memberships m
+cross join generate_series('2033-06-01'::date, '2033-06-30'::date, interval '1 day') d
+cross join unnest(array['day', 'night']::slot_type[]) sl
+where m.station_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+  and m.status = 'active'
+on conflict (station_id, user_id, date, slot) do nothing;
+
+select tests.check(
+  (select count(*) from availabilities
+    where station_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and date >= '2033-06-01' and date < '2033-07-01') > 400,
+  'plus de 400 lignes de disponibilités sur le mois');
+
+select tests.check(
+  (select count(*) from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001') = 1,
+  'et toujours une seule ligne à lire : rien à tronquer');
+
+select tests.check(
+  (select active_members = 7 and members_with_availability = 7
+     from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001'),
+  'les sept membres actifs ont saisi');
+
+\echo ''
+\echo '-- 9 bis. La vue est lue sous la RLS de qui la lit'
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+select tests.check(
+  (select active_members = 7 and members_with_availability = 7
+     from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001'),
+  'l''admin de la caserne A lit les deux nombres justes');
+
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000101","role":"authenticated"}';
+
+-- Un membre ordinaire ne lit dans `availabilities` que ses propres lignes : son
+-- numérateur vaut 0 ou 1. Ce n'est pas une fuite, c'est une vue partielle — il
+-- n'apprend rien qu'il ne puisse déjà lire ligne à ligne.
+select tests.check(
+  (select members_with_availability from v_period_completion
+    where period_id = 'eeeeeeee-0000-4000-8000-000000000001') = 1,
+  'un membre ne voit dans le numérateur que lui-même');
+
+select tests.check(
+  (select count(*) from v_period_completion
+    where station_id = 'bbbbbbbb-0000-4000-8000-000000000001') = 0,
+  'et rien de la caserne B');
+
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"bbbbbbbb-0000-4000-8000-000000000100","role":"authenticated"}';
+
+select tests.check(
+  (select count(*) from v_period_completion
+    where station_id = 'aaaaaaaa-0000-4000-8000-000000000001') = 0,
+  'l''admin de la caserne B ne lit aucune période de la caserne A');
+
+reset role;
+
+select tests.check(
+  not has_table_privilege('anon', 'v_period_completion', 'select'),
+  'anon n''a pas le droit de lire la vue');
+
+rollback to savepoint avant_completion;
+
+-- ===========================================================================
+-- 10. Cycle de vie tracé, et date limite qui ne recule pas (0013)
+-- ===========================================================================
+\echo ''
+\echo '== 10. Création, suppression et date limite'
+
+savepoint avant_cycle;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+select tests.check(
+  (select count(*) from create_period(
+     'aaaaaaaa-0000-4000-8000-000000000001', 2034, 9)) = 1,
+  'un admin ouvre septembre 2034');
+
+reset role;
+-- Et la session : sans cela, `auth.uid()` reste renseigné et les fixtures
+-- posées ensuite « en tant que serveur » déclencheraient l'audit de création.
+reset request.jwt.claims;
+
+select tests.check(
+  (select count(*) from audit_log
+    where action = 'period.created'
+      and actor_id = 'aaaaaaaa-0000-4000-8000-000000000100'
+      and data ->> 'year' = '2034' and data ->> 'month' = '9') = 1,
+  'l''ouverture d''un mois est journalisée');
+
+-- Des saisies sur ce mois : elles survivront à la suppression de la période,
+-- puisque rien ne les y rattache. C'est ce que la trace doit dire.
+insert into availabilities (station_id, user_id, date, slot, status, set_by)
+select 'aaaaaaaa-0000-4000-8000-000000000001', m.user_id, '2034-09-10', 'day', 'available', m.user_id
+from memberships m
+where m.station_id = 'aaaaaaaa-0000-4000-8000-000000000001' and m.status = 'active';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+select tests.allowed(
+  $$delete from periods
+     where station_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+       and year = 2034 and month = 9$$,
+  'un admin supprime le mois qu''il vient d''ouvrir');
+
+reset role;
+-- Et la session : sans cela, `auth.uid()` reste renseigné et les fixtures
+-- posées ensuite « en tant que serveur » déclencheraient l'audit de création.
+reset request.jwt.claims;
+
+select tests.check(
+  (select count(*) from audit_log
+    where action = 'period.deleted'
+      and actor_id = 'aaaaaaaa-0000-4000-8000-000000000100'
+      and data ->> 'year' = '2034' and data ->> 'month' = '9'
+      and data ->> 'status' = 'open') = 1,
+  'la suppression est journalisée, avec le statut au moment du geste');
+
+select tests.check(
+  (select (data ->> 'disponibilites_conservees')::int from audit_log
+    where action = 'period.deleted' and data ->> 'year' = '2034') = 9,
+  'et elle dit combien de saisies survivent à la période supprimée');
+
+select tests.check(
+  (select count(*) from availabilities
+    where station_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and date = '2034-09-10') = 9,
+  'les disponibilités sont bien toujours là : la manœuvre ne coûte rien');
+
+-- Le contournement complet : supprimer un mois verrouillé puis le recréer.
+-- Il reste possible, mais il laisse désormais deux lignes derrière lui.
+insert into periods (id, station_id, year, month, status, deadline_at, locked_at)
+values ('ffffffff-0000-4000-8000-000000000001',
+        'aaaaaaaa-0000-4000-8000-000000000001',
+        2035, 4, 'locked',
+        make_timestamptz(2035, 3, 15, 23, 59, 59, 'Europe/Paris'),
+        make_timestamptz(2035, 3, 15, 23, 59, 59, 'Europe/Paris'));
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+select tests.allowed(
+  $$delete from periods where id = 'ffffffff-0000-4000-8000-000000000001'$$,
+  'un admin supprime un mois verrouillé');
+
+select tests.check(
+  (select count(*) from create_period(
+     'aaaaaaaa-0000-4000-8000-000000000001', 2035, 4)) = 1,
+  'puis le recrée, ouvert');
+
+reset role;
+-- Et la session : sans cela, `auth.uid()` reste renseigné et les fixtures
+-- posées ensuite « en tant que serveur » déclencheraient l'audit de création.
+reset request.jwt.claims;
+
+select tests.check(
+  (select count(*) from audit_log
+    where entity = 'period'
+      and data ->> 'year' = '2035' and data ->> 'month' = '4'
+      and action in ('period.created', 'period.deleted')) = 2,
+  'le journal porte la suppression et la recréation : plus rien de silencieux');
+
+select tests.check(
+  (select data ->> 'status' from audit_log
+    where action = 'period.deleted' and data ->> 'year' = '2035') = 'locked',
+  'et il dit que le mois supprimé était verrouillé');
+
+-- La machine, elle, ne remplit pas le journal.
+select tests.check(
+  (select count(*) from audit_log where action = 'period.created') = 2,
+  'départ : deux créations journalisées, celles de l''admin');
+
+select cron_create_periods('2036-06-10 12:00:00+00'::timestamptz);
+
+select tests.check(
+  (select count(*) from audit_log where action = 'period.created') = 2,
+  'la tâche create_periods n''écrit pas dans le journal des admins');
+
+\echo ''
+\echo '-- 10 bis. Une date limite ne recule pas dans le passé'
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+select tests.echoue_avec(
+  $$update periods set deadline_at = now() - interval '1 day'
+      where station_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+        and year = 2035 and month = 4$$,
+  'period_deadline_in_past',
+  'ramener la date limite d''un mois ouvert dans le passé');
+
+select tests.allowed(
+  $$update periods set deadline_at = now() + interval '30 days'
+      where station_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+        and year = 2035 and month = 4$$,
+  'la repousser dans le futur reste possible');
+
+reset role;
+-- Et la session : sans cela, `auth.uid()` reste renseigné et les fixtures
+-- posées ensuite « en tant que serveur » déclencheraient l'audit de création.
+reset request.jwt.claims;
+
+-- Le recalcul de 0011 passe à travers, volontairement : refuser le réglage d'une
+-- caserne entière pour une date limite dérivée serait un contresens.
+insert into periods (id, station_id, year, month, status, deadline_at)
+values ('ffffffff-0000-4000-8000-000000000002',
+        'aaaaaaaa-0000-4000-8000-000000000001',
+        extract(year  from now())::int,
+        extract(month from now())::int,
+        'open', now() + interval '10 days');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+select tests.allowed(
+  $$update stations
+       set settings = jsonb_set(settings, '{availability_deadline_day}', '1'::jsonb)
+     where id = 'aaaaaaaa-0000-4000-8000-000000000001'$$,
+  'un admin avance le jour limite au 1er, ce qui ferme le mois en cours');
+
+reset role;
+-- Et la session : sans cela, `auth.uid()` reste renseigné et les fixtures
+-- posées ensuite « en tant que serveur » déclencheraient l'audit de création.
+reset request.jwt.claims;
+
+select tests.check(
+  (select deadline_at from periods where id = 'ffffffff-0000-4000-8000-000000000002') < now(),
+  'la date limite du mois en cours est désormais passée, et le réglage a été accepté');
+
+select tests.check(
+  cron_lock_periods() >= 1,
+  'la tâche horaire referme ce mois, ce qui est la bonne suite');
+
+\echo ''
+\echo '-- 10 ter. Supprimer une caserne n''échoue pas sur le journal'
+
+-- La ligne d'audit référencerait une caserne déjà disparue : la clé étrangère de
+-- `audit_log.station_id` bloquerait la suppression en cascade.
+insert into stations (id, name, slug, timezone)
+values ('ffffffff-0000-4000-8000-000000000009', 'CIS Éphémère', 'ephemere', 'Europe/Paris');
+
+insert into periods (station_id, year, month, status, deadline_at)
+values ('ffffffff-0000-4000-8000-000000000009', 2037, 1, 'open',
+        make_timestamptz(2036, 12, 15, 23, 59, 59, 'Europe/Paris'));
+
+select tests.allowed(
+  $$delete from stations where id = 'ffffffff-0000-4000-8000-000000000009'$$,
+  'supprimer une caserne emporte ses périodes sans casser sur le journal');
+
+rollback to savepoint avant_cycle;
 
 \echo ''
 \echo 'periods_cron_test : OK'
