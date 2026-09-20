@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 017, 025
 - **Branche** : `feat/019-publication-suivi`
-- **Statut** : en cours depuis 2026-09-20
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Condition d'entrée, relevée en revue du ticket 017
 La machine à états des plannings n'est gardée par rien en base. Un admin peut aujourd'hui
