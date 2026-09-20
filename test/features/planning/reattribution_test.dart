@@ -345,6 +345,35 @@ void main() {
       );
     });
 
+    testWidgets('une annulation ne se dit pas comme un refus', (tester) async {
+      await _ouvrir(
+        tester,
+        reponses: <AttributionSuivi>[
+          attributionSuivi(
+            id: 'a-annulee',
+            creneauId: 'c-1-j',
+            userId: 'moreau',
+            nom: 'Thomas M.',
+            etat: AttributionEtat.annule,
+            proposeeLe: _maintenant.subtract(const Duration(days: 4)),
+            motifRefus: 'manœuvre annulée',
+          ),
+        ],
+      );
+      await _toucher(tester, find.text(AppStrings.reattribuerAction));
+
+      // La caserne a retiré la garde ; personne n'a refusé. Le dire autrement
+      // mettrait un refus sur le dos de quelqu'un qui n'a rien refusé.
+      expect(
+        find.text(AppStrings.reattributionBandeauAnnulation('Thomas M.')),
+        findsOneWidget,
+      );
+      expect(
+        find.text(AppStrings.reattributionBandeauRefus('Thomas M.')),
+        findsNothing,
+      );
+    });
+
     testWidgets('réattribuer demande confirmation avant de notifier', (
       tester,
     ) async {
@@ -626,9 +655,11 @@ void main() {
           etat: AttributionEtat.accepte,
         ),
       ]);
-      // Le créneau est pourvu et son refus est couvert : plus rien à faire.
+      // Le créneau est pourvu et son refus est **déjà couvert** : plus rien à
+      // décider, donc plus rien à ouvrir. Le refus reste dans l'historique, il
+      // ne redemande pas d'action.
       expect(c.aRemplacer, isNull);
-      expect(c.aReparer, isTrue, reason: 'le refus reste dans l\'historique');
+      expect(c.aReparer, isFalse);
       expect(c.remplacantDe(c.attributions.first), 'B');
     });
 
@@ -666,6 +697,44 @@ void main() {
       ]);
       expect(c.pourvus, 0);
       expect(c.nonPourvu, isTrue);
+    });
+
+    // **La régression trouvée en pilotant l'écran.** Une ligne reçue par le
+    // canal temps réel arrive sans nom d'usage ; le contrôleur lui rend celui
+    // qu'il connaît. Reconstruire l'objet champ par champ a coûté
+    // `replaced_by` : le créneau réparé gardait son bouton « Réattribuer », et
+    // l'historique perdait « remplacé par… ».
+    test('le recollage du nom ne perd aucune colonne', () {
+      final recue = attributionSuivi(
+        id: 'a1',
+        creneauId: 'c-1-j',
+        userId: 'u1',
+        nom: '',
+        etat: AttributionEtat.refuse,
+        motifRefus: 'en formation',
+        remplaceParId: 'a2',
+      );
+
+      final fusionnee = recue.avecNom('Thomas M.');
+
+      expect(fusionnee.nom, 'Thomas M.');
+      expect(fusionnee.remplaceParId, 'a2');
+      expect(fusionnee.motifRefus, 'en formation');
+      expect(fusionnee.etat, AttributionEtat.refuse);
+      expect(
+        creneauAvec(<AttributionSuivi>[
+          fusionnee,
+          attributionSuivi(
+            id: 'a2',
+            creneauId: 'c-1-j',
+            userId: 'u2',
+            nom: 'Camille G.',
+            etat: AttributionEtat.accepte,
+          ),
+        ]).aReparer,
+        isFalse,
+        reason: 'le trou est comblé : plus rien à ouvrir',
+      );
     });
 
     test('l\'ordre des réponses met le remplacé avant l\'annulé', () {

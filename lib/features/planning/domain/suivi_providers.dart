@@ -228,21 +228,14 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
         // **Le nom ne voyage pas dans le canal** : `postgres_changes` diffuse
         // les colonnes de la table, pas la jointure sur `profiles`. Celui qu'on
         // connaît déjà vaut mieux qu'une ligne anonyme.
+        //
+        // La copie se fait par `avecNom`, jamais champ par champ : reconstruire
+        // l'objet ici a déjà coûté silencieusement `replaced_by`, et un créneau
+        // réparé continuait d'afficher son bouton « Réattribuer ».
         final connue = courant.suivi.attributionParId(attribution.id);
         final fusionnee = connue == null || attribution.nom.isNotEmpty
             ? attribution
-            : AttributionSuivi(
-                id: attribution.id,
-                creneauId: attribution.creneauId,
-                userId: attribution.userId,
-                nom: connue.nom,
-                etat: attribution.etat,
-                proposeeLe: attribution.proposeeLe,
-                repondueLe: attribution.repondueLe,
-                motifRefus: attribution.motifRefus,
-                relances: attribution.relances,
-                derniereRelance: attribution.derniereRelance,
-              );
+            : attribution.avecNom(connue.nom);
 
         if (connue == fusionnee) return;
         state = AsyncValue<EtatSuivi?>.data(

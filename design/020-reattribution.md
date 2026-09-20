@@ -64,8 +64,9 @@ D'où trois décisions qui ne sont pas des détails :
 2. **Un client ne peut pas écrire `replaced` ni `cancelled` à la main.** Un déclencheur le refuse.
    Sans lui, la promesse ci-dessus ne tient qu'à la discipline des écrans — la même faille que le
    019 a fermée sur les plannings.
-3. **`replaced_by` est posé systématiquement**, y compris quand l'ancienne attribution reste
-   `declined`. C'est le fil de l'histoire : « ce refus-là a été couvert par cette attribution-là ».
+3. **`replaced_by` est posé systématiquement**, y compris quand l'ancienne attribution garde son
+   statut terminal (`declined`, `cancelled`). C'est le fil de l'histoire : « ce trou-là a été comblé
+   par cette attribution-là ».
 
 ## 4. Périmètre et limites
 
@@ -261,8 +262,10 @@ Une transaction, dans cet ordre :
    relance doivent la voir —, `created_by = p_actor` et `was_available` **relu dans
    `availabilities`**. Une écriture serveur ne passe pas par
    `assignments_trace_disponibilite` : la trace se pose ici, à la main, ou elle ne se pose pas ;
-4. l'ancienne, s'il y en a une : `accepted → replaced`, `proposed → replaced`, `declined` **reste
-   `declined`** ; dans les trois cas `replaced_by` pointe la nouvelle ;
+4. l'ancienne, s'il y en a une : `accepted → replaced`, `proposed → replaced`, `declined` et
+   `cancelled` **restent tels quels** — un statut terminal a déjà été notifié sous ce nom ; dans
+   les quatre cas `replaced_by` pointe la nouvelle. Seul `replaced` n'est pas remplaçable : ce qui
+   a trouvé son remplaçant ne s'en cherche pas un second ;
 5. les notifications : `assignment_proposed` au nouveau, **toujours** ;
    `assignment_cancelled` à l'ancien **si et seulement si** son attribution était `accepted` ;
 6. `audit_log` : `assignment.reassigned` ;
@@ -314,9 +317,14 @@ concernée.
   « Remplacé » est ajouté avec l'encre et le fond d'« annulé » — contrastes déjà vérifiés — et son
   icône et son libellé propres. Consigné en fin de `DESIGN.md`.
 - **Le lien implicite.** Quand le chef pourvoit un créneau sans désigner d'ancienne attribution, la
-  base rattache la nouvelle au **plus ancien refus non encore remplacé** du même créneau. Le statut
-  ne bouge pas, seul `replaced_by` se pose. C'est ce que le chef fait dans sa tête, et le laisser
-  vide obligerait l'historique à se reconstruire par la chronologie.
+  base rattache la nouvelle au **plus ancien trou non encore comblé** du même créneau — un refus ou
+  une annulation. Le statut ne bouge pas, seul `replaced_by` se pose. C'est ce que le chef fait dans
+  sa tête, et le laisser vide obligerait l'historique à se reconstruire par la chronologie.
+- **Une annulation se repourvoit comme un refus.** Trouvé en pilotant l'écran : la première version
+  ne laissait remplacer qu'un refus, et le geste échouait en `409` sur une garde annulée — alors que
+  c'est exactement le même trou et exactement le même geste. Le bandeau, lui, distingue les deux :
+  « L'astreinte de X a été annulée » n'est pas « X a refusé », et mettre un refus sur le dos de
+  quelqu'un qui n'a rien refusé serait une faute.
 - **La réattribution est refusée hors ligne** plutôt que mise en file. Décision assumée au § 6.5.
 - **Le panneau chargé depuis le suivi relit la matrice du mois.** Deux requêtes de plus, à
   l'ouverture du panneau seulement, jamais au chargement de l'écran. Mesurées au 016 : ~20 ms de

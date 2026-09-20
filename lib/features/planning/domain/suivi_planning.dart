@@ -112,6 +112,28 @@ class AttributionSuivi {
 
   bool get aUnMotif => (motifRefus ?? '').isNotEmpty;
 
+  /// La même attribution, avec un autre nom d'affichage.
+  ///
+  /// **Le canal temps réel ne diffuse aucune jointure** : une ligne reçue par
+  /// `postgres_changes` arrive sans nom d'usage, et le contrôleur lui rend
+  /// celui qu'il connaît déjà. Cette copie existe pour que ce recollage ne
+  /// puisse pas **perdre une colonne** : reconstruire l'objet champ par champ à
+  /// l'appel a déjà coûté `replaced_by`, et avec lui le fil de l'historique et
+  /// la disparition du bouton d'un créneau réparé.
+  AttributionSuivi avecNom(String autre) => AttributionSuivi(
+    id: id,
+    creneauId: creneauId,
+    userId: userId,
+    nom: autre,
+    etat: etat,
+    proposeeLe: proposeeLe,
+    repondueLe: repondueLe,
+    motifRefus: motifRefus,
+    relances: relances,
+    derniereRelance: derniereRelance,
+    remplaceParId: remplaceParId,
+  );
+
   /// Vrai quand la réponse se fait attendre au-delà du délai de la caserne.
   /// **`proposeeLe` nul n'est jamais en retard** : un brouillon n'a rien
   /// demandé à personne. Même règle que `v_schedule_progress`.
@@ -353,15 +375,16 @@ class CreneauSuivi {
     return null;
   }
 
-  /// Vrai quand ce créneau porte une décision à prendre : quelqu'un a refusé,
-  /// une attribution a été annulée ou remplacée, ou la place manque.
+  /// Vrai quand ce créneau porte une décision à prendre : la place manque, ou
+  /// un refus — une annulation, un remplacement — n'a **pas encore été
+  /// couvert**.
   ///
   /// **C'est la seule condition qui rend une ligne du suivi actionnable.** Un
-  /// créneau entièrement accepté et pourvu n'a rien à réparer, et un élément
-  /// qui a l'air cliquable sans servir est pire qu'un élément inerte.
-  bool get aReparer =>
-      nonPourvu ||
-      attributions.any((AttributionSuivi a) => a.close);
+  /// créneau entièrement accepté et pourvu n'a rien à réparer, même s'il porte
+  /// un refus dans son histoire : ce refus-là a déjà trouvé son remplaçant, et
+  /// un élément qui a l'air cliquable sans servir est pire qu'un élément
+  /// inerte.
+  bool get aReparer => nonPourvu || aRemplacer != null;
 
   /// Vrai quand le créneau porte au moins une attribution close : le geste se
   /// nomme alors « Réattribuer » plutôt que « Pourvoir ».

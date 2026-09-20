@@ -145,16 +145,15 @@ class LigneCandidat extends StatelessWidget {
             padding: const EdgeInsets.only(top: AppSpacing.xs),
             // **L'étiquette nomme la personne**, pas seulement l'action : au
             // lecteur d'écran, douze boutons « Réattribuer » à la suite ne
-            // disent rien de ce qu'on choisit.
-            child: Semantics(
-              label: '${action.libelle} ${membre.nomAffiche}',
-              excludeSemantics: true,
-              button: true,
-              enabled: onAction != null,
-              child: TextButton.icon(
-                onPressed: onAction,
-                icon: Icon(action.icone, size: AppTouch.icone),
-                label: Text(action.libelle),
+            // disent rien de ce qu'on choisit. Elle passe par le texte du
+            // bouton et non par un `Semantics` englobant, qui effacerait
+            // l'action du nœud avec `excludeSemantics`.
+            child: TextButton.icon(
+              onPressed: onAction,
+              icon: Icon(action.icone, size: AppTouch.icone),
+              label: Text(
+                action.libelle,
+                semanticsLabel: '${action.libelle} ${membre.nomAffiche}',
               ),
             ),
           ),

@@ -318,28 +318,30 @@ class _BoutonReparer extends StatelessWidget {
         .creneau(creneau.creneau.creneau)
         .libelle;
 
-    final bouton = Semantics(
-      button: true,
-      enabled: raisonInactif == null,
-      label: refus
-          ? AppStrings.reattribuerSemantique(
-              jourEtDate: jourEtDate,
-              creneau: libelleCreneau,
-            )
-          : AppStrings.pourvoirSemantique(
-              jourEtDate: jourEtDate,
-              creneau: libelleCreneau,
-            ),
-      excludeSemantics: true,
-      child: TextButton.icon(
-        onPressed: raisonInactif == null ? onReparer : null,
-        icon: Icon(
-          refus ? Icons.published_with_changes : Icons.person_add_alt_1,
-          size: AppTouch.icone,
-        ),
-        label: Text(
-          refus ? AppStrings.reattribuerAction : AppStrings.pourvoirAction,
-        ),
+    // **L'étiquette passe par le texte du bouton, pas par un `Semantics`
+    // englobant.** Un `Semantics(excludeSemantics: true)` autour d'un
+    // `TextButton` efface l'action du nœud : le bouton se lit mais ne
+    // s'active plus, et le seul geste de l'écran devient inatteignable au
+    // lecteur d'écran. `Text.semanticsLabel` remplace ce qui est *annoncé*
+    // sans toucher à ce qui est *affiché*, et le bouton garde son action, son
+    // focus et son état désactivé.
+    final bouton = TextButton.icon(
+      onPressed: raisonInactif == null ? onReparer : null,
+      icon: Icon(
+        refus ? Icons.published_with_changes : Icons.person_add_alt_1,
+        size: AppTouch.icone,
+      ),
+      label: Text(
+        refus ? AppStrings.reattribuerAction : AppStrings.pourvoirAction,
+        semanticsLabel: refus
+            ? AppStrings.reattribuerSemantique(
+                jourEtDate: jourEtDate,
+                creneau: libelleCreneau,
+              )
+            : AppStrings.pourvoirSemantique(
+                jourEtDate: jourEtDate,
+                creneau: libelleCreneau,
+              ),
       ),
     );
 

@@ -199,7 +199,11 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     if (refusee == null || refusee.nom.isEmpty) {
       return AppStrings.reattributionBandeau;
     }
-    return AppStrings.reattributionBandeauRefus(refusee.nom);
+    // Un refus et une annulation ne se disent pas de la même façon : l'un est
+    // la réponse d'un pompier, l'autre une décision de la caserne.
+    return refusee.etat == AttributionEtat.refuse
+        ? AppStrings.reattributionBandeauRefus(refusee.nom)
+        : AppStrings.reattributionBandeauAnnulation(refusee.nom);
   }
 
   /// Pourquoi la réattribution est impossible, ou `null`.

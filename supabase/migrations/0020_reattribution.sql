@@ -113,12 +113,12 @@ create trigger assignments_guard_reattribution
 -- le créneau déjà pourvu.
 --
 -- **`p_previous` est facultatif, et les trois cas sont réels** :
---   - l'identifiant d'un refus ou d'une acceptation à remplacer — le geste du
---     ticket ;
---   - `null` sur un créneau qui porte un refus non encore remplacé : la
---     fonction rattache la nouvelle attribution au **plus ancien** d'entre eux.
---     C'est ce que le chef fait dans sa tête, et le laisser vide obligerait
---     l'historique à se reconstruire par la chronologie ;
+--   - l'identifiant d'un refus, d'une annulation ou d'une attribution vivante à
+--     remplacer — le geste du ticket ;
+--   - `null` sur un créneau qui porte un trou non encore comblé : la fonction
+--     rattache la nouvelle attribution au **plus ancien** d'entre eux. C'est ce
+--     que le chef fait dans sa tête, et le laisser vide obligerait l'historique
+--     à se reconstruire par la chronologie ;
 --   - `null` sur un créneau simplement vide : on pourvoit, sans rien remplacer.
 --
 -- **Ce que la fonction écrit elle-même, et pourquoi.** `created_by` et
@@ -215,20 +215,27 @@ begin
       return jsonb_build_object('ok', false, 'code', 'assignment_not_found');
     end if;
 
-    -- Une attribution déjà sortie du jeu ne se remplace pas deux fois : son
-    -- `replaced_by` pointerait ailleurs et l'historique se contredirait.
-    if ancienne.status not in ('proposed', 'accepted', 'declined')
+    -- Quatre statuts se remplacent : les deux vivants (`proposed`,
+    -- `accepted`), et les deux qui laissent un trou (`declined`, `cancelled`).
+    -- Une annulation se repourvoit exactement comme un refus : c'est la même
+    -- histoire — une garde qui manque, quelqu'un qui la reprend —, et la
+    -- refuser ici obligerait l'écran à distinguer deux gestes identiques.
+    --
+    -- `replaced` est le seul exclu, et la condition sur `replaced_by` dit
+    -- pourquoi : ce qui a déjà trouvé son remplaçant ne s'en cherche pas un
+    -- second, sinon le fil de l'histoire pointerait deux fois ailleurs.
+    if ancienne.status not in ('proposed', 'accepted', 'declined', 'cancelled')
        or ancienne.replaced_by is not null then
       return jsonb_build_object('ok', false, 'code', 'assignment_not_replaceable',
                                 'status', ancienne.status);
     end if;
   else
-    -- Le plus ancien refus non encore remplacé de ce créneau. `order by` sur la
-    -- réponse puis sur la création : deux refus dans la même seconde restent
-    -- départagés.
+    -- Le plus ancien trou non encore comblé de ce créneau — un refus ou une
+    -- annulation. `order by` sur la réponse puis sur la création : deux refus
+    -- dans la même seconde restent départagés.
     select * into ancienne from assignments a
      where a.shift_id    = p_shift
-       and a.status      = 'declined'
+       and a.status in ('declined', 'cancelled')
        and a.replaced_by is null
      order by a.responded_at nulls last, a.created_at
      limit 1;
@@ -265,14 +272,19 @@ begin
   -- 2. L'ancienne : le statut selon ce qu'elle était, le lien dans tous les cas.
   -- ------------------------------------------------------------------
   -- docs/WORKFLOWS.md § 3 et § 5 :
-  --   accepted -> replaced  (avec notification)
-  --   proposed -> replaced  (sans notification : rien n'était acquis)
-  --   declined -> declined  (le refus **reste** un refus ; il est l'histoire)
-  -- et `replaced_by` pointe la nouvelle dans les trois cas : c'est le fil qui
-  -- dit « ce refus-là a été couvert par cette attribution-là ».
+  --   accepted  -> replaced   (avec notification)
+  --   proposed  -> replaced   (sans notification : rien n'était acquis)
+  --   declined  -> declined   (le refus **reste** un refus ; il est l'histoire)
+  --   cancelled -> cancelled  (l'annulation aussi : elle est déjà dite)
+  -- et `replaced_by` pointe la nouvelle dans les quatre cas : c'est le fil qui
+  -- dit « ce trou-là a été comblé par cette attribution-là ». Un statut
+  -- terminal ne se réécrit pas — il a déjà été notifié sous ce nom.
   if ancienne.id is not null then
     update assignments a
-       set status = case when a.status = 'declined' then a.status else 'replaced' end,
+       set status = case
+                      when a.status in ('declined', 'cancelled') then a.status
+                      else 'replaced'
+                    end,
            replaced_by = nouvelle.id
      where a.id = ancienne.id;
   end if;

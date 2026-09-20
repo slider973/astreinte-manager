@@ -8,7 +8,7 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
 | `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation |
 | `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                   |
 | `publish-schedule`  | 019    | Publie un planning : statut, `proposed_at` de chaque attribution, puis **une** notification par membre                                                |
-| `reassign-shift`    | 020    | Réattribue un créneau d'un planning publié : nouvelle attribution proposée, ancienne remplacée, **une** notification au nouveau membre               |
+| `reassign-shift`    | 020    | Réattribue un créneau d'un planning publié : nouvelle attribution proposée, ancienne remplacée, **une** notification au nouveau membre                |
 | `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                  |
 
 ## Règles qui ne se négocient pas
@@ -366,20 +366,21 @@ Content-Type: application/json
 `reassign_shift(p_shift, p_user, p_actor, p_previous)` — fonction SQL `security definer`, réservée
 au rôle de service — fait tout, en une fois :
 
-1. verrou de ligne sur le planning, pour que deux adjoints ne pourvoient pas deux fois la même
-   place ;
+1. verrou de ligne sur le planning, pour que deux adjoints ne pourvoient pas deux fois la même place
+   ;
 2. la nouvelle attribution, `proposed` et **déjà horodatée** (`proposed_at`), avec `created_by` et
    `was_available` posés par la fonction — sous le rôle de service, le déclencheur
    `assignments_trace_disponibilite` rend la ligne telle quelle ;
-3. l'ancienne, s'il y en a une : `accepted → replaced`, `proposed → replaced`, et **`declined`
-   reste `declined`** — un refus est l'histoire de la caserne. Dans les trois cas, `replaced_by`
-   pointe la nouvelle ;
+3. l'ancienne, s'il y en a une : `accepted → replaced`, `proposed → replaced`, et **`declined` et
+   `cancelled` restent tels quels** — un statut terminal est l'histoire de la caserne, et il a déjà
+   été notifié sous ce nom. Dans les quatre cas, `replaced_by` pointe la nouvelle ;
 4. les **demandes de notification**, dans la même transaction, par `notify(...)` ;
 5. `audit_log` (`assignment.reassigned`) et `schedule_reevaluer`, qui ramène un planning validé en
    `published` quand une acceptation vient de disparaître.
 
-`previous_assignment_id` est facultatif : laissé vide sur un créneau qui porte un refus non encore
-couvert, la base rattache la nouvelle attribution au **plus ancien** d'entre eux.
+`previous_assignment_id` est facultatif : laissé vide sur un créneau qui porte un trou non encore
+comblé — un refus ou une annulation —, la base rattache la nouvelle attribution au **plus ancien**
+d'entre eux. Seule une attribution déjà `replaced` est refusée : elle a trouvé son remplaçant.
 
 ### Pourquoi elle n'appelle pas `send-notification`, contrairement à `publish-schedule`
 
@@ -387,14 +388,15 @@ Une publication groupe trente pompiers et sept créneaux chacun : le regroupemen
 l'envoi part ensuite de l'Edge Function, **après** la transaction, pour ne pas pouvoir défaire une
 publication acquise. Une réattribution vise **une** personne et **un** créneau : il n'y a rien à
 grouper, et la file de `notify(...)` — avec son rejeu par `cron_dispatch_notifications` — garantit
-l'envoi même si le processus meurt entre la transaction et l'appel HTTP. Un pompier qui ignore
-qu'il est d'astreinte est le seul défaut que ce ticket n'a pas le droit de produire.
+l'envoi même si le processus meurt entre la transaction et l'appel HTTP. Un pompier qui ignore qu'il
+est d'astreinte est le seul défaut que ce ticket n'a pas le droit de produire.
 
 ### Combien de notifications
 
 | Ce que remplace la réattribution | Nouveau membre        | Ancien membre                     |
 | -------------------------------- | --------------------- | --------------------------------- |
 | un refus (`declined`)            | `assignment_proposed` | **rien** — c'est lui qui a refusé |
+| une annulation (`cancelled`)     | `assignment_proposed` | rien — il a déjà été prévenu      |
 | une proposition sans réponse     | `assignment_proposed` | rien — il n'avait rien acquis     |
 | une garde acceptée               | `assignment_proposed` | `assignment_cancelled`            |
 | un créneau vide                  | `assignment_proposed` | —                                 |
@@ -422,27 +424,29 @@ Réponse `200` :
 
 Erreurs, forme `{"error": {"code", "message"}}` :
 
-| Statut | `code`                       | Quand                                                              |
-| ------ | ---------------------------- | ------------------------------------------------------------------ |
-| 400    | `invalid_body`               | JSON invalide, `shift_id` ou `user_id` absent                      |
-| 401    | `unauthenticated`            | Pas de jeton porteur, ou jeton qui n'identifie pas un utilisateur  |
-| 403    | `not_admin`                  | L'appelant n'est pas admin **actif** de la caserne du créneau      |
-| 403    | `station_suspended`          | Abonnement suspendu : la caserne est en lecture seule              |
-| 404    | `shift_not_found`            | Créneau inconnu                                                    |
-| 404    | `assignment_not_found`       | L'attribution à remplacer n'est pas sur ce créneau                 |
-| 405    | `method_not_allowed`         | Autre verbe que POST                                               |
-| 409    | `schedule_not_published`     | Planning en brouillon ou archivé. `status` accompagne l'erreur     |
-| 409    | `already_assigned`           | Ce pompier tient déjà ce créneau                                   |
-| 409    | `assignment_not_replaceable` | L'ancienne attribution a déjà été remplacée                        |
-| 422    | `member_not_active`          | Le pompier visé n'est pas membre actif de la caserne               |
-| 500    | `internal_error`             | Incident serveur                                                   |
+| Statut | `code`                       | Quand                                                             |
+| ------ | ---------------------------- | ----------------------------------------------------------------- |
+| 400    | `invalid_body`               | JSON invalide, `shift_id` ou `user_id` absent                     |
+| 401    | `unauthenticated`            | Pas de jeton porteur, ou jeton qui n'identifie pas un utilisateur |
+| 403    | `not_admin`                  | L'appelant n'est pas admin **actif** de la caserne du créneau     |
+| 403    | `station_suspended`          | Abonnement suspendu : la caserne est en lecture seule             |
+| 404    | `shift_not_found`            | Créneau inconnu                                                   |
+| 404    | `assignment_not_found`       | L'attribution à remplacer n'est pas sur ce créneau                |
+| 405    | `method_not_allowed`         | Autre verbe que POST                                              |
+| 409    | `schedule_not_published`     | Planning en brouillon ou archivé. `status` accompagne l'erreur    |
+| 409    | `already_assigned`           | Ce pompier tient déjà ce créneau                                  |
+| 409    | `assignment_not_replaceable` | L'ancienne attribution a déjà été remplacée                       |
+| 422    | `member_not_active`          | Le pompier visé n'est pas membre actif de la caserne              |
+| 500    | `internal_error`             | Incident serveur                                                  |
 
 ### Ce qui n'est pas ici, et pourquoi
 
-**L'annulation** est une fonction SQL appelable par un admin (`cancel_assignment(p_assignment,
-p_reason)`), pas une Edge Function : il n'y a ni identité à établir autrement que par `auth.uid()`,
-ni regroupement à faire, et `docs/SCHEMA.md § 7` n'en nomme aucune pour ce geste. Elle notifie le
-membre **si sa garde était acceptée** ; une proposition retirée avant réponse ne prévient personne.
+**L'annulation** est une fonction SQL appelable par un admin
+(`cancel_assignment(p_assignment,
+p_reason)`), pas une Edge Function : il n'y a ni identité à
+établir autrement que par `auth.uid()`, ni regroupement à faire, et `docs/SCHEMA.md § 7` n'en nomme
+aucune pour ce geste. Elle notifie le membre **si sa garde était acceptée** ; une proposition
+retirée avant réponse ne prévient personne.
 
 ---
 

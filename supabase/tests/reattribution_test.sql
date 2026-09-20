@@ -650,6 +650,46 @@ begin
     2, 'les deux refus restent des refus');
 end $$;
 
+-- **Une annulation se repourvoit comme un refus.** C'est le cas que l'écran de
+-- suivi produit le plus souvent après le ticket 020 : une garde retirée par la
+-- caserne laisse exactement le même trou qu'un refus, et le geste est le même.
+do $$
+declare
+  r jsonb;
+begin
+  insert into assignments (id, station_id, shift_id, user_id, status, proposed_at, created_by)
+  values ('77777777-0000-4000-8000-000000000543', '77777777-0000-4000-8000-000000000001',
+          '77777777-0000-4000-8000-000000000402', '77777777-0000-4000-8000-000000000101',
+          'proposed', now(), '77777777-0000-4000-8000-000000000100');
+  -- L'annulation est posée directement : ce bloc tourne sous le rôle
+  -- propriétaire, sans `auth.uid()`, et `cancel_assignment` y répondrait
+  -- `not_admin`. Elle est testée pour elle-même au § 6.
+  update assignments
+     set status = 'cancelled', decline_reason = 'manœuvre annulée'
+   where id = '77777777-0000-4000-8000-000000000543';
+
+  r := reassign_shift('77777777-0000-4000-8000-000000000402',
+                      '77777777-0000-4000-8000-000000000103',
+                      '77777777-0000-4000-8000-000000000100',
+                      '77777777-0000-4000-8000-000000000543');
+
+  perform tests_rea.check((r ->> 'ok')::boolean,
+    'une astreinte annulée se repourvoit');
+  perform tests_rea.egal(r ->> 'previous_status', 'cancelled',
+    'la fonction rend l''état annulé de l''ancienne attribution');
+  perform tests_rea.egal((r ->> 'previous_notified')::boolean, false,
+    'son titulaire a déjà été prévenu par l''annulation : rien de plus ne part');
+  perform tests_rea.egal(
+    (select status from assignments
+      where id = '77777777-0000-4000-8000-000000000543'),
+    'cancelled'::assignment_status,
+    'l''annulation reste une annulation : un statut terminal ne se réécrit pas');
+  perform tests_rea.egal(
+    (select replaced_by::text from assignments
+      where id = '77777777-0000-4000-8000-000000000543'),
+    r ->> 'assignment_id', 'et elle porte le fil vers ce qui l''a comblée');
+end $$;
+
 -- Sur un créneau simplement vide, il n'y a rien à relier.
 do $$
 declare

@@ -300,9 +300,9 @@ n'autorise la suppression que si le planning est encore `draft`.
 (déclencheur `assignments_guard_reattribution`, migration `0020`, ticket 020). Ces trois écritures
 passent par `reassign_shift` ou `cancel_assignment`, qui préviennent le pompier concerné **dans la
 même transaction** : un changement d'état qui ne se dit pas laisserait quelqu'un se croire
-d'astreinte. `replaced_by` est posé dans les trois cas de réattribution, y compris quand l'ancienne
-attribution reste `declined` — c'est le fil qui dit « ce refus-là a été couvert par cette
-attribution-là ».
+d'astreinte. `replaced_by` est posé dans les quatre cas de réattribution, y compris quand l'ancienne
+attribution reste `declined` ou `cancelled` — c'est le fil qui dit « ce trou-là a été comblé par
+cette attribution-là ».
 
 **`decline_reason` porte le motif d'un `declined` comme celui d'un `cancelled`** (migration
 `0020`). La colonne répond à « pourquoi cette garde n'est pas tenue » ; `status` dit déjà qui l'a
@@ -622,7 +622,7 @@ pas.
 
 | Fonction | Signature | Rôle |
 |---|---|---|
-| `reassign_shift` | `(p_shift uuid, p_user uuid, p_actor uuid, p_previous uuid default null) returns jsonb` `security definer`, **réservée à `service_role`** | La réattribution, **en une transaction** : verrou du planning, nouvelle attribution `proposed` avec `proposed_at = now()`, `created_by` et `was_available` posés par la fonction, ancienne marquée `replaced` (`accepted` ou `proposed`) ou **laissée `declined`**, `replaced_by` posé dans les trois cas, notifications, `audit_log` et `schedule_reevaluer`. `p_previous` omis sur un créneau qui porte un refus non couvert : la fonction rattache la nouvelle au **plus ancien** d'entre eux. Refus métier en `{"ok": false, "code": …}` : `shift_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `member_not_active`, `already_assigned`, `assignment_not_found`, `assignment_not_replaceable`. |
+| `reassign_shift` | `(p_shift uuid, p_user uuid, p_actor uuid, p_previous uuid default null) returns jsonb` `security definer`, **réservée à `service_role`** | La réattribution, **en une transaction** : verrou du planning, nouvelle attribution `proposed` avec `proposed_at = now()`, `created_by` et `was_available` posés par la fonction, ancienne marquée `replaced` (`accepted` ou `proposed`) ou **laissée telle quelle** (`declined`, `cancelled` : un statut terminal a déjà été notifié sous ce nom), `replaced_by` posé dans les quatre cas, notifications, `audit_log` et `schedule_reevaluer`. `p_previous` omis sur un créneau qui porte un trou non comblé — un refus ou une annulation : la fonction rattache la nouvelle au **plus ancien** d'entre eux. Seul `replaced` n'est pas remplaçable : ce qui a déjà trouvé son remplaçant ne s'en cherche pas un second. Refus métier en `{"ok": false, "code": …}` : `shift_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `member_not_active`, `already_assigned`, `assignment_not_found`, `assignment_not_replaceable`. |
 | `cancel_assignment` | `(p_assignment uuid, p_reason text default null) returns jsonb` `security definer`, ouverte à `authenticated` | L'annulation d'une attribution d'un planning publié : statut `cancelled`, motif conservé dans `decline_reason`, notification `assignment_cancelled` **si la garde était acceptée**, `audit_log` et `schedule_reevaluer`. Refus : `assignment_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `assignment_not_active`. |
 
 **Une notification, et une seule, sauf quand une garde acquise disparaît.** Un refus suivi d'une

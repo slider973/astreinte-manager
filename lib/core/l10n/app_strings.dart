@@ -2046,6 +2046,13 @@ abstract final class AppStrings {
       '$qui a refusé ce créneau. La personne choisie sera notifiée tout de '
       'suite.';
 
+  /// Une annulation n'est pas un refus : c'est la caserne qui a retiré la
+  /// garde, et le dire autrement serait mettre un refus sur le dos de
+  /// quelqu'un qui n'a rien refusé.
+  static String reattributionBandeauAnnulation(String qui) =>
+      'L\'astreinte de $qui a été annulée. La personne choisie sera notifiée '
+      'tout de suite.';
+
   // --- La confirmation --------------------------------------------------
 
   static const String reattribuerTitre = 'Réattribuer ce créneau';

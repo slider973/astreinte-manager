@@ -57,9 +57,9 @@ stateDiagram-v2
 
 Règles :
 - Un membre passe uniquement de `proposed` à `accepted` ou `declined`.
-- `replaced` porte `replaced_by` vers la nouvelle attribution. **Un refus aussi** : il reste
-  `declined` — c'est l'histoire de la caserne — et son `replaced_by` dit quelle attribution l'a
-  couvert (migration `0020`).
+- `replaced` porte `replaced_by` vers la nouvelle attribution. **Un refus et une annulation
+  aussi** : ils gardent leur statut — c'est l'histoire de la caserne, et elle a déjà été notifiée
+  sous ce nom — et leur `replaced_by` dit quelle attribution a comblé le trou (migration `0020`).
 - **`replaced`, `cancelled` et `replaced_by` ne s'écrivent pas depuis un client** (migration
   `0020`). Ils passent par `reassign_shift` ou `cancel_assignment`, qui préviennent le pompier
   concerné dans la même transaction : un changement d'état qui ne se dit pas laisse quelqu'un se
@@ -119,11 +119,12 @@ nouveau membre. Le refus a déjà produit la sienne — `assignment_declined` au
 moment où il a été prononcé. Rien n'est renvoyé au reste de la caserne : c'est exactement ce que
 l'outil remplacé imposait, et la raison d'être du ticket 020.
 
-Les deux variantes du même geste :
+Les variantes du même geste :
 
 | Ce que remplace la réattribution | Ancienne attribution | Nouveau membre | Ancien membre |
 |---|---|---|---|
 | un refus | reste `declined`, `replaced_by` posé | `assignment_proposed` | rien |
+| une annulation | reste `cancelled`, `replaced_by` posé | `assignment_proposed` | rien : il a déjà été prévenu |
 | une proposition sans réponse | `replaced` | `assignment_proposed` | rien |
 | une garde acceptée | `replaced` | `assignment_proposed` | `assignment_cancelled` |
 | un créneau vide | — | `assignment_proposed` | — |
