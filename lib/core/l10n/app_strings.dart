@@ -1112,6 +1112,14 @@ abstract final class AppStrings {
     ].join(', ');
   }
 
+  /// Une rangée de la feuille de choix : « 4 astreintes au maximum ».
+  static String preferencesPlafondAstreintes(int n) =>
+      '$n ${n <= 1 ? 'astreinte' : 'astreintes'} au maximum';
+
+  /// Une rangée de la feuille de choix : « 2 weekends au maximum ».
+  static String preferencesPlafondWeekends(int n) =>
+      '$n ${n <= 1 ? 'weekend' : 'weekends'} au maximum';
+
   /// La même chose en phrase, pour une annonce ou un résumé isolé.
   static String preferencesResume(int? astreintes, int? weekends) =>
       astreintes == null && weekends == null

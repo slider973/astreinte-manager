@@ -523,7 +523,14 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     }
 
     final heritee = precedente == null ? null : lues[precedente.id];
-    if (heritee == null || !periode.ouverte || _lectureSeuleConnue) {
+    // Une reprise est une écriture que le membre n'a pas demandée : on ne la
+    // déclenche que si elle porte une information. Une ligne à « sans limite »
+    // et sans commentaire n'apprend rien à l'admin du ticket 016 et ne vaut pas
+    // une écriture non sollicitée.
+    if (heritee == null ||
+        heritee.vide ||
+        !periode.ouverte ||
+        _lectureSeuleConnue) {
       return const EtatPreferences();
     }
 

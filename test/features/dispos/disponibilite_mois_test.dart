@@ -15,7 +15,39 @@ DisponibiliteMois mois(Map<(int, CreneauType), DisponibiliteEtat> saisies) =>
       },
     );
 
+/// Les jours d'un mois, du 1er au dernier.
+List<DateTime> joursDe(int annee, int mois) => <DateTime>[
+  for (var j = 1; j <= DateTime(annee, mois + 1, 0).day; j++)
+    DateTime(annee, mois, j),
+];
+
 void main() {
+  group('Les unités de weekend du mois', () {
+    // Ce chiffre est celui que le membre plafonne au ticket 013 et que l'admin
+    // lit au ticket 016 : une erreur ici fausse le planning de toutes les
+    // casernes. Les cas sont vérifiés à la main sur le calendrier français.
+    test('un mois qui commence un dimanche compte le samedi de la veille', () {
+      // Mars 2026 : le 1er est un dimanche, samedis les 7, 14, 21, 28.
+      expect(unitesWeekendDuMois(joursDe(2026, 3)), 5);
+    });
+
+    test('un mois qui finit un samedi compte ce samedi seul', () {
+      // Février 2026 : samedis les 7, 14, 21, 28, le 28 clôt le mois.
+      expect(unitesWeekendDuMois(joursDe(2026, 2)), 5);
+    });
+
+    test('les fériés en semaine ajoutent chacun une unité', () {
+      // Mai 2026 : 5 samedis, plus le 1er et le 8 (vendredis), l'Ascension
+      // le 14 (jeudi) et la Pentecôte le 25 (lundi).
+      expect(unitesWeekendDuMois(joursDe(2026, 5)), 9);
+    });
+
+    test('un férié tombant un samedi ne double pas son weekend', () {
+      // Août 2026 : le 15 est un samedi, il se fond dans son unité.
+      expect(unitesWeekendDuMois(joursDe(2026, 8)), 5);
+    });
+  });
+
   group('Le cycle de la case', () {
     test('non saisi → disponible → absent → non saisi', () {
       expect(

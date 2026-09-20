@@ -228,8 +228,7 @@ class _SectionPreferencesState extends ConsumerState<SectionPreferences> {
       valeur: etat.preferences.valeurs.maxAstreintes,
       maximum: PreferencesMois.plafondAstreintesMax,
       libelleZero: AppStrings.preferencesZeroAstreintes,
-      libelleNombre: (n) =>
-          '$n ${n <= 1 ? 'astreinte' : 'astreintes'} au maximum',
+      libelleNombre: AppStrings.preferencesPlafondAstreintes,
     );
     if (choix == null) return;
     ref
@@ -242,10 +241,11 @@ class _SectionPreferencesState extends ConsumerState<SectionPreferences> {
       context: context,
       titre: AppStrings.preferencesFeuilleWeekends,
       valeur: etat.preferences.valeurs.maxWeekends,
-      // La borne vient du mois affiché : 4 à 8 unités selon les fériés.
+      // La borne vient du mois affiché : le nombre réel d'unités de weekend,
+      // fériés en semaine compris. Mai 2026 en porte neuf.
       maximum: unitesWeekendDuMois(etat.periode.jours),
       libelleZero: AppStrings.preferencesZeroWeekends,
-      libelleNombre: (n) => '$n ${n <= 1 ? 'weekend' : 'weekends'} au maximum',
+      libelleNombre: AppStrings.preferencesPlafondWeekends,
     );
     if (choix == null) return;
     ref
