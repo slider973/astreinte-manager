@@ -64,6 +64,8 @@
 -- exactement ceux de `docs/SCHEMA.md § 2.6` :
 --
 --     '.' non saisi (absence de ligne)   'D' disponible   'A' absent
+--     Minuscules 'd' et 'a' : même état, mais saisi par un admin à la place du
+--     membre. L'écran les distingue ; la valeur de disponibilité est la même.
 --
 -- La position `i` (0 en tête) est le jour `i + 1` du mois ; la longueur des deux
 -- chaînes est le nombre de jours du mois, ce que le test vérifie sur un mois de
@@ -397,7 +399,18 @@ begin
       a.user_id,
       a.date,
       a.slot,
-      case a.status when 'available' then 'D' else 'A' end as code
+      -- Majuscule quand le membre a saisi lui-même, minuscule quand un admin a
+      -- saisi à sa place. La marque « saisi par l'admin » de l'écran survit ainsi
+      -- au rechargement : sans elle, elle ne vivrait que dans la session qui a
+      -- fait la saisie, et l'admin suivant ne verrait plus qui a écrit quoi.
+      -- `set_by` est posé par le déclencheur `availabilities_trace_auteur` (0012)
+      -- et vaut `null` sur les lignes antérieures, traitées comme saisies par le
+      -- membre — le cas le plus probable et le moins alarmant des deux.
+      case
+        when a.set_by is not null and a.set_by <> a.user_id
+          then case a.status when 'available' then 'd' else 'a' end
+        else case a.status when 'available' then 'D' else 'A' end
+      end as code
     from availabilities a
     where a.station_id = p_station
       and a.date >= premier
