@@ -41,7 +41,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 029 | [Abonnement Stripe par caserne](backlog/029-stripe-abonnement.md) | P0 | 008 010 |  |
 | 030 | [Mode suspendu et bannières](backlog/030-gating-suspension.md) | P1 | 029 |  |
 | 031 | [Interface super-admin](backlog/031-super-admin.md) | P1 | 008 029 |  |
-| 032 | [Build web PWA et déploiement](backlog/032-web-pwa-deploy.md) | P0 (canal principal, à faire dès le jalon 2 pour tester la PWA sur téléphone) | 001 |  |
+| 032 | [Build web PWA et déploiement](backlog/032-web-pwa-deploy.md) | P0 | 001 |  |
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 034 | [RGPD : export et suppression des données](backlog/034-rgpd-export.md) | P1 | 007 |  |
 | 035 | [Tests d'intégration bout en bout](backlog/035-tests-e2e.md) | P1 | 021 020 |  |

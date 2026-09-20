@@ -1,9 +1,13 @@
 # 032 — Build web PWA et déploiement
 
 - **Épopée** : E9 Release
-- **Priorité** : P0 (canal principal, à faire dès le jalon 2 pour tester la PWA sur téléphone)
+- **Priorité** : P0
 - **Dépend de** : 001
 - **Branche** : `feat/032-web-pwa-deploy`
+
+## Contexte
+La PWA est le canal principal : ce ticket se fait dès le jalon 2, juste après la connexion, pour
+tester chaque écran suivant sur téléphone avec la PWA installée.
 
 ## À faire
 - `flutter build web` avec CanvasKit, manifeste PWA complété (nom, icônes, couleurs, `display: standalone`), service worker par défaut vérifié.
