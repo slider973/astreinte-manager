@@ -8,7 +8,9 @@ import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/champ_texte.dart';
 import '../../../../core/widgets/legende_etats.dart';
+import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/save_indicator.dart';
+import '../../../../core/widgets/status_badge.dart';
 import '../../../dispos/domain/periode_saisie.dart';
 import '../../../dispos/presentation/widgets/selecteur_mois.dart';
 import '../../domain/matrice_filtres.dart';
@@ -37,6 +39,7 @@ class BarreCommandeMatrice extends StatefulWidget {
     required this.total,
     required this.affiches,
     required this.montrerLegende,
+    required this.planning,
     super.key,
   });
 
@@ -70,6 +73,11 @@ class BarreCommandeMatrice extends StatefulWidget {
   /// La légende n'a pas sa place sur un téléphone, où la vue par jour montre
   /// déjà deux cases nommées.
   final bool montrerLegende;
+
+  /// Ce que la barre dit du planning : le créer, son état, et l'état du canal
+  /// temps réel. **`null` tant que le planning n'est pas lu** : tant qu'on ne
+  /// sait pas s'il existe, on n'affirme ni qu'il existe ni le contraire.
+  final CommandePlanning? planning;
 
   @override
   State<BarreCommandeMatrice> createState() => _BarreCommandeMatriceState();
@@ -226,6 +234,39 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
                       ),
                     ],
                   ),
+                // **La création du planning vit ici**, pas dans un écran à
+                // part : c'est le premier geste du mois, au même endroit que
+                // tous les autres contrôles du mois.
+                if (widget.planning?.existe == false) ...<Widget>[
+                  PrimaryButton(
+                    libelle: AppStrings.planningCreer(
+                      AppStrings.moisLongs[widget.periode.mois - 1],
+                    ),
+                    variante: PrimaryButtonVariante.secondaire,
+                    icone: Icons.event_note,
+                    chargement: widget.planning!.creation,
+                    pleineLargeur: false,
+                    onPressed: widget.planning!.onCreer,
+                    raisonDesactivation: widget.planning!.raisonCreation,
+                  ),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: Text(
+                      AppStrings.planningCreerDetail(
+                        widget.periode.nombreDeJours * 2,
+                      ),
+                      style: AppTextStyles.mention.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ] else if (widget.planning != null) ...<Widget>[
+                  StatusBadge.planning(
+                    widget.planning!.etat,
+                    taille: StatusBadgeTaille.compacte,
+                  ),
+                  _Direct(branche: widget.planning!.canalBranche),
+                ],
                 if (widget.montrerLegende) const LegendeEtats(),
                 SaveIndicator(
                   etat: widget.sync,
@@ -306,6 +347,77 @@ class _InterrupteurSaisie extends StatelessWidget {
       checkmarkColor: theme.colorScheme.onTertiaryContainer,
       onSelected: possible ? onArmer : null,
       tooltip: arme ? AppStrings.matriceModeSaisieQuitter : null,
+    );
+  }
+}
+
+/// Ce que la barre de commande sait du planning du mois.
+///
+/// Un objet et non six paramètres : la barre en portait déjà treize, et six de
+/// plus en auraient fait une signature que personne ne relit.
+@immutable
+class CommandePlanning {
+  const CommandePlanning({
+    required this.existe,
+    required this.etat,
+    required this.canalBranche,
+    required this.creation,
+    required this.onCreer,
+    this.raisonCreation,
+  });
+
+  final bool existe;
+  final PlanningEtat etat;
+
+  /// Le canal temps réel est abonné.
+  final bool canalBranche;
+
+  /// La création est en vol : le bouton garde son libellé et sa largeur.
+  final bool creation;
+
+  /// `null` désactive le bouton — et exige alors [raisonCreation].
+  final VoidCallback? onCreer;
+  final String? raisonCreation;
+}
+
+/// L'état du canal temps réel, **affiché**.
+///
+/// Un écran collaboratif qui perd son abonnement en silence est un écran qui
+/// ment : le chef croirait voir l'état réel du mois. L'icône et le libellé
+/// vont ensemble, et l'infobulle dit la conséquence.
+class _Direct extends StatelessWidget {
+  const _Direct({required this.branche});
+
+  final bool branche;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final encre = branche
+        ? theme.colorScheme.onSurfaceVariant
+        : context.statuts.attribution(AttributionEtat.propose).encre;
+
+    return Tooltip(
+      message: branche
+          ? AppStrings.planningDirectDetail
+          : AppStrings.planningDirectInterrompuDetail,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            branche ? Icons.sync : Icons.cloud_off,
+            size: AppTouch.iconePetite,
+            color: encre,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            branche
+                ? AppStrings.planningDirect
+                : AppStrings.planningDirectInterrompu,
+            style: AppTextStyles.mention.copyWith(color: encre),
+          ),
+        ],
+      ),
     );
   }
 }

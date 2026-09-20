@@ -38,8 +38,19 @@ abstract final class GeoMatrice {
   /// La ligne « Disponibles », dernière du bloc épinglé.
   static const double hauteurDisponibles = colonne;
 
-  /// Le bloc épinglé entier.
-  static const double hauteurBlocEpingle = hauteurEntete + hauteurDisponibles;
+  /// La ligne des créneaux à pourvoir (ticket 017), **entre l'en-tête des
+  /// dates et la ligne « Disponibles »** : la place que le brief du 016 lui
+  /// avait réservée, à la hauteur qu'il avait annoncée.
+  static const double hauteurCreneaux = colonne;
+
+  /// Le bloc épinglé entier : 84 px sans planning, 112 px avec.
+  ///
+  /// La ligne des créneaux n'existe que lorsque le planning du mois existe —
+  /// une fraction sur un mois sans créneaux ne voudrait rien dire. La hauteur
+  /// est partagée par le coin figé et par l'en-tête des dates : si elles
+  /// divergeaient, le coin ne serait plus en face de ses colonnes.
+  static double hauteurBlocEpingle({required bool avecCreneaux}) =>
+      hauteurEntete + (avecCreneaux ? hauteurCreneaux : 0) + hauteurDisponibles;
 
   /// Largeur de la colonne figée : 280 en `large`, 240 en `expanded`.
   static double colonneFigee(AppWindowClass classe) =>

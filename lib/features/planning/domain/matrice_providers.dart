@@ -74,6 +74,30 @@ PeriodeSaisie? periodeParDefautAdmin(
   return triees.last;
 }
 
+/// Le mois que l'écran d'administration travaille, résolu **une seule fois**.
+///
+/// La matrice et le planning en dépendent tous les deux, et il n'y a qu'une
+/// bonne façon de le faire : un provider à part. Le faire résoudre par le
+/// contrôleur de la matrice ferait recharger le planning à chaque case saisie.
+///
+/// `null` signifie « rien à afficher » : pas d'administrateur, pas de période.
+final FutureProvider<PeriodeSaisie?> periodeAdminProvider =
+    FutureProvider<PeriodeSaisie?>((ref) async {
+      final appartenance = ref.watch(appartenanceCouranteProvider);
+      if (appartenance == null || !appartenance.estAdmin) return null;
+
+      final periodes = await ref.watch(periodesProvider.future);
+      if (periodes.isEmpty) return null;
+
+      final cle = ref.watch(moisMatriceProvider);
+      for (final periode in periodes) {
+        if (periode.cle == cle) return periode;
+      }
+      // Une clé de mois inconnue de la caserne — un lien partagé, une URL
+      // bricolée — retombe sur le défaut plutôt que de rendre un écran vide.
+      return periodeParDefautAdmin(periodes, DateTime.now());
+    });
+
 /// Ce que l'écran « Planning du mois » affiche.
 @immutable
 class EtatMatrice {
@@ -138,23 +162,10 @@ class MatriceController extends AsyncNotifier<EtatMatrice?> {
     final appartenance = ref.watch(appartenanceCouranteProvider);
     if (appartenance == null || !appartenance.estAdmin) return null;
 
-    final periodes = await ref.watch(periodesProvider.future);
-    if (periodes.isEmpty) return null;
-
-    final cle = ref.watch(moisMatriceProvider);
-    final periode = _resoudre(periodes, cle);
+    final periode = await ref.watch(periodeAdminProvider.future);
     if (periode == null) return null;
 
     return _lire(appartenance.stationId, periode);
-  }
-
-  /// Une clé de mois inconnue de la caserne — un lien partagé, une URL
-  /// bricolée — retombe sur le défaut plutôt que de rendre un écran vide.
-  static PeriodeSaisie? _resoudre(List<PeriodeSaisie> periodes, String? cle) {
-    for (final periode in periodes) {
-      if (periode.cle == cle) return periode;
-    }
-    return periodeParDefautAdmin(periodes, DateTime.now());
   }
 
   Future<EtatMatrice> _lire(String stationId, PeriodeSaisie periode) async {
@@ -292,14 +303,3 @@ matriceControllerProvider =
       MatriceController.new,
       isAutoDispose: true,
     );
-
-/// Les lignes réellement affichées : filtrées, triées, **sans requête**.
-///
-/// Mémorisé par Riverpod : le tri de soixante lignes n'est refait que si la
-/// matrice ou les filtres changent, pas à chaque image de la grille.
-final Provider<List<LigneMatrice>> lignesVisiblesProvider =
-    Provider<List<LigneMatrice>>((ref) {
-      final etat = ref.watch(matriceControllerProvider).value;
-      if (etat == null) return const <LigneMatrice>[];
-      return ref.watch(filtresMatriceProvider).appliquer(etat.matrice.lignes);
-    });

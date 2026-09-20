@@ -32,7 +32,9 @@ import 'package:astreinte_sp/features/parametres/domain/parametres_providers.dar
 import 'package:astreinte_sp/features/periodes/data/periodes_repository.dart';
 import 'package:astreinte_sp/features/periodes/domain/periodes_providers.dart';
 import 'package:astreinte_sp/features/planning/data/matrice_repository.dart';
+import 'package:astreinte_sp/features/planning/data/planning_repository.dart';
 import 'package:astreinte_sp/features/planning/domain/matrice_providers.dart';
+import 'package:astreinte_sp/features/planning/domain/planning_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,6 +42,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'faux_dispos.dart';
 import 'faux_invitations.dart';
 import 'faux_notifications.dart';
+import 'faux_planning.dart';
 import 'faux_push.dart';
 
 /// Environnement de test : configuration Supabase présente, mais aucun réseau
@@ -210,6 +213,7 @@ Future<AppMontee> monterApp(
   ParametresRepository? parametres,
   PeriodesRepository? periodes,
   MatriceRepository? matrice,
+  PlanningRepository? planning,
   DisposRepository? dispos,
   FileLocale? fileLocale,
   Connectivite? reseau,
@@ -264,6 +268,11 @@ Future<AppMontee> monterApp(
           periodesRepositoryProvider.overrideWithValue(periodes),
         if (matrice != null)
           matriceRepositoryProvider.overrideWithValue(matrice),
+        // L'écran d'administration lit toujours le planning du mois : sans
+        // faux, il toucherait un client Supabase qui n'existe pas en test.
+        planningRepositoryProvider.overrideWithValue(
+          planning ?? FauxPlanningRepository(),
+        ),
         // L'onglet 0 est désormais « Mon mois » : sans faux dépôt, il
         // toucherait un client Supabase qui n'existe pas en test.
         disposRepositoryProvider.overrideWithValue(

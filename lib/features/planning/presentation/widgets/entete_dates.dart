@@ -116,9 +116,17 @@ class _IconeCreneau extends StatelessWidget {
 /// les titres des trois zones de l'en-tête de ligne, et le libellé de la
 /// ligne « Disponibles ».
 class CoinFige extends StatelessWidget {
-  const CoinFige({required this.largeur, super.key});
+  const CoinFige({
+    required this.largeur,
+    required this.avecCreneaux,
+    super.key,
+  });
 
   final double largeur;
+
+  /// Vrai quand la ligne des créneaux à pourvoir est affichée : le coin porte
+  /// alors son libellé, à la même hauteur qu'elle.
+  final bool avecCreneaux;
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +137,7 @@ class CoinFige extends StatelessWidget {
 
     return SizedBox(
       width: largeur,
-      height: GeoMatrice.hauteurBlocEpingle,
+      height: GeoMatrice.hauteurBlocEpingle(avecCreneaux: avecCreneaux),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
         child: Column(
@@ -160,6 +168,14 @@ class CoinFige extends StatelessWidget {
                 ],
               ),
             ),
+            if (avecCreneaux)
+              SizedBox(
+                height: GeoMatrice.hauteurCreneaux,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(AppStrings.planningLigneCreneaux, style: style),
+                ),
+              ),
             SizedBox(
               height: GeoMatrice.hauteurDisponibles,
               child: Align(

@@ -14,10 +14,12 @@ import '../../../../core/widgets/slot_chip.dart';
 import '../../domain/cle_cellule.dart';
 import '../../domain/ligne_matrice.dart';
 import '../../domain/matrice_mois.dart';
+import '../../domain/planning_mois.dart';
 import 'entete_dates.dart';
 import 'entete_ligne_membre.dart';
 import 'fond_jour.dart';
 import 'geometrie_matrice.dart';
+import 'ligne_creneaux.dart';
 import 'ligne_disponibles.dart';
 import 'ruban_jours.dart';
 
@@ -49,6 +51,9 @@ class GrilleMatrice extends StatefulWidget {
     required this.erreurs,
     required this.saisieActive,
     required this.onCase,
+    required this.planning,
+    required this.creneauSelectionne,
+    required this.onCreneau,
     super.key,
   });
 
@@ -72,6 +77,16 @@ class GrilleMatrice extends StatefulWidget {
   final bool saisieActive;
 
   final ValueChanged<CleCellule> onCase;
+
+  /// Le planning du mois. Sa ligne de créneaux s'insère dans le bloc épinglé
+  /// **entre l'en-tête des dates et la ligne « Disponibles »** ; elle n'existe
+  /// pas tant que le planning n'a pas été créé.
+  final PlanningMois planning;
+
+  /// L'identifiant du créneau ouvert dans le panneau, ou `null`.
+  final String? creneauSelectionne;
+
+  final ValueChanged<String> onCreneau;
 
   @override
   State<GrilleMatrice> createState() => _GrilleMatriceState();
@@ -212,10 +227,15 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
             child: Column(
               children: <Widget>[
                 SizedBox(
-                  height: GeoMatrice.hauteurBlocEpingle,
+                  height: GeoMatrice.hauteurBlocEpingle(
+                    avecCreneaux: widget.planning.existe,
+                  ),
                   child: Row(
                     children: <Widget>[
-                      CoinFige(largeur: largeurFigee),
+                      CoinFige(
+                        largeur: largeurFigee,
+                        avecCreneaux: widget.planning.existe,
+                      ),
                       const AppDivider.colonneFigee(),
                       Expanded(child: _entete(visibles)),
                     ],
@@ -242,11 +262,12 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
     );
   }
 
-  /// Le bloc épinglé : les dates, puis la ligne « Disponibles ».
+  /// Le bloc épinglé : les dates, la ligne des créneaux à pourvoir, puis la
+  /// ligne « Disponibles ».
   ///
-  /// L'emplacement du ticket 017 — la ligne des créneaux à pourvoir — vient
-  /// **entre les deux**. Il n'est ni dessiné ni grisé : une place réservée se
-  /// tient dans le code, pas dans l'interface (brief § 6.8).
+  /// Les deux lignes se suivent et ne se confondent pas : la première porte
+  /// une **fraction** (« 0/1 »), la seconde un **chiffre nu** (« 4 »). La
+  /// marque distingue avant la couleur (`design/017 § 3`).
   Widget _entete(int visibles) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -264,6 +285,14 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
             child: Column(
               children: <Widget>[
                 EnteteJour(date: date, aujourdhui: widget.aujourdhui),
+                if (widget.planning.existe)
+                  CasesCreneaux(
+                    planning: widget.planning,
+                    jour: jour,
+                    date: date,
+                    selectionne: widget.creneauSelectionne,
+                    onCreneau: widget.onCreneau,
+                  ),
                 CasesDisponibles(
                   matrice: widget.matrice,
                   jour: jour,

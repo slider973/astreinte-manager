@@ -12,6 +12,7 @@ import '../../../core/reseau/connectivite.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_status.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -20,13 +21,19 @@ import '../../dispos/domain/dispos_providers.dart';
 import '../../dispos/domain/periode_saisie.dart';
 import '../../membres/domain/membres_providers.dart';
 import '../data/matrice_repository.dart';
+import '../data/planning_repository.dart';
+import '../domain/candidat.dart';
 import '../domain/cle_cellule.dart';
 import '../domain/ligne_matrice.dart';
 import '../domain/matrice_filtres.dart';
 import '../domain/matrice_providers.dart';
+import '../domain/planning_mois.dart';
+import '../domain/planning_providers.dart';
 import 'widgets/barre_commande_matrice.dart';
+import 'widgets/confirmation_hors_dispo.dart';
 import 'widgets/confirmation_saisie_admin.dart';
 import 'widgets/grille_matrice.dart';
+import 'widgets/panneau_creneau.dart';
 import 'widgets/squelette_matrice.dart';
 import 'widgets/vue_jour.dart';
 
@@ -100,7 +107,16 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
   MatriceController get _controleur =>
       ref.read(matriceControllerProvider.notifier);
 
-  void _relire() => unawaited(_controleur.rafraichir());
+  PlanningController get _planning =>
+      ref.read(planningControllerProvider.notifier);
+
+  /// « Rafraîchir » relit **les deux** : la matrice et le planning. Un bouton
+  /// qui ne rafraîchirait que la moitié de l'écran serait pire que pas de
+  /// bouton du tout.
+  void _relire() {
+    unawaited(_controleur.rafraichir());
+    unawaited(_planning.rafraichir());
+  }
 
   void _choisirMois(PeriodeSaisie periode) {
     _controleur.choisirMois(periode.cle);
@@ -132,6 +148,163 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     }
     if (!mounted) return;
     _controleur.armer(arme: true);
+  }
+
+  // -------------------------------------------------------------------
+  // Le planning : créer, ouvrir un créneau, attribuer, retirer
+  // -------------------------------------------------------------------
+
+  Future<void> _creer() async {
+    final avant = ref.read(planningControllerProvider).value;
+    if (avant == null) return;
+
+    await _planning.creer();
+    final apres = ref.read(planningControllerProvider).value;
+    if (!mounted || apres == null || !apres.planning.existe) return;
+    _annoncer(
+      AppStrings.planningCreeTexte(
+        AppStrings.moisLongs[apres.periode.mois - 1],
+        apres.periode.nombreDeJours * 2,
+      ),
+    );
+  }
+
+  /// Ouvre le panneau d'un créneau : le volet de droite en `large`, une
+  /// feuille de bas d'écran en dessous. Jamais un dialogue.
+  void _ouvrirCreneau(String creneauId) {
+    ref.read(creneauSelectionneProvider.notifier).choisir(creneauId);
+    if (!AppWindowClass.of(context).estLarge) unawaited(_ouvrirFeuille());
+  }
+
+  Future<void> _ouvrirFeuille() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (BuildContext contexteFeuille) => FractionallySizedBox(
+        heightFactor: 0.8,
+        child: Consumer(
+          builder: (BuildContext context, WidgetRef ref, Widget? _) {
+            final panneau = ref.watch(panneauCandidatsProvider);
+            if (panneau == null) return const SizedBox.shrink();
+            return _panneau(
+              panneau,
+              onFermer: () => Navigator.of(contexteFeuille).pop(),
+            );
+          },
+        ),
+      ),
+    );
+    // Le geste retour ferme la feuille : la sélection doit suivre, sinon la
+    // case reste marquée sélectionnée sans rien derrière.
+    if (mounted) ref.read(creneauSelectionneProvider.notifier).fermer();
+  }
+
+  Widget _panneau(PanneauCandidats panneau, {VoidCallback? onFermer}) {
+    final etat = ref.watch(planningControllerProvider).value;
+    final distant = etat?.distant;
+
+    return PanneauCreneau(
+      panneau: panneau,
+      raisonInactif: etat == null ? null : _raisonAttribution(etat),
+      messageDistant: distant?.creneauId == panneau.creneau.id
+          ? _libelleDistant(distant!)
+          : null,
+      onFermer:
+          onFermer ?? ref.read(creneauSelectionneProvider.notifier).fermer,
+      onAttribuer: (Candidat candidat) =>
+          unawaited(_attribuer(candidat, panneau)),
+      onRetirer: (Candidat candidat) => unawaited(_retirer(candidat)),
+      onEffectif: (int effectif) => unawaited(
+        _planning.definirEffectif(
+          creneauId: panneau.creneau.id,
+          effectif: effectif,
+        ),
+      ),
+    );
+  }
+
+  /// Qui a modifié le créneau sous notre main. Le nom vient des lignes de la
+  /// matrice **déjà chargées** : aucune requête pour un nom. À défaut, la
+  /// phrase reste vraie sans lui.
+  String _libelleDistant(ChangementDistant distant) {
+    final auteur = distant.auteurId;
+    final ligne = auteur == null
+        ? null
+        : ref.read(matriceControllerProvider).value?.matrice.ligneDe(auteur);
+    return ligne == null
+        ? AppStrings.planningModifieDistantAnonyme
+        : AppStrings.planningModifieDistant(ligne.nomAffiche);
+  }
+
+  /// Attribue un candidat. **Un seul dialogue dans tout l'écran** : celui de
+  /// l'attribution hors disponibilité. Le quota, lui, s'est déjà dit en clair
+  /// sur la ligne (`design/017 § 6.3`).
+  Future<void> _attribuer(Candidat candidat, PanneauCandidats panneau) async {
+    if (!candidat.estDisponible) {
+      final confirme = await confirmerHorsDispo(
+        context,
+        candidat: candidat,
+        jour: panneau.jour,
+        creneau: panneau.creneau.creneau,
+      );
+      if (!confirme) return;
+    }
+
+    final echec = await _planning.attribuer(
+      creneauId: panneau.creneau.id,
+      userId: candidat.userId,
+    );
+
+    // Un doublon n'est pas une panne : c'est l'autre administrateur qui a été
+    // plus rapide. On le dit d'une phrase et on relit.
+    if (echec == ErreurPlanning.dejaAttribue && mounted) {
+      _annoncer(AppStrings.planningDejaAttribue);
+      unawaited(_planning.rafraichir());
+    }
+  }
+
+  /// Retire une attribution. **Pas de confirmation, une sortie** : en
+  /// brouillon le geste est réversible en un clic, et un dialogue de plus
+  /// apprendrait à cliquer « Oui » sans lire.
+  Future<void> _retirer(Candidat candidat) async {
+    final attribution = candidat.attribution;
+    if (attribution == null) return;
+
+    final retiree = await _planning.retirer(attribution.id);
+    if (retiree == null || !mounted) return;
+
+    _annoncer(
+      AppStrings.planningRetireeTexte,
+      libelleAction: AppStrings.planningAnnulerRetrait,
+      onAction: () => unawaited(
+        _planning.attribuer(
+          creneauId: retiree.creneauId,
+          userId: retiree.userId,
+        ),
+      ),
+    );
+  }
+
+  /// Pourquoi la création du planning est impossible, ou `null`.
+  String? _raisonCreation(EtatPlanning etat) {
+    if (etat.lectureSeule) return AppStrings.matriceSaisieIndisponibleSuspendue;
+    if (!(ref.watch(enLigneProvider).value ?? true)) {
+      return AppStrings.planningSaisieHorsLigne;
+    }
+    return null;
+  }
+
+  /// Pourquoi l'attribution est impossible, ou `null`.
+  String? _raisonAttribution(EtatPlanning etat) {
+    if (etat.lectureSeule) return AppStrings.matriceSaisieIndisponibleSuspendue;
+    if (!(ref.watch(enLigneProvider).value ?? true)) {
+      return AppStrings.planningSaisieHorsLigne;
+    }
+    // Le cas n'arrive pas encore — rien ne publie avant le ticket 019 — mais
+    // l'écran ne le suppose pas.
+    if (!etat.planning.modifiable) return AppStrings.planningPublieDetail;
+    return null;
   }
 
   void _versDestination(int index, List<AppDestination> destinations) {
@@ -167,6 +340,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     final admin = ref.watch(estAdminCaserneProvider);
     final asynchrone = ref.watch(matriceControllerProvider);
     final etat = asynchrone.value;
+    final panneau = ref.watch(panneauCandidatsProvider);
     final destinations = AppDestination.pour(admin: admin);
     final indexAdmin = destinations.indexWhere(
       (AppDestination d) => d.route == _routeAdmin,
@@ -188,8 +362,10 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
         ),
       ],
       banniere: _banniere(etat, asynchrone),
-      // `filActions` et `panneauLateral` restent vides : ce sont les places du
-      // bouton « Publier » (ticket 019) et du panneau de candidats (017).
+      // Le panneau du créneau prend la place que le brief du 016 lui avait
+      // réservée. `filActions` reste vide : c'est celle du bouton « Publier »
+      // du ticket 019.
+      panneauLateral: panneau == null ? null : _panneau(panneau),
       child: _corps(admin: admin, asynchrone: asynchrone, etat: etat),
     );
   }
@@ -267,6 +443,9 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     final visibles = ref.watch(lignesVisiblesProvider);
     final periodes =
         ref.watch(periodesProvider).value ?? const <PeriodeSaisie>[];
+    final etatPlanning = ref.watch(planningControllerProvider).value;
+    final planning = etatPlanning?.planning ?? PlanningMois.vide();
+    final creneauChoisi = ref.watch(creneauSelectionneProvider);
 
     final echelle = MediaQuery.textScalerOf(context).scale(16) / 16;
     final classe = AppWindowClass.of(context);
@@ -287,6 +466,20 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       total: etat.matrice.lignes.length,
       affiches: visibles.length,
       montrerLegende: matriceVisible,
+      // Tant que le planning n'est pas lu, la barre n'en dit rien : ni
+      // « crée-le », ni « il existe ».
+      planning: etatPlanning == null
+          ? null
+          : CommandePlanning(
+              existe: planning.existe,
+              etat: planning.planning?.etat ?? PlanningEtat.brouillon,
+              canalBranche: etatPlanning.canalBranche,
+              creation: etatPlanning.creation,
+              onCreer: _raisonCreation(etatPlanning) != null
+                  ? null
+                  : () => unawaited(_creer()),
+              raisonCreation: _raisonCreation(etatPlanning),
+            ),
     );
 
     // La vue par jour porte la barre de commande **dans son défilement** : un
@@ -294,7 +487,14 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     if (!matriceVisible && visibles.isNotEmpty) {
       return _zoneSaisie(
         arme: etat.modeArme,
-        enfant: _vueJour(etat, visibles, filtres, barre),
+        enfant: _vueJour(
+          etat,
+          visibles,
+          filtres,
+          barre,
+          planning,
+          creneauChoisi,
+        ),
       );
     }
 
@@ -307,7 +507,13 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
               ? _aucunResultat(filtres)
               : _zoneSaisie(
                   arme: etat.modeArme,
-                  enfant: _matrice(etat, visibles, filtres),
+                  enfant: _matrice(
+                    etat,
+                    visibles,
+                    filtres,
+                    planning,
+                    creneauChoisi,
+                  ),
                 ),
         ),
       ],
@@ -318,6 +524,8 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     EtatMatrice etat,
     List<LigneMatrice> visibles,
     FiltresMatrice filtres,
+    PlanningMois planning,
+    String? creneauChoisi,
   ) => GrilleMatrice(
     matrice: etat.matrice,
     lignes: visibles,
@@ -328,6 +536,9 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     erreurs: etat.erreurs,
     saisieActive: _saisieActive(etat, matrice: true),
     onCase: _basculer,
+    planning: planning,
+    creneauSelectionne: creneauChoisi,
+    onCreneau: _ouvrirCreneau,
   );
 
   Widget _vueJour(
@@ -335,6 +546,8 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     List<LigneMatrice> visibles,
     FiltresMatrice filtres,
     Widget barre,
+    PlanningMois planning,
+    String? creneauChoisi,
   ) => VueJour(
     enTete: barre,
     matrice: etat.matrice,
@@ -346,6 +559,9 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     erreurs: etat.erreurs,
     saisieActive: _saisieActive(etat, matrice: false),
     onCase: _basculer,
+    planning: planning,
+    creneauSelectionne: creneauChoisi,
+    onCreneau: _ouvrirCreneau,
   );
 
   /// Le liseré du mode armé : **2 dp `tertiary` autour de la zone entière**.
@@ -396,7 +612,15 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     return null;
   }
 
-  void _annoncer(String message) {
+  /// Une phrase passagère, et sa sortie quand il y en a une.
+  ///
+  /// **Huit secondes**, la durée retenue au ticket 024 : téléphone posé,
+  /// regardé avec un temps de retard, parfois manipulé avec des gants.
+  void _annoncer(
+    String message, {
+    String? libelleAction,
+    VoidCallback? onAction,
+  }) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -404,6 +628,10 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
         SnackBar(
           content: Semantics(liveRegion: true, child: Text(message)),
           showCloseIcon: true,
+          duration: const Duration(seconds: 8),
+          action: libelleAction == null || onAction == null
+              ? null
+              : SnackBarAction(label: libelleAction, onPressed: onAction),
         ),
       );
   }
@@ -415,11 +643,16 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
   AppBanner? _banniere(EtatMatrice? etat, AsyncValue<EtatMatrice?> asynchrone) {
     if (etat == null) return null;
 
+    final planning = ref.watch(planningControllerProvider).value;
     final horsLigne = !(ref.watch(enLigneProvider).value ?? true);
+    // Une seule bannière à la fois : l'erreur de la matrice passe devant celle
+    // du planning, parce que c'est elle qui décide de ce qui est lisible.
+    final messageErreur = etat.messageErreur ?? planning?.messageErreur;
+    final lectureSeule = etat.lectureSeule || (planning?.lectureSeule ?? false);
     final variantes = <AppBannerVariante>[
-      if (etat.messageErreur != null) AppBannerVariante.erreur,
+      if (messageErreur != null) AppBannerVariante.erreur,
       if (horsLigne) AppBannerVariante.horsLigne,
-      if (etat.lectureSeule) AppBannerVariante.lectureSeule,
+      if (lectureSeule) AppBannerVariante.lectureSeule,
       if (!etat.periode.ouverte) AppBannerVariante.verrouille,
       if (etat.modeArme) AppBannerVariante.attention,
       if (etat.matrice.vierge) AppBannerVariante.information,
@@ -431,7 +664,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     return switch (gagnante) {
       AppBannerVariante.erreur => AppBanner(
         variante: AppBannerVariante.erreur,
-        texte: etat.messageErreur!,
+        texte: messageErreur!,
         libelleAction: AppStrings.actionReessayer,
         onAction: _relire,
       ),

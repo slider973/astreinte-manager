@@ -81,6 +81,22 @@ class StatusBadge extends StatelessWidget {
     this.tampon = false,
   }) : _valeur = etat;
 
+  /// Badge d'un état qui n'a pas de famille dans le thème, mais dont le
+  /// descripteur est **composé à partir des encres du thème** — la couverture
+  /// d'un créneau, au ticket 017.
+  ///
+  /// Le descripteur est alors construit par l'appelant, à chaque rendu, depuis
+  /// `context.statuts` : il suit donc le mode clair/sombre comme les autres.
+  /// Ce que le type continue de garantir est l'essentiel : pas de badge sans
+  /// icône ni libellé.
+  const StatusBadge.descripteur(
+    StatusDescriptor descripteur, {
+    super.key,
+    this.taille = StatusBadgeTaille.normale,
+    this.libelle,
+    this.tampon = false,
+  }) : _valeur = descripteur;
+
   /// Valeur d'énumération portée par ce badge. Le thème la résout en
   /// [StatusDescriptor] au moment du rendu, pour suivre le mode clair/sombre.
   final Object _valeur;
@@ -100,6 +116,7 @@ class StatusBadge extends StatelessWidget {
   final bool tampon;
 
   StatusDescriptor _descripteur(AppStatusColors statuts) => switch (_valeur) {
+    final StatusDescriptor d => d,
     final DisponibiliteEtat e => statuts.disponibilite(e),
     final CreneauType e => statuts.creneau(e),
     final AttributionEtat e => statuts.attribution(e),
