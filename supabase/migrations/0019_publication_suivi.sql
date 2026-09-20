@@ -10,12 +10,18 @@
 --      § 2, imposée en base. **C'est la condition d'entrée du ticket** : sans
 --      elle, un retour en brouillon puis une suppression d'attribution
 --      effaçaient une proposition déjà partie.
---   2. `schedules_guard_suppression` + politique restreinte : un planning ne se
---      supprime qu'en brouillon, **cascade comprise**.
+--   2. `schedules_guard_suppression`, `shifts_guard_suppression` et leurs deux
+--      politiques : ni un planning ni un créneau ne se supprime après
+--      publication, **cascade comprise**. La garde des plannings seule laissait
+--      la porte ouverte : supprimer un **créneau** emportait ses attributions
+--      par cascade, sur un planning publié et déjà notifié.
 --   3. `publish_schedule(planning, acteur)` : la publication, atomique, avec les
 --      destinataires **déjà groupés par membre**.
---   4. `schedule_auto_validate` : la validation sans action d'administrateur,
---      annoncée par docs/SCHEMA.md § 5 et laissée en attente du ticket 025.
+--   4. `schedule_complet` + `schedule_reevaluer` : le test de complétude, écrit
+--      **une fois**, et la transition qu'il commande. Appelés par le
+--      déclencheur d'acceptation, par la fin de la publication et par un
+--      changement d'effectif requis — les trois moments où la complétude d'un
+--      planning peut changer.
 --   5. `remind_schedule(planning)` : la relance manuelle des retardataires,
 --      celle du bouton « Relancer maintenant ».
 --   6. L'inscription de `schedules` dans la publication `supabase_realtime`.
@@ -166,6 +172,64 @@ create policy "schedules_delete_admin"
     and status = 'draft'
   );
 
+-- ---------------------------------------------------------------------------
+-- Et la même garde sur les **créneaux**, parce que garder le planning ne suffit
+-- pas.
+--
+-- `shifts` cascade vers `assignments`. Supprimer un créneau d'un planning déjà
+-- publié efface donc les attributions que des pompiers ont reçues — le chemin
+-- est plus court que la suppression du planning, et la politique de 0007 ne
+-- regardait que la caserne, jamais le statut du planning parent. La règle
+-- « l'historique n'est jamais supprimé » (docs/PRD.md § 7.6) se contournait
+-- ainsi en **une** écriture.
+--
+-- Même construction qu'au-dessus, et pour les mêmes raisons : la politique rend
+-- le refus lisible à un client, le déclencheur arrête la cascade — qui, elle,
+-- ne consulte aucune politique.
+create function shifts_guard_suppression() returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  etat schedule_status;
+begin
+  select sc.status into etat from schedules sc where sc.id = old.schedule_id;
+
+  -- Le planning disparaît en même temps que son créneau (cascade depuis
+  -- `schedules`) : c'est la garde du planning qui a déjà tranché, et elle l'a
+  -- fait sur le brouillon. Rien à redire ici.
+  if etat is null or etat = 'draft' then
+    return old;
+  end if;
+
+  raise exception 'shift_delete_published'
+    using hint = 'Un créneau publié ne se supprime pas : ses attributions sont parties chez des pompiers et font l''historique de la caserne (docs/PRD.md § 7.6).';
+end $$;
+
+comment on function shifts_guard_suppression() is
+  'Refuse la suppression d''un créneau dont le planning n''est plus en brouillon, y compris en cascade : supprimer le créneau effacerait les attributions déjà notifiées.';
+
+revoke execute on function shifts_guard_suppression() from public, anon, authenticated;
+
+create trigger shifts_guard_suppression
+  before delete on shifts
+  for each row execute function shifts_guard_suppression();
+
+drop policy "shifts_delete_admin" on shifts;
+
+create policy "shifts_delete_admin"
+  on shifts for delete to authenticated
+  using (
+    is_admin(station_id)
+    and station_writable(station_id)
+    and exists (
+      select 1 from schedules sc
+      where sc.id = shifts.schedule_id
+        and sc.station_id = shifts.station_id
+        and sc.status = 'draft'
+    )
+  );
+
 -- ===========================================================================
 -- 3. publish_schedule — la publication, en une transaction
 -- ===========================================================================
@@ -299,24 +363,34 @@ begin
       'recipients',  jsonb_array_length(destinataires))
   );
 
+  -- 4. **Un planning peut naître complet**, et c'est le piège qu'un ticket
+  --    oublie toujours : tous ses créneaux demandent zéro personne, ou toutes
+  --    ses attributions sont déjà acceptées. Le déclencheur d'acceptation ne se
+  --    réveillera jamais — il n'y a plus de réponse à donner. La complétude se
+  --    teste donc **ici aussi**, dans la même transaction que la publication.
+  if schedule_reevaluer(planning.id) then
+    select * into planning from schedules where id = planning.id;
+  end if;
+
   return jsonb_build_object(
     'ok',            true,
     'schedule_id',   planning.id,
     'station_id',    planning.station_id,
     'status',        planning.status,
     'published_at',  planning.published_at,
+    'validated_at',  planning.validated_at,
     'period',        cle_periode,
     'assignments',   attribuees,
     'recipients',    destinataires);
 end $$;
 
 comment on function publish_schedule(uuid, uuid) is
-  'Publie un planning en une transaction : statut, proposed_at de chaque attribution, audit. Rend les destinataires déjà groupés par membre, prêts pour send-notification. Réservée au rôle de service.';
+  'Publie un planning en une transaction : statut, proposed_at de chaque attribution, audit, puis test de complétude — un planning qui naît complet se valide sans attendre une réponse qui ne viendra pas. Rend les destinataires déjà groupés par membre, prêts pour send-notification. Réservée au rôle de service.';
 
 revoke execute on function publish_schedule(uuid, uuid) from public, anon, authenticated;
 
 -- ===========================================================================
--- 4. schedule_auto_validate — la validation sans personne
+-- 4. La complétude d'un planning, et la validation qu'elle commande
 -- ===========================================================================
 -- docs/SCHEMA.md § 5 : « après update d'un `assignment`, si tous les créneaux du
 -- planning ont `count(accepted) >= required_count`, passe le planning en
@@ -328,15 +402,64 @@ revoke execute on function publish_schedule(uuid, uuid) from public, anon, authe
 -- une proposition sans réponse est *pourvu* du point de vue de la construction
 -- et *pas encore acquis* du point de vue de la validation.
 --
--- **Une seule fois, quoi qu'il arrive.** L'`update … where status = 'published'
--- returning` prend un verrou de ligne : deux acceptations simultanées qui voient
--- toutes deux le planning complet ne rendent qu'une ligne, donc **une** salve de
--- notifications. Arbitrer sur l'ordre d'arrivée aurait donné deux « Planning
--- validé » à soixante personnes.
+-- Le test est **extrait**, parce qu'il a trois appelants et qu'une règle écrite
+-- trois fois se contredit à la première correction : le déclencheur
+-- d'acceptation, la fin de la publication (un planning dont tous les créneaux
+-- demandent zéro personne est complet **avant** la moindre réponse, et aucune
+-- réponse ne viendrait jamais le réveiller), et le changement d'effectif requis
+-- d'un créneau publié.
+create function schedule_complet(p_schedule uuid) returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  -- Un seul créneau en défaut suffit à répondre non : `exists` s'arrête au
+  -- premier, là où un `count(*) = 0` parcourrait les soixante-deux.
+  select not exists (
+    select 1
+      from shifts sh
+     where sh.schedule_id = p_schedule
+       and sh.required_count > (
+         select count(*)
+           from assignments a
+          where a.shift_id = sh.id
+            and a.station_id = sh.station_id
+            and a.status = 'accepted')
+  );
+$$;
+
+comment on function schedule_complet(uuid) is
+  'Vrai quand chaque créneau du planning atteint son effectif requis en attributions ACCEPTÉES. La complétude de la construction, elle, se lit dans v_schedule_progress.shifts_filled : deux questions, deux chiffres.';
+
+revoke execute on function schedule_complet(uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- `schedule_reevaluer` — la transition que la complétude commande.
 --
--- La clause `when` du déclencheur porte le test : la fonction n'est pas appelée
--- pour les refus, les annulations, ni pour les mises à jour ordinaires.
-create function schedule_auto_validate() returns trigger
+-- **Le verrou de ligne est pris en tête, avant le test, et c'est toute
+-- l'affaire.** Deux membres qui acceptent en même temps les deux places d'un
+-- créneau qui en demande deux : chaque transaction lit son propre instantané,
+-- ne voit pas l'acceptation de l'autre, conclut « pas complet » et s'arrête.
+-- Le planning reste publié pour toujours, sans qu'aucune réponse ultérieure ne
+-- vienne le réveiller — il n'en reste plus à donner. Arbitrer *après* le test,
+-- par un `update … where status = 'published'`, ne sert à rien : aucune des
+-- deux n'atteint l'arbitrage.
+--
+-- Avec `select … for update` en première instruction, la seconde transaction
+-- **attend** la première. En `read committed`, la requête de complétude qui suit
+-- prend un instantané frais : elle voit alors l'acceptation déjà validée et
+-- conclut juste. L'`update … where status = 'published' returning` reste, en
+-- seconde sécurité — il coûte une condition et ferme le cas où deux chemins
+-- concurrents auraient tous deux conclu « complet ».
+--
+-- La fonction traite **les deux sens**, parce qu'un effectif requis se modifie
+-- (ticket 020) : un planning validé qui cesse d'être complet retourne en
+-- `published`, comme docs/WORKFLOWS.md § 2 le prescrit. Ce retour ne notifie
+-- personne — ce n'est pas un fait nouveau pour les pompiers, c'est une décision
+-- d'administration dont la conséquence leur parviendra par la modification
+-- elle-même.
+create function schedule_reevaluer(p_schedule uuid) returns boolean
 language plpgsql
 security definer
 set search_path = public, pg_temp
@@ -344,43 +467,39 @@ as $$
 declare
   planning  schedules;
   periode   periods;
-  valide    uuid;
+  bascule   uuid;
   membres   uuid[];
 begin
-  select sc.* into planning
-    from shifts sh
-    join schedules sc on sc.id = sh.schedule_id
-   where sh.id = new.shift_id;
-
-  if planning.id is null or planning.status <> 'published' then
-    return null;
+  -- Le verrou d'abord. Tout le reste en dépend.
+  select * into planning from schedules where id = p_schedule for update;
+  if planning.id is null then
+    return false;
   end if;
 
-  -- Un seul créneau en défaut suffit à répondre non : `exists` s'arrête au
-  -- premier, là où un `count(*) = 0` parcourrait les soixante-deux.
-  if exists (
-    select 1
-      from shifts sh
-     where sh.schedule_id = planning.id
-       and sh.required_count > (
-         select count(*)
-           from assignments a
-          where a.shift_id = sh.id
-            and a.station_id = sh.station_id
-            and a.status = 'accepted')
-  ) then
-    return null;
+  if planning.status not in ('published', 'validated') then
+    return false;
+  end if;
+
+  if not schedule_complet(p_schedule) then
+    if planning.status = 'validated' then
+      update schedules set status = 'published' where id = p_schedule;
+    end if;
+    return false;
+  end if;
+
+  if planning.status = 'validated' then
+    return true;
   end if;
 
   update schedules
      set status = 'validated'
-   where id = planning.id
+   where id = p_schedule
      and status = 'published'
-   returning id into valide;
+   returning id into bascule;
 
-  -- Quelqu'un d'autre a validé dans la même milliseconde : il a notifié.
-  if valide is null then
-    return null;
+  -- Quelqu'un d'autre a validé entre-temps : il a notifié.
+  if bascule is null then
+    return true;
   end if;
 
   select * into periode from periods where id = planning.period_id;
@@ -394,26 +513,55 @@ begin
      and m.status = 'active';
 
   if membres is null or array_length(membres, 1) = 0 then
-    return null;
+    return true;
   end if;
 
+  -- **Aucune clé de dédoublonnage ici, et c'est délibéré.** L'exclusivité est
+  -- déjà tenue en amont par l'`update … where status = 'published' returning` :
+  -- une seule transaction flippe le statut, donc `notify` n'est appelée qu'une
+  -- fois par validation. Une clé « par seconde » n'ajouterait rien et
+  -- **avalerait** au contraire une revalidation légitime survenue dans la même
+  -- seconde — un effectif requis abaissé juste après une modification, par
+  -- exemple. Mesuré : deux validations successives, une seule notification.
   perform notify(
     'schedule_validated',
     p_user_ids => membres,
     p_station  => planning.station_id,
-    p_payload  => jsonb_build_object('period', to_char(make_date(periode.year, periode.month, 1), 'YYYY-MM')),
-    -- La clé porte l'instant de validation : un planning revalidé après une
-    -- modification de créneau (ticket 020) est un **second** fait, et il doit
-    -- repartir. Ce que la clé écarte, ce sont deux appels dans la même
-    -- transaction, pas deux validations successives.
-    p_dedupe_key => format('schedule_validated:%s:%s',
-                           planning.id, extract(epoch from now())::bigint));
+    p_payload  => jsonb_build_object(
+                    'period',
+                    to_char(make_date(periode.year, periode.month, 1), 'YYYY-MM')));
 
+  return true;
+end $$;
+
+comment on function schedule_reevaluer(uuid) is
+  'Verrouille le planning, teste sa complétude et applique la transition : published -> validated avec notification à tous les membres actifs, ou validated -> published quand un effectif requis a changé. Le verrou précède le test : sans lui, deux acceptations simultanées ne valident jamais.';
+
+revoke execute on function schedule_reevaluer(uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Les trois appelants.
+--
+-- La clause `when` du déclencheur d'acceptation porte le test : la fonction
+-- n'est pas appelée pour les refus, les annulations, ni pour les mises à jour
+-- ordinaires.
+create function schedule_auto_validate() returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  planning uuid;
+begin
+  select sh.schedule_id into planning from shifts sh where sh.id = new.shift_id;
+  if planning is not null then
+    perform schedule_reevaluer(planning);
+  end if;
   return null;
 end $$;
 
 comment on function schedule_auto_validate() is
-  'Passe un planning publié en validé dès que chaque créneau atteint son effectif requis en attributions acceptées, et notifie tous les membres actifs (docs/WORKFLOWS.md § 4).';
+  'Réévalue la complétude du planning après l''acceptation d''une attribution (docs/WORKFLOWS.md § 4).';
 
 revoke execute on function schedule_auto_validate() from public, anon, authenticated;
 
@@ -423,8 +571,40 @@ create trigger schedule_auto_validate
   when (new.status = 'accepted' and old.status is distinct from new.status)
   execute function schedule_auto_validate();
 
+-- ---------------------------------------------------------------------------
+-- Changer l'effectif requis d'un créneau **change la condition de validation**.
+--
+-- Un chef qui ramène un créneau publié de 2 à 1 alors qu'une seule personne a
+-- accepté vient de rendre son planning complet — et aucune réponse ne viendra
+-- plus le réveiller, puisqu'il n'en reste plus à donner. À l'inverse, passer un
+-- créneau de 1 à 2 sur un planning validé le rend incomplet, et le laisser
+-- « validé » mentirait à toute la caserne.
+--
+-- `after update of required_count`, avec la clause `when` qui évite d'appeler la
+-- fonction quand la colonne est réécrite à l'identique.
+create function shifts_effectif_revalide() returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  perform schedule_reevaluer(new.schedule_id);
+  return null;
+end $$;
+
+comment on function shifts_effectif_revalide() is
+  'Réévalue la complétude du planning quand l''effectif requis d''un créneau change : la condition de validation vient de bouger.';
+
+revoke execute on function shifts_effectif_revalide() from public, anon, authenticated;
+
+create trigger shifts_effectif_revalide
+  after update of required_count on shifts
+  for each row
+  when (new.required_count is distinct from old.required_count)
+  execute function shifts_effectif_revalide();
+
 -- ===========================================================================
--- 5. remind_schedule — la relance manuelle des retardataires
+-- 5. remind_schedule — la relance manuelle
 -- ===========================================================================
 -- Le bouton « Relancer maintenant » de l'écran de suivi. Les crons de relance
 -- automatique sont le ticket 022 ; celui-ci livre le geste qu'on fait en
@@ -435,17 +615,26 @@ create trigger schedule_auto_validate
 -- plus vieux que `settings.late_report_hours`. La vue compte, cette fonction
 -- relance, et aucune des deux ne redéfinit le retard pour son compte.
 --
--- **Idempotente à l'heure.** `p_dedupe_key` porte l'heure courante : un double
--- clic, ou deux adjoints qui appuient ensemble, ne coûtent rien —
--- `notification_outbox_dedupe_uniq` écarte la seconde ligne et `notify` rend
--- l'identifiant de la première. C'est l'idiome du projet
--- (`cron_availability_reminders`, 0016), et il vaut mieux qu'un compteur d'état.
+-- `p_tout` lève la condition d'âge, et il a un appelant précis : **le rattrapage
+-- d'un envoi qui n'a pas abouti**. Quand `send-notification` échoue au moment de
+-- la publication, les pompiers concernés n'ont rien reçu et ne sont pourtant pas
+-- « en retard » — ils viennent d'être proposés. Leur faire attendre
+-- `late_report_hours` avant de pouvoir les prévenir serait absurde. La liste des
+-- retardataires, elle, appelle toujours avec le défaut.
 --
--- `reminder_count` et `last_reminder_at` sont mis à jour pour les attributions
--- réellement relancées : les crons du 022 verront qu'un palier est déjà passé,
--- et l'écran peut dire « relancé il y a 20 min » au lieu de laisser croire que
--- rien n'est parti.
-create function remind_schedule(p_schedule uuid)
+-- **Idempotente à l'heure, et la marque suit l'envoi, pas l'inverse.**
+-- `p_dedupe_key` porte l'heure courante ; si une demande existe déjà sous cette
+-- clé, personne ne recevra rien de plus et la fonction **ne touche ni
+-- `reminder_count` ni `last_reminder_at`**. Marquer avant de savoir, c'était
+-- faire croire à un palier franchi : les crons du ticket 022 sautent le push de
+-- 24 h quand `reminder_count` vaut déjà 1, et un double clic aurait donc privé
+-- un pompier de sa relance automatique.
+--
+-- Le verrou consultatif sérialise les appels concurrents sur un même planning :
+-- sans lui, deux clics simultanés passeraient tous deux devant la recherche de
+-- clé et marqueraient deux fois. Il est pris pour la transaction, jamais tenu
+-- au-delà.
+create function remind_schedule(p_schedule uuid, p_tout boolean default false)
 returns jsonb
 language plpgsql
 security definer
@@ -456,8 +645,11 @@ declare
   caserne       stations;
   periode       periods;
   cle_periode   text;
+  cle_dedoublon text;
   seuil         timestamptz;
   destinataires jsonb;
+  cibles        uuid[];
+  deja          uuid;
   relancees     integer := 0;
   file          uuid;
 begin
@@ -482,6 +674,8 @@ begin
                               'status', planning.status);
   end if;
 
+  perform pg_advisory_xact_lock(hashtext('remind_schedule:' || p_schedule::text));
+
   select * into caserne from stations where id = planning.station_id;
   select * into periode from periods where id = planning.period_id;
   cle_periode := to_char(make_date(periode.year, periode.month, 1), 'YYYY-MM');
@@ -489,45 +683,63 @@ begin
   seuil := now() - make_interval(
     hours => coalesce((caserne.settings ->> 'late_report_hours')::int, 72));
 
-  with tardives as (
-    select a.id, a.user_id, sh.date, sh.slot
-      from assignments a
-      join shifts sh on sh.id = a.shift_id
-     where sh.schedule_id = planning.id
-       and a.station_id = planning.station_id
-       and a.status = 'proposed'
-       and a.proposed_at is not null
-       and a.proposed_at < seuil
-  ),
-  marquees as (
-    update assignments a
-       set reminder_count   = a.reminder_count + 1,
-           last_reminder_at = now()
-      from tardives t
-     where a.id = t.id
-     returning a.id
-  )
-  select
-    coalesce(jsonb_agg(g.entree order by g.user_id), '[]'::jsonb),
-    (select count(*)::integer from marquees)
-    into destinataires, relancees
+  -- Les attributions visées, une fois. Le tableau sert deux fois : à composer
+  -- les destinataires, puis — et seulement si l'envoi est réel — à poser la
+  -- marque. Deux requêtes sur le même ensemble valent mieux qu'une table
+  -- temporaire dans une fonction `security definer`, où `pg_temp` en fin de
+  -- `search_path` est une précaution qu'on ne contourne pas pour du confort.
+  select array_agg(a.id)
+    into cibles
+    from assignments a
+    join shifts sh on sh.id = a.shift_id
+   where sh.schedule_id = planning.id
+     and a.station_id = planning.station_id
+     and a.status = 'proposed'
+     and a.proposed_at is not null
+     and (p_tout or a.proposed_at < seuil);
+
+  select coalesce(jsonb_agg(g.entree order by g.user_id), '[]'::jsonb)
+    into destinataires
     from (
       select
-        t.user_id,
+        a.user_id,
         jsonb_build_object(
-          'user_id', t.user_id,
+          'user_id', a.user_id,
           'payload', jsonb_build_object(
             'shifts', jsonb_agg(
-              jsonb_build_object('date', t.date, 'slot', t.slot)
-              order by t.date, t.slot))
+              jsonb_build_object('date', sh.date, 'slot', sh.slot)
+              order by sh.date, sh.slot))
         ) as entree
-      from tardives t
-     group by t.user_id
+      from assignments a
+      join shifts sh on sh.id = a.shift_id
+     where a.id = any(coalesce(cibles, '{}'::uuid[]))
+     group by a.user_id
     ) g;
 
   if jsonb_array_length(destinataires) = 0 then
     return jsonb_build_object('ok', true, 'members', 0, 'assignments', 0,
-                              'outbox_id', null);
+                              'deduplicated', false, 'outbox_id', null);
+  end if;
+
+  cle_dedoublon := format('assignment_reminder:%s:%s:%s',
+                          planning.id,
+                          case when p_tout then 'rattrapage' else 'manuel' end,
+                          to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24'));
+
+  -- **Le constat avant la marque.** Une demande déjà en file sous cette clé
+  -- veut dire que personne ne recevra rien de plus dans l'heure : rien à
+  -- marquer, et l'écran le dira au lieu de feindre un envoi.
+  select id into deja
+    from notification_outbox
+   where type = 'assignment_reminder' and dedupe_key = cle_dedoublon;
+
+  if deja is not null then
+    return jsonb_build_object(
+      'ok', true,
+      'members', jsonb_array_length(destinataires),
+      'assignments', 0,
+      'deduplicated', true,
+      'outbox_id', deja);
   end if;
 
   file := notify(
@@ -535,22 +747,27 @@ begin
     p_station    => planning.station_id,
     p_payload    => jsonb_build_object('period', cle_periode),
     p_recipients => destinataires,
-    p_dedupe_key => format('assignment_reminder:%s:manuel:%s',
-                           planning.id,
-                           to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24')));
+    p_dedupe_key => cle_dedoublon);
+
+  update assignments a
+     set reminder_count   = a.reminder_count + 1,
+         last_reminder_at = now()
+   where a.id = any(cibles);
+  get diagnostics relancees = row_count;
 
   return jsonb_build_object(
-    'ok',          true,
-    'members',     jsonb_array_length(destinataires),
-    'assignments', relancees,
-    'outbox_id',   file);
+    'ok',           true,
+    'members',      jsonb_array_length(destinataires),
+    'assignments',  relancees,
+    'deduplicated', false,
+    'outbox_id',    file);
 end $$;
 
-comment on function remind_schedule(uuid) is
-  'Relance en une notification par membre les attributions sans réponse depuis plus de late_report_hours. Idempotente à l''heure par sa clé de dédoublonnage.';
+comment on function remind_schedule(uuid, boolean) is
+  'Relance en une notification par membre les attributions sans réponse depuis plus de late_report_hours, ou toutes (p_tout, rattrapage d''un envoi manqué). Idempotente à l''heure : une demande déjà en file ne remarque ni reminder_count ni last_reminder_at.';
 
-revoke execute on function remind_schedule(uuid) from public, anon;
-grant  execute on function remind_schedule(uuid) to authenticated;
+revoke execute on function remind_schedule(uuid, boolean) from public, anon;
+grant  execute on function remind_schedule(uuid, boolean) to authenticated;
 
 -- ===========================================================================
 -- 6. Le temps réel sur les plannings

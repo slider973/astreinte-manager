@@ -8,17 +8,23 @@
 --    brouillon. La clé gelée, les deux horodatages tenus par la base, et la
 --    règle qui vaut aussi pour le rôle de service.
 -- 2. La suppression : bornée au brouillon par la politique **et** par un
---    déclencheur, parce que la cascade depuis `periods` ne consulte aucune
---    politique.
+--    déclencheur, **plannings comme créneaux**, parce que la cascade ne
+--    consulte aucune politique. Supprimer un créneau publié effacerait les
+--    attributions déjà reçues par des pompiers.
 -- 3. `publish_schedule` : les quatre refus, la publication atomique,
 --    `proposed_at` posé sur chaque attribution, l'audit, et surtout les
 --    **destinataires groupés par membre** — un pompier à sept créneaux fait
 --    une entrée, pas sept.
--- 4. `schedule_auto_validate` : la validation sans action d'administrateur, sur
---    les **acceptations seules**, une seule fois, avec la notification
---    `schedule_validated` à tous les membres actifs.
+-- 4. La complétude et la validation : sur les **acceptations seules**, une
+--    seule fois, avec la notification à tous les membres actifs — et les trois
+--    cas qui n'avaient pas d'appelant : un effectif requis **supérieur à un**,
+--    un planning que **personne ne requiert** et qui doit se valider à la
+--    publication, et un effectif requis **modifié** sur un planning publié ou
+--    validé.
 -- 5. `remind_schedule` : les refus, le regroupement par membre, l'incrément de
---    `reminder_count`, et l'idempotence à l'heure.
+--    `reminder_count`, l'idempotence à l'heure — et surtout le fait que la
+--    **marque suit l'envoi** : une demande écartée par le dédoublonnage ne
+--    touche ni `reminder_count` ni `last_reminder_at`.
 -- 6. Le temps réel et les droits : `schedules` inscrite dans
 --    `supabase_realtime` en identité de réplique `default`, et les exécutions
 --    refusées à `anon` comme à `authenticated` là où elles doivent l'être.
@@ -370,6 +376,106 @@ rollback to savepoint s2;
 release savepoint s2;
 
 -- ===========================================================================
+-- 2 bis. Supprimer un créneau : la même règle, et la porte qui restait ouverte
+-- ===========================================================================
+-- Garder les plannings ne suffisait pas : `shifts` cascade vers `assignments`,
+-- et la politique de 0007 ne regardait que la caserne. Supprimer **un créneau**
+-- d'un planning publié effaçait donc les attributions qu'un pompier avait déjà
+-- reçues — une écriture, aucune trace.
+\echo ''
+\echo '--- 2 bis. Un créneau publié ne se supprime pas non plus'
+savepoint s2b;
+
+insert into schedules (id, station_id, period_id, status, created_by) values
+  ('55555555-0000-4000-8000-000000000320',
+   '55555555-0000-4000-8000-000000000001',
+   '55555555-0000-4000-8000-000000000202', 'draft',
+   '55555555-0000-4000-8000-000000000100');
+
+insert into shifts (id, station_id, schedule_id, date, slot, required_count) values
+  ('55555555-0000-4000-8000-000000000330',
+   '55555555-0000-4000-8000-000000000001',
+   '55555555-0000-4000-8000-000000000320', '2028-02-01', 'day', 1),
+  ('55555555-0000-4000-8000-000000000331',
+   '55555555-0000-4000-8000-000000000001',
+   '55555555-0000-4000-8000-000000000320', '2028-02-01', 'night', 1);
+
+insert into assignments (id, station_id, shift_id, user_id, created_by) values
+  ('55555555-0000-4000-8000-000000000340',
+   '55555555-0000-4000-8000-000000000001',
+   '55555555-0000-4000-8000-000000000330',
+   '55555555-0000-4000-8000-000000000101',
+   '55555555-0000-4000-8000-000000000100');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"55555555-0000-4000-8000-000000000100","role":"authenticated"}';
+
+do $$
+declare
+  lignes integer;
+begin
+  -- En brouillon, un créneau se supprime : c'est la construction du mois.
+  delete from shifts where id = '55555555-0000-4000-8000-000000000331';
+  get diagnostics lignes = row_count;
+  perform tests_pub.egal(lignes, 1, 'un admin supprime un créneau de brouillon');
+end $$;
+
+reset role;
+
+do $$
+begin
+  perform publish_schedule('55555555-0000-4000-8000-000000000320',
+                           '55555555-0000-4000-8000-000000000100');
+  perform tests_pub.egal(
+    (select status::text from schedules
+      where id = '55555555-0000-4000-8000-000000000320'),
+    'published', 'le planning est publié, l''attribution est partie');
+end $$;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"55555555-0000-4000-8000-000000000100","role":"authenticated"}';
+
+do $$
+declare
+  lignes integer;
+begin
+  -- La politique filtre sans lever : zéro ligne, et l'attribution survit.
+  delete from shifts where id = '55555555-0000-4000-8000-000000000330';
+  get diagnostics lignes = row_count;
+  perform tests_pub.egal(lignes, 0,
+    'un admin ne supprime pas un créneau publié (politique)');
+  perform tests_pub.egal(
+    (select count(*)::int from assignments
+      where id = '55555555-0000-4000-8000-000000000340'),
+    1, 'et l''attribution déjà reçue est toujours là');
+end $$;
+
+reset role;
+
+do $$
+begin
+  -- Le rôle de service contourne la politique : c'est le déclencheur qui
+  -- l'arrête, et **c'est lui qui attrape la cascade**.
+  perform tests_pub.refuse(
+    $sql$delete from shifts where id = '55555555-0000-4000-8000-000000000330'$sql$,
+    'shift_delete_published',
+    'même le rôle de service ne supprime pas un créneau publié');
+
+  perform tests_pub.refuse(
+    $sql$delete from schedules where id = '55555555-0000-4000-8000-000000000320'$sql$,
+    'schedule_delete_published',
+    'et le planning entier reste inattaquable');
+
+  perform tests_pub.egal(
+    (select count(*)::int from assignments
+      where id = '55555555-0000-4000-8000-000000000340'),
+    1, 'l''attribution a survécu aux trois tentatives');
+end $$;
+
+rollback to savepoint s2b;
+release savepoint s2b;
+
+-- ===========================================================================
 -- 3. publish_schedule
 -- ===========================================================================
 \echo ''
@@ -669,6 +775,132 @@ rollback to savepoint s4;
 release savepoint s4;
 
 -- ===========================================================================
+-- 4 bis. Les trois cas que le déclencheur d'acceptation ne couvrait pas
+-- ===========================================================================
+\echo ''
+\echo '--- 4 bis. Effectif supérieur à un, planning sans besoin, effectif modifié'
+savepoint s4b;
+
+-- (a) **Un effectif requis de deux.** Une acceptation ne suffit pas ; la
+--     seconde valide. C'est aussi le cas que la concurrence fait tomber
+--     (scripts/test_concurrence.sh).
+insert into schedules (id, station_id, period_id, status, created_by) values
+  ('55555555-0000-4000-8000-000000000350',
+   '55555555-0000-4000-8000-000000000001',
+   '55555555-0000-4000-8000-000000000202', 'draft',
+   '55555555-0000-4000-8000-000000000100');
+
+insert into shifts (id, station_id, schedule_id, date, slot, required_count) values
+  ('55555555-0000-4000-8000-000000000360',
+   '55555555-0000-4000-8000-000000000001',
+   '55555555-0000-4000-8000-000000000350', '2028-02-01', 'day', 2);
+
+insert into assignments (id, station_id, shift_id, user_id, created_by) values
+  ('55555555-0000-4000-8000-000000000370',
+   '55555555-0000-4000-8000-000000000001',
+   '55555555-0000-4000-8000-000000000360',
+   '55555555-0000-4000-8000-000000000101',
+   '55555555-0000-4000-8000-000000000100'),
+  ('55555555-0000-4000-8000-000000000371',
+   '55555555-0000-4000-8000-000000000001',
+   '55555555-0000-4000-8000-000000000360',
+   '55555555-0000-4000-8000-000000000102',
+   '55555555-0000-4000-8000-000000000100');
+
+do $$
+declare
+  planning constant uuid := '55555555-0000-4000-8000-000000000350';
+begin
+  perform publish_schedule(planning, '55555555-0000-4000-8000-000000000100');
+  perform tests_pub.egal(
+    (select status::text from schedules where id = planning), 'published',
+    'effectif 2 : le planning part publié');
+
+  update assignments set status = 'accepted', responded_at = now()
+   where id = '55555555-0000-4000-8000-000000000370';
+  perform tests_pub.egal(
+    (select status::text from schedules where id = planning), 'published',
+    'effectif 2 : une acceptation sur deux ne valide pas');
+
+  update assignments set status = 'accepted', responded_at = now()
+   where id = '55555555-0000-4000-8000-000000000371';
+  perform tests_pub.egal(
+    (select status::text from schedules where id = planning), 'validated',
+    'effectif 2 : la seconde acceptation valide');
+
+  -- (c) **L'effectif requis se modifie**, et il change la condition de
+  --     validation sans qu'aucune réponse ne bouge. Le laisser « validé »
+  --     mentirait à toute la caserne.
+  update shifts set required_count = 3
+   where id = '55555555-0000-4000-8000-000000000360';
+  perform tests_pub.egal(
+    (select status::text from schedules where id = planning), 'published',
+    'effectif porté à 3 : le planning n''est plus validé');
+  perform tests_pub.check(
+    (select validated_at is null from schedules where id = planning),
+    'et sa date de validation est effacée');
+
+  update shifts set required_count = 1
+   where id = '55555555-0000-4000-8000-000000000360';
+  perform tests_pub.egal(
+    (select status::text from schedules where id = planning), 'validated',
+    'effectif ramené à 1 : le planning se revalide, sans aucune réponse de plus');
+
+  -- Deux validations, deux faits : la seconde ne doit pas être avalée par une
+  -- clé de dédoublonnage à la seconde. C'est exactement ce qui a été mesuré.
+  perform tests_pub.egal(
+    (select count(*)::int from notification_outbox
+      where type = 'schedule_validated'
+        and station_id = '55555555-0000-4000-8000-000000000001'),
+    2, 'deux validations successives font deux notifications');
+end $$;
+
+rollback to savepoint s4b;
+
+-- (b) **Un planning dont aucun créneau ne demande personne.** Il est complet
+--     avant la moindre réponse, et aucune réponse ne viendra jamais le
+--     réveiller : c'est la publication elle-même qui doit conclure.
+savepoint s4c;
+
+insert into schedules (id, station_id, period_id, status, created_by) values
+  ('55555555-0000-4000-8000-000000000380',
+   '55555555-0000-4000-8000-000000000001',
+   '55555555-0000-4000-8000-000000000202', 'draft',
+   '55555555-0000-4000-8000-000000000100');
+
+insert into shifts (station_id, schedule_id, date, slot, required_count)
+select '55555555-0000-4000-8000-000000000001',
+       '55555555-0000-4000-8000-000000000380', j::date, s.slot, 0
+  from generate_series('2028-02-01'::date, '2028-02-05'::date, interval '1 day') j
+  cross join (select unnest(enum_range(null::slot_type)) as slot) s;
+
+do $$
+declare
+  planning constant uuid := '55555555-0000-4000-8000-000000000380';
+  resultat jsonb;
+begin
+  resultat := publish_schedule(planning, '55555555-0000-4000-8000-000000000100');
+
+  perform tests_pub.egal(resultat ->> 'status', 'validated',
+    'aucun besoin : la publication rend un planning déjà validé');
+  perform tests_pub.check(resultat ->> 'validated_at' is not null,
+    'et la réponse porte la date de validation');
+  perform tests_pub.egal(
+    (select status::text from schedules where id = planning), 'validated',
+    'la table dit la même chose');
+  perform tests_pub.egal(
+    (select count(*)::int from notification_outbox
+      where type = 'schedule_validated'
+        and station_id = '55555555-0000-4000-8000-000000000001'),
+    1, 'et tout le monde en est averti, sans qu''un admin ait rien fait');
+  perform tests_pub.egal(jsonb_array_length(resultat -> 'recipients'), 0,
+    'personne n''a reçu de proposition : il n''y en avait aucune');
+end $$;
+
+rollback to savepoint s4c;
+release savepoint s4b;
+
+-- ===========================================================================
 -- 5. remind_schedule
 -- ===========================================================================
 \echo ''
@@ -767,8 +999,17 @@ begin
        and a.reminder_count = 1 and a.last_reminder_at is not null),
     4, 'reminder_count et last_reminder_at sont à jour');
 
-  -- Double clic, ou deux adjoints : la clé de dédoublonnage rend la même ligne.
+  -- Double clic, ou deux adjoints : la clé de dédoublonnage rend la même ligne
+  -- **et la marque ne bouge pas**. Marquer avant de savoir, c'était faire
+  -- croire à un palier franchi : les crons du 022 sautent le push de 24 h
+  -- quand `reminder_count` vaut déjà 1.
   insert into tests_pub.relances values ('rejeu', remind_schedule(planning));
+
+  perform tests_pub.egal(
+    (select max(a.reminder_count) from assignments a
+      join shifts sh on sh.id = a.shift_id
+     where sh.schedule_id = planning),
+    1, 'un second clic ne fait pas franchir un second palier');
 end $$;
 
 reset role;
@@ -782,6 +1023,12 @@ declare
 begin
   perform tests_pub.egal(rejeu ->> 'outbox_id', premiere ->> 'outbox_id',
     'relancer deux fois dans l''heure ne met rien de plus en file');
+  perform tests_pub.egal(rejeu ->> 'deduplicated', 'true',
+    'et la fonction le dit, au lieu de feindre un envoi');
+  perform tests_pub.egal((rejeu ->> 'assignments')::int, 0,
+    'aucune attribution n''est remarquée par le second clic');
+  perform tests_pub.egal(premiere ->> 'deduplicated', 'false',
+    'le premier appel, lui, a bien envoyé');
   perform tests_pub.egal(
     (select count(*)::int from notification_outbox
       where type = 'assignment_reminder'
@@ -872,8 +1119,20 @@ begin
     'publish_schedule est fermée à anon');
   perform tests_pub.check(
     has_function_privilege('authenticated',
-      'public.remind_schedule(uuid)', 'execute'),
+      'public.remind_schedule(uuid, boolean)', 'execute'),
     'remind_schedule est ouverte à authenticated, qui la garde par is_admin');
+  perform tests_pub.check(
+    not has_function_privilege('authenticated',
+      'public.schedule_reevaluer(uuid)', 'execute'),
+    'schedule_reevaluer n''est pas appelable en RPC');
+  perform tests_pub.check(
+    not has_function_privilege('authenticated',
+      'public.schedule_complet(uuid)', 'execute'),
+    'schedule_complet n''est pas appelable en RPC');
+  perform tests_pub.check(
+    not has_function_privilege('anon',
+      'public.shifts_guard_suppression()', 'execute'),
+    'shifts_guard_suppression n''est pas appelable en RPC');
 end $$;
 
 release savepoint s6;
