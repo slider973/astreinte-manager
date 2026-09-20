@@ -18,6 +18,8 @@ import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
 import 'package:astreinte_sp/features/membres/domain/membres_providers.dart';
 import 'package:astreinte_sp/features/onboarding/data/profil_repository.dart';
 import 'package:astreinte_sp/features/onboarding/domain/profil_providers.dart';
+import 'package:astreinte_sp/features/parametres/data/parametres_repository.dart';
+import 'package:astreinte_sp/features/parametres/domain/parametres_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -173,6 +175,7 @@ Future<AppMontee> monterApp(
   MembresRepository? membres,
   InvitationRepository? invitations,
   ProfilRepository? profils,
+  ParametresRepository? parametres,
   ReperesLocaux? reperes,
   ContextePlateforme? plateforme,
   Size taille = const Size(390, 844),
@@ -204,6 +207,8 @@ Future<AppMontee> monterApp(
           invitationRepositoryProvider.overrideWithValue(invitations),
         if (profils != null)
           profilRepositoryProvider.overrideWithValue(profils),
+        if (parametres != null)
+          parametresRepositoryProvider.overrideWithValue(parametres),
         reperesLocauxProvider.overrideWithValue(
           reperes ?? ReperesLocauxMemoire(),
         ),

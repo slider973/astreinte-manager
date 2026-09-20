@@ -13,6 +13,7 @@ import '../../../core/widgets/app_divider.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/champ_texte.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/entete_section.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../domain/administration_membre.dart';
@@ -20,7 +21,6 @@ import '../domain/invitation.dart';
 import '../domain/membre_caserne.dart';
 import '../domain/membres_providers.dart';
 import 'widgets/confirmation_desactivation.dart';
-import 'widgets/entete_section.dart';
 import 'widgets/feuille_actions_membre.dart';
 import 'widgets/feuille_renommer_membre.dart';
 import 'widgets/ligne_invitation.dart';
@@ -209,6 +209,12 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
       indexSelectionne: indexAdmin < 0 ? 0 : indexAdmin,
       onDestination: (int index) => _versDestination(index, destinations),
       actions: <Widget>[
+        if (admin)
+          IconButton(
+            onPressed: () => context.goNamed(AppRoutes.parametresName),
+            icon: const Icon(Icons.tune),
+            tooltip: AppStrings.parametresDepuisMembres,
+          ),
         IconButton(
           onPressed: _relire,
           icon: const Icon(Icons.refresh),

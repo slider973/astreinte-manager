@@ -648,6 +648,183 @@ abstract final class AppStrings {
   static const String installTermine = 'C\'est fait';
 
   // -------------------------------------------------------------------
+  // Paramètres de la caserne (ticket 010)
+  // -------------------------------------------------------------------
+
+  static const String parametresTitre = 'Paramètres';
+  static const String parametresSousTitre =
+      'Les réglages de ta caserne. Ils s\'appliquent aux plannings créés '
+      'ensuite.';
+  static const String parametresReserveAdmin =
+      'Les réglages de la caserne appartiennent à ses administrateurs.';
+  static const String parametresErreurTexte =
+      'Les paramètres de la caserne n\'ont pas pu être lus.';
+  static const String parametresRafraichir = 'Relire les paramètres';
+  static const String parametresVersMembres = 'Membres de la caserne';
+  static const String parametresDepuisMembres = 'Paramètres de la caserne';
+
+  /// Les neuf fuseaux d'une caserne française, métropole et outre-mer. Un
+  /// champ libre n'a rien à faire ici : un fuseau inventé casse le calcul des
+  /// dates limites, et la base le refuse (`stations_check_timezone`).
+  static const Map<String, String> fuseauxCaserne = <String, String>{
+    'Europe/Paris': 'France métropolitaine',
+    'America/Guadeloupe': 'Guadeloupe',
+    'America/Martinique': 'Martinique',
+    'America/Cayenne': 'Guyane',
+    'Indian/Reunion': 'La Réunion',
+    'Indian/Mayotte': 'Mayotte',
+    'America/Miquelon': 'Saint-Pierre-et-Miquelon',
+    'Pacific/Noumea': 'Nouvelle-Calédonie',
+    'Pacific/Tahiti': 'Polynésie française',
+  };
+
+  /// « France métropolitaine (Europe/Paris) » : le nom du lieu d'abord, son
+  /// identifiant ensuite — c'est lui qui voyage dans la base.
+  static String fuseauLibelle(String identifiant) {
+    final lieu = fuseauxCaserne[identifiant];
+    return lieu == null ? identifiant : '$lieu ($identifiant)';
+  }
+
+  static const List<String> joursSemaineLongs = <String>[
+    'Lundi',
+    'Mardi',
+    'Mercredi',
+    'Jeudi',
+    'Vendredi',
+    'Samedi',
+    'Dimanche',
+  ];
+
+  static const String parametresSectionCaserne = 'La caserne';
+  static const String parametresSectionCaserneNote =
+      'Le nom que voient les membres, et le fuseau qui date les échéances.';
+  static const String parametresNom = 'Nom de la caserne';
+  static const String parametresNomInvite = 'CIS Saint-Martin';
+  static const String parametresFuseau = 'Fuseau horaire';
+
+  static const String parametresSectionCreneaux = 'Créneaux';
+  static const String parametresSectionCreneauxNote =
+      'Des heures d\'affichage. Elles ne découpent pas l\'astreinte : un '
+      'créneau reste « le 12 octobre, nuit ».';
+  static const String parametresDebutJour = 'Début du créneau de jour';
+  static const String parametresFinJour = 'Fin du créneau de jour';
+  static const String parametresHeureInvite = '07:00';
+
+  static String parametresNuitDeduite(String debut, String fin) =>
+      'La nuit couvre le reste : de $fin à $debut.';
+
+  static const String parametresSectionEffectif = 'Effectif requis';
+  static const String parametresSectionEffectifNote =
+      'Le nombre de pompiers attendus sur chaque créneau.';
+  static const String parametresEffectifJour = 'Requis en journée';
+  static const String parametresEffectifNuit = 'Requis la nuit';
+  static const String parametresEffectifConsequence =
+      'Les plannings déjà créés gardent leur effectif. Ce réglage s\'applique '
+      'aux plannings créés ensuite.';
+
+  static const String parametresSectionSurcharges = 'Surcharges';
+  static const String parametresSectionSurchargesNote =
+      'Les exceptions à l\'effectif requis : un samedi chargé, un 31 décembre.';
+  static const String parametresSurchargesSemaine = 'Par jour de semaine';
+  static const String parametresSurchargesDates = 'Par date';
+  static const String parametresSurchargeAucune = 'Par défaut';
+  static const String parametresSurchargesDatesVide =
+      'Aucune date particulière.';
+  static const String parametresSurchargeAjouterDate = 'Ajouter une date';
+  static const String parametresSurchargeRevenirDefaut =
+      'Revenir à l\'effectif par défaut';
+  static const String parametresSurchargeAppliquer = 'Appliquer';
+  static const String parametresSurchargeDate = 'Date';
+  static const String parametresSurchargeDateInvite = '31/12/2026';
+  static const String parametresSurchargeDateExistante =
+      'Cette date a déjà une surcharge.';
+
+  /// L'état d'une surcharge, en toutes lettres : « 2 en journée · 3 la nuit ».
+  static String parametresSurchargeValeur(int? jour, int? nuit) {
+    final morceaux = <String>[
+      if (jour != null) '$jour en journée',
+      if (nuit != null) '$nuit la nuit',
+    ];
+    return morceaux.isEmpty ? parametresSurchargeAucune : morceaux.join(' · ');
+  }
+
+  static String parametresSurchargeModifier(String quoi) =>
+      'Modifier la surcharge : $quoi';
+  static String parametresSurchargeRetirer(String quoi) =>
+      'Retirer la surcharge : $quoi';
+  static String parametresSurchargeTitre(String quoi) => 'Surcharge — $quoi';
+  static String parametresSurchargeDefautRappel(int jour, int nuit) =>
+      'Par défaut : $jour en journée, $nuit la nuit.';
+
+  static const String parametresCreneauJourLibelle = 'En journée';
+  static const String parametresCreneauNuitLibelle = 'La nuit';
+  static const String parametresSurchargeFixerJour =
+      'Fixer l\'effectif en journée';
+  static const String parametresSurchargeFixerNuit =
+      'Fixer l\'effectif la nuit';
+
+  static const String parametresSectionSaisie = 'Saisie des disponibilités';
+  static const String parametresSectionSaisieNote =
+      'Le jour du mois précédent où la saisie se ferme.';
+  static const String parametresJourLimite = 'Jour limite de saisie';
+  static const String parametresJourLimiteConsequence =
+      'La date limite des mois encore ouverts sera recalculée.';
+
+  static String parametresJourLimiteExemple(String mois, String date) =>
+      'Les disponibilités de $mois se ferment le $date à 23:59.';
+
+  static const String parametresSectionRelances = 'Relances';
+  static const String parametresSectionRelancesNote =
+      'Le délai après la publication d\'un planning, en heures.';
+  static const String parametresRelancePush = 'Rappel poussé, sans réponse';
+  static const String parametresRelanceEmail = 'Relance par courriel';
+  static const String parametresRapportRetard = 'Rapport des retardataires';
+
+  static String parametresHeures(int n) => n <= 1 ? '$n heure' : '$n heures';
+
+  static const String parametresEnregistrer = 'Enregistrer les paramètres';
+  static const String parametresAucuneModification =
+      'Aucune modification à enregistrer.';
+  static const String parametresEnregistres = 'Paramètres enregistrés.';
+
+  static String parametresACorriger(int n) =>
+      n <= 1 ? 'Un réglage est à corriger.' : '$n réglages sont à corriger.';
+
+  static String parametresDiminuer(String quoi) => 'Diminuer : $quoi';
+  static String parametresAugmenter(String quoi) => 'Augmenter : $quoi';
+
+  // Validation — les mêmes phrases que les bornes de la contrainte SQL
+  // `stations_settings_valide` (migration 0011).
+  static const String parametresNomVide = 'Donne un nom à la caserne.';
+  static const String parametresNomLong = '80 caractères au maximum.';
+  static const String parametresFuseauInconnu =
+      'Choisis un fuseau horaire dans la liste.';
+  static const String parametresHeureInvalide = 'Écris une heure comme 07:00.';
+  static const String parametresHeuresIdentiques =
+      'Le jour ne peut pas commencer et finir à la même heure.';
+  static const String parametresEffectifBorne = 'Un effectif va de 0 à 50.';
+  static const String parametresJourLimiteBorne =
+      'Le jour limite va du 1 au 28 : le 29, le 30 et le 31 n\'existent pas '
+      'tous les mois.';
+  static const String parametresDelaiBorne =
+      'Un délai va de 1 à 336 heures (deux semaines).';
+  static const String parametresSurchargeIncomplete =
+      'Une surcharge fixe l\'effectif du jour, celui de la nuit, ou les deux.';
+  static const String parametresDateInvalide =
+      'Écris une date comme 31/12/2026.';
+
+  // Refus venus du serveur.
+  static const String parametresRefusDroits =
+      'Seul un administrateur de la caserne modifie ses paramètres.';
+  static const String parametresRefusDocument =
+      'Le serveur a refusé ces réglages. Vérifie les valeurs saisies.';
+  static const String parametresRefusFuseau =
+      'Ce fuseau horaire est inconnu du serveur.';
+  static const String parametresEchecGenerique =
+      'Les paramètres n\'ont pas été enregistrés. Vérifie ta connexion, puis '
+      'réessaie.';
+
+  // -------------------------------------------------------------------
   // Écran de démonstration (build de développement)
   // -------------------------------------------------------------------
 
