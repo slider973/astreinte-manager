@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 011
 - **Branche** : `feat/013-preferences-quotas`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/12
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte
