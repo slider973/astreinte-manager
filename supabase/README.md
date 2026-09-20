@@ -24,6 +24,47 @@ Studio : <http://127.0.0.1:54323>. Emails de test (OTP, liens magiques) :
 `env/dev.json` contient l'URL locale et la clé anon locale, identiques sur toutes les
 installations (voir `env/README.md`). La clé `service_role` n'est jamais versionnée.
 
+## ⚠️ Ne pas pousser `config.toml` tel quel vers un projet hébergé
+
+Deux réglages de `supabase/config.toml` n'existent que pour la pile locale. Un
+`supabase config push` les reporterait tels quels sur le projet hébergé, et c'est
+à chaque fois une régression de sécurité :
+
+| Réglage | Valeur locale | Pourquoi elle ne doit pas partir |
+|---|---|---|
+| `auth.additional_redirect_urls` | `http://127.0.0.1:*`, `http://localhost:*` | Jokers de port, nécessaires parce que `flutter run -d chrome` choisit un port au hasard. En production, seule l'origine déployée de la PWA doit être acceptée : un joker ouvre la redirection du lien magique à n'importe quel service qui écoute en local chez la victime. |
+| `auth.rate_limit.email_sent` | `30` par heure | Les courriels locaux partent dans Mailpit, pas vers de vraies boîtes. 30 par heure sur un projet hébergé transforme le point d'entrée d'envoi de code en amplificateur d'envoi. |
+
+Avant tout `config push`, ramener ces deux valeurs à celles du projet hébergé, ou
+pousser la configuration depuis le tableau de bord Supabase plutôt que depuis ce
+fichier.
+
+En revanche, `auth.enable_signup = false` **doit** être le même des deux côtés :
+les comptes naissent de l'Edge Function d'invitation (ticket 006), jamais d'un
+écran de connexion. La clé anon étant publique, c'est ce réglage-là, et non
+`shouldCreateUser: false` côté app, qui empêche un inconnu de fabriquer des
+comptes et de vider le quota d'envoi de courriels.
+
+### Le piège de `auth.email.enable_signup`
+
+Malgré son nom, cette clé n'est pas « les inscriptions par e-mail » : c'est
+l'interrupteur du **fournisseur e-mail entier** (`GOTRUE_EXTERNAL_EMAIL_ENABLED`).
+À faux, la pile répond `422 email_provider_disabled — Email logins are disabled`
+à **tout le monde**, y compris à un membre du jeu de données qui demande son
+code. Elle doit donc rester à `true`. Vérifié contre la pile locale le
+20 septembre 2026 :
+
+```sh
+# auth.enable_signup = false, auth.email.enable_signup = true
+POST /auth/v1/otp     membre1@caserne-a.test, create_user=false  → 200
+POST /auth/v1/otp     inconnu@exemple.test,  create_user=true   → 422 signup_disabled
+POST /auth/v1/signup  inconnu@exemple.test                      → 422 signup_disabled
+```
+
+Un changement de `config.toml` dans la section `[auth]` n'est pris en compte
+qu'après `supabase stop && supabase start` : `supabase db reset` rejoue les
+migrations mais ne recharge pas la configuration du conteneur Auth.
+
 ## Migrations
 
 Une migration par sujet, nommée `NNNN_sujet.sql` dans l'ordre de `docs/SCHEMA.md` section 10.
