@@ -28,6 +28,8 @@ class ChampTexte extends StatelessWidget {
     this.autofocus = false,
     this.actif = true,
     this.lignes = 1,
+    this.icone,
+    this.suffixe,
   });
 
   final String libelle;
@@ -53,6 +55,14 @@ class ChampTexte extends StatelessWidget {
   /// Nombre de lignes visibles. Au-delà d'une, le champ accepte les retours à
   /// la ligne : la touche entrée saute une ligne au lieu de valider.
   final int lignes;
+
+  /// Icône de 20 dp à gauche du texte saisi. Décorative : elle double le
+  /// libellé, elle ne le remplace jamais.
+  final IconData? icone;
+
+  /// Contrôle posé à droite du champ — un « effacer » par exemple. C'est une
+  /// cible tactile : il lui faut ses 48 dp et son libellé annoncé.
+  final Widget? suffixe;
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +96,10 @@ class ChampTexte extends StatelessWidget {
               hintText: texteInvite,
               counterText: '',
               alignLabelWithHint: multiligne,
+              prefixIcon: icone == null
+                  ? null
+                  : Icon(icone, size: AppTouch.icone),
+              suffixIcon: suffixe,
               error: erreur == null ? null : _MessageErreur(texte: erreur!),
             ),
           ),

@@ -4,7 +4,8 @@
 - **Priorité** : P0
 - **Dépend de** : 006, 008
 - **Branche** : `feat/009-gestion-membres`
-- **Statut** : en cours depuis 2026-09-20
+- **PR** : https://github.com/slider973/astreinte-manager/pull/8
+- **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
 - Écran admin « Membres » : liste avec statut, rôle, dernière saisie, recherche.

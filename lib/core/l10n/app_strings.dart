@@ -257,6 +257,16 @@ abstract final class AppStrings {
       'Ton accès à $caserne a été désactivé. Contacte ton chef de centre pour '
       'le rouvrir.';
 
+  /// Le même message quand le nom de la caserne n'est pas lisible.
+  ///
+  /// Ce n'est pas un cas d'école : la politique de `stations` n'ouvre la
+  /// lecture qu'aux membres **actifs** (`is_member`), donc un compte
+  /// fraîchement désactivé n'a plus le nom de sa caserne. Mieux vaut une
+  /// phrase sans nom qu'une phrase avec un trou.
+  static const String caserneDesactiveeTexteSansNom =
+      'Ton accès à cette caserne a été désactivé. Contacte ton chef de centre '
+      'pour le rouvrir.';
+
   // --- Accueil --------------------------------------------------------
 
   static const String accueilTitre = 'Accueil';
@@ -408,6 +418,106 @@ abstract final class AppStrings {
       'sont bloquées.';
   static const String inviteCaserneInconnue =
       'Cette caserne est introuvable. Reconnecte-toi, puis réessaie.';
+
+  // -------------------------------------------------------------------
+  // Administration d'un membre (ticket 009)
+  // -------------------------------------------------------------------
+
+  // --- Liste et recherche ---------------------------------------------
+
+  static const String membresRecherche = 'Rechercher un membre';
+  static const String membresRechercheInvite = 'Nom ou adresse e-mail';
+  static const String membresRechercheEffacer = 'Effacer la recherche';
+  static const String membresRechercheVideTexte =
+      'Vérifie l\'orthographe, ou efface la recherche pour revoir toute la '
+      'caserne.';
+
+  static String membresRechercheVideTitre(String requete) =>
+      'Aucun membre ne correspond à « $requete ».';
+
+  /// « 2 membres sur 9 » : le compte de la section pendant une recherche.
+  static String membresCompteFiltre(int trouves, int total) =>
+      '$trouves membre${trouves > 1 ? 's' : ''} sur $total';
+
+  /// « 9 membres actifs · 1 désactivé ». Le second nombre n'apparaît que
+  /// lorsqu'il y a quelque chose à dire : un badge sur chaque ligne serait du
+  /// bruit sur quatre-vingt-dix-neuf lignes.
+  static String membresCompteAvecDesactives(int actifs, int desactives) =>
+      desactives == 0
+      ? membresCompte(actifs)
+      : '${membresCompte(actifs)} · $desactives '
+            '${desactives > 1 ? 'désactivés' : 'désactivé'}';
+
+  static const String membreStatutDesactive = 'Désactivé';
+  static const String membreStatutActif = 'Actif';
+  static const String membreAucuneSaisie = 'Aucune saisie de disponibilités';
+
+  static String membreDerniereSaisie(String date) => 'Dispos saisies le $date';
+
+  static String membreActions(String nom) => 'Actions pour $nom';
+
+  // --- Feuille d'actions ----------------------------------------------
+
+  static const String membreRole = 'Rôle';
+  static const String membreStatut = 'Statut';
+  static const String membreDispos = 'Dernière saisie';
+  static const String membreActionRenommer = 'Modifier le nom affiché';
+  static const String membreActionPromouvoir = 'Nommer administrateur';
+  static const String membreActionRetrograder =
+      'Retirer le rôle d\'administrateur';
+  static const String membreActionDesactiver = 'Désactiver l\'accès';
+  static const String membreActionReactiver = 'Réactiver l\'accès';
+
+  // --- Garde-fous ------------------------------------------------------
+
+  static const String membreRefusDernierAdmin =
+      'C\'est le dernier administrateur actif de la caserne. Nomme un autre '
+      'administrateur avant de retirer celui-ci.';
+  static const String membreRefusSoiMeme =
+      'Tu ne peux pas modifier ton propre rôle ni désactiver ton accès. '
+      'Demande-le à un autre administrateur de la caserne.';
+
+  // --- Renommer --------------------------------------------------------
+
+  static const String membreRenommerTitre = 'Nom affiché';
+  static const String membreRenommerAide =
+      'Ce nom remplace le prénom et le nom dans les plannings de la caserne. '
+      'Laisse le champ vide pour revenir au nom du profil.';
+  static const String membreRenommerEnregistrer = 'Enregistrer le nom';
+
+  // --- Confirmation de désactivation ------------------------------------
+
+  /// L'espace avant le « ? » est **insécable** (`\u00A0`) : la typographie
+  /// française l'exige, et sans lui le point d'interrogation part seul à la
+  /// ligne suivante quand le nom est long. Vu en vrai sur « Lucas Bernard ».
+  static String membreDesactiverTitre(String nom) =>
+      'Désactiver l\'accès de $nom\u00A0?';
+  static const String membreDesactiverTexte =
+      'La personne ne verra plus la caserne à sa prochaine connexion. Son '
+      'historique d\'astreintes est conservé, et tu peux la réactiver quand '
+      'tu veux.';
+
+  // --- Verdicts ---------------------------------------------------------
+
+  static String membreVerdictPromu(String nom) =>
+      '$nom administre maintenant la caserne.';
+
+  static String membreVerdictRetrograde(String nom) =>
+      '$nom n\'administre plus la caserne.';
+
+  static String membreVerdictDesactive(String nom) =>
+      'L\'accès de $nom est désactivé.';
+
+  static String membreVerdictReactive(String nom) =>
+      'L\'accès de $nom est réactivé.';
+
+  static const String membreVerdictRenomme = 'Nom affiché enregistré.';
+
+  static const String membreEchecRefus =
+      'Modification refusée par la caserne. Tu n\'es peut-être plus '
+      'administrateur, ou l\'abonnement est suspendu. Relis la liste.';
+  static const String membreEchecGenerique =
+      'La modification n\'a pas abouti. Vérifie ta connexion, puis réessaie.';
 
   // -------------------------------------------------------------------
   // Parcours de l'invité (ticket 006)

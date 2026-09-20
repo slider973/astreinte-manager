@@ -60,7 +60,10 @@ class FauxMembresRepository implements MembresRepository {
     this.echecInvitation,
     this.rapport,
     this.echecAnnulation = false,
-  }) : invitations = invitations ?? <Invitation>[];
+    Map<String, DateTime>? saisies,
+    this.echecAdministration,
+  }) : invitations = invitations ?? <Invitation>[],
+       saisies = saisies ?? <String, DateTime>{};
 
   List<MembreCaserne> membresActifs;
   List<Invitation> invitations;
@@ -76,7 +79,21 @@ class FauxMembresRepository implements MembresRepository {
 
   bool echecAnnulation;
 
+  /// Dernières saisies de disponibilités, par identifiant d'utilisateur.
+  Map<String, DateTime> saisies;
+
+  /// Refus rendu par les trois écritures d'administration, ou `null`.
+  ErreurAdministration? echecAdministration;
+
   int lectures = 0;
+
+  /// Ce que l'écran a demandé d'écrire, dans l'ordre.
+  final List<({String membershipId, RoleMembre role})> roles =
+      <({String membershipId, RoleMembre role})>[];
+  final List<({String membershipId, StatutMembre statut})> statuts =
+      <({String membershipId, StatutMembre statut})>[];
+  final List<({String membershipId, String? nomAffiche})> renommages =
+      <({String membershipId, String? nomAffiche})>[];
   final List<List<String>> envois = <List<String>>[];
   final List<RoleMembre> rolesEnvoyes = <RoleMembre>[];
   final List<String> annulations = <String>[];
@@ -116,6 +133,74 @@ class FauxMembresRepository implements MembresRepository {
               ),
           ],
         );
+  }
+
+  @override
+  Future<Map<String, DateTime>> dernieresSaisies(String stationId) async {
+    if (erreurLecture) throw const FormatException('lecture refusée');
+    return saisies;
+  }
+
+  @override
+  Future<void> changerRole({
+    required String membershipId,
+    required RoleMembre role,
+  }) async {
+    _refuserSiDemande();
+    roles.add((membershipId: membershipId, role: role));
+    _remplacer(membershipId, role: role);
+  }
+
+  @override
+  Future<void> changerStatut({
+    required String membershipId,
+    required StatutMembre statut,
+  }) async {
+    _refuserSiDemande();
+    statuts.add((membershipId: membershipId, statut: statut));
+    _remplacer(membershipId, statut: statut);
+  }
+
+  @override
+  Future<void> renommer({
+    required String membershipId,
+    String? nomAffiche,
+  }) async {
+    _refuserSiDemande();
+    renommages.add((membershipId: membershipId, nomAffiche: nomAffiche));
+    _remplacer(membershipId, nomAffiche: nomAffiche, effaceNom: true);
+  }
+
+  void _refuserSiDemande() {
+    final refus = echecAdministration;
+    if (refus != null) throw EchecAdministration(refus);
+  }
+
+  /// La base rendrait la liste à jour à la relecture : le faux fait pareil.
+  void _remplacer(
+    String membershipId, {
+    RoleMembre? role,
+    StatutMembre? statut,
+    String? nomAffiche,
+    bool effaceNom = false,
+  }) {
+    membresActifs = <MembreCaserne>[
+      for (final membre in membresActifs)
+        if (membre.id != membershipId)
+          membre
+        else
+          MembreCaserne(
+            id: membre.id,
+            userId: membre.userId,
+            role: role ?? membre.role,
+            statut: statut ?? membre.statut,
+            prenom: membre.prenom,
+            nom: membre.nom,
+            email: membre.email,
+            nomAffiche: effaceNom ? nomAffiche : membre.nomAffiche,
+            derniereSaisie: membre.derniereSaisie,
+          ),
+    ];
   }
 
   @override

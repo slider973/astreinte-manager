@@ -424,7 +424,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | Table | Lecture | Écriture |
 |---|---|---|
 | `stations` | membre de la caserne ou super-admin | admin de la caserne ou super-admin (update), super-admin (insert), pas de delete |
-| `profiles` | soi-même, et les profils des membres de ses casernes | soi-même |
+| `profiles` | soi-même ; les profils des membres **actifs** de ses casernes ; et, pour un **admin**, ceux de tous les membres de sa caserne quel que soit leur statut (migration `0010` : sans cette branche, un membre désactivé disparaissait de l'écran « Membres » et ne pouvait plus être réactivé) | soi-même |
 | `memberships` | membre de la caserne, et toujours ses propres lignes (un compte `invited` ou `disabled` doit pouvoir constater son état) | admin de la caserne, sauf son propre rôle. Aucune politique d'update pour un membre sur sa propre ligne : elle ouvrirait une escalade de privilèges |
 | `invitations` | admin de la caserne, **sauf `token`** (retiré du grant de select : c'est un porteur de droits, réservé au service role). Ne jamais faire `select *` sur cette table | admin de la caserne |
 | `periods` | membre | admin |
@@ -521,6 +521,14 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
 - `set_updated_at` sur toutes les tables avec `updated_at`.
 - `handle_new_user` sur `auth.users` : crée la ligne `profiles`.
 - `assignments_member_transition` (ci-dessus).
+- `memberships_guard_admin` (migration `0010`, ticket 009) : `before update or delete` sur
+  `memberships`. Refuse la rétrogradation, la désactivation et la suppression du **dernier
+  administrateur actif** d'une caserne (`membership_last_admin`), ainsi que celles qu'un
+  administrateur s'appliquerait à lui-même alors qu'un autre admin existe
+  (`membership_self_admin_change`). Aucune politique RLS ne sait exprimer « il doit rester au
+  moins une ligne qui… » : c'est une contrainte sur l'ensemble de la table. Le déclencheur
+  laisse passer le rôle de service (`current_user not in ('authenticated', 'anon')`), comme
+  `assignments_member_transition`, et tient `disabled_at` à jour pour tout le monde.
 - `schedule_auto_validate` : après update d'un `assignment`, si tous les créneaux du
   planning ont `count(accepted) >= required_count`, passe le planning en `validated` et
   insère une notification `schedule_validated` (via `pg_net` vers l'Edge Function, ou via
@@ -542,6 +550,15 @@ plutôt qu'une vue pour porter les filtres.
 Par (station, user, period) : nombre d'astreintes acceptées ou proposées, nombre de
 weekends distincts couverts, quotas déclarés, quotas restants, et nombre d'astreintes
 acceptées sur les 3 périodes précédentes (pour l'équilibrage).
+
+### `v_member_last_availability` — dernière saisie d'un membre *(migration `0010`, ticket 009)*
+
+Par (caserne, membre) : `max(availabilities.updated_at)`. C'est la date lue par l'écran
+« Membres » pour dire « Dispos saisies le 4 octobre 2026 », et la seule vue déjà livrée.
+Déclarée `with (security_invoker = true)` : elle n'accorde aucun droit, elle est lue sous la RLS
+de `availabilities` — un admin y voit sa caserne, un membre n'y voit que lui-même. Elle existe
+parce que les agrégats PostgREST sont désactivés sur ce projet (`PGRST123`) : sans elle, l'app
+rapatrierait toutes les lignes du mois pour n'en garder qu'une par membre.
 
 ### `v_schedule_progress` — avancement d'un planning
 
@@ -606,15 +623,17 @@ Ordre proposé :
 7. `0007_functions_rls.sql`
 8. `0008_rls_durcissement.sql` (revue du ticket 008 : `pg_temp`, liste blanche du trigger, cohérence du `station_id` avec la ligne parente, token d'invitation)
 9. `0009_invitation_functions.sql` (ticket 006 : `mask_email`, `create_invitation`, `accept_invitation`, exécution réservée à `service_role`)
-10. `0010_views.sql`
-11. `0011_cron.sql`
+10. `0010_memberships_administration.sql` (ticket 009 : déclencheur `memberships_guard_admin`, vue `v_member_last_availability`)
+11. `0011_views.sql`
+12. `0012_cron.sql`
 
 Chaque migration est rejouable sur un projet vide et testée en local avec `supabase start`.
 
 Les politiques RLS sont couvertes par `supabase/tests/rls_test.sql`, exécuté par
 `scripts/test_rls.sh` (pas de pgTAP : le script lève une exception et rend un code non nul
 dès qu'une politique fuit). Les fonctions d'invitation de `0009` sont couvertes par
-`supabase/tests/invitations_test.sql`, joué par le même script. La couche HTTP des Edge
+`supabase/tests/invitations_test.sql`, et le déclencheur de `0010` par
+`supabase/tests/memberships_admin_test.sql`, joués par le même script. La couche HTTP des Edge
 Functions est testée par `scripts/test_functions.sh`, qui a besoin de
 `supabase functions serve` et reste donc local : la CI démarre la pile sans `edge-runtime`.
 

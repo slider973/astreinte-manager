@@ -20,7 +20,13 @@ class AucuneCaserneScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final toutes =
         ref.watch(appartenancesProvider).value ?? const <Appartenance>[];
-    final desactivee = toutes.firstOrNull;
+
+    // La ligne désactivée, pas la première venue : un compte peut porter une
+    // appartenance `invited` restée en plan, et ce n'est pas elle qui explique
+    // pourquoi la caserne a disparu de l'écran.
+    final desactivee = toutes
+        .where((Appartenance a) => a.statut == StatutMembre.desactive)
+        .firstOrNull;
 
     return Scaffold(
       body: SafeArea(
@@ -35,9 +41,11 @@ class AucuneCaserneScreen extends ConsumerWidget {
                     )
                   : EmptyState(
                       titre: AppStrings.caserneDesactiveeTitre,
-                      texte: AppStrings.caserneDesactiveeTexte(
-                        desactivee.nomCaserne,
-                      ),
+                      texte: desactivee.nomCaserne.isEmpty
+                          ? AppStrings.caserneDesactiveeTexteSansNom
+                          : AppStrings.caserneDesactiveeTexte(
+                              desactivee.nomCaserne,
+                            ),
                       icone: Icons.no_accounts_outlined,
                     ),
             ),
