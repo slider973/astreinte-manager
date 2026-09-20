@@ -201,7 +201,7 @@ void main() {
       expect(tester.getSize(find.byType(SlotChip)).height, 40);
     });
 
-    testWidgets('dense mesure 28 px et n\'est jamais actionnable', (
+    testWidgets('dense mesure 28 px et est actionnable au pointeur fin', (
       tester,
     ) async {
       var appels = 0;
@@ -214,33 +214,68 @@ void main() {
             onTap: () => appels++,
           ),
         ),
-        // Fenêtre large : la densité dense n'est autorisée qu'au pointeur fin,
-        // l'assertion du widget le vérifie.
+        // Fenêtre large : c'est le contexte de la matrice du ticket 016,
+        // celui où l'admin clique ses cellules.
         taille: const Size(1400, 900),
       );
 
       expect(tester.getSize(find.byType(SlotChip)), const Size(28, 28));
+      await tester.tap(find.byType(SlotChip));
+      expect(appels, 1);
+    });
+
+    testWidgets('dense annoncée comme un bouton actif au pointeur fin', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await monter(
+        tester,
+        Align(
+          child: _case(
+            DisponibiliteEtat.disponible,
+            densite: SlotChipDensite.dense,
+            onTap: () {},
+          ),
+        ),
+        taille: const Size(1400, 900),
+      );
+
+      expect(
+        tester.getSemantics(find.byType(SlotChip)),
+        containsSemantics(isButton: true, isEnabled: true),
+      );
+      // Et le focus clavier existe : la matrice se parcourt au clavier.
+      expect(
+        find.descendant(
+          of: find.byType(SlotChip),
+          matching: find.byType(Focus),
+        ),
+        findsWidgets,
+      );
+
+      handle.dispose();
+    });
+
+    testWidgets('dense reste inerte au tactile', (tester) async {
+      var appels = 0;
+      await monter(
+        tester,
+        Align(
+          child: _case(
+            DisponibiliteEtat.disponible,
+            densite: SlotChipDensite.dense,
+            onTap: () => appels++,
+          ),
+        ),
+        // Fenêtre compacte par défaut : pointeur grossier, la densité dense
+        // est interdite.
+      );
+      // L'assertion de debug prévient le développeur…
+      expect(tester.takeException(), isAssertionError);
+      // …et en production, la case refuse quand même l'appui du doigt.
       await tester.tap(find.byType(SlotChip), warnIfMissed: false);
       expect(appels, 0);
     });
-
-    testWidgets(
-      'dense actionnable sur une fenêtre tactile déclenche une assertion',
-      (tester) async {
-        await monter(
-          tester,
-          Align(
-            child: _case(
-              DisponibiliteEtat.disponible,
-              densite: SlotChipDensite.dense,
-              onTap: () {},
-            ),
-          ),
-        );
-
-        expect(tester.takeException(), isAssertionError);
-      },
-    );
   });
 
   group('SlotChip — accessibilité', () {
