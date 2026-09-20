@@ -380,11 +380,17 @@ $$;
 
 RLS activé sur toutes les tables. Principes :
 
+Toutes les politiques sont posées `to authenticated`. `anon` n'a aucune politique et ne lit
+rien ; `service_role` et `postgres` ont l'attribut `bypassrls` (Edge Functions, webhooks,
+cron). `station_writable()` conditionne **toutes** les écritures métier, membre comme admin :
+une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `stations`
+(update) et `profiles`, qui restent modifiables pour permettre de régulariser l'abonnement.
+
 | Table | Lecture | Écriture |
 |---|---|---|
-| `stations` | membre de la caserne ou super-admin | admin de la caserne (update), super-admin (insert) |
+| `stations` | membre de la caserne ou super-admin | admin de la caserne ou super-admin (update), super-admin (insert), pas de delete |
 | `profiles` | soi-même, et les profils des membres de ses casernes | soi-même |
-| `memberships` | membre de la caserne | admin de la caserne, sauf son propre rôle |
+| `memberships` | membre de la caserne, et toujours ses propres lignes (un compte `invited` ou `disabled` doit pouvoir constater son état) | admin de la caserne, sauf son propre rôle. Aucune politique d'update pour un membre sur sa propre ligne : elle ouvrirait une escalade de privilèges |
 | `invitations` | admin de la caserne | admin de la caserne |
 | `periods` | membre | admin |
 | `availabilities` | membre : les siennes ; admin : toutes celles de la caserne | membre : les siennes si période `open` et caserne writable ; admin : toutes |
@@ -393,7 +399,7 @@ RLS activé sur toutes les tables. Principes :
 | `shifts` | membre si le schedule est publié ou validé ; admin toujours | admin |
 | `assignments` | membre : les siennes si schedule publié ; tous les membres si validé ; admin toutes | membre : `status` uniquement, de `proposed` vers `accepted` ou `declined`, sur les siennes ; admin : tout |
 | `push_tokens` | soi-même | soi-même |
-| `notifications` | soi-même | soi-même (`read_at` uniquement) ; insert par service role |
+| `notifications` | soi-même | soi-même (`read_at` uniquement, imposé par un grant de colonne : `revoke update on notifications from authenticated` puis `grant update (read_at)`) ; insert par service role |
 | `subscriptions` | admin de la caserne | service role uniquement (webhook Stripe) |
 | `audit_log` | admin de la caserne | service role et triggers |
 | `super_admins` | super-admin | personne (SQL manuel) |
@@ -424,12 +430,17 @@ create policy "member writes own during open period"
 -- update et delete : même condition. Politique admin séparée sans condition de période.
 ```
 
-La transition de statut d'une attribution par un membre est verrouillée par trigger :
+La transition de statut d'une attribution par un membre est verrouillée par trigger. Le
+premier garde-fou laisse passer les écritures serveur : sans lui, `publish-schedule` et
+`reassign-shift`, qui passent par le service role, seraient rejetées par
+« invalid transition ».
 
 ```sql
 create function assignments_member_transition() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = public as $$
 begin
+  -- écritures serveur : service_role, postgres, cron, Edge Functions
+  if current_user not in ('authenticated', 'anon') then return new; end if;
   if is_admin(new.station_id) then return new; end if;
   if old.user_id <> auth.uid() then raise exception 'forbidden'; end if;
   if old.status <> 'proposed' or new.status not in ('accepted', 'declined') then
@@ -443,6 +454,10 @@ begin
   return new;
 end $$;
 ```
+
+Les fonctions trigger (`set_updated_at`, `handle_new_user`, `assignments_member_transition`)
+voient leur `execute` révoqué pour `public`, `anon` et `authenticated` : elles n'apparaissent
+pas dans le schéma PostgREST et ne sont pas appelables en RPC.
 
 ## 5. Triggers
 
@@ -528,6 +543,10 @@ Ordre proposé :
 9. `0009_cron.sql`
 
 Chaque migration est rejouable sur un projet vide et testée en local avec `supabase start`.
+
+Les politiques RLS sont couvertes par `supabase/tests/rls_test.sql`, exécuté par
+`scripts/test_rls.sh` (pas de pgTAP : le script lève une exception et rend un code non nul
+dès qu'une politique fuit).
 
 `supabase/types/database.types.ts` est généré par `scripts/gen_types.sh` et versionné
 volontairement : les Edge Functions (section 7) l'importent et la CI doit pouvoir les typer sans

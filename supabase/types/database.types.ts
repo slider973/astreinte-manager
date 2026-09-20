@@ -763,7 +763,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: { p_station: string }; Returns: boolean }
+      is_member: { Args: { p_station: string }; Returns: boolean }
+      is_super_admin: { Args: never; Returns: boolean }
+      station_writable: { Args: { p_station: string }; Returns: boolean }
     }
     Enums: {
       assignment_status:
