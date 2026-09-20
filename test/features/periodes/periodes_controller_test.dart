@@ -2,6 +2,7 @@ import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
+import 'package:astreinte_sp/features/dispos/domain/dispos_providers.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/periodes/data/periodes_repository.dart';
 import 'package:astreinte_sp/features/periodes/domain/periodes_providers.dart';
@@ -20,6 +21,7 @@ import '../../support/faux_periodes.dart';
 Future<(ProviderContainer, PeriodesController)> _ouvrir(
   FauxPeriodesRepository depot, {
   Appartenance appartenance = appartenanceAdmin,
+  FauxDisposRepository? dispos,
 }) async {
   final conteneur = ProviderContainer(
     overrides: [
@@ -27,6 +29,9 @@ Future<(ProviderContainer, PeriodesController)> _ouvrir(
         (ref) async => <Appartenance>[appartenance],
       ),
       periodesRepositoryProvider.overrideWithValue(depot),
+      disposRepositoryProvider.overrideWithValue(
+        dispos ?? FauxDisposRepository(),
+      ),
     ],
   );
   addTearDown(conteneur.dispose);
@@ -230,6 +235,29 @@ void main() {
 
       expect(resultat.reussi, isFalse);
       expect(resultat.message, AppStrings.periodeRefusDroits);
+    });
+
+    test('une action rafraîchit la liste que lit « Mon mois »', () async {
+      final depot = FauxPeriodesRepository(
+        periodes: <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 11)],
+      );
+      final dispos = FauxDisposRepository(
+        periodes: <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 11)],
+      );
+      final (conteneur, controleur) = await _ouvrir(depot, dispos: dispos);
+
+      conteneur.listen(periodesProvider, (_, _) {});
+      await conteneur.read(periodesProvider.future);
+      expect(dispos.lecturesPeriodes, 1);
+
+      await controleur.verrouiller(_etat(conteneur).periodes.single);
+      await conteneur.read(periodesProvider.future);
+
+      expect(
+        dispos.lecturesPeriodes,
+        2,
+        reason: 'sinon le sélecteur de « Mon mois » garde l\'état d\'avant',
+      );
     });
 
     test('relire jette les comptes de saisie en même temps que la liste',

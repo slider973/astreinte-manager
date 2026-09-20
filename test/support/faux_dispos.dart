@@ -66,6 +66,9 @@ class FauxDisposRepository implements DisposRepository {
 
   int lectures = 0;
 
+  /// Le nombre de lectures de la liste des périodes.
+  int lecturesPeriodes = 0;
+
   /// Les préférences « en base », par `period_id`.
   final Map<String, PreferencesMois> basePreferences;
 
@@ -88,6 +91,7 @@ class FauxDisposRepository implements DisposRepository {
 
   @override
   Future<List<PeriodeSaisie>> periodes(String stationId) async {
+    lecturesPeriodes++;
     final echec = erreurLecture;
     if (echec != null) throw EchecDispos(echec);
     return _periodes;

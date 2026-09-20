@@ -57,18 +57,28 @@ class FeuilleReouverture extends StatefulWidget {
 }
 
 class _FeuilleReouvertureState extends State<FeuilleReouverture> {
-  /// Le jour choisi, à 23:59:59 — la même heure que celle posée par
-  /// `period_deadline_at` : une date limite court jusqu'au bout de son jour.
-  late DateTime _limite = _finDeJournee(
-    widget.maintenant.add(
-      const Duration(days: FeuilleReouverture.joursProposes),
-    ),
-  );
-
   /// Le plancher : la date limite que le mois avait déjà. Descendre en
   /// dessous n'aurait aucun sens — on ne rouvre pas pour fermer plus tôt
   /// qu'avant.
   late final DateTime _plancher = _finDeJournee(widget.periode.dateLimite);
+
+  /// Le jour choisi, à 23:59:59 — la même heure que celle posée par
+  /// `period_deadline_at` : une date limite court jusqu'au bout de son jour.
+  ///
+  /// Trois jours, **ou la date limite d'origine si elle est encore devant**.
+  /// Un mois verrouillé à la main avant l'heure se rouvre sur la date que les
+  /// membres avaient déjà reçue : leur en proposer une plus courte parce
+  /// qu'on vient de rouvrir serait une punition involontaire.
+  late DateTime _limite = _plusTard(
+    _plancher,
+    _finDeJournee(
+      widget.maintenant.add(
+        const Duration(days: FeuilleReouverture.joursProposes),
+      ),
+    ),
+  );
+
+  static DateTime _plusTard(DateTime a, DateTime b) => a.isAfter(b) ? a : b;
 
   late final DateTime _plafond = _finDeJournee(
     widget.maintenant.add(const Duration(days: FeuilleReouverture.joursMax)),

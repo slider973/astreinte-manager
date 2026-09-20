@@ -1,6 +1,7 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/l10n/format_date.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/periodes/data/periodes_repository.dart';
 import 'package:astreinte_sp/features/periodes/presentation/periodes_screen.dart';
@@ -208,6 +209,44 @@ void main() {
       expect(depot.reouvertures.single.limite.isAfter(_maintenant), isTrue);
       expect(find.text(AppStrings.periodeOuverte), findsOneWidget);
       expect(find.text(AppStrings.periodeActionVerrouiller), findsOneWidget);
+    });
+
+    testWidgets('un mois fermé avant l\'heure se rouvre sur sa date d\'origine',
+        (tester) async {
+      // Verrouillé à la main alors que sa date limite était encore devant :
+      // rouvrir ne doit pas la raccourcir au passage.
+      final limite = DateTime.now().add(const Duration(days: 40));
+      final depot = await _ouvrirPeriodes(
+        tester,
+        depot: FauxPeriodesRepository(
+          periodes: <PeriodeSaisie>[
+            PeriodeSaisie(
+              id: 'p-tot',
+              stationId: stationTest,
+              annee: _mois(1).year,
+              mois: _mois(1).month,
+              statut: PeriodeEtat.verrouillee,
+              dateLimite: DateTime(
+                limite.year,
+                limite.month,
+                limite.day,
+                23,
+                59,
+                59,
+              ),
+              verrouilleeLe: DateTime.now(),
+            ),
+          ],
+        ),
+      );
+
+      await tester.tap(find.text(AppStrings.periodeActionRouvrir));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.periodeRouvrirConfirmer));
+      await tester.pumpAndSettle();
+
+      expect(depot.reouvertures.single.limite.day, limite.day);
+      expect(depot.reouvertures.single.limite.month, limite.month);
     });
 
     testWidgets('rouvrir sans repousser la date limite est refusé', (

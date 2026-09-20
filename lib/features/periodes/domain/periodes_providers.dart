@@ -10,6 +10,7 @@ import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
+import '../../dispos/domain/dispos_providers.dart';
 import '../../dispos/domain/periode_saisie.dart';
 import '../data/periodes_repository.dart';
 import 'taux_saisie.dart';
@@ -177,6 +178,13 @@ class PeriodesController extends AsyncNotifier<EtatPeriodes> {
     try {
       final ecrite = await action();
       state = AsyncValue<EtatPeriodes>.data(etat.avec(ecrite));
+
+      // L'écran « Mon mois » lit sa propre liste de périodes, et il la garde
+      // pour la session. Sans cette invalidation, l'admin qui vient de rouvrir
+      // un mois retrouve son sélecteur en disant « Verrouillé ». Vu en vrai
+      // dans Chrome.
+      ref.invalidate(periodesProvider);
+
       return ResultatPeriode(reussi: true, message: annonce(ecrite));
     } on EchecPeriodes catch (echec) {
       return ResultatPeriode(reussi: false, message: echec.message);
