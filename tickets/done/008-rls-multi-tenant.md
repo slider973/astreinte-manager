@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 002
 - **Branche** : `feat/008-rls-multi-tenant`
-- **Statut** : en cours depuis 2026-09-20
+- **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte
 Référence : `docs/SCHEMA.md` sections 3 et 4. C'est le socle de sécurité, à faire avant tout écran qui lit des données.
