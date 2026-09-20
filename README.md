@@ -76,6 +76,6 @@ associés seront déclarés avec les notifications (tickets 024 et 026).
 
 ## Règle de travail
 
-Le code n'est pas encore écrit. Chaque ticket de `tickets/` donne lieu à une branche
+Chaque ticket de `tickets/` donne lieu à une branche
 `feat/<numéro>-<slug>` et une PR qui référence le ticket. Les tickets précisent leurs
 dépendances : respecter l'ordre indiqué dans `tickets/README.md`.
