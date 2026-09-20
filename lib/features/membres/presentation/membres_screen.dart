@@ -11,12 +11,18 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_divider.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/champ_texte.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../domain/administration_membre.dart';
 import '../domain/invitation.dart';
+import '../domain/membre_caserne.dart';
 import '../domain/membres_providers.dart';
+import 'widgets/confirmation_desactivation.dart';
 import 'widgets/entete_section.dart';
+import 'widgets/feuille_actions_membre.dart';
+import 'widgets/feuille_renommer_membre.dart';
 import 'widgets/ligne_invitation.dart';
 import 'widgets/ligne_membre.dart';
 
@@ -38,9 +44,14 @@ class MembresScreen extends ConsumerStatefulWidget {
 }
 
 class _MembresScreenState extends ConsumerState<MembresScreen> {
-  /// L'invitation sur laquelle une action est en cours : ses deux boutons
-  /// sont inertes le temps de l'aller-retour.
+  /// La ligne sur laquelle une action est en cours — invitation ou membre :
+  /// ses boutons sont inertes le temps de l'aller-retour.
   String? _occupee;
+
+  /// La recherche en cours. Locale : la liste est déjà en mémoire, et une
+  /// requête par frappe coûterait plus cher que la caserne entière.
+  final TextEditingController _recherche = TextEditingController();
+  String _requete = '';
 
   /// Le retour de l'application au premier plan relit les deux listes.
   ///
@@ -59,7 +70,15 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
   @override
   void dispose() {
     _cycleDeVie.dispose();
+    _recherche.dispose();
     super.dispose();
+  }
+
+  void _chercher(String texte) => setState(() => _requete = texte);
+
+  void _effacerRecherche() {
+    _recherche.clear();
+    _chercher('');
   }
 
   void _relire() {
@@ -75,6 +94,64 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
     setState(() => _occupee = invitation.id);
 
     final resultat = await action(invitation);
+
+    if (!mounted) return;
+    setState(() => _occupee = null);
+    _annoncer(resultat);
+  }
+
+  /// Ouvre les actions d'un membre, puis joue celle qui a été choisie.
+  ///
+  /// Les garde-fous sont calculés ici à partir de l'état lu, pour afficher le
+  /// refus **avant** le geste ; la base reste l'autorité, et son refus est
+  /// annoncé tel quel s'il arrive quand même.
+  Future<void> _actionsMembre(MembreCaserne membre) async {
+    if (_occupee != null) return;
+
+    final contexte = ref.read(contexteAdministrationProvider);
+    final action = await afficherActionsMembre(
+      context: context,
+      membre: membre,
+      contexte: contexte,
+    );
+    if (action == null || !mounted) return;
+
+    final controleur = ref.read(membresControllerProvider.notifier);
+
+    switch (action) {
+      case ActionMembre.renommer:
+        final choix = await afficherRenommerMembre(
+          context: context,
+          membre: membre,
+        );
+        if (choix == null || !mounted) return;
+        await _executer(membre, () => controleur.renommer(membre, choix.nom));
+
+      case ActionMembre.promouvoir:
+        await _executer(membre, () => controleur.promouvoir(membre));
+
+      case ActionMembre.retrograder:
+        await _executer(membre, () => controleur.retrograder(membre));
+
+      case ActionMembre.desactiver:
+        final confirme = await confirmerDesactivation(
+          context: context,
+          membre: membre,
+        );
+        if (!confirme || !mounted) return;
+        await _executer(membre, () => controleur.desactiver(membre));
+
+      case ActionMembre.reactiver:
+        await _executer(membre, () => controleur.reactiver(membre));
+    }
+  }
+
+  Future<void> _executer(
+    MembreCaserne membre,
+    Future<ResultatAction> Function() action,
+  ) async {
+    setState(() => _occupee = membre.id);
+    final resultat = await action();
 
     if (!mounted) return;
     setState(() => _occupee = null);
@@ -193,6 +270,12 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
     return _ListeMembres(
       donnees: donnees,
       occupee: _occupee,
+      recherche: _recherche,
+      requete: _requete,
+      onChercher: _chercher,
+      onEffacerRecherche: _effacerRecherche,
+      onActionsMembre: (MembreCaserne membre) =>
+          unawaited(_actionsMembre(membre)),
       onRenvoyer: (Invitation invitation) => unawaited(
         _agir(
           invitation,
@@ -211,12 +294,22 @@ class _ListeMembres extends StatelessWidget {
   const _ListeMembres({
     required this.donnees,
     required this.occupee,
+    required this.recherche,
+    required this.requete,
+    required this.onChercher,
+    required this.onEffacerRecherche,
+    required this.onActionsMembre,
     required this.onRenvoyer,
     required this.onAnnuler,
   });
 
   final EtatMembres donnees;
   final String? occupee;
+  final TextEditingController recherche;
+  final String requete;
+  final ValueChanged<String> onChercher;
+  final VoidCallback onEffacerRecherche;
+  final ValueChanged<MembreCaserne> onActionsMembre;
   final ValueChanged<Invitation> onRenvoyer;
   final ValueChanged<Invitation> onAnnuler;
 
@@ -225,6 +318,8 @@ class _ListeMembres extends StatelessWidget {
     final theme = Theme.of(context);
     final marge = AppWindowClass.of(context).margePage;
     final maintenant = DateTime.now();
+    final filtres = donnees.filtres(requete);
+    final cherche = requete.trim().isNotEmpty;
 
     return CustomScrollView(
       slivers: <Widget>[
@@ -241,28 +336,72 @@ class _ListeMembres extends StatelessWidget {
               ),
               EnteteSection(
                 titre: AppStrings.membresSectionActifs,
-                compte: AppStrings.membresCompte(donnees.membres.length),
+                compte: cherche
+                    ? AppStrings.membresCompteFiltre(
+                        filtres.length,
+                        donnees.membres.length,
+                      )
+                    : AppStrings.membresCompteAvecDesactives(
+                        donnees.actifs,
+                        donnees.desactives,
+                      ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ChampTexte(
+                libelle: AppStrings.membresRecherche,
+                texteInvite: AppStrings.membresRechercheInvite,
+                controleur: recherche,
+                clavier: TextInputType.text,
+                icone: Icons.search,
+                onChanged: onChercher,
+                suffixe: cherche
+                    ? IconButton(
+                        onPressed: onEffacerRecherche,
+                        icon: const Icon(Icons.close),
+                        tooltip: AppStrings.membresRechercheEffacer,
+                      )
+                    : null,
               ),
             ]),
           ),
         ),
-        SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: marge),
-          sliver: SliverList.builder(
-            itemCount: donnees.membres.length,
-            itemBuilder: (BuildContext context, int index) {
-              final membre = donnees.membres[index];
-              return Column(
-                key: ValueKey<String>(membre.id),
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  LigneMembre(membre: membre),
-                  const AppDivider(),
-                ],
-              );
-            },
+        if (filtres.isEmpty)
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              marge,
+              AppSpacing.md,
+              marge,
+              AppSpacing.md,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: _RechercheSansResultat(
+                requete: requete.trim(),
+                onEffacer: onEffacerRecherche,
+              ),
+            ),
+          )
+        else
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: marge),
+            sliver: SliverList.builder(
+              itemCount: filtres.length,
+              itemBuilder: (BuildContext context, int index) {
+                final membre = filtres[index];
+                return Column(
+                  key: ValueKey<String>(membre.id),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    LigneMembre(
+                      membre: membre,
+                      occupee: occupee == membre.id,
+                      onActions: () => onActionsMembre(membre),
+                    ),
+                    const AppDivider(),
+                  ],
+                );
+              },
+            ),
           ),
-        ),
         SliverPadding(
           padding: EdgeInsets.symmetric(horizontal: marge),
           sliver: SliverToBoxAdapter(
@@ -315,6 +454,51 @@ class _ListeMembres extends StatelessWidget {
           ),
         const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
       ],
+    );
+  }
+}
+
+/// Une recherche qui ne rend rien n'est pas un écran vide : elle dit ce qui a
+/// été cherché, et propose la sortie.
+class _RechercheSansResultat extends StatelessWidget {
+  const _RechercheSansResultat({
+    required this.requete,
+    required this.onEffacer,
+  });
+
+  final String requete;
+  final VoidCallback onEffacer;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Semantics(
+      liveRegion: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            AppStrings.membresRechercheVideTitre(requete),
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            AppStrings.membresRechercheVideTexte,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          PrimaryButton(
+            libelle: AppStrings.membresRechercheEffacer,
+            variante: PrimaryButtonVariante.secondaire,
+            icone: Icons.close,
+            pleineLargeur: false,
+            onPressed: onEffacer,
+          ),
+        ],
+      ),
     );
   }
 }

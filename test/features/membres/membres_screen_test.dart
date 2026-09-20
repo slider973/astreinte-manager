@@ -12,6 +12,26 @@ import '../../support/faux_invitations.dart';
 
 const String _cheminMembres = '/admin/membres';
 
+/// Amène la première invitation sous les yeux.
+///
+/// Depuis le ticket 009, la section des membres porte un champ de recherche et
+/// trois lignes de texte par membre : sur un téléphone, les invitations sont
+/// sous le pli. C'est la liste virtualisée qui l'exige, pas le test — un
+/// widget qui n'est pas construit n'est pas trouvable.
+Future<void> _versInvitations(WidgetTester tester) async {
+  await tester.scrollUntilVisible(
+    find.byType(LigneInvitation),
+    200,
+    scrollable: find
+        .descendant(
+          of: find.byType(MembresScreen),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<FauxMembresRepository> _ouvrirMembres(
   WidgetTester tester, {
   required FauxMembresRepository depot,
@@ -43,8 +63,10 @@ void main() {
       expect(find.byType(MembresScreen), findsOneWidget);
       expect(find.text('Jean Dupont'), findsOneWidget);
       expect(find.text('Marie Lefebvre'), findsOneWidget);
-      expect(find.text('recrue@exemple.fr'), findsOneWidget);
       expect(find.text(AppStrings.membresCompte(2)), findsOneWidget);
+
+      await _versInvitations(tester);
+      expect(find.text('recrue@exemple.fr'), findsOneWidget);
       expect(find.text(AppStrings.invitationsCompte(1)), findsOneWidget);
       expect(find.text(AppStrings.invitationEnAttente), findsOneWidget);
     });
@@ -60,6 +82,7 @@ void main() {
         ),
       );
 
+      await _versInvitations(tester);
       expect(find.text(AppStrings.invitationExpiree), findsOneWidget);
       expect(find.text(AppStrings.invitationEnAttente), findsNothing);
     });
@@ -120,6 +143,7 @@ void main() {
         invitations: <Invitation>[invitationEnAttente()],
       );
       await _ouvrirMembres(tester, depot: depot);
+      await _versInvitations(tester);
 
       await tester.tap(
         find.bySemanticsLabel(
@@ -151,6 +175,7 @@ void main() {
         ),
       );
       await _ouvrirMembres(tester, depot: depot);
+      await _versInvitations(tester);
 
       await tester.tap(
         find.bySemanticsLabel(
@@ -168,6 +193,7 @@ void main() {
         invitations: <Invitation>[invitationEnAttente()],
       );
       await _ouvrirMembres(tester, depot: depot);
+      await _versInvitations(tester);
 
       await tester.tap(
         find.bySemanticsLabel(
@@ -246,6 +272,7 @@ void main() {
         echecAnnulation: true,
       );
       await _ouvrirMembres(tester, depot: depot);
+      await _versInvitations(tester);
 
       await tester.tap(
         find.bySemanticsLabel(
