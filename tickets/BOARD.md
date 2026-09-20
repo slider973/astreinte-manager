@@ -6,12 +6,12 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 002 | [Créer le projet Supabase et les migrations initiales](in-progress/002-supabase-migrations.md) | P0 |  |  |
 
 ## À faire
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 002 | [Créer le projet Supabase et les migrations initiales](backlog/002-supabase-migrations.md) | P0 |  |  |
 | 003 | [Mettre en place la CI](backlog/003-ci-github-actions.md) | P1 | 001 002 |  |
 | 004 | [Thème et composants de base](backlog/004-design-system.md) | P1 | 001 |  |
 | 005 | [Connexion par email et code OTP](backlog/005-auth-otp.md) | P0 | 001 002 |  |
