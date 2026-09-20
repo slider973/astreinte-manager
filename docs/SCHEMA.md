@@ -528,3 +528,9 @@ Ordre proposé :
 9. `0009_cron.sql`
 
 Chaque migration est rejouable sur un projet vide et testée en local avec `supabase start`.
+
+`supabase/types/database.types.ts` est généré par `scripts/gen_types.sh` et versionné
+volontairement : les Edge Functions (section 7) l'importent et la CI doit pouvoir les typer sans
+base disponible. C'est la seule exception à la règle « pas de fichier généré commité ». Le
+régénérer à chaque migration. La CLI ne produit pas de Dart : les modèles Flutter sont écrits à la
+main dans `lib/features/<f>/data/` à partir de ce document.

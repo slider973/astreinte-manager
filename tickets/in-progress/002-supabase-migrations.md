@@ -19,7 +19,10 @@ Référence : `docs/SCHEMA.md`. Un projet Supabase unique, région Europe.
 ## Critères d'acceptation
 - `supabase db reset` rejoue toutes les migrations sans erreur en local.
 - Le seed produit des données cohérentes visibles dans Studio.
-- Les migrations sont appliquées sur le projet distant dev.
+- Les migrations sont appliquées sur le projet distant dev. **Reporté** : le compte Supabase de
+  l'organisation « Perso Jonathan » a des factures impayées, ce qui bloque la création de tout
+  projet sur le compte. À reprendre sur un autre compte avec `supabase login`, `supabase link
+  --project-ref <ref>` puis `supabase db push` (marche à suivre dans `supabase/README.md`).
 
 ## Hors périmètre
 - RLS, vues et cron : tickets 008, 016, 022.

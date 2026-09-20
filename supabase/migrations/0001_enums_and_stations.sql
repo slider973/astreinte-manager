@@ -13,8 +13,16 @@ create extension if not exists pgcrypto with schema extensions;
 create extension if not exists pg_net;
 create extension if not exists pg_cron;
 
-grant usage on schema cron to postgres;
-grant all privileges on all tables in schema cron to postgres;
+-- Sur un projet Supabase hébergé, le schéma cron appartient à supabase_admin et
+-- l'event trigger issue_pg_cron_access donne déjà les droits au rôle postgres :
+-- ces grants y échoueraient. Ils ne servent qu'en local, d'où le garde-fou.
+do $$
+begin
+  grant usage on schema cron to postgres;
+  grant all privileges on all tables in schema cron to postgres;
+exception
+  when insufficient_privilege then null;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Enums (docs/SCHEMA.md section 1)
