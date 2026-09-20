@@ -59,6 +59,9 @@ class FauxAuthRepository implements AuthRepository {
   /// Erreur levée par [verifierCode], ou `null` pour ouvrir une session.
   AuthErreur? erreurVerification;
 
+  /// Erreur levée par [seDeconnecter], ou `null` pour fermer la session.
+  AuthErreur? erreurDeconnexion;
+
   final StreamController<SessionUtilisateur?> _controleur =
       StreamController<SessionUtilisateur?>.broadcast();
 
@@ -99,6 +102,8 @@ class FauxAuthRepository implements AuthRepository {
 
   @override
   Future<void> seDeconnecter() async {
+    final erreur = erreurDeconnexion;
+    if (erreur != null) throw AuthEchec(erreur);
     deconnexions++;
     _session = null;
     _controleur.add(null);

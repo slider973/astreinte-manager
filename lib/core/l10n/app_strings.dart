@@ -176,7 +176,6 @@ abstract final class AppStrings {
   static const String connexionEmailLabel = 'Adresse e-mail';
   static const String connexionEmailExemple = 'prenom.nom@exemple.fr';
   static const String connexionEnvoyer = 'Recevoir mon code';
-  static const String connexionEnvoiEnCours = 'Envoi du code…';
 
   static const String codeTitre = 'Ton code';
   static const String codeLabel = 'Code à six chiffres';
@@ -204,8 +203,6 @@ abstract final class AppStrings {
   static const String authCompteInconnu =
       'Aucun compte pour cette adresse. Demande une invitation à ton chef de '
       'centre.';
-  static const String authCodeIncomplet =
-      'Il manque des chiffres. Le code en compte six.';
   /// Couvre le code faux **et** le code périmé : le serveur ne les distingue
   /// pas (voir `AuthErreur.codeInvalide`). La phrase nomme donc les deux
   /// causes et les deux sorties.
@@ -214,10 +211,13 @@ abstract final class AppStrings {
       'code.';
   static const String authCodeExpire =
       'Ce code a expiré. Demande un nouveau code.';
+  static const String authEnvoiIndisponible =
+      'L\'envoi des codes est en panne. Ce n\'est pas ton compte : réessaie '
+      'dans quelques minutes.';
+  static const String authDeconnexionImpossible =
+      'La déconnexion n\'a pas abouti. Vérifie ta connexion, puis réessaie.';
   static const String authTropDeTentatives =
       'Trop d\'essais. Attends quelques minutes, puis redemande un code.';
-  static const String authEnvoiImpossible =
-      'Impossible d\'envoyer le code. Vérifie ta connexion, puis réessaie.';
 
   // --- Compte sans caserne -------------------------------------------
 

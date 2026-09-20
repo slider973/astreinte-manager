@@ -52,7 +52,12 @@ Future<SupabaseDemarrage> demarrerSupabase(Env env) async {
     );
     return SupabaseDemarrage.pret;
   } on Object catch (erreur, pile) {
-    debugPrint('Initialisation Supabase impossible : $erreur\n$pile');
+    // En production, l'écran « application non configurée » dit tout ce qu'un
+    // utilisateur peut faire de cette panne ; la trace, elle, n'irait que dans
+    // la console du navigateur, à la vue de tous.
+    if (kDebugMode) {
+      debugPrint('Initialisation Supabase impossible : $erreur\n$pile');
+    }
     return SupabaseDemarrage.echec;
   }
 }

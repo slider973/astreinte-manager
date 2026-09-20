@@ -79,6 +79,22 @@ void main() {
       expect(faux.auth.deconnexions, 1);
       expect(find.byType(ConnexionScreen), findsOneWidget);
     });
+
+    testWidgets('une déconnexion qui échoue le dit, au lieu de faire croire '
+        'que la session est fermée', (tester) async {
+      final faux = await monterApp(
+        tester,
+        session: sessionMembre,
+        appartenances: const <Appartenance>[appartenanceMembre],
+      );
+      faux.auth.erreurDeconnexion = AuthErreur.reseau;
+
+      await tester.tap(find.text(AppStrings.seDeconnecter));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AuthErreur.reseau.message), findsOneWidget);
+      expect(find.byType(AccueilScreen), findsOneWidget);
+    });
   });
 
   group('AucuneCaserneScreen', () {

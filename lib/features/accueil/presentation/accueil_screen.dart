@@ -1,15 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/appartenance.dart';
+import '../../../core/session/deconnexion.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
-import '../../../core/widgets/primary_button.dart';
 
 /// L'accueil minimal d'après-connexion (ticket 005).
 ///
@@ -54,13 +52,13 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
   }
 }
 
-class _Contenu extends ConsumerWidget {
+class _Contenu extends StatelessWidget {
   const _Contenu({required this.appartenance});
 
   final Appartenance? appartenance;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return ListView(
@@ -83,13 +81,7 @@ class _Contenu extends ConsumerWidget {
         const SizedBox(height: AppSpacing.auDessusTitre),
         _BlocIdentite(appartenance: appartenance),
         const SizedBox(height: AppSpacing.auDessusTitre),
-        PrimaryButton(
-          libelle: AppStrings.seDeconnecter,
-          variante: PrimaryButtonVariante.secondaire,
-          icone: Icons.logout,
-          onPressed: () =>
-              unawaited(ref.read(authRepositoryProvider).seDeconnecter()),
-        ),
+        const BoutonDeconnexion(),
       ],
     );
   }

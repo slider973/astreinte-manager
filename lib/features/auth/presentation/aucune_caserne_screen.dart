@@ -1,14 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/appartenance.dart';
+import '../../../core/session/deconnexion.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/empty_state.dart';
-import '../../../core/widgets/primary_button.dart';
 
 /// Connecté, mais rattaché à aucune caserne active.
 ///
@@ -43,16 +41,9 @@ class AucuneCaserneScreen extends ConsumerWidget {
                       icone: Icons.no_accounts_outlined,
                     ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: PrimaryButton(
-                libelle: AppStrings.seDeconnecter,
-                variante: PrimaryButtonVariante.secondaire,
-                icone: Icons.logout,
-                onPressed: () => unawaited(
-                  ref.read(authRepositoryProvider).seDeconnecter(),
-                ),
-              ),
+            const Padding(
+              padding: EdgeInsets.all(AppSpacing.lg),
+              child: BoutonDeconnexion(),
             ),
           ],
         ),

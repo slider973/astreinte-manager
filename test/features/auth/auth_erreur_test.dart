@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
-import 'package:astreinte_sp/features/auth/domain/email.dart';
+import 'package:astreinte_sp/core/session/email.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -45,6 +45,23 @@ void main() {
           etape: AuthEtape.envoi,
         ),
         AuthErreur.compteInconnu,
+      );
+    });
+
+    test('un fournisseur d\'envoi coupé n\'accuse pas le compte', () {
+      expect(
+        traduireErreurAuth(
+          const AuthException(
+            'Email logins are disabled',
+            code: 'email_provider_disabled',
+          ),
+          etape: AuthEtape.envoi,
+        ),
+        AuthErreur.envoiIndisponible,
+      );
+      expect(
+        AuthErreur.envoiIndisponible.message,
+        isNot(contains('invitation')),
       );
     });
 

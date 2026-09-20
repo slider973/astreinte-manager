@@ -26,6 +26,10 @@ enum AuthErreur {
 
   /// Réservé au cas où le serveur dirait un jour « périmé » sans « invalide ».
   codeExpire(AppStrings.authCodeExpire),
+  /// Le fournisseur d'envoi est coupé côté serveur. Rien à voir avec le
+  /// compte de la personne : lui dire « aucun compte pour cette adresse »
+  /// l'enverrait réclamer une invitation qu'elle a déjà.
+  envoiIndisponible(AppStrings.authEnvoiIndisponible),
   tropDeTentatives(AppStrings.authTropDeTentatives),
   reseau(AppStrings.erreurReseauTexte),
   inconnue(AppStrings.erreurTexteGenerique);
@@ -85,9 +89,11 @@ AuthErreur traduireErreurAuth(Object erreur, {required AuthEtape etape}) {
       return AuthErreur.codeInvalide;
     case 'otp_disabled':
     case 'signup_disabled':
-    case 'email_provider_disabled':
-      // `shouldCreateUser: false` : l'adresse n'a pas de compte.
+      // Inscription fermée côté serveur (`supabase/config.toml`) et
+      // `shouldCreateUser: false` côté app : l'adresse n'a pas de compte.
       return AuthErreur.compteInconnu;
+    case 'email_provider_disabled':
+      return AuthErreur.envoiIndisponible;
     case 'over_email_send_rate_limit':
     case 'over_request_rate_limit':
       return AuthErreur.tropDeTentatives;
