@@ -90,6 +90,7 @@ class SlotChip extends StatelessWidget {
     this.verrouille = false,
     this.enEnregistrement = false,
     this.erreur = false,
+    this.saisiParAdmin = false,
     this.onTap,
     this.onDragEnter,
     this.onRefus,
@@ -121,6 +122,17 @@ class SlotChip extends StatelessWidget {
 
   /// Contour 2 dp `error` : l'enregistrement a échoué pour cette case.
   final bool erreur;
+
+  /// **Saisie faite par un administrateur à la place du membre** (ticket 016).
+  ///
+  /// Contour 2 dp `tertiary`, priorité après [erreur] et [selectionne], et
+  /// avant le filet propre à l'état. La valeur de disponibilité est la même
+  /// qu'une saisie du membre : ce drapeau dit **qui a écrit**, pas quoi.
+  ///
+  /// C'est une valeur, jamais un état interne : la case reste sans `State`.
+  /// La marque est doublée d'un mot dans la sémantique — la couleur n'est
+  /// jamais seule (`DESIGN.md § Named Rules`).
+  final bool saisiParAdmin;
 
   final VoidCallback? onTap;
 
@@ -163,6 +175,7 @@ class SlotChip extends StatelessWidget {
       verrouille: verrouille,
       selectionne: selectionne,
       erreur: erreur,
+      saisiParAdmin: saisiParAdmin,
       pulse: enEnregistrement && !AppMotion.reduit(context),
     );
 
@@ -193,7 +206,11 @@ class SlotChip extends StatelessWidget {
     }
 
     return Semantics(
-      label: libelleSemantique,
+      // La marque « saisi par un administrateur » est un contour : elle se
+      // double d'un mot, sinon elle ne serait qu'une couleur.
+      label: saisiParAdmin
+          ? '$libelleSemantique, ${AppStrings.matriceCaseSaisieParAdmin}'
+          : libelleSemantique,
       hint: verrouille
           ? AppStrings.slotVerrouille
           : actionnable
@@ -326,6 +343,7 @@ class _Apparence {
     required bool verrouille,
     required bool selectionne,
     required bool erreur,
+    required bool saisiParAdmin,
     required bool pulse,
   }) {
     final theme = Theme.of(context);
@@ -340,7 +358,9 @@ class _Apparence {
     final filetEtat = verrouille ? verrouillee.encre : descripteur.filet;
 
     // Un seul contour à la fois, par ordre de priorité : erreur, puis
-    // sélection, puis le filet propre à l'état.
+    // sélection, puis la saisie par un administrateur, puis le filet propre à
+    // l'état. Le contour de procuration n'est **pas** imposé : l'anneau de
+    // focus peut encore le prendre, et il n'est jamais supprimé.
     final (
       Color? filet,
       double epaisseur,
@@ -353,6 +373,12 @@ class _Apparence {
         AppStroke.etat,
         false,
         true,
+      ),
+      _ when saisiParAdmin && !verrouille => (
+        theme.colorScheme.tertiary,
+        AppStroke.etat,
+        false,
+        false,
       ),
       _ when etat == DisponibiliteEtat.nonSaisi => (
         filetEtat,

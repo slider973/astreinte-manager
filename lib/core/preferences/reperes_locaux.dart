@@ -26,7 +26,16 @@ enum RepereAccueil {
   /// bloc réapparaît. C'est accepté (brief 011 § 7.6) : un rappel de trop
   /// coûte deux lignes, un geste jamais découvert coûte cent vingt touches
   /// par mois.
-  peintureDispos('dispos.peinture.faite');
+  peintureDispos('dispos.peinture.faite'),
+
+  /// L'admin a confirmé une fois qu'il saisissait **à la place** d'un membre
+  /// (ticket 016). Le dialogue ne revient plus : redemander à chaque
+  /// armement apprend à cliquer « Oui » sans lire.
+  ///
+  /// Repère local au navigateur : un chef qui change de poste le reverra une
+  /// fois. Le stocker en base serait une colonne de préférence qui n'existe
+  /// pas au schéma.
+  saisieProcuration('matrice.procuration.confirmee');
 
   const RepereAccueil(this.cle);
 
