@@ -4,7 +4,8 @@
 - **Priorité** : P0
 - **Dépend de** : aucune
 - **Branche** : `feat/001-setup-flutter`
-- **Statut** : en cours depuis 2026-09-20
+- **PR** : https://github.com/slider973/astreinte-manager/pull/1
+- **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte
 Point de départ de toute l'app. Une seule base de code pour iOS, Android et Web.

@@ -1,0 +1,24 @@
+name: astreinte_sp
+description: "Gestion des astreintes pour les centres de secours (iOS, Android, Web)."
+publish_to: 'none'
+
+# Version applicative : build-name (versionName / CFBundleShortVersionString)
+# et build-number (versionCode / CFBundleVersion), surchargés par `flutter build`.
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.10.9
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.3.2
+  go_router: ^17.5.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

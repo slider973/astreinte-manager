@@ -10,3 +10,50 @@ supabase/.temp/
 supabase/.branches/
 __pycache__/
 *.pyc
+
+# --- Flutter / Dart ---
+*.class
+*.log
+*.pyo
+*.swp
+.atom/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code (garder .vscode/settings.json si partagé un jour)
+.vscode/
+
+# Flutter
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication / obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android Studio build artifacts
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Environnements : seuls dev.json et *.example sont versionnés
+env/*
+!env/dev.json
+!env/*.example
+!env/README.md
