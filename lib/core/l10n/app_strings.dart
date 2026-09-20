@@ -111,12 +111,34 @@ abstract final class AppStrings {
     'décembre',
   ];
 
+  /// Les douze mois abrégés, pour une ligne d'état qui n'a pas la place d'un
+  /// mois entier (« Ouvert jusqu'au 15 sept. »). Mai, juin et juillet ne
+  /// s'abrègent pas : ils sont déjà courts.
+  static const List<String> moisCourts = <String>[
+    'janv.',
+    'févr.',
+    'mars',
+    'avr.',
+    'mai',
+    'juin',
+    'juil.',
+    'août',
+    'sept.',
+    'oct.',
+    'nov.',
+    'déc.',
+  ];
+
   /// « 4 octobre 2026 ». Le premier du mois se dit « 1er ».
   static String dateLongue({
     required int jour,
     required int mois,
     required int annee,
   }) => '${jour == 1 ? '1er' : jour} ${moisLongs[mois - 1]} $annee';
+
+  /// « 15 sept. ». Sans l'année : elle est déjà dans le sélecteur de mois.
+  static String dateCourte({required int jour, required int mois}) =>
+      '${jour == 1 ? '1er' : jour} ${moisCourts[mois - 1]}';
 
   static const String jourAujourdhui = 'Aujourd\'hui';
   static const String jourWeekend = 'Weekend';
@@ -823,6 +845,130 @@ abstract final class AppStrings {
   static const String parametresEchecGenerique =
       'Les paramètres n\'ont pas été enregistrés. Vérifie ta connexion, puis '
       'réessaie.';
+
+  // -------------------------------------------------------------------
+  // Mon mois — saisie des disponibilités (ticket 011)
+  // -------------------------------------------------------------------
+
+  // --- Sélecteur de mois -----------------------------------------------
+
+  static const String moisSelecteurLabel = 'Mois à saisir';
+
+  /// « Octobre 2026 » : capitale initiale, contrairement à [moisLongs], parce
+  /// que le bouton du sélecteur **est** le titre de l'écran.
+  static String moisNomEtAnnee(int mois, int annee) {
+    final nom = moisLongs[mois - 1];
+    return '${nom[0].toUpperCase()}${nom.substring(1)} $annee';
+  }
+
+  static String moisOuvertJusquAuCourt(String date) => 'Ouvert jusqu\'au $date';
+
+  static const String moisVerrouilleCourt = 'Verrouillé';
+
+  static String moisSelectionSemantique(String mois) =>
+      'Mois sélectionné : $mois';
+
+  // --- En-tête de colonnes ----------------------------------------------
+
+  static const String grilleColonneDate = 'Date';
+
+  static const List<String> grilleJoursCourts = <String>[
+    'lun.',
+    'mar.',
+    'mer.',
+    'jeu.',
+    'ven.',
+    'sam.',
+    'dim.',
+  ];
+
+  /// Initiales de la vue calendaire. Deux « M » et deux « J » : c'est l'usage
+  /// français, et la position en colonne lève l'ambiguïté.
+  static const List<String> grilleJoursInitiales = <String>[
+    'L',
+    'M',
+    'M',
+    'J',
+    'V',
+    'S',
+    'D',
+  ];
+
+  static const List<String> grilleJoursLongs = <String>[
+    'lundi',
+    'mardi',
+    'mercredi',
+    'jeudi',
+    'vendredi',
+    'samedi',
+    'dimanche',
+  ];
+
+  // --- Peinture au glissement -------------------------------------------
+
+  static String peintureEnCours(String etat) => 'Tu peins : $etat';
+
+  static const String peintureAnnulee = 'Peinture annulée';
+
+  static String peintureResultat(int n, String etat) => n <= 1
+      ? '$n case mise à jour, ${etat.toLowerCase()}'
+      : '$n cases mises à jour, ${etat.toLowerCase()}';
+
+  static const String peintureIndiceSemantique =
+      'Appui long puis glissement pour cocher plusieurs cases';
+
+  // --- Bloc d'aide -------------------------------------------------------
+
+  static const String astuceSaisieTouche =
+      'Appuie sur une case pour te déclarer disponible. Appuie encore pour '
+      't\'absenter.';
+  static const String astuceSaisieGlissement =
+      'Astuce : appui long puis glisse pour cocher plusieurs cases d\'un coup.';
+
+  // --- Compteurs ---------------------------------------------------------
+
+  /// Le résumé annoncé de la barre du bas. Les trois nombres, toujours.
+  static String compteursResume(int jours, int nuits, int weekends) =>
+      'Total du mois : $jours ${jours <= 1 ? 'jour' : 'jours'}, '
+      '$nuits ${nuits <= 1 ? 'nuit' : 'nuits'}, '
+      '$weekends ${weekends <= 1 ? 'weekend' : 'weekends'} disponibles';
+
+  // --- Enregistrement, réseau, verrouillage ------------------------------
+
+  static const String moisErreurEnregistrementBanniere =
+      'Impossible d\'enregistrer tes disponibilités. Elles sont conservées sur '
+      'ton téléphone.';
+  static const String moisErreurVerrouilleEnCours =
+      'Le mois vient d\'être verrouillé. Tes dernières modifications n\'ont pas '
+      'été enregistrées.';
+  static const String moisErreurSuspendueEnCours =
+      'Ta caserne est passée en lecture seule. Tes dernières modifications '
+      'n\'ont pas été enregistrées.';
+  static const String actionRecharger = 'Recharger';
+
+  // --- États vides -------------------------------------------------------
+
+  static const String moisAucunePeriodeTitre = 'Aucun mois à saisir';
+  static const String moisAucunePeriodeTexte =
+      'Ton chef de centre n\'a pas encore ouvert de mois. Tu recevras une '
+      'notification dès que la saisie sera possible.';
+  static const String moisChargementImpossibleTexte =
+      'Impossible de lire tes disponibilités. Vérifie ta connexion, puis '
+      'réessaie.';
+
+  // --- Jours fériés ------------------------------------------------------
+
+  static const String feriePremierJanvier = 'Jour de l\'an';
+  static const String feriePaques = 'Lundi de Pâques';
+  static const String ferieFeteTravail = 'Fête du Travail';
+  static const String ferieVictoire1945 = 'Victoire 1945';
+  static const String ferieAscension = 'Ascension';
+  static const String feriePentecote = 'Lundi de Pentecôte';
+  static const String ferieFeteNationale = 'Fête nationale';
+  static const String ferieAssomption = 'Assomption';
+  static const String ferieToussaint = 'Toussaint';
+  static const String ferieArmistice = 'Armistice';
+  static const String ferieNoel = 'Noël';
 
   // -------------------------------------------------------------------
   // Écran de démonstration (build de développement)
