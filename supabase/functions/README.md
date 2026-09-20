@@ -7,6 +7,7 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
 | ------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation |
 | `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                   |
+| `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                  |
 
 ## Règles qui ne se négocient pas
 
@@ -16,6 +17,11 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
   courriel, vers l'adresse invitée. La colonne `invitations.token` est hors du `grant` de `select`
   du rôle `authenticated` (migration `0008`), et les deux fonctions SQL qui la manipulent sont
   réservées à `service_role` (migration `0009`).
+- **`send-notification` n'est jamais appelable par un client.** Elle écrirait une notification à
+  n'importe qui, dans n'importe quelle caserne. Elle n'accepte que deux appelants : la clé de
+  service en jeton porteur (les autres Edge Functions), ou l'en-tête `x-notify-secret` qui vaut le
+  secret engendré dans Vault par la migration `0014` (pg_net). Tout le reste, y compris un
+  administrateur connecté, reçoit un 401 — et `scripts/test_functions.sh § 8` le vérifie.
 - **`verify_jwt = true` n'est qu'un portier.** La clé anon est un JWT valide et publique : elle
   franchit ce filtre. C'est `caller()` qui établit l'identité réelle auprès de GoTrue, et une
   requête en base qui établit le rôle. Rien du corps de la requête n'est cru sur parole :
@@ -26,7 +32,15 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
 ```sh
 supabase start
 supabase functions serve          # dans un second terminal, rechargement à chaud
-scripts/test_functions.sh         # 69 assertions de bout en bout
+scripts/test_functions.sh         # 105 assertions de bout en bout
+```
+
+Sans Docker ni base, la logique pure des fonctions se vérifie seule :
+
+```sh
+deno test supabase/functions/tests/ --allow-env
+deno check supabase/functions/send-notification/index.ts
+deno fmt --check && deno lint            # depuis supabase/functions/
 ```
 
 Aucun fichier d'environnement n'est nécessaire en local : toutes les variables ci-dessous ont une
@@ -48,13 +62,15 @@ Fournies par la plateforme, à ne pas déclarer :
 
 À régler par le projet :
 
-| Variable          | Défaut                                          | Rôle                                                                                                                               |
-| ----------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `APP_BASE_URL`    | `http://127.0.0.1:3000`                         | Origine de la PWA, base du lien d'invitation                                                                                       |
-| `APP_INVITE_PATH` | `/#/invite/{token}`                             | Chemin du lien. `{token}` est remplacé. La valeur par défaut suit la stratégie de hash de go_router, en vigueur dans l'application. Passer à `/invite/{token}` seulement si `usePathUrlStrategy()` est activé |
-| `MAIL_FROM`       | `Astreinte SP <invitations@astreinte-sp.local>` | Expéditeur. En production, un domaine vérifié chez Resend                                                                          |
-| `RESEND_API_KEY`  | —                                               | Présente : les courriels partent par Resend. Absente : repli sur le serveur de courriel local                                      |
-| `MAILPIT_URL`     | `http://supabase_inbucket_pompier:8025`         | API HTTP de Mailpit, joignable depuis le réseau Docker de la pile locale. Les courriels sont lisibles sur <http://127.0.0.1:54324> |
+| Variable                   | Défaut                                          | Rôle                                                                                                                                                                                                                  |
+| -------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_BASE_URL`             | `http://127.0.0.1:3000`                         | Origine de la PWA, base du lien d'invitation                                                                                                                                                                          |
+| `APP_INVITE_PATH`          | `/#/invite/{token}`                             | Chemin du lien. `{token}` est remplacé. La valeur par défaut suit la stratégie de hash de go_router, en vigueur dans l'application. Passer à `/invite/{token}` seulement si `usePathUrlStrategy()` est activé         |
+| `MAIL_FROM`                | `Astreinte SP <invitations@astreinte-sp.local>` | Expéditeur. En production, un domaine vérifié chez Resend                                                                                                                                                             |
+| `RESEND_API_KEY`           | —                                               | Présente : les courriels partent par Resend. Absente : repli sur le serveur de courriel local                                                                                                                         |
+| `MAILPIT_URL`              | `http://supabase_inbucket_pompier:8025`         | API HTTP de Mailpit, joignable depuis le réseau Docker de la pile locale. Les courriels sont lisibles sur <http://127.0.0.1:54324>                                                                                    |
+| `APP_LINK_PATH`            | `/#{route}`                                     | Chemin d'une destination de notification dans la PWA. `{route}` est remplacé par `notifications.data.route` (`/proposals`, `/schedule/2026-10`…). Même logique que `APP_INVITE_PATH`                                  |
+| `FIREBASE_SERVICE_ACCOUNT` | —                                               | Le fichier JSON du compte de service Firebase, tel quel (`docs/FIREBASE.md § 5`). Absent : le push est **indisponible** — la ligne interne est écrite, le courriel prend le relais, et **aucun jeton n'est supprimé** |
 
 En production :
 
@@ -63,7 +79,30 @@ supabase secrets set APP_BASE_URL=https://app.astreinte-sp.fr
 supabase secrets set APP_INVITE_PATH='/#/invite/{token}'
 supabase secrets set MAIL_FROM='Astreinte SP <invitations@astreinte-sp.fr>'
 supabase secrets set RESEND_API_KEY=re_…
+supabase secrets set APP_LINK_PATH='/#{route}'
+supabase secrets set FIREBASE_SERVICE_ACCOUNT="$(cat chemin/vers/le-compte-de-service.json)"
 ```
+
+### Deux secrets qui vivent dans la base, pas dans l'environnement
+
+`public.notify(...)` (migration `0014`) doit savoir **où** appeler `send-notification` et **avec
+quel secret**. Ces deux valeurs sont dans Supabase Vault, pas dans les variables d'environnement des
+fonctions : c'est Postgres qui les lit, au moment de l'appel.
+
+Le secret est engendré au hasard par la migration et n'est recopié nulle part — l'Edge Function va
+le lire avec sa clé de service. Il n'y a **rien à faire**.
+
+L'adresse, elle, vise la pile locale par défaut. Sur un projet hébergé, une commande, une fois :
+
+```sql
+select vault.update_secret(
+  (select id from vault.secrets where name = 'notify_function_url'),
+  'https://<ref-du-projet>.supabase.co/functions/v1/send-notification');
+```
+
+Tant que ce n'est pas fait, les notifications déclenchées **depuis la base** restent en file :
+`select * from notification_outbox where status <> 'sent'` les montre, avec `last_error`. Rien n'est
+perdu — c'est tout l'intérêt de la file — mais rien ne part.
 
 Aucun secret dans le dépôt : `supabase/functions/.env*` est ignoré par git (`.gitignore`, règles
 `.env` / `.env.*`).
@@ -207,12 +246,188 @@ Erreurs :
 nommer la caserne et proposer d'écrire à l'administrateur plutôt que de laisser l'invité dans un
 cul-de-sac.
 
+---
+
+## `send-notification`
+
+La pièce maîtresse des notifications : toutes les autres fonctions du produit l'appellent. Référence
+: `docs/SCHEMA.md § 7`, `docs/WORKFLOWS.md § 6 et 8`, `docs/FIREBASE.md`.
+
+### Deux façons de l'appeler
+
+**Depuis la base** — un déclencheur ou une tâche planifiée :
+
+```sql
+select public.notify(
+  'assignment_proposed',
+  p_station    => '<uuid caserne>',
+  p_payload    => jsonb_build_object('period', '2026-10'),
+  p_recipients => jsonb_build_array(
+    jsonb_build_object(
+      'user_id', '<uuid membre>',
+      'payload', jsonb_build_object('shifts', jsonb_build_array(
+        jsonb_build_object('date', '2026-10-12', 'slot', 'night'))))));
+```
+
+La demande est écrite dans `notification_outbox` **dans la transaction métier**, puis postée par
+pg_net. Si la fonction ne répond pas, la tâche `dispatch_notifications` reprend chaque minute. C'est
+le chemin des tickets 015 et 022.
+
+**Depuis une autre Edge Function** — `publish-schedule` (019), `reassign-shift` (020) :
+
+```
+POST /functions/v1/send-notification
+Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
+Content-Type: application/json
+```
+
+Pas de file, pas d'attente : la réponse porte le compte rendu, ce qui permet de le montrer à l'admin
+qui vient de cliquer.
+
+### Corps de la requête
+
+Deux formes. La courte, quand tout le monde reçoit la même chose :
+
+```jsonc
+{
+  "type": "schedule_validated",
+  "station_id": "uuid",
+  "user_ids": ["uuid", "uuid"],
+  "payload": { "period": "2026-10" },
+  "channels": ["push", "inapp"] // facultatif
+}
+```
+
+La groupée, quand chaque membre a sa propre charge utile — c'est celle d'une publication de planning
+:
+
+```jsonc
+{
+  "type": "assignment_proposed",
+  "station_id": "uuid",
+  "payload": { "period": "2026-10" }, // fusionné sous chaque destinataire
+  "recipients": [
+    { "user_id": "uuid", "payload": { "shifts": [{ "date": "2026-10-12", "slot": "night" }] } },
+    { "user_id": "uuid", "payload": { "shifts": [{ "date": "2026-10-09", "slot": "day" }] } }
+  ]
+}
+```
+
+**Le même membre peut apparaître plusieurs fois** : pour les types regroupés
+(`docs/WORKFLOWS.md § 8`), les entrées sont fusionnées et les créneaux dédoublonnés. Sept créneaux
+pour un membre font **une** notification qui les résume, pas sept.
+
+`channels` force les canaux ; absent, ce sont ceux du type (§ 8). `inapp` est toujours écrit quand
+il figure dans les canaux, **avant tout envoi** : le centre de notifications (ticket 026) ne dépend
+pas de la réussite de FCM.
+
+### Charges utiles par type
+
+| Type                    | Clés lues                                             | Exemple de titre                                                                   |
+| ----------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `invitation`            | `station_name`, `inviter_name`                        | « Invitation à rejoindre CIS Saint-Martin »                                        |
+| `availability_reminder` | `period`, `deadline_at` (ISO)                         | « Dispos d'octobre à saisir »                                                      |
+| `assignment_proposed`   | `period`, `shifts[]`                                  | « Astreinte proposée le 12 octobre, nuit » / « 7 astreintes proposées en octobre » |
+| `assignment_reminder`   | `period`, `shifts[]`                                  | « Réponse attendue : astreinte du 12 octobre, nuit »                               |
+| `assignment_declined`   | `period`, `shifts[]`, `member_name`, `decline_reason` | « Astreinte refusée : 12 octobre, nuit »                                           |
+| `assignment_changed`    | `period`, `shifts[]`                                  | « Astreinte modifiée : 12 octobre, nuit »                                          |
+| `assignment_cancelled`  | `period`, `shifts[]`, `reason`                        | « Astreinte annulée : 12 octobre, nuit »                                           |
+| `schedule_validated`    | `period`, `shifts[]`                                  | « Planning d'octobre validé »                                                      |
+| `schedule_all_accepted` | `period`                                              | « Planning d'octobre complet »                                                     |
+| `late_responders`       | `period`, `pending_count`, `hours`, `members[]`       | « 3 astreintes sans réponse »                                                      |
+
+`shifts` est un tableau de `{ "date": "AAAA-MM-JJ", "slot": "day" | "night",
+"assignment_id"? }`.
+`period` est un `AAAA-MM` ; s'il manque, il est déduit du premier créneau. Toute clé absente dégrade
+le texte, aucune ne fait échouer l'envoi : une notification pauvre vaut mieux qu'une notification
+perdue.
+
+### Liens profonds
+
+`notifications.data.route`, exactement les quatre formes de `docs/WORKFLOWS.md § 8`, traduites côté
+client par `lib/features/notifications/domain/destination_push.dart` :
+
+| Type                                                               | `route`                     |
+| ------------------------------------------------------------------ | --------------------------- |
+| `availability_reminder`                                            | `/availability/<AAAA-MM>`   |
+| `assignment_proposed`, `assignment_reminder`, `assignment_changed` | `/proposals`                |
+| `assignment_cancelled`, `schedule_validated`                       | `/schedule/<AAAA-MM>`       |
+| `assignment_declined`, `schedule_all_accepted`, `late_responders`  | `/admin/schedule/<AAAA-MM>` |
+| `invitation`                                                       | `/connexion`                |
+
+Le message FCM porte **`notification` et `data`**, et ce n'est pas de la ceinture-bretelles : au
+premier plan `messagerie_push.dart` lit `notification.title` ; en arrière-plan le SDK affiche tout
+seul et `web/firebase-messaging-sw.js` retrouve la destination dans `FCM_MSG.data.route` ; en repli
+« data only », le même service worker lit `data.title`, `data.body` et `data.route`. Retirer l'un
+des deux blocs casse l'un des trois chemins.
+
+### Réponse `200`
+
+```jsonc
+{
+  "ok": true, // faux dès qu'un destinataire n'a rien reçu du tout
+  "type": "assignment_proposed",
+  "recipients": 2, // après regroupement
+  "delivered": 2,
+  "failed": 0,
+  "outbox_id": "uuid", // null pour un appel direct
+  "results": [
+    {
+      "user_id": "uuid",
+      "ok": true,
+      "title": "Astreinte proposée le 12 octobre, nuit",
+      "body": "CIS Saint-Martin te propose une astreinte le lundi 12 octobre, de nuit. …",
+      "route": "/proposals",
+      "inapp": true,
+      "notification_id": "uuid",
+      "push": {
+        "attempted": 2,
+        "delivered": 1,
+        "removed_tokens": 1,
+        "skipped": null // "channel" | "push_disabled" | "no_token" | "unavailable"
+      },
+      "email": { "sent": true, "provider": "mailpit", "fallback": true }
+    }
+  ]
+}
+```
+
+Erreurs, forme `{"error": {"code", "message"}}` : `method_not_allowed` (405), `unauthenticated`
+(401), `invalid_body`, `invalid_type`, `invalid_recipients`, `invalid_channels` (400),
+`internal_error` (500). Un destinataire en échec n'est pas une erreur de requête : il porte un
+`code` dans son entrée de `results` (`profile_not_found`, `no_channel_delivered`).
+
+### Les règles qui ne se voient pas
+
+- **La ligne `inapp` est écrite en premier**, avant tout envoi. Une notification dont le push et le
+  courriel échouent reste lisible dans l'application.
+- **`profiles.push_enabled` est respecté** pour tous les types sauf `assignment_proposed` :
+  `docs/PRD.md § 6.5` en fait une notification non désactivable, et l'écran de réglage le dit au
+  membre au lieu de le lui cacher. Un push coupé par le réglage **ne bascule pas** sur le courriel :
+  « ne me préviens pas » ne veut pas dire « préviens-moi autrement ».
+- **Le courriel est le repli** quand le membre n'a aucun appareil enregistré, ou quand aucun
+  appareil n'a reçu le push. C'est ce qui fait qu'un pompier sans téléphone compatible apprend quand
+  même qu'on lui propose une astreinte.
+- **Un jeton définitivement rejeté est supprimé**, un échec passager ne l'est pas. Le 404
+  `UNREGISTERED` et le 403 `SENDER_ID_MISMATCH` sont définitifs ; un `400
+  INVALID_ARGUMENT` ne
+  l'est que s'il désigne le jeton, parce que le même code sort d'un message mal formé — c'est-à-dire
+  d'un bogue de notre côté, et supprimer tous les jetons de la caserne à la première régression
+  serait une catastrophe.
+- **Sans `FIREBASE_SERVICE_ACCOUNT`, le push est « indisponible », pas « en échec »** : rien n'est
+  supprimé, l'incident est tracé dans `notifications.error`, le courriel prend le relais. C'est
+  l'état du projet tant que `docs/FIREBASE.md § 5` n'a pas été fait.
+
+---
+
 ## Tests
 
-| Quoi                                                    | Où                                                                    | En CI ? |
-| ------------------------------------------------------- | --------------------------------------------------------------------- | ------- |
-| Fonctions SQL `create_invitation` / `accept_invitation` | `supabase/tests/invitations_test.sql`, joué par `scripts/test_rls.sh` | oui     |
-| Couche HTTP des deux Edge Functions                     | `scripts/test_functions.sh`                                           | non     |
+| Quoi                                                                         | Où                                                                      | En CI ? |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------- |
+| Fonctions SQL `create_invitation` / `accept_invitation`                      | `supabase/tests/invitations_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
+| Couche HTTP des trois Edge Functions                                         | `scripts/test_functions.sh`                                             | non     |
+| File d'attente et `notify(...)` (migration `0014`)                           | `supabase/tests/notifications_test.sql`, joué par `scripts/test_rls.sh` | oui     |
+| Libellés, regroupement, liens profonds, erreurs FCM, enchaînement d'un envoi | `deno test supabase/functions/tests/`                                   | oui     |
 
 La CI (`.github/workflows/ci.yml`) démarre la pile sans `edge-runtime` ni `kong` : les Edge
 Functions n'y sont pas joignables. Toute la logique de décision vit donc en SQL, où elle est testée
