@@ -298,3 +298,14 @@ Future<void> ouvrirRoute(WidgetTester tester, String chemin) async {
 /// Démonte l'arbre pour libérer les minuteries des contrôleurs.
 Future<void> demonter(WidgetTester tester) =>
     tester.pumpWidget(const SizedBox.shrink());
+
+/// L'emplacement servi par le routeur, chaîne de requête comprise.
+///
+/// C'est ce que la barre d'adresse affiche : les tests de liens profonds
+/// vérifient la destination réelle, pas l'écran qui se trouve dessus.
+String emplacementCourant(WidgetTester tester) {
+  final conteneur = ProviderScope.containerOf(
+    tester.element(find.byType(AstreinteApp)),
+  );
+  return conteneur.read(appRouterProvider).state.uri.toString();
+}

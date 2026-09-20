@@ -204,12 +204,15 @@ class AppBanner extends StatelessWidget {
                   ],
                   if (onFermer != null) ...<Widget>[
                     const SizedBox(width: AppSpacing.xs),
+                    // Pas d'info-bulle : la bannière peut être posée
+                    // au-dessus du navigateur de l'application (ticket 024),
+                    // où aucun `Overlay` n'existe. Le nom du bouton passe par
+                    // la sémantique, qui n'en demande pas.
                     IconButton(
                       onPressed: onFermer,
-                      icon: const Icon(Icons.close),
+                      icon: Icon(Icons.close, semanticLabel: libelleFermer),
                       iconSize: AppTouch.icone,
                       color: encre,
-                      tooltip: libelleFermer,
                       constraints: const BoxConstraints(
                         minWidth: AppTouch.cible,
                         minHeight: AppTouch.cible,

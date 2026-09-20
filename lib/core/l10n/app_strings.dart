@@ -1424,10 +1424,4 @@ abstract final class AppStrings {
   /// Une notification sans titre : le canal a au moins un corps, sinon rien
   /// ne s'affiche.
   static const String notifBanniereSansTitre = 'Nouvelle notification';
-
-  /// Annonce complète de la bannière aux lecteurs d'écran.
-  static String notifBanniereSemantique({
-    required String titre,
-    String? corps,
-  }) => corps == null || corps.isEmpty ? titre : '$titre. $corps';
 }

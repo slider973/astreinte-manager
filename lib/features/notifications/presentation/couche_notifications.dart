@@ -157,9 +157,12 @@ class _Banniere extends StatelessWidget {
         : AppStrings.notifBanniereSansTitre;
     final corps = message.corps?.trim();
 
+    // `liveRegion` sans libellé propre : les deux textes de la bannière sont
+    // lus tels quels, et le bouton de fermeture garde le sien. Un libellé de
+    // conteneur les doublerait.
     return Semantics(
       liveRegion: true,
-      label: AppStrings.notifBanniereSemantique(titre: titre, corps: corps),
+      container: true,
       child: AppBanner(
         variante: AppBannerVariante.information,
         icone: Icons.notifications_active_outlined,

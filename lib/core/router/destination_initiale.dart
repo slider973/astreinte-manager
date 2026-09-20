@@ -64,7 +64,12 @@ class DestinationInitiale {
     final chemin = uri.path;
     if (chemin.isEmpty) return false;
 
-    for (final prefixe in _prefixesTechniques) {
+    for (final brut in _prefixesTechniques) {
+      // `prefixeInvitation` porte déjà sa barre finale, les autres non : on
+      // normalise plutôt que d'en faire un cas particulier.
+      final prefixe = brut.endsWith('/')
+          ? brut.substring(0, brut.length - 1)
+          : brut;
       if (chemin == prefixe || chemin.startsWith('$prefixe/')) return false;
     }
 
