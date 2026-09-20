@@ -21,6 +21,7 @@ import '../../features/onboarding/presentation/profil_accueil_screen.dart';
 import '../../features/parametres/presentation/parametres_screen.dart';
 import '../../features/periodes/presentation/periodes_screen.dart';
 import '../../features/planning/presentation/matrice_screen.dart';
+import '../../features/planning/presentation/suivi_screen.dart';
 import '../env.dart';
 import '../session/email.dart';
 import '../session/etat_auth.dart';
@@ -88,6 +89,15 @@ abstract final class AppRoutes {
   /// Le mois voyage en `?mois=AAAA-MM` ([parametreMois]).
   static const String planningAdmin = '/admin/planning';
   static const String planningAdminName = 'planningAdmin';
+
+  /// **Le suivi d'un planning publié** (ticket 019) : progression, réponses,
+  /// retardataires. Cinquième écran de la destination « Admin », au même
+  /// niveau que les autres — aucune destination de navigation ne s'ajoute.
+  ///
+  /// C'est la cible interne du lien public [lienSuiviAdmin]. Le mois voyage en
+  /// `?mois=AAAA-MM` ([parametreMois]).
+  static const String suivi = '/admin/suivi';
+  static const String suiviName = 'suiviPlanning';
 
   /// Administration de la caserne : les membres et les invitations
   /// (ticket 006).
@@ -268,6 +278,13 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.planningAdmin,
         name: AppRoutes.planningAdminName,
         builder: (context, state) => MatriceScreen(
+          mois: state.uri.queryParameters[AppRoutes.parametreMois],
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.suivi,
+        name: AppRoutes.suiviName,
+        builder: (context, state) => SuiviScreen(
           mois: state.uri.queryParameters[AppRoutes.parametreMois],
         ),
       ),

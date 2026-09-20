@@ -27,7 +27,9 @@ void main() {
     test('/admin/schedule/<mois> n\'ouvre que pour un admin', () {
       expect(
         destinationInterne('/admin/schedule/2026-10', admin: true),
-        '/admin/periodes',
+        // Depuis le ticket 019, l'écran de suivi existe : le lien mène au mois
+        // qu'il nomme, plus à la liste des périodes faute de mieux.
+        '/admin/suivi?mois=2026-10',
       );
       expect(
         destinationInterne('/admin/schedule/2026-10', admin: false),

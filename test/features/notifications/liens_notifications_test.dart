@@ -28,7 +28,7 @@ void main() {
         '/proposals': '/?onglet=1',
         '/schedule/2026-10': '/?onglet=2',
         '/availability/2026-10': '/?onglet=0&mois=2026-10',
-        '/admin/schedule/2026-10': '/admin/periodes',
+        '/admin/schedule/2026-10': '/admin/suivi?mois=2026-10',
       };
 
       for (final lien in attendu.entries) {

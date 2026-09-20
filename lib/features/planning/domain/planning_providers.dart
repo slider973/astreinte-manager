@@ -8,11 +8,13 @@ import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
 import '../../dispos/domain/periode_saisie.dart';
 import '../data/planning_repository.dart';
+import '../data/suivi_repository.dart';
 import 'candidat.dart';
 import 'creneau_planning.dart';
 import 'ligne_matrice.dart';
 import 'matrice_providers.dart';
 import 'planning_mois.dart';
+import 'suivi_providers.dart';
 
 /// Le dépôt du planning. Surchargé par un faux dans les tests.
 final Provider<PlanningRepository> planningRepositoryProvider =
@@ -64,6 +66,7 @@ class EtatPlanning {
     required this.planning,
     this.canalBranche = false,
     this.creation = false,
+    this.publication = false,
     this.sync = SyncEtat.repos,
     this.messageErreur,
     this.lectureSeule = false,
@@ -80,6 +83,10 @@ class EtatPlanning {
   /// La création du planning est en vol.
   final bool creation;
 
+  /// La publication est en vol. Le bouton garde son libellé et sa largeur ; le
+  /// récapitulatif reste ouvert (`design/019 § 5.2`).
+  final bool publication;
+
   final SyncEtat sync;
   final String? messageErreur;
 
@@ -95,6 +102,7 @@ class EtatPlanning {
     PlanningMois? planning,
     bool? canalBranche,
     bool? creation,
+    bool? publication,
     SyncEtat? sync,
     String? messageErreur,
     bool effacerMessage = false,
@@ -106,6 +114,7 @@ class EtatPlanning {
     planning: planning ?? this.planning,
     canalBranche: canalBranche ?? this.canalBranche,
     creation: creation ?? this.creation,
+    publication: publication ?? this.publication,
     sync: sync ?? this.sync,
     messageErreur: effacerMessage ? null : messageErreur ?? this.messageErreur,
     lectureSeule: lectureSeule ?? this.lectureSeule,
@@ -457,6 +466,59 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
         ),
       );
       _echouer(echec);
+    }
+  }
+
+  /// Publie le planning : `publish-schedule`, et rien d'autre.
+  ///
+  /// **Le geste le plus lourd du produit** : il fait vibrer trente téléphones
+  /// et il ne se défait pas. La publication est atomique en base (`docs/SCHEMA`
+  /// § 7, migration 0019), donc un échec laisse le planning exactement où il
+  /// était — l'écran peut proposer « Réessayer » sans rien vérifier.
+  ///
+  /// Rend le compte rendu, ou `null` en cas d'échec : c'est l'écran qui choisit
+  /// la surface — un message passager pour « déjà publié », qui n'est pas une
+  /// panne mais l'autre administrateur.
+  Future<ResultatPublication?> publier() async {
+    final courant = state.value;
+    final planning = courant?.planning.planning;
+    if (courant == null || planning == null || courant.publication) return null;
+
+    state = AsyncValue<EtatPlanning?>.data(
+      courant.copie(publication: true, effacerMessage: true),
+    );
+
+    try {
+      final resultat = await ref
+          .read(suiviRepositoryProvider)
+          .publier(planningId: planning.id);
+
+      // L'état du planning vient de la base, jamais d'une supposition : la
+      // relecture est la seule façon honnête de savoir ce qui s'est passé.
+      await rafraichir();
+      final apres = state.value;
+      if (!ref.mounted || apres == null) return resultat;
+      state = AsyncValue<EtatPlanning?>.data(apres.copie(publication: false));
+      return resultat;
+    } on EchecSuivi catch (echec) {
+      final apres = state.value;
+      if (!ref.mounted || apres == null) return null;
+
+      // « Déjà publié » n'est pas une panne : l'adjoint a été plus rapide. On
+      // relit, et l'écran le dira d'une phrase passagère.
+      final concurrence = echec.erreur == ErreurSuivi.dejaPublie;
+      state = AsyncValue<EtatPlanning?>.data(
+        apres.copie(
+          publication: false,
+          sync: concurrence ? SyncEtat.repos : SyncEtat.echec,
+          messageErreur: concurrence ? null : echec.message,
+          effacerMessage: concurrence,
+          lectureSeule:
+              apres.lectureSeule || echec.erreur == ErreurSuivi.lectureSeule,
+        ),
+      );
+      if (concurrence) unawaited(rafraichir());
+      rethrow;
     }
   }
 

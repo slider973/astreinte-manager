@@ -68,12 +68,18 @@ String? destinationInterne(String? lien, {required bool admin}) {
     }
   }
 
-  // `/admin/schedule/<period>` — le suivi admin (ticket 019).
+  // `/admin/schedule/<period>` — le suivi admin. L'écran existe depuis le
+  // ticket 019 : le lien mène enfin au mois qu'il nomme.
   if (segments.length == 3 &&
       segments[0] == 'admin' &&
       segments[1] == 'schedule') {
-    if (!periodeValide(segments[2])) return null;
-    return admin ? AppRoutes.periodes : null;
+    final periode = segments[2];
+    if (!periodeValide(periode)) return null;
+    if (!admin) return null;
+    return Uri(
+      path: AppRoutes.suivi,
+      queryParameters: <String, String>{AppRoutes.parametreMois: periode},
+    ).toString();
   }
 
   return null;

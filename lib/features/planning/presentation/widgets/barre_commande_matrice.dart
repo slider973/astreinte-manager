@@ -14,6 +14,7 @@ import '../../../../core/widgets/status_badge.dart';
 import '../../../dispos/domain/periode_saisie.dart';
 import '../../../dispos/presentation/widgets/selecteur_mois.dart';
 import '../../domain/matrice_filtres.dart';
+import 'indicateur_direct.dart';
 
 /// La barre de commande : le mois, la recherche, les filtres, le tri, le mode
 /// de saisie, la légende et l'indicateur d'enregistrement.
@@ -265,7 +266,7 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
                     widget.planning!.etat,
                     taille: StatusBadgeTaille.compacte,
                   ),
-                  _Direct(branche: widget.planning!.canalBranche),
+                  IndicateurDirect(branche: widget.planning!.canalBranche),
                 ],
                 if (widget.montrerLegende) const LegendeEtats(),
                 SaveIndicator(
@@ -378,46 +379,4 @@ class CommandePlanning {
   /// `null` désactive le bouton — et exige alors [raisonCreation].
   final VoidCallback? onCreer;
   final String? raisonCreation;
-}
-
-/// L'état du canal temps réel, **affiché**.
-///
-/// Un écran collaboratif qui perd son abonnement en silence est un écran qui
-/// ment : le chef croirait voir l'état réel du mois. L'icône et le libellé
-/// vont ensemble, et l'infobulle dit la conséquence.
-class _Direct extends StatelessWidget {
-  const _Direct({required this.branche});
-
-  final bool branche;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final encre = branche
-        ? theme.colorScheme.onSurfaceVariant
-        : context.statuts.attribution(AttributionEtat.propose).encre;
-
-    return Tooltip(
-      message: branche
-          ? AppStrings.planningDirectDetail
-          : AppStrings.planningDirectInterrompuDetail,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(
-            branche ? Icons.sync : Icons.cloud_off,
-            size: AppTouch.iconePetite,
-            color: encre,
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Text(
-            branche
-                ? AppStrings.planningDirect
-                : AppStrings.planningDirectInterrompu,
-            style: AppTextStyles.mention.copyWith(color: encre),
-          ),
-        ],
-      ),
-    );
-  }
 }

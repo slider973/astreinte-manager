@@ -1802,4 +1802,192 @@ abstract final class AppStrings {
       'Hors ligne : l\'attribution reprendra au retour du réseau.';
   static const String planningSaisieTactile =
       'Ouvre un créneau depuis la vue par jour pour l\'attribuer.';
+
+  // -------------------------------------------------------------------
+  // Publication et suivi des réponses (ticket 019)
+  // -------------------------------------------------------------------
+
+  // --- Le bouton « Publier » et son récapitulatif -----------------------
+
+  static const String publierAction = 'Publier le planning';
+
+  /// Ce que le bouton va faire, avant qu'on l'actionne. Le nombre compte les
+  /// **membres** : c'est le nombre de téléphones qui vont sonner.
+  static String publierDetail(int membres) => switch (membres) {
+    0 => 'Aucun pompier n\'est attribué : le planning deviendra simplement '
+        'visible de tous.',
+    1 => '1 pompier recevra une notification.',
+    _ => '$membres pompiers recevront une notification.',
+  };
+
+  static String publierTitre(String mois) =>
+      'Publier le planning ${moisAvecDe(mois)}';
+
+  static const String publierConfirmer = 'Publier et notifier';
+  static const String publierAnnuler = 'Annuler';
+  static const String publierFermer = 'Fermer le récapitulatif';
+
+  static const String publierCreneaux = 'créneaux';
+  static const String publierPompiers = 'pompiers';
+  static const String publierAstreintes = 'astreintes';
+
+  /// La promesse du ticket, écrite avant qu'on la croie.
+  static const String publierPromesse =
+      'Chaque pompier recevra une seule notification listant tous ses '
+      'créneaux.';
+
+  static const String publierAVerifier = 'À vérifier avant d\'envoyer';
+
+  static const String publierSansReserve =
+      'Tous les créneaux sont pourvus, aucun quota dépassé, aucune '
+      'attribution forcée.';
+
+  static String publierNonPourvus(int n) => n == 1
+      ? '1 créneau n\'est pourvu par personne'
+      : '$n créneaux ne sont pourvus par personne';
+
+  static String publierHorsQuota(int n) => n == 1
+      ? '1 pompier au-delà de son quota'
+      : '$n pompiers au-delà de leur quota';
+
+  static String publierHorsDispo(int n) => n == 1
+      ? '1 pompier attribué hors disponibilité'
+      : '$n pompiers attribués hors disponibilité';
+
+  /// « Marie L. — 5 astreintes pour un plafond de 4 ».
+  static String publierQuotaLigne({
+    required String membre,
+    required int astreintes,
+    required int plafond,
+  }) => '$membre — $astreintes astreintes pour un plafond de $plafond';
+
+  /// « Marie L. — sam. 11 nuit, mar. 14 jour ».
+  static String publierMembreEtCreneaux(String membre, String creneaux) =>
+      '$membre — $creneaux';
+
+  /// Au-delà de six, la liste s'arrête et dit combien elle tait.
+  static String publierEtAutres(int n) =>
+      n == 1 ? 'et 1 autre' : 'et $n autres';
+
+  static const String publierEnCours = 'Publication…';
+
+  static String publiePourMois(String mois, int membres) => membres == 0
+      ? 'Planning ${moisAvecDe(mois)} publié.'
+      : 'Planning ${moisAvecDe(mois)} publié : '
+            '$membres pompier${membres > 1 ? 's' : ''} '
+            'notifié${membres > 1 ? 's' : ''}.';
+
+  static const String publierDejaFait = 'Ce planning a déjà été publié.';
+  static const String publierErreur =
+      'La publication n\'a pas abouti. Le planning n\'a pas bougé.';
+  static const String publierHorsLigne =
+      'Hors ligne : la publication part des pompiers, elle a besoin du '
+      'réseau.';
+  static const String publierReserveAdmin =
+      'Il faut être administrateur de la caserne pour publier son planning.';
+
+  // --- L'écran de suivi ---------------------------------------------------
+
+  static const String suiviTitre = 'Suivi du planning';
+  static const String suiviVersSuivi = 'Suivi du planning';
+  static const String suiviVersConstruction = 'Ouvrir la construction';
+
+  static const String suiviProgressionTitre = 'Progression';
+
+  /// « 42 réponses sur 70 attendues ». La barre ne dit rien de plus.
+  static String suiviReponses(int reponses, int attendues) =>
+      '$reponses réponse${reponses > 1 ? 's' : ''} sur $attendues '
+      'attendue${attendues > 1 ? 's' : ''}';
+
+  static const String suiviAucuneAttribution =
+      'Aucune attribution : il n\'y a rien à attendre.';
+
+  static const String suiviEnAttente = 'en attente';
+  static const String suiviAcceptees = 'acceptées';
+  static const String suiviRefusees = 'refusées';
+  static const String suiviCreneauxPourvus = 'créneaux pourvus';
+
+  static String suiviRetardatairesTitre(int n) => 'Retardataires ($n)';
+
+  static String suiviRetardatairesDetail(int heures) =>
+      'Sans réponse depuis plus de $heures h.';
+
+  /// « 2 créneaux · proposé il y a 4 jours ».
+  static String suiviRetardataireLigne({
+    required int creneaux,
+    required String depuis,
+  }) =>
+      '$creneaux créneau${creneaux > 1 ? 'x' : ''} · proposé $depuis';
+
+  static String suiviRelanceLe(String depuis) => 'relancé $depuis';
+
+  static const String suiviRelancer = 'Relancer maintenant';
+  static const String suiviRelanceEnCours = 'Relance…';
+
+  static String suiviRelanceFaite(int membres) => membres == 0
+      ? 'Personne à relancer.'
+      : '$membres pompier${membres > 1 ? 's' : ''} '
+            'relancé${membres > 1 ? 's' : ''}.';
+
+  static const String suiviRelanceDejaFaite =
+      'Ces pompiers ont déjà été relancés dans l\'heure.';
+  static const String suiviRelanceErreur =
+      'La relance n\'a pas abouti. Réessaie dans un instant.';
+  static const String suiviRelanceHorsLigne =
+      'Hors ligne : la relance a besoin du réseau.';
+  static const String suiviRelanceArchive =
+      'Ce planning est archivé : plus personne n\'a de réponse à donner.';
+
+  // --- Les filtres et la liste des créneaux -------------------------------
+
+  static const String suiviFiltreTous = 'Tous';
+  static const String suiviFiltreAttente = 'En attente';
+  static const String suiviFiltreAcceptes = 'Acceptés';
+  static const String suiviFiltreRefuses = 'Refusés';
+  static const String suiviFiltreNonPourvus = 'Non pourvus';
+
+  static String suiviFiltreVide(String filtre) =>
+      'Aucun créneau dans « $filtre » pour ce mois.';
+  static const String suiviToutAfficher = 'Tout afficher';
+  static String suiviFiltreDesactive(String filtre) =>
+      'Aucun créneau « ${filtre.toLowerCase()} » ce mois-ci.';
+
+  static const String suiviPersonne = 'personne';
+
+  /// « en attente depuis 3 j », « accepté hier », « refusé il y a 2 h ».
+  static String suiviEtatDepuis(String etat, String depuis) =>
+      '$etat $depuis';
+
+  /// Le motif d'un refus, entre guillemets français.
+  static String suiviMotifRefus(String motif) => '« $motif »';
+
+  static String suiviLigneSemantique({
+    required String jourEtDate,
+    required String creneau,
+    required int pourvus,
+    required int requis,
+    required String detail,
+  }) =>
+      '$jourEtDate, ${creneau.toLowerCase()} : '
+      '${planningCouvertureCompte(pourvus, requis)}. $detail';
+
+  // --- Les états de l'écran ----------------------------------------------
+
+  static String suiviValideLe(String date) =>
+      'Planning validé le $date. Tout le monde peut le voir.';
+
+  static const String suiviBrouillonTitre = 'Le planning est encore en '
+      'brouillon';
+  static const String suiviBrouillonTexte =
+      'Rien n\'est parti : il n\'y a pas encore de réponse à suivre.';
+
+  static const String suiviAbsentTitre = 'Rien à suivre pour ce mois';
+  static const String suiviAbsentTexte =
+      'Le planning de ce mois n\'a pas encore été construit.';
+  static const String suiviAbsentAction = 'Construire le planning';
+
+  static const String suiviErreurTexte =
+      'Impossible de charger le suivi du planning.';
+  static const String suiviReserveAdmin =
+      'Le suivi du planning est réservé aux administrateurs de la caserne.';
 }

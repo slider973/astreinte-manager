@@ -146,12 +146,19 @@ class Attribution {
 /// Le planning d'un mois : sa ligne `schedules`, sans ses créneaux.
 @immutable
 class PlanningBrouillon {
-  const PlanningBrouillon({required this.id, required this.etat});
+  const PlanningBrouillon({
+    required this.id,
+    required this.etat,
+    this.publieLe,
+    this.valideLe,
+  });
 
   factory PlanningBrouillon.depuisJson(Map<String, dynamic> ligne) =>
       PlanningBrouillon(
         id: ligne['id']! as String,
         etat: _etatDepuisSql(ligne['status'] as String?),
+        publieLe: _instant(ligne['published_at']),
+        valideLe: _instant(ligne['validated_at']),
       );
 
   static const String colonnes = 'id, status, published_at, validated_at';
@@ -159,10 +166,19 @@ class PlanningBrouillon {
   final String id;
   final PlanningEtat etat;
 
+  /// Les deux horodatages sont **posés par la base** (`schedules_guard_transition`,
+  /// migration 0019) : l'écran les lit, il ne les écrit jamais. `publieLe` est
+  /// celui de la **première** publication, et il ne bouge plus.
+  final DateTime? publieLe;
+  final DateTime? valideLe;
+
   /// Vrai tant que le planning n'est pas publié : c'est la seule situation où
   /// cet écran écrit. Un statut inconnu se lit comme **publié** — le refus est
   /// le côté sûr, comme pour les périodes.
   bool get modifiable => etat == PlanningEtat.brouillon;
+
+  static DateTime? _instant(Object? valeur) =>
+      valeur is String ? DateTime.tryParse(valeur)?.toLocal() : null;
 
   static PlanningEtat _etatDepuisSql(String? valeur) => switch (valeur) {
     'draft' => PlanningEtat.brouillon,
