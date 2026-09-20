@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 008, 010
 - **Branche** : `feat/014-periodes-verrouillage`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/13
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire

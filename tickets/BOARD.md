@@ -54,5 +54,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 011 | [Grille de saisie des disponibilités](done/011-saisie-dispos-grille.md) | P0 | 004 008 | https://github.com/slider973/astreinte-manager/pull/10 |
 | 012 | [Raccourcis de sélection](done/012-raccourcis-selection.md) | P0 | 011 | https://github.com/slider973/astreinte-manager/pull/11 |
 | 013 | [Préférences de charge par mois](done/013-preferences-quotas.md) | P0 | 011 | https://github.com/slider973/astreinte-manager/pull/12 |
-| 014 | [Périodes, date limite et verrouillage](done/014-periodes-verrouillage.md) | P0 | 008 010 |  |
+| 014 | [Périodes, date limite et verrouillage](done/014-periodes-verrouillage.md) | P0 | 008 010 | https://github.com/slider973/astreinte-manager/pull/13 |
 
