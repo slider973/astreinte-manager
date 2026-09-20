@@ -23,6 +23,28 @@ design : [`design/011-saisie-dispos-grille.md`](../../../design/011-saisie-dispo
    requêtes au plus : un envoi groupé, une suppression groupée. Mesuré dans Chrome : une colonne
    de trente nuits peinte d'un geste coûte **une** requête.
 
+## La file gardée sur l'appareil
+
+`data/file_locale.dart` : une tranche par **caserne, utilisateur et mois**,
+écrite avant même l'envoi, oubliée dès la confirmation du serveur, rejouée au
+démarrage. Sans elle, la bannière « tes modifications sont conservées sur ton
+téléphone » serait un mensonge, et un onglet fermé dans une remise sans réseau
+emporterait des disponibilités déclarées.
+
+Trois règles qui tiennent la promesse :
+
+- **La file ne connaît pas les mois.** Chaque clé porte sa date et le dépôt
+  écrit indifféremment des créneaux de plusieurs mois dans le même lot :
+  changer de mois avec un envoi en échec ne perd rien. Seul un changement de
+  caserne ou d'utilisateur la jette.
+- **Rien ne part pendant un geste**, quelle que soit l'origine de l'appel. Un
+  minuteur armé avant le geste est désarmé à son ouverture, et l'envoi porte
+  une garde en tête : sinon une annulation rendrait l'écran à son état
+  d'avant-geste en laissant la base en avance.
+- **Une tranche qui vise un mois verrouillé entre-temps est abandonnée**, et
+  la bannière le dit. Le cron `lock_periods` tourne toutes les heures ;
+  rejouer contre un mois fermé ne ferait que collectionner des refus.
+
 ## Le piège des lignes affectées
 
 En période verrouillée ou caserne suspendue, la clause `using` de la politique RLS **filtre sans
@@ -30,6 +52,11 @@ lever** : un `update` ou un `delete` refusé répond « 0 ligne, tout va bien »
 (`supabase/README.md`, ticket 008). Le contrôleur compare donc systématiquement le nombre de
 lignes rendues au nombre envoyé. Une case revenue à « non saisi » sans avoir jamais eu de ligne
 n'est pas envoyée du tout : une requête de moins, et un « 0 ligne » de moins à interpréter.
+
+Zéro ligne supprimée reste ambigu : la RLS a filtré, ou la ligne avait déjà disparu. Un envoi
+accepté dans le même lot tranche tout de suite — la période n'est pas verrouillée, sinon il aurait
+été refusé lui aussi. Sans envoi pour trancher, on relit avant de conclure : accuser le
+verrouillage à tort coûte une bannière d'erreur et une file qui tourne en rond.
 
 ## Ce qui n'est pas ici
 
