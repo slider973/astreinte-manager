@@ -133,6 +133,6 @@ export function renderInvitationEmail(data: InvitationEmailData): {
 export function invitationUrl(token: string): string {
   const base = (Deno.env.get("APP_BASE_URL") ?? "http://127.0.0.1:3000")
     .replace(/\/+$/, "");
-  const path = Deno.env.get("APP_INVITE_PATH") ?? "/invite/{token}";
+  const path = Deno.env.get("APP_INVITE_PATH") ?? "/#/invite/{token}";
   return base + path.replace("{token}", encodeURIComponent(token));
 }

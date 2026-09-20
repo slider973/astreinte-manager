@@ -51,7 +51,7 @@ Fournies par la plateforme, à ne pas déclarer :
 | Variable          | Défaut                                          | Rôle                                                                                                                               |
 | ----------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `APP_BASE_URL`    | `http://127.0.0.1:3000`                         | Origine de la PWA, base du lien d'invitation                                                                                       |
-| `APP_INVITE_PATH` | `/invite/{token}`                               | Chemin du lien. `{token}` est remplacé. À passer à `/#/invite/{token}` si go_router reste en stratégie de hash                     |
+| `APP_INVITE_PATH` | `/#/invite/{token}`                             | Chemin du lien. `{token}` est remplacé. La valeur par défaut suit la stratégie de hash de go_router, en vigueur dans l'application. Passer à `/invite/{token}` seulement si `usePathUrlStrategy()` est activé |
 | `MAIL_FROM`       | `Astreinte SP <invitations@astreinte-sp.local>` | Expéditeur. En production, un domaine vérifié chez Resend                                                                          |
 | `RESEND_API_KEY`  | —                                               | Présente : les courriels partent par Resend. Absente : repli sur le serveur de courriel local                                      |
 | `MAILPIT_URL`     | `http://supabase_inbucket_pompier:8025`         | API HTTP de Mailpit, joignable depuis le réseau Docker de la pile locale. Les courriels sont lisibles sur <http://127.0.0.1:54324> |
@@ -60,7 +60,7 @@ En production :
 
 ```sh
 supabase secrets set APP_BASE_URL=https://app.astreinte-sp.fr
-supabase secrets set APP_INVITE_PATH='/invite/{token}'
+supabase secrets set APP_INVITE_PATH='/#/invite/{token}'
 supabase secrets set MAIL_FROM='Astreinte SP <invitations@astreinte-sp.fr>'
 supabase secrets set RESEND_API_KEY=re_…
 ```
