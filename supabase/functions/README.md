@@ -119,7 +119,6 @@ Réponse `200` — sémantique de lot : chaque adresse a son sort.
       "invitation_id": "uuid",
       "role": "member",
       "expires_at": "2026-10-04T13:27:19.268869+00:00",
-      "account_created": true, // un compte auth a été créé pour cette adresse
       "email_sent": true,
       "email_provider": "mailpit" // "resend" | "mailpit" | "none"
     },

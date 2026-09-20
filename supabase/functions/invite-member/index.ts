@@ -57,7 +57,6 @@ type ResultatAdresse = {
   invitation_id?: string;
   role?: Role;
   expires_at?: string;
-  account_created?: boolean;
   email_sent?: boolean;
   email_provider?: string;
 };
@@ -119,7 +118,7 @@ async function tracerNotification(
     channel: "email",
     title: params.subject,
     body: `Invitation à rejoindre ${params.stationName}.`,
-    data: { route: "/invite" },
+    data: { route: "/connexion" },
     sent_at: params.sent ? new Date().toISOString() : null,
     delivered: params.sent,
     error: params.error ?? null,
@@ -228,7 +227,6 @@ async function inviterUneAdresse(
     invitation_id: invitation.id,
     role: invitation.role,
     expires_at: invitation.expires_at,
-    account_created: accountCreated,
     email_sent: envoi.sent,
     email_provider: envoi.provider,
   };

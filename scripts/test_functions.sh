@@ -156,7 +156,7 @@ verifier "invitation créée : 200" "200" "$STATUT"
 verifier "ok" "true" "$(jq -r '.ok' <<<"$CORPS")"
 verifier "statut invited" "invited" "$(jq -r '.results[0].status' <<<"$CORPS")"
 verifier "adresse normalisée" "invite-test-1@caserne-a.test" "$(jq -r '.results[0].email' <<<"$CORPS")"
-verifier "compte créé" "true" "$(jq -r '.results[0].account_created' <<<"$CORPS")"
+verifier "aucun oracle de compte dans la réponse" "null" "$(jq -r '.results[0].account_created' <<<"$CORPS")"
 verifier "courriel envoyé" "true" "$(jq -r '.results[0].email_sent' <<<"$CORPS")"
 
 INVITATION_ID="$(jq -r '.results[0].invitation_id' <<<"$CORPS")"
@@ -195,7 +195,7 @@ appeler invite-member "$ADMIN_A" "{\"station_id\":\"$STATION_A\",\"email\":\"inv
 verifier "renvoi : 200" "200" "$STATUT"
 verifier "statut resent" "resent" "$(jq -r '.results[0].status' <<<"$CORPS")"
 verifier "même invitation, pas de doublon" "$INVITATION_ID" "$(jq -r '.results[0].invitation_id' <<<"$CORPS")"
-verifier "le compte n'est pas recréé" "false" "$(jq -r '.results[0].account_created' <<<"$CORPS")"
+verifier "invitation renvoyée sans recréer de compte" "resent" "$(jq -r '.results[0].status' <<<"$CORPS")"
 verifier "une seule ligne en base" "1" "$(sql 'select count(*) from invitations')"
 verifier "expiration repoussée à 14 jours" "t" \
   "$(sql "select expires_at > now() + interval '13 days' from invitations
