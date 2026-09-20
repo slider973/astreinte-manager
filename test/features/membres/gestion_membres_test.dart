@@ -366,6 +366,27 @@ void main() {
         findsOneWidget,
       );
 
+      // Sans le nom : la politique de `stations` n'ouvre la lecture qu'aux
+      // membres actifs, un compte désactivé ne lit donc plus le nom de sa
+      // caserne. Vérifié en vrai contre la base locale.
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        appartenances: const <Appartenance>[
+          Appartenance(
+            id: 'm-2',
+            stationId: 'aaaaaaaa-0000-4000-8000-000000000001',
+            nomCaserne: '',
+            role: RoleMembre.membre,
+            statut: StatutMembre.desactive,
+          ),
+        ],
+      );
+      expect(
+        find.text(AppStrings.caserneDesactiveeTexteSansNom),
+        findsOneWidget,
+      );
+
       // Et l'écran d'administration lui reste fermé, même en tapant l'adresse.
       await ouvrirRoute(tester, _cheminMembres);
       expect(find.text(AppStrings.membresTitre), findsNothing);

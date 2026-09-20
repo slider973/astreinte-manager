@@ -98,9 +98,9 @@ Tous les textes sont dans `AppStrings` ; les libellés ci-dessous sont ceux qui 
 chose à dire : « 9 membres actifs » ou « 9 membres actifs · 1 désactivé ». Un membre désactivé
 reste dans la liste : on ne réactive pas quelqu'un qu'on ne voit plus.
 
-**Recherche.** Un champ du système (`ChampTexte`, libellé « Rechercher un membre »,
-`keyboardType: text`, icône `search` en préfixe), posé sous l'en-tête de section dès qu'il y a au
-moins un membre. Filtre local, sans requête réseau : la liste est déjà en mémoire, et un chef de
+**Recherche.** Un champ du système (`ChampTexte`, libellé « Rechercher un membre », texte d'invite
+« Nom ou adresse e-mail », icône `search` en préfixe, croix « Effacer la recherche » en suffixe dès
+qu'on a tapé), posé sous l'en-tête de section dès qu'il y a au moins un membre. Filtre local, sans requête réseau : la liste est déjà en mémoire, et un chef de
 centre qui tape doit voir la liste fondre à chaque lettre. Comparaison sans accent ni casse, sur le
 nom, le nom affiché et l'adresse. Le compte de la section suit le filtre : « 2 membres sur 9 ».
 
@@ -172,11 +172,14 @@ immédiatement dans la liste.
 Une action réussie relit les deux listes et l'annonce en snackbar, au passé, en nommant la
 personne :
 
-- « Marie Lefebvre est administratrice de la caserne. »
-- « Marie Lefebvre n'est plus administratrice. »
+- « Marie Lefebvre administre maintenant la caserne. »
+- « Marie Lefebvre n'administre plus la caserne. »
 - « L'accès de Marie Lefebvre est désactivé. »
 - « L'accès de Marie Lefebvre est réactivé. »
 - « Nom affiché enregistré. »
+
+Les verdicts sont écrits **sans genre** : la caserne compte des femmes et des hommes, et le
+prénom ne le décide pas de façon fiable.
 
 Un refus dit le problème **et** la sortie, dans le même bandeau d'erreur (`errorContainer`) :
 
@@ -184,16 +187,30 @@ Un refus dit le problème **et** la sortie, dans le même bandeau d'erreur (`err
 |---|---|
 | Dernier admin (base) | « C'est le dernier administrateur actif de la caserne. Nomme un autre administrateur avant de retirer celui-ci. » |
 | Soi-même (base) | « Tu ne peux pas modifier ton propre rôle ni désactiver ton accès. Demande-le à un autre administrateur de la caserne. » |
-| Caserne suspendue | « Abonnement suspendu : la caserne est en lecture seule. » |
-| Droits insuffisants | « Cette modification a été refusée. Tu n'es peut-être plus administrateur de cette caserne. » |
-| Réseau / incident | « La modification n'a pas abouti. Réessaie dans un instant. » |
+| Refus de la RLS | « Modification refusée par la caserne. Tu n'es peut-être plus administrateur, ou l'abonnement est suspendu. Relis la liste. » |
+| Réseau / incident | « La modification n'a pas abouti. Vérifie ta connexion, puis réessaie. » |
+
+**Une seule phrase pour « plus admin » et « abonnement suspendu », et c'est voulu.** Les deux
+donnent exactement la même réponse HTTP : une politique `using` qui ne matche pas filtre la ligne
+en silence, un `with check` qui échoue rend `42501`, et rien ne dit laquelle des deux conditions a
+lâché. Inventer deux phrases reviendrait à deviner devant quelqu'un qui, lui, ne devine pas.
 
 ### 5.4 « Accès désactivé » — `/aucune-caserne`
 
-Écran existant (ticket 005), inchangé dans sa forme. Une correction : l'appartenance affichée est
-maintenant **la première appartenance désactivée**, et non la première appartenance tout court —
-un compte qui aurait une ligne `invited` traînante voyait le mauvais nom de caserne. Titre « Accès
-désactivé », texte nommant la caserne, `BoutonDeconnexion` en bas.
+Écran existant (ticket 005), inchangé dans sa forme. Deux corrections, toutes deux trouvées en
+essayant le parcours contre la base locale :
+
+1. L'appartenance affichée est **la première appartenance désactivée**, et non la première
+   appartenance tout court — un compte qui aurait une ligne `invited` traînante voyait le mauvais
+   nom de caserne.
+2. **Le nom de la caserne peut manquer.** La politique de `stations` n'ouvre la lecture qu'aux
+   membres *actifs* (`is_member`) : à la seconde où l'accès est coupé, le compte ne lit plus le
+   nom de son centre, et la phrase devenait « Ton accès à  a été désactivé. ». Une variante sans
+   nom est servie dans ce cas : « Ton accès à cette caserne a été désactivé. Contacte ton chef de
+   centre pour le rouvrir. » On ne rouvre pas `stations` à un compte désactivé pour une question
+   de cosmétique.
+
+Titre « Accès désactivé », `BoutonDeconnexion` en bas.
 
 ## 6. Interaction et layout
 
@@ -222,7 +239,9 @@ désactivé », texte nommant la caserne, `BoutonDeconnexion` en bas.
 - La dernière saisie vient de la vue `v_member_last_availability` en `security_invoker` : la RLS de
   `availabilities` s'applique telle quelle, donc un membre n'y lit que ses propres lignes.
 - Un membre désactivé reste lisible par l'admin : `membres()` lit les statuts `active` **et**
-  `disabled`, jamais `select *`.
+  `disabled`, jamais `select *`. La politique de `profiles` a dû être élargie d'une branche pour
+  les admins (migration `0010`) : sans elle, la jointure `profiles!inner` perdait la ligne et
+  « Réactiver l'accès » portait sur quelqu'un d'invisible.
 
 **Tranchées pendant le brief.**
 

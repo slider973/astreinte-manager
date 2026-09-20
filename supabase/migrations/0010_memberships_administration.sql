@@ -128,3 +128,37 @@ comment on view v_member_last_availability is
 
 revoke all on v_member_last_availability from anon;
 grant select on v_member_last_availability to authenticated;
+
+-- ===========================================================================
+-- 3. Un admin voit le profil des membres qu'il a désactivés
+-- ===========================================================================
+-- Trouvé en essayant l'écran contre la base locale : après une désactivation, le
+-- membre **disparaissait** de la liste de l'admin, et personne ne pouvait plus le
+-- réactiver. La cause n'est pas dans `memberships` (la ligne reste lisible) mais
+-- dans `profiles` : `profiles_select_self_or_same_station` exige
+-- `m.status = 'active'`, donc la jointure `profiles!inner` de l'écran ne ramenait
+-- plus rien pour un membre désactivé.
+--
+-- La correction est la plus étroite possible : une branche de plus, réservée aux
+-- **admins** de la caserne où cette personne a une ligne, quel que soit son statut.
+-- Un membre ordinaire, lui, ne voit toujours que les profils des membres actifs.
+drop policy "profiles_select_self_or_same_station" on profiles;
+
+create policy "profiles_select_self_or_same_station"
+  on profiles for select to authenticated
+  using (
+    id = auth.uid()
+    or exists (
+      select 1 from memberships m
+      where m.user_id = profiles.id
+        and m.status = 'active'
+        and is_member(m.station_id)
+    )
+    -- L'admin administre aussi ceux qu'il a mis dehors : sans cette branche,
+    -- « Réactiver l'accès » serait une action sur une ligne invisible.
+    or exists (
+      select 1 from memberships m
+      where m.user_id = profiles.id
+        and is_admin(m.station_id)
+    )
+  );

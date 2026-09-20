@@ -250,6 +250,59 @@ end $$;
 rollback to savepoint s5;
 
 \echo ''
+\echo '=== 5b. Un membre désactivé reste visible par son admin ==='
+
+savepoint s5b;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+do $$
+begin
+  perform tests.allowed(
+    $sql$update memberships set status = 'disabled'
+         where user_id = 'aaaaaaaa-0000-4000-8000-000000000103'
+           and station_id = 'aaaaaaaa-0000-4000-8000-000000000001'$sql$,
+    'désactivation du membre à retrouver');
+
+  -- La ligne d'appartenance, évidemment.
+  perform tests.check(
+    (select count(*) from memberships
+     where user_id = 'aaaaaaaa-0000-4000-8000-000000000103'
+       and station_id = 'aaaaaaaa-0000-4000-8000-000000000001') = 1,
+    'l''appartenance désactivée reste lisible par l''admin');
+
+  -- Et son profil : sans lui, la jointure `profiles!inner` de l'écran perd la
+  -- ligne, et « Réactiver l'accès » porte sur quelqu'un d'invisible. C'est le
+  -- défaut trouvé en essayant l'écran contre la base locale.
+  perform tests.check(
+    (select count(*) from profiles
+     where id = 'aaaaaaaa-0000-4000-8000-000000000103') = 1,
+    'le profil d''un membre désactivé reste lisible par son admin');
+end $$;
+
+rollback to savepoint s5b;
+
+savepoint s5c;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+update memberships set status = 'disabled'
+where user_id = 'aaaaaaaa-0000-4000-8000-000000000103'
+  and station_id = 'aaaaaaaa-0000-4000-8000-000000000001';
+
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000101","role":"authenticated"}';
+
+do $$
+begin
+  perform tests.check(
+    (select count(*) from profiles
+     where id = 'aaaaaaaa-0000-4000-8000-000000000103') = 0,
+    'un membre simple, lui, ne lit plus le profil d''un désactivé');
+end $$;
+
+rollback to savepoint s5c;
+
+\echo ''
 \echo '=== 6. La vue v_member_last_availability est lue sous la RLS de availabilities ==='
 
 savepoint s6;

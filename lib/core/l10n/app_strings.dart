@@ -257,6 +257,16 @@ abstract final class AppStrings {
       'Ton accès à $caserne a été désactivé. Contacte ton chef de centre pour '
       'le rouvrir.';
 
+  /// Le même message quand le nom de la caserne n'est pas lisible.
+  ///
+  /// Ce n'est pas un cas d'école : la politique de `stations` n'ouvre la
+  /// lecture qu'aux membres **actifs** (`is_member`), donc un compte
+  /// fraîchement désactivé n'a plus le nom de sa caserne. Mieux vaut une
+  /// phrase sans nom qu'une phrase avec un trou.
+  static const String caserneDesactiveeTexteSansNom =
+      'Ton accès à cette caserne a été désactivé. Contacte ton chef de centre '
+      'pour le rouvrir.';
+
   // --- Accueil --------------------------------------------------------
 
   static const String accueilTitre = 'Accueil';

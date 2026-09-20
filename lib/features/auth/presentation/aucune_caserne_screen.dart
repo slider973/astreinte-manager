@@ -41,9 +41,11 @@ class AucuneCaserneScreen extends ConsumerWidget {
                     )
                   : EmptyState(
                       titre: AppStrings.caserneDesactiveeTitre,
-                      texte: AppStrings.caserneDesactiveeTexte(
-                        desactivee.nomCaserne,
-                      ),
+                      texte: desactivee.nomCaserne.isEmpty
+                          ? AppStrings.caserneDesactiveeTexteSansNom
+                          : AppStrings.caserneDesactiveeTexte(
+                              desactivee.nomCaserne,
+                            ),
                       icone: Icons.no_accounts_outlined,
                     ),
             ),
