@@ -2,18 +2,20 @@
 
 <!-- impeccable:product-schema 1 -->
 
-Rédigé à partir de `docs/PRD.md`, validé par le propriétaire du produit le 20 septembre 2026.
-Les faits marqués « hypothèse » n'ont pas été confirmés en entretien.
+Rédigé à partir de `docs/PRD.md`, puis confirmé en entretien `impeccable init` avec le propriétaire
+du produit le 20 septembre 2026 (plateforme, usage admin, marque, méthode de construction).
 
 ## Platform
 
-adaptive
+android
 
 ## Stack
 
-Flutter 3.x, une base de code pour iOS, Android et Web (PWA). Material 3 comme base, avec les
-adaptations natives de Flutter (physique de défilement, geste retour, pickers) sur iOS. Backend
-Supabase. Choix confirmé par le propriétaire du produit après comparaison avec Next.js + Capacitor,
+Flutter 3.x, une base de code pour iOS, Android et Web (PWA). Langage de design : Material 3
+partout, une seule apparence sur les trois cibles (décision confirmée). Sur iPhone, l'app doit
+tout de même respecter les garanties iOS : zones sûres, geste retour depuis le bord, Reduce Motion,
+Dynamic Type. Sur le web, la même UI rendue en PWA mobile-first, avec une disposition grand écran
+pour l'admin. Backend Supabase. Choix confirmé par le propriétaire du produit après comparaison avec Next.js + Capacitor,
 Expo et Appwrite.
 
 ## Users
@@ -51,7 +53,8 @@ Deux mécanismes que l'outil remplacé n'a pas :
 - Les notifications (push, email de secours) sont le canal principal de la boucle de validation.
   Sur iOS web, le push n'existe que si la PWA est installée sur l'écran d'accueil.
 - Une caserne a typiquement 15 à 60 membres. L'admin voit une matrice membres × jours × créneaux.
-- Hypothèse : l'admin fait le planning sur ordinateur, les membres répondent sur téléphone.
+- Confirmé : l'admin fait le planning sur ordinateur (la matrice est conçue pour grand écran,
+  consultable sur téléphone), les membres répondent sur téléphone.
 
 ## Capabilities and Constraints
 
@@ -66,7 +69,9 @@ Deux mécanismes que l'outil remplacé n'a pas :
 
 ## Brand Commitments
 
-Nom de travail : Astreinte SP. Aucun logo, aucune charte, aucune couleur imposée à ce jour.
+Nom de travail : Astreinte SP. Aucune contrainte de marque (confirmé) : ni logo, ni charte, ni
+couleur imposée, y compris les codes visuels des sapeurs-pompiers. Le monde visuel est libre et
+sera établi par Impeccable (`new-work`) au ticket 004.
 Ton : direct, tutoiement du membre, phrases courtes, vocabulaire des pompiers sans jargon logiciel.
 
 ## Evidence on Hand

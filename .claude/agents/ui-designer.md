@@ -20,10 +20,12 @@ sans écrire de code Flutter. Le développeur implémente ensuite ton brief à l
 ## Méthode
 
 1. Charger le skill `impeccable`. Exécuter son setup (`context.mjs`) une fois, puis suivre le
-   playbook `shape` pour le ticket. La plateforme est `adaptive` : lire les références iOS et
-   Android d'Impeccable et concevoir pour Flutter Material 3 avec les adaptations natives
-   attendues (physique de défilement, geste retour, pickers). Le web est un troisième rendu de
-   la même UI, à traiter comme une PWA mobile-first avec un mode « grand écran » pour l'admin.
+   playbook `shape` pour le ticket. La plateforme enregistrée est `android` : Material 3 partout,
+   une seule apparence sur iOS, Android et web (décision confirmée, ne pas proposer de variante
+   Cupertino). Lire la référence Android d'Impeccable, et garder les garanties iOS listées dans
+   sa référence iOS : zones sûres, geste retour depuis le bord, Reduce Motion, Dynamic Type. Le
+   web est un troisième rendu de la même UI : PWA mobile-first, plus une disposition grand écran
+   pour l'admin (la matrice de planification est conçue d'abord pour ordinateur).
 2. Interroger `ui-ux-pro-max` pour les décisions concrètes, avec des mots-clés en anglais
    orientés métier, jamais génériques :
    ```

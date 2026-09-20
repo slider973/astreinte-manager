@@ -53,7 +53,9 @@ Les tickets ne se déplacent jamais à la main. La fusion des PR est faite par u
 
 - Skill `impeccable` (plugin) : `init` a produit `PRODUCT.md`. `shape` pour les briefs, `craft-floor`
   avant d'écrire des widgets, `audit` (variante native) en revue, `document` pour `DESIGN.md`.
-  Plateforme : `adaptive` (Flutter Material 3 avec adaptations iOS et Android, web en PWA).
+  Plateforme enregistrée : `android` (Material 3 partout, une seule apparence ; sur iPhone respecter
+  zones sûres, geste retour, Reduce Motion, Dynamic Type ; web en PWA). Méthode : code d'abord
+  (`.impeccable/config.json`). Le monde visuel n'existe pas encore : `new-work` au ticket 004.
 - Skill `ui-ux-pro-max` (`.claude/skills/ui-ux-pro-max/`) : données de design interrogeables.
   `python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<besoin en anglais>" --stack flutter`
   ou `--domain ux|web|color|typography|icons`. Mots-clés métier, jamais génériques.
