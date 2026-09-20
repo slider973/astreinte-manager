@@ -23,11 +23,29 @@
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <!-- Couleur de chrome du navigateur : surface-container-low du thème actif
+       (DESIGN.md § Zones sûres et chrome PWA). -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F7F9FA">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#141C22">
   <meta name="apple-mobile-web-app-title" content="Astreinte SP">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <!--
+    Polices embarquées préchargées : sans cela, la grille d'états s'affiche
+    d'abord dans la police système puis saute (FOUT), ce qui est un défaut de
+    lecture sur une matrice de 62 cases. Seules les graisses présentes au
+    premier écran sont préchargées ; les autres suivent avec le bundle.
+  -->
+  <link rel="preload" as="font" type="font/ttf" crossorigin
+        href="assets/assets/fonts/AtkinsonHyperlegibleNext-Regular.ttf">
+  <link rel="preload" as="font" type="font/ttf" crossorigin
+        href="assets/assets/fonts/AtkinsonHyperlegibleNext-Bold.ttf">
+  <link rel="preload" as="font" type="font/ttf" crossorigin
+        href="assets/assets/fonts/AtkinsonHyperlegibleMono-SemiBold.ttf">
 
   <title>Astreinte SP</title>
   <link rel="manifest" href="manifest.json">
