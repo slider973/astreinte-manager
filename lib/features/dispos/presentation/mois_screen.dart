@@ -165,11 +165,53 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
   }
 
   // -------------------------------------------------------------------
+  // Le refus d'un mois fermé
+  // -------------------------------------------------------------------
+
+  /// **Ce que reçoit un membre qui appuie sur un mois verrouillé**
+  /// (ticket 014, critère d'acceptation 2).
+  ///
+  /// Une phrase en bas d'écran, pas une bannière de plus : la bannière dit
+  /// déjà l'état permanent du mois, celle-ci répond à un geste précis. Elle
+  /// n'est **pas rouge** — un mois fermé est un fait, pas une panne
+  /// (`DESIGN.md § Do`).
+  void _annoncerRefus() {
+    final etat = ref.read(saisieControllerProvider).value;
+    if (etat == null) return;
+
+    final message = etat.lectureSeule
+        ? AppStrings.moisRefusLectureSeule
+        : AppStrings.moisRefusVerrouille(etat.periode.libelle);
+
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          // `liveRegion` : sur le web, le contenu d'un `SnackBar` n'est pas
+          // annoncé tout seul, et c'est justement la réponse à un geste.
+          content: Semantics(liveRegion: true, child: Text(message)),
+          showCloseIcon: true,
+        ),
+      );
+  }
+
+  // -------------------------------------------------------------------
   // Rendu
   // -------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
+    // Un compteur et non un message : l'écran connaît le mois et la cause,
+    // le contrôleur n'a qu'à publier l'événement.
+    ref.listen<int>(
+      saisieControllerProvider.select(
+        (AsyncValue<EtatSaisie?> valeur) => valeur.value?.refusSaisie ?? 0,
+      ),
+      (int? avant, int apres) {
+        if (apres > (avant ?? 0)) _annoncerRefus();
+      },
+    );
+
     final periodes = ref.watch(periodesProvider);
     final saisie = ref.watch(saisieControllerProvider);
     final etat = saisie.value;

@@ -16,6 +16,7 @@ SlotChip _case(
   bool verrouille = false,
   bool erreur = false,
   bool enEnregistrement = false,
+  VoidCallback? onRefus,
 }) {
   return SlotChip(
     etat: etat,
@@ -26,6 +27,7 @@ SlotChip _case(
     erreur: erreur,
     enEnregistrement: enEnregistrement,
     onTap: onTap,
+    onRefus: onRefus,
     libelleSemantique:
         'Samedi 4 octobre, jour, '
         '${etat.name}',
@@ -395,6 +397,62 @@ void main() {
             verrouille.b.toInt(),
           ].reduce((a, b) => a < b ? a : b);
       expect(ecart, lessThan(40), reason: 'un fait gris, pas une alarme');
+    });
+
+    testWidgets('elle répond au doigt sans devenir modifiable', (
+      tester,
+    ) async {
+      var refus = 0;
+      await monter(
+        tester,
+        SizedBox(
+          height: 48,
+          child: _case(
+            DisponibiliteEtat.disponible,
+            verrouille: true,
+            onRefus: () => refus++,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(SlotChip));
+      await tester.pump();
+      await tester.tap(find.byType(SlotChip));
+      await tester.pump();
+
+      expect(
+        refus,
+        2,
+        reason: 'deux appuis, deux explications : une case muette fait '
+            'recommencer',
+      );
+      expect(
+        find.descendant(
+          of: find.byType(SlotChip),
+          matching: find.byType(Focus),
+        ),
+        findsNothing,
+        reason: 'expliquer un refus n\'est pas devenir actionnable',
+      );
+    });
+
+    testWidgets('sans explication à donner, elle reste muette', (tester) async {
+      await monter(
+        tester,
+        SizedBox(
+          height: 48,
+          child: _case(DisponibiliteEtat.disponible, verrouille: true),
+        ),
+      );
+
+      expect(
+        find.descendant(
+          of: find.byType(SlotChip),
+          matching: find.byType(GestureDetector),
+        ),
+        findsNothing,
+        reason: 'la matrice admin ne paie pas un détecteur par case',
+      );
     });
 
     testWidgets('la valeur reste lisible : chaque état garde son glyphe', (

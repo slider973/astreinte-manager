@@ -434,6 +434,20 @@ Et une fonction de calcul, `stable` parce qu'elle dépend de la base des fuseaux
 |---|---|---|
 | `period_deadline_at` | `(p_year integer, p_month integer, p_deadline_day integer, p_timezone text) returns timestamptz` | La date limite d'une période : le jour limite du mois précédent, 23:59:59, dans le fuseau de la caserne. Une seule écriture de la règle, partagée par le déclencheur de recalcul, le seed et le cron de création des périodes. |
 
+### Fonctions du cycle de vie des périodes (migration `0012`, ticket 014)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `cron_create_periods` | `(p_reference timestamptz default null) returns integer` | Corps de la tâche `create_periods` (§ 8). Crée les périodes M+1 et M+2 manquantes de chaque caserne, **mois de référence calculé dans le fuseau de chaque caserne** : à 02:00 UTC le 1er du mois, une caserne à UTC-11 est encore dans le mois précédent et un calcul en UTC lui sauterait un mois. Date limite posée par `period_deadline_at`. Idempotente (`on conflict do nothing`) : rejouée, elle ne crée rien et ne réécrit ni le statut ni la date limite d'une période existante. Renvoie le nombre de créations. |
+| `cron_lock_periods` | `(p_reference timestamptz default null) returns integer` | Corps de la tâche `lock_periods` (§ 8). Passe en `locked` les périodes `open` dont `deadline_at` est dépassée et pose `locked_at`. Idempotente : la clause `status = 'open'` fait qu'un second passage ne touche rien et n'écrase pas un `locked_at` déjà posé. Renvoie le nombre de verrouillages. |
+| `create_period` | `(p_station uuid, p_year integer, p_month integer) returns periods` | Action « créer un mois » de l'écran d'administration. Vérifie `is_admin` puis `station_writable`, refuse un mois écoulé (jugé dans le fuseau de la caserne, `period_month_in_past`) et un mois hors bornes (`period_month_invalid`). Idempotente : renvoie la période existante plutôt qu'une erreur. Seule fonction de la migration ouverte à `authenticated`. |
+
+Le paramètre `p_reference` des deux fonctions de cron n'est pas une commodité : c'est la
+seule façon de vérifier en CI, en quelques millisecondes, un comportement dont la période est
+le mois. L'ordonnanceur appelle toujours la forme sans argument. Leur exécution est révoquée
+de `public`, `anon` et `authenticated` : une tâche qui tourne avec des droits élevés ne doit
+pas être un bouton accessible depuis un client.
+
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
 Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
@@ -595,8 +609,52 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   planning ont `count(accepted) >= required_count`, passe le planning en `validated` et
   insère une notification `schedule_validated` (via `pg_net` vers l'Edge Function, ou via
   une table `outbox` lue par cron — choix ticket 025).
+- `periods_guard_transition` (migration `0012`, ticket 014) : `before update` sur `periods`.
+  Tient `locked_at` à jour avec le statut, gèle la clé (`station_id`, `year`, `month`)
+  — `period_key_immutable` — et **refuse une réouverture dont la date limite est déjà
+  passée** (`period_reopen_deadline_passed`). Ce dernier point est la moitié manquante de
+  l'idempotence du cron : sans lui, « rouvrir » est une action que la tâche horaire défait
+  dans l'heure, et l'admin en accuse le logiciel. Rouvrir, c'est nécessairement dire jusqu'à
+  quand. Security invoker : aucune lecture privilégiée, et la règle vaut aussi pour le rôle
+  de service. Étendu par `0013` : une date limite ne peut pas non plus **reculer dans le
+  passé** sur un mois déjà `open` (`period_deadline_in_past`), même symptôme et même refus.
+  Cette dernière règle ne s'applique qu'aux écritures clients — le recalcul de `0011` est
+  `security definer`, donc `current_user` y vaut le propriétaire de la fonction et il passe
+  à travers : un admin qui avance le jour limite de sa caserne décide de fermer les mois en
+  cours, et refuser son réglage entier pour une date dérivée serait un contresens.
+- `availabilities_trace_auteur` (migration `0012`, ticket 014) : `before insert or update`
+  sur `availabilities`. Impose `set_by = auth.uid()` pour toute écriture client. La trace de
+  l'auteur ne se choisit pas : laissée au client, un admin y écrirait l'identifiant du membre
+  et ferait disparaître son intervention de l'écran comme du journal. Les écritures serveur
+  (seed, rôle de service) gardent la valeur qu'elles fournissent, comme pour
+  `memberships_guard_admin`.
 - `audit_admin_actions` : sur `availabilities` quand `set_by <> user_id`, sur `periods`
   quand `status` passe de `locked` à `open`, sur `assignments` quand `was_available = false`.
+  **Éclaté en déclencheurs par table** plutôt qu'en une fonction unique (migration `0012`) :
+  les trois sémantiques n'ont rien de commun, et une clause `when` par table évite d'appeler
+  la fonction sur les écritures ordinaires — une saisie de mois complet, c'est une soixantaine
+  de lignes par membre. À ce jour :
+  `periods_audit_reouverture` (`after update … when (old.status = 'locked' and new.status = 'open')`)
+  → `period.reopen` ;
+  `availabilities_audit_saisie_admin` (`after insert or update … when (new.set_by is distinct from new.user_id)`)
+  → `availability.set_for_member` ;
+  `availabilities_audit_effacement_admin` (`after delete … when (auth.uid() is distinct from old.user_id)`)
+  → `availability.cleared_for_member`, parce que décocher une case est une suppression de
+  ligne (§ 2.6) et qu'un effacement fait pour autrui doit laisser autant de trace qu'une
+  saisie. Le volet `assignments` viendra avec les plannings.
+- `periods_audit_creation` et `periods_audit_suppression` (migration `0013`, revue du
+  ticket 014) : `after insert` / `after delete` sur `periods`, `period.created` et
+  `period.deleted`. Sans elles, la trace de réouverture se contournait sans rien laisser —
+  supprimer la période, la recréer par `create_period`, repousser sa date limite, et le mois
+  était rouvert avec un `audit_log` vide. Rien ne rattachant les disponibilités à la période
+  (`availabilities` porte une date, pas un `period_id`), la manœuvre ne coûtait même pas les
+  données saisies : la trace de suppression compte donc les disponibilités du mois qui lui
+  survivent. La création n'est journalisée que `when (auth.uid() is not null)` — la tâche
+  `create_periods` et le seed en créent par dizaines sans acteur humain, et `audit_log` est
+  le journal des administrateurs (§ 2.14), pas celui de la machine. La suppression, elle, est
+  journalisée sans condition : c'est une perte de données. Elle s'abstient dans un seul cas,
+  la cascade d'une caserne supprimée, où la ligne d'audit référencerait une caserne déjà
+  disparue et ferait échouer la suppression sur une clé étrangère.
 
 ## 6. Vues
 
@@ -622,6 +680,28 @@ de `availabilities` — un admin y voit sa caserne, un membre n'y voit que lui-m
 parce que les agrégats PostgREST sont désactivés sur ce projet (`PGRST123`) : sans elle, l'app
 rapatrierait toutes les lignes du mois pour n'en garder qu'une par membre.
 
+### `v_period_completion` — taux de saisie d'un mois *(migration `0013`, revue du ticket 014)*
+
+Une ligne par période : `period_id`, `station_id`, `year`, `month`, `active_members`
+(les appartenances `active` de la caserne) et `members_with_availability` (ceux qui ont **au
+moins une** ligne de `availabilities` sur le mois). Une période d'une caserne sans membre
+actif y figure avec `0` et `0` : l'écran doit pouvoir dire « aucun membre actif » plutôt
+qu'afficher « 0 % ».
+
+Le numérateur se construit à partir du même ensemble que le dénominateur : un membre
+désactivé depuis qu'il a saisi ne produit pas « 10 membres sur 9 ».
+
+Déclarée `with (security_invoker = true)`, comme `v_member_last_availability`. Les deux
+nombres ne sont donc justes que pour un **admin**, seul à lire toutes les disponibilités de
+sa caserne (`availabilities_select_own_or_admin`) ; un membre ordinaire y lit un numérateur
+de 0 ou 1 — une vue partielle, pas une fuite, et l'écran qui la consomme lui est de toute
+façon fermé.
+
+Elle existe parce que compter côté client était **faux sans le dire** : PostgREST plafonne
+une réponse à mille lignes et rend `200` sans en-tête d'alerte. À ~62 lignes de
+disponibilités par membre et par mois, le compte devenait faux dès dix-sept membres et
+plafonnait vers seize — « 16 membres sur 60 ont saisi » alors que les 60 avaient saisi.
+
 ### `v_schedule_progress` — avancement d'un planning
 
 Par schedule : créneaux totaux, créneaux pourvus, attributions en attente, acceptées,
@@ -646,13 +726,21 @@ refusées, retardataires (proposées depuis plus de `late_report_hours`).
 
 | Nom | Fréquence | Action |
 |---|---|---|
-| `create_periods` | 1er du mois, 02:00 | Crée les périodes M+1 et M+2 manquantes pour chaque caserne |
-| `lock_periods` | toutes les heures | Passe en `locked` les périodes dont `deadline_at < now()` |
+| `create_periods` | 1er du mois, 02:00 | `select public.cron_create_periods();` — crée les périodes M+1 et M+2 manquantes pour chaque caserne *(migration `0012`)* |
+| `lock_periods` | toutes les heures | `select public.cron_lock_periods();` — passe en `locked` les périodes dont `deadline_at < now()` *(migration `0012`)* |
 | `availability_reminders` | tous les jours 09:00 | Push J-3 et email J-1 aux membres sans saisie |
 | `assignment_reminders` | toutes les heures | Rappel push à `response_reminder_hours`, email à `response_email_hours` |
 | `late_responders_report` | toutes les heures | Notifie les admins des attributions en attente depuis `late_report_hours` |
 | `archive_schedules` | 1er du mois | Archive les plannings des mois passés |
 | `prune_notifications` | hebdomadaire | Supprime les notifications lues de plus de 90 jours |
+
+Chaque tâche est un appel **qualifié** (`public.…`) et **sans argument** d'une fonction
+`security definer` dont le `search_path` est figé : rien n'est interpolé dans la commande, et
+le travail réel se fait dans une fonction que ni `anon` ni `authenticated` ne peuvent appeler.
+Toutes les tâches doivent être idempotentes — l'ordonnanceur rejoue après un redémarrage — et
+testables sans l'ordonnanceur : leur fonction prend un instant de référence
+(`p_reference`, `now()` par défaut) que les tests appellent directement. La CI n'exécute donc
+jamais `pg_cron` ; elle vérifie la logique et la présence des lignes dans `cron.job`.
 
 ## 9. Index et performance
 
@@ -686,8 +774,11 @@ Ordre proposé :
 8. `0008_rls_durcissement.sql` (revue du ticket 008 : `pg_temp`, liste blanche du trigger, cohérence du `station_id` avec la ligne parente, token d'invitation)
 9. `0009_invitation_functions.sql` (ticket 006 : `mask_email`, `create_invitation`, `accept_invitation`, exécution réservée à `service_role`)
 10. `0010_memberships_administration.sql` (ticket 009 : déclencheur `memberships_guard_admin`, vue `v_member_last_availability`)
-11. `0011_views.sql`
-12. `0012_cron.sql`
+11. `0011_station_settings.sql` (ticket 010 : validation de `settings`, garde-fou de fuseau, `period_deadline_at`, recalcul des dates limites)
+12. `0012_cron_periodes.sql` (ticket 014 : `cron_create_periods`, `cron_lock_periods`, `create_period`, transitions et audit des périodes, `set_by` imposé sur `availabilities`, les deux tâches `pg_cron` des périodes)
+13. `0013_periodes_completion_audit.sql` (revue du ticket 014 : vue `v_period_completion`, audit de la création et de la suppression d'une période, date limite qui ne recule plus dans le passé)
+14. `0014_views.sql` (les trois vues restantes du § 6)
+15. `0015_cron_notifications.sql` (les cinq tâches restantes du § 8)
 
 Chaque migration est rejouable sur un projet vide et testée en local avec `supabase start`.
 
@@ -695,7 +786,9 @@ Les politiques RLS sont couvertes par `supabase/tests/rls_test.sql`, exécuté p
 `scripts/test_rls.sh` (pas de pgTAP : le script lève une exception et rend un code non nul
 dès qu'une politique fuit). Les fonctions d'invitation de `0009` sont couvertes par
 `supabase/tests/invitations_test.sql`, et le déclencheur de `0010` par
-`supabase/tests/memberships_admin_test.sql`, joués par le même script. La couche HTTP des Edge
+`supabase/tests/memberships_admin_test.sql`, les paramètres de caserne de `0011` par
+`supabase/tests/station_settings_test.sql` et le cycle de vie des périodes de `0012` par
+`supabase/tests/periods_cron_test.sql`, joués par le même script. La couche HTTP des Edge
 Functions est testée par `scripts/test_functions.sh`, qui a besoin de
 `supabase functions serve` et reste donc local : la CI démarre la pile sans `edge-runtime`.
 

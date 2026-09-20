@@ -12,6 +12,15 @@ stateDiagram-v2
 Règles :
 - Les membres écrivent leurs disponibilités uniquement en `open`.
 - L'admin écrit toujours, avec `set_by` renseigné et audit si `set_by <> user_id`.
+  `set_by` est **imposé** par le déclencheur `availabilities_trace_auteur` (migration `0012`) :
+  ce que le client envoie dans cette colonne est ignoré.
+- **Rouvrir, c'est dire jusqu'à quand.** La transition `locked → open` exige une
+  `deadline_at` future (`period_reopen_deadline_passed`, migration `0012`) : la tâche
+  `lock_periods` passe toutes les heures, et une période rouverte sans nouvelle date limite
+  serait reverrouillée dans l'heure. L'écran d'administration demande donc la nouvelle date
+  limite dans le même geste que la réouverture.
+- `locked_at` n'est jamais écrit par le client : le déclencheur le pose au verrouillage et
+  l'efface à la réouverture.
 
 ## 2. Planning (`schedules.status`)
 

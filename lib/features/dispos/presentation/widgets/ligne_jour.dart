@@ -62,6 +62,8 @@ class JourDeGrille extends ConsumerWidget {
       aujourdhui: aujourdhui,
       horsMois: horsMois,
       verrouille: etat.verrouille,
+      // Le mois est fermé : la case ne bouge plus, mais elle dit pourquoi.
+      onRefus: etat.verrouille ? controleur.refuserSaisie : null,
       jour: DaySlot(
         etat: etat.jour,
         erreur: etat.erreurJour,

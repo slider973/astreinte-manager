@@ -685,6 +685,10 @@ abstract final class AppStrings {
   static const String parametresVersMembres = 'Membres de la caserne';
   static const String parametresDepuisMembres = 'Paramètres de la caserne';
 
+  /// Le troisième écran de la destination Admin, atteint par la barre
+  /// d'application depuis les deux autres.
+  static const String periodesDepuisAdmin = 'Mois de saisie';
+
   /// Les neuf fuseaux d'une caserne française, métropole et outre-mer. Un
   /// champ libre n'a rien à faire ici : un fuseau inventé casse le calcul des
   /// dates limites, et la base le refuse (`stations_check_timezone`).
@@ -953,6 +957,19 @@ abstract final class AppStrings {
       'n\'ont pas été enregistrées.';
   static const String actionRecharger = 'Recharger';
 
+  /// **La réponse à un appui sur une case verrouillée** (ticket 014).
+  ///
+  /// La grille du ticket 011 rendait les cases inertes : l'appui ne faisait
+  /// rien du tout, et un doigt qui n'obtient rien recommence. La case reste
+  /// non modifiable, mais elle répond — le problème, puis la sortie.
+  static String moisRefusVerrouille(String mois) =>
+      '$mois est verrouillé : la saisie est fermée. Demande à ton chef de '
+      'centre de rouvrir le mois.';
+
+  static const String moisRefusLectureSeule =
+      'Caserne suspendue : la saisie est fermée. Tu peux consulter tes '
+      'disponibilités, pas les changer.';
+
   // --- États vides -------------------------------------------------------
 
   static const String moisAucunePeriodeTitre = 'Aucun mois à saisir';
@@ -1174,6 +1191,129 @@ abstract final class AppStrings {
     if (astreintes == null && weekends == null) return '';
     return '. ${preferencesResume(astreintes, weekends)}';
   }
+
+  // -------------------------------------------------------------------
+  // Écran « Périodes » — administration (ticket 014)
+  // -------------------------------------------------------------------
+
+  static const String periodesTitre = 'Périodes';
+  static const String periodesSousTitre =
+      'Un mois se verrouille tout seul à sa date limite. Tu peux le fermer '
+      'plus tôt, ou le rouvrir en repoussant sa date limite.';
+  static const String periodesReserveAdmin =
+      'Les mois de saisie appartiennent aux administrateurs de la caserne.';
+  static const String periodesRafraichir = 'Relire les mois';
+  static const String periodesErreurTexte =
+      'Impossible de lire les mois de la caserne. Vérifie ta connexion, puis '
+      'réessaie.';
+  static const String periodesSectionAVenir = 'Mois à venir';
+  static const String periodesSectionEcoules = 'Mois écoulés';
+  static const String periodesVideTitre = 'Aucun mois ouvert';
+  static const String periodesVideTexte =
+      'Ouvre le mois prochain pour que les pompiers puissent saisir leurs '
+      'disponibilités.';
+  static const String periodesAucunAVenir =
+      'Aucun mois à venir. Ouvre le mois prochain dès maintenant.';
+  static const String periodesAucunEcoule = 'Aucun mois écoulé.';
+
+  /// « 2 mois » : le mot est invariable, le compte ne l'est pas.
+  static String periodesCompte(int n) => '$n mois';
+
+  /// La ligne de faits d'un mois verrouillé : quand, et jusqu'à quand il
+  /// était ouvert.
+  static String periodeLigneVerrouillee(String verrouilleLe, String limite) =>
+      'Verrouillé le $verrouilleLe · date limite du $limite';
+
+  // --- Le taux de saisie -------------------------------------------------
+
+  static String periodeTauxSaisie(int saisis, int effectif) =>
+      '$saisis ${saisis <= 1 ? 'membre' : 'membres'} sur $effectif '
+      '${saisis <= 1 ? 'a' : 'ont'} saisi';
+
+  static const String periodeTauxAucunMembre =
+      'Aucun membre actif dans la caserne.';
+  static const String periodeTauxIndisponible = 'Comptage indisponible.';
+
+  /// Le pourcentage, annoncé avec son unité : la jauge n'est qu'un rappel.
+  static String periodeTauxPourcentage(int pourcentage) => '$pourcentage %';
+
+  // --- Verrouiller maintenant -------------------------------------------
+
+  static const String periodeActionVerrouiller = 'Verrouiller';
+
+  static String periodeVerrouillerTitre(String mois) =>
+      'Verrouiller $mois ?';
+
+  static const String periodeVerrouillerTexte =
+      'Les membres ne pourront plus modifier leurs disponibilités. Toi, tu '
+      'peux toujours saisir pour eux, et rouvrir le mois plus tard.';
+  static const String periodeVerrouillerConfirmer = 'Verrouiller maintenant';
+
+  static String periodeVerrouilleeConfirmation(String mois) =>
+      '$mois est verrouillé.';
+
+  // --- Rouvrir ------------------------------------------------------------
+
+  static const String periodeActionRouvrir = 'Rouvrir';
+
+  static String periodeRouvrirTitre(String mois) => 'Rouvrir $mois';
+
+  static const String periodeRouvrirRegle =
+      'Le verrouillage automatique passe toutes les heures. Sans nouvelle '
+      'date limite, le mois se refermerait dans l\'heure.';
+  static const String periodeRouvrirLibelleDate = 'Nouvelle date limite';
+  static const String periodeRouvrirJourPlusTot = 'Un jour plus tôt';
+  static const String periodeRouvrirJourPlusTard = 'Un jour plus tard';
+  static const String periodeRouvrirConfirmer = 'Rouvrir le mois';
+  static const String periodeRouvrirRefusDatePassee =
+      'Choisis une date future : sinon le verrouillage automatique refermera '
+      'le mois dans l\'heure.';
+
+  /// La date limite en toutes lettres : « mercredi 23 septembre, 23 h 59 ».
+  /// L'heure est écrite parce qu'une date limite « le 23 » ne dit pas si le
+  /// 23 compte.
+  static String periodeDateLimiteHeure(String dateLongue) =>
+      '$dateLongue, 23 h 59';
+
+  static String periodeRouverteConfirmation(String mois, String date) =>
+      '$mois est rouvert jusqu\'au $date.';
+
+  // --- Ouvrir un mois -----------------------------------------------------
+
+  static const String periodesOuvrirUnMois = 'Ouvrir un mois';
+  static const String periodeCreerTitre = 'Ouvrir un mois à la saisie';
+  static const String periodeCreerAide =
+      'La date limite est calculée depuis les paramètres de la caserne : le '
+      'jour limite du mois précédent, à 23 h 59.';
+  static const String periodeCreerDejaOuvert = 'Déjà ouvert';
+  static const String periodeCreerDejaVerrouille = 'Déjà verrouillé';
+
+  static String periodeCreeeConfirmation(String mois) =>
+      '$mois est ouvert à la saisie.';
+
+  static String periodeDejaOuverteConfirmation(String mois) =>
+      '$mois était déjà ouvert.';
+
+  // --- Refus du serveur ---------------------------------------------------
+
+  static const String periodeRefusDroits =
+      'Seul un administrateur de la caserne ouvre, verrouille ou rouvre un '
+      'mois.';
+  static const String periodeRefusSuspendue =
+      'Abonnement suspendu : la caserne est en lecture seule, les mois ne '
+      'bougent plus.';
+  static const String periodeRefusMoisPasse =
+      'Un mois déjà écoulé ne peut plus être ouvert à la saisie.';
+  static const String periodeRefusMoisInvalide =
+      'Ce mois n\'existe pas. Choisis un mois de la liste.';
+  static const String periodeRefusDeadlinePassee =
+      'Rouvrir un mois demande de repousser sa date limite : sinon la tâche '
+      'horaire le reverrouille dans l\'heure.';
+  static const String periodeRefusDeadlineDansLePasse =
+      'La date limite d\'un mois ouvert doit rester dans le futur. Pour fermer '
+      'ce mois, verrouille-le.';
+  static const String periodeEchecGenerique =
+      'Impossible de modifier ce mois. Réessaie dans un instant.';
 
   // -------------------------------------------------------------------
   // Écran de démonstration (build de développement)

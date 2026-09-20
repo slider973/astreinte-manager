@@ -164,6 +164,12 @@ class _ParametresScreenState extends ConsumerState<ParametresScreen> {
             icon: const Icon(Icons.group_outlined),
             tooltip: AppStrings.parametresVersMembres,
           ),
+        if (admin)
+          IconButton(
+            onPressed: () => context.goNamed(AppRoutes.periodesName),
+            icon: const Icon(Icons.event_available_outlined),
+            tooltip: AppStrings.periodesDepuisAdmin,
+          ),
         IconButton(
           onPressed: _relire,
           icon: const Icon(Icons.refresh),

@@ -211,6 +211,12 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
       actions: <Widget>[
         if (admin)
           IconButton(
+            onPressed: () => context.goNamed(AppRoutes.periodesName),
+            icon: const Icon(Icons.event_available_outlined),
+            tooltip: AppStrings.periodesDepuisAdmin,
+          ),
+        if (admin)
+          IconButton(
             onPressed: () => context.goNamed(AppRoutes.parametresName),
             icon: const Icon(Icons.tune),
             tooltip: AppStrings.parametresDepuisMembres,

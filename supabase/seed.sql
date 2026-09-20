@@ -139,11 +139,12 @@ select
 from seed_periods p
 join stations s on s.id = p.station_id
 cross join lateral (
-  select make_timestamptz(
-    extract(year  from p.first_day - interval '1 month')::int,
-    extract(month from p.first_day - interval '1 month')::int,
+  -- Même règle que le cron de création et que le recalcul des dates limites :
+  -- une seule écriture, dans period_deadline_at (migration 0011).
+  select period_deadline_at(
+    extract(year  from p.first_day)::int,
+    extract(month from p.first_day)::int,
     (s.settings ->> 'availability_deadline_day')::int,
-    23, 59, 59,
     s.timezone
   ) as deadline_at
 ) d

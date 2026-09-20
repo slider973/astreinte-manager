@@ -124,6 +124,7 @@ class DayCell extends StatelessWidget {
     this.horsMois = false,
     this.verrouille = false,
     this.deuxNiveaux = false,
+    this.onRefus,
   });
 
   /// Numéro du jour dans le mois (1 à 31).
@@ -161,6 +162,11 @@ class DayCell extends StatelessWidget {
 
   /// Mois verrouillé : les cases restent lisibles, l'interaction disparaît.
   final bool verrouille;
+
+  /// Ce que répond une case verrouillée qu'on appuie quand même. `null` la
+  /// laisse muette — c'est le cas des jours d'un mois voisin, qui n'ont rien
+  /// à expliquer (ticket 014).
+  final VoidCallback? onRefus;
 
   /// En orientation ligne et à très grande échelle de texte (> ×1.6), la
   /// ligne passe à deux niveaux : la date au-dessus, les deux cases pleine
@@ -241,6 +247,8 @@ class DayCell extends StatelessWidget {
       enEnregistrement: slot.enEnregistrement,
       onTap: _inerte ? null : slot.onTap,
       onDragEnter: _inerte ? null : slot.onDragEnter,
+      // Un jour hors mois ne refuse rien : il n'appartient pas à ce mois-ci.
+      onRefus: horsMois ? null : onRefus,
       libelleSemantique: AppStrings.slotSemantique(
         jourEtDate: dateLongue,
         creneau: descripteurCreneau.libelle,

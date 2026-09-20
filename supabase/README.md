@@ -83,6 +83,8 @@ Une migration poussée sur `main` n'est jamais modifiée : on en crée une nouve
 | `0009_invitation_functions.sql` | ticket 006 : `mask_email`, `create_invitation`, `accept_invitation`, exécution réservée à `service_role` |
 | `0010_memberships_administration.sql` | ticket 009 : trigger `memberships_guard_admin` (dernier admin, pas soi-même, identité gelée, `disabled_at`), vue `v_member_last_availability`, profils des membres désactivés visibles par leur admin |
 | `0011_station_settings.sql` | ticket 010 : `station_settings_valid` et la contrainte `stations_settings_valide`, nom non vide, trigger `stations_check_timezone`, `period_deadline_at`, trigger `stations_recalcule_deadlines` |
+| `0012_cron_periodes.sql` | ticket 014 : `cron_create_periods`, `cron_lock_periods`, `create_period`, triggers `periods_guard_transition` et `periods_audit_reouverture`, `set_by` imposé sur `availabilities` et audit de la saisie pour autrui, tâches `pg_cron` `create_periods` et `lock_periods` |
+| `0013_periodes_completion_audit.sql` | revue du ticket 014 : vue `v_period_completion`, triggers `periods_audit_creation` / `periods_audit_suppression`, date limite qui ne recule plus dans le passé sur un mois ouvert |
 
 RLS est activé sur chaque table dès sa création et toutes les tables ont au moins une
 politique depuis `0007`. Les politiques sont posées `to authenticated` : `anon` ne lit rien,
@@ -135,6 +137,15 @@ de `0010`, et `supabase/tests/station_settings_test.sql` les paramètres de case
 documents `settings` refusés et acceptés, nom, fuseau inconnu, recalcul des dates limites des
 périodes ouvertes (fuseau compris), immobilité de `shifts.required_count`, et droits
 d'écriture sur `stations`.
+
+`supabase/tests/periods_cron_test.sql` couvre le cycle de vie des périodes (`0012` et
+`0013`) : date limite sur un mois court, création M+1/M+2 idempotente et calculée dans le
+fuseau de chaque caserne, verrouillage des périodes échues, réouverture refusée sans date
+limite future puis tracée dans `audit_log`, `create_period`, `set_by` imposé, vue
+`v_period_completion`, audit de la création et de la suppression d'une période. Les deux
+fonctions de cron y sont appelées **directement avec un instant de référence** : aucun test
+n'attend l'ordonnanceur, et la CI couvre toute la logique sans dépendre de `pg_cron` pour
+l'exécuter.
 
 `scripts/test_functions.sh` exerce les deux Edge Functions en HTTP contre la pile locale
 (69 assertions, base rendue à l'état du seed). Il n'est pas dans la CI : le workflow
@@ -216,4 +227,43 @@ supabase login
 supabase link --project-ref <ref>
 supabase db push          # applique les migrations
 supabase secrets set …    # secrets des Edge Functions, jamais dans le dépôt
+```
+
+### Après chaque `db push` : vérifier que les tâches planifiées existent
+
+`0012` planifie ses deux tâches dans un bloc qui **avale** un
+`insufficient_privilege` en simple `raise notice` : sur un projet hébergé, le schéma `cron`
+appartient à `supabase_admin` et les droits sont posés par un event trigger, si bien qu'une
+migration qui échouerait là bloquerait tout le déploiement pour une tâche de confort. Le
+revers est qu'une planification ratée **ne se voit pas** dans la sortie de `db push` : plus
+aucune période ne se verrouillerait, plus aucun mois ne s'ouvrirait, et personne ne
+l'apprendrait avant qu'une caserne ne signale que sa saisie ne se ferme plus.
+
+C'est donc une vérification explicite, à faire après chaque `db push` sur le projet hébergé
+(SQL Editor du dashboard, ou `psql` sur l'URL de connexion) :
+
+```sql
+select jobname, schedule, command, active, database, username
+from cron.job
+order by jobname;
+```
+
+Attendu, aujourd'hui : deux lignes `active = true`, `create_periods` (`0 2 1 * *`) et
+`lock_periods` (`0 * * * *`), toutes deux sur la base `postgres`. Les autres tâches de
+`docs/SCHEMA.md` § 8 s'y ajouteront ; la liste de ce document fait foi.
+
+S'il en manque une, la replanifier à la main — l'appel est un upsert par nom, il est sans
+risque de doublon :
+
+```sql
+select cron.schedule('create_periods', '0 2 1 * *', $$select public.cron_create_periods();$$);
+select cron.schedule('lock_periods',   '0 * * * *', $$select public.cron_lock_periods();$$);
+```
+
+Et pour vérifier qu'elles tournent vraiment, quelques heures après :
+
+```sql
+select jobid, status, return_message, start_time
+from cron.job_run_details
+order by start_time desc limit 20;
 ```
