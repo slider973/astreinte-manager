@@ -5,14 +5,18 @@
 // même `traiterEnvoi`, `send-notification/index.ts` ne fait que lui brancher les
 // vraies implémentations.
 //
-// Les six promesses vérifiées ici sont celles du ticket :
+// Les sept promesses vérifiées ici sont celles du ticket, plus celle que la revue
+// a trouvée manquante (la septième) :
 //   1. la ligne interne est écrite même quand tout envoi échoue ;
 //   2. un membre sans appareil reçoit un courriel ;
 //   3. `push_enabled = false` coupe le push des types non critiques…
 //   4. …et ne coupe pas les propositions d'astreinte ;
 //   5. un jeton définitivement rejeté est supprimé, un jeton en panne passagère
 //      est conservé ;
-//   6. une publication ne produit qu'une notification par membre.
+//   6. une publication ne produit qu'une notification par membre ;
+//   7. une ligne interne qui n'a pas pu s'écrire n'est jamais comptée comme
+//      délivrée — sans quoi la demande serait close en « sent » et la
+//      notification disparaîtrait sans trace ni reprise.
 
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 
@@ -48,7 +52,12 @@ type Journal = {
   notifications: LigneNotification[];
   jetonsSupprimes: string[];
   courriels: { to: string; titre: string }[];
-  pushEnvoyes: { jetons: string[]; titre: string; donnees: Record<string, string> }[];
+  pushEnvoyes: {
+    jetons: string[];
+    titre: string;
+    donnees: Record<string, string>;
+    lien?: string;
+  }[];
 };
 
 function faussesDeps(options: {
@@ -86,7 +95,12 @@ function faussesDeps(options: {
       return Promise.resolve();
     },
     envoyerPush: (jetons, message) => {
-      journal.pushEnvoyes.push({ jetons, titre: message.titre, donnees: message.donnees });
+      journal.pushEnvoyes.push({
+        jetons,
+        titre: message.titre,
+        donnees: message.donnees,
+        lien: message.lien,
+      });
       return Promise.resolve(
         options.push?.(jetons) ??
           {
@@ -154,6 +168,58 @@ Deno.test("la ligne interne est écrite avant l'envoi, et reste quand tout écho
   // Et le destinataire reste « servi » : il verra la notification dans l'app.
   assertEquals(resultat.ok, true);
   assertEquals(resultat.delivered, 1);
+});
+
+Deno.test("une ligne interne qui échoue à s'écrire n'est pas comptée comme délivrée", async () => {
+  // C'est le point que la revue a relevé : l'insertion peut échouer (contrainte,
+  // base indisponible) et rendre `null`. Poser `inapp: true` sans regarder faisait
+  // compter le membre comme servi, clore la demande en « sent », et la
+  // notification disparaissait — sans ligne à lire, sans reprise, sans trace.
+  const { deps, journal } = faussesDeps({
+    echecEcriture: true,
+    jetons: {},
+    mail: { sent: false, provider: "none", error: "aucun fournisseur" },
+  });
+
+  const resultat = await traiterEnvoi(deps, demande());
+
+  // L'insertion a bien été tentée…
+  assertEquals(journal.notifications.filter((n) => n.channel === "inapp").length, 1);
+  // …mais elle n'a rien produit, et le résultat le dit.
+  assertEquals(resultat.results[0].inapp, false);
+  assertEquals(resultat.results[0].notification_id, null);
+  assertEquals(resultat.results[0].ok, false);
+  assertEquals(resultat.results[0].code, "no_channel_delivered");
+  // Donc la demande n'est pas close comme réussie : la file la reprendra.
+  assertEquals(resultat.ok, false);
+  assertEquals(resultat.failed, 1);
+});
+
+Deno.test("une ligne interne perdue reste rattrapée par un canal qui, lui, aboutit", async () => {
+  const { deps } = faussesDeps({ echecEcriture: true, jetons: {} });
+
+  const resultat = await traiterEnvoi(deps, demande());
+
+  // Le courriel de repli est parti : le membre est prévenu, même si le centre de
+  // notifications n'a rien reçu. Inutile de rejouer l'envoi.
+  assertEquals(resultat.results[0].inapp, false);
+  assertEquals(resultat.results[0].email?.sent, true);
+  assertEquals(resultat.ok, true);
+});
+
+Deno.test("le lien du push est une adresse complète, pas le chemin interne", async () => {
+  const { deps, journal } = faussesDeps({
+    jetons: { [MEMBRE]: [{ token: "T1", platform: "web" }] },
+  });
+
+  await traiterEnvoi(deps, demande());
+
+  const lien = journal.pushEnvoyes[0].lien;
+  assert(lien !== undefined && lien.endsWith("/#/proposals"), `lien inattendu : ${lien}`);
+  assert(
+    lien.startsWith("http://") || lien.startsWith("https://"),
+    "le lien doit être une adresse complète",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -387,12 +453,21 @@ Deno.test("un corps mal formé est refusé avec un code stable", () => {
     [{ type: "schedule_validated", recipients: [{}] }, "invalid_recipients"],
     [{ type: "schedule_validated", user_ids: [MEMBRE], channels: ["sms"] }, "invalid_channels"],
     [{ type: "schedule_validated", user_ids: [MEMBRE], channels: [] }, "invalid_channels"],
+    // `/connexion` n'est pas un des quatre liens profonds : un push le portant
+    // n'ouvrirait rien. Le canal est refusé plutôt que le lien livré mort.
+    [{ type: "invitation", user_ids: [MEMBRE], channels: ["push"] }, "invalid_channels"],
   ];
   for (const [corps, code] of cas) {
     const lu = lireDemande(corps);
     assert("erreur" in lu, `${JSON.stringify(corps)} aurait dû être refusé`);
     assertEquals(lu.erreur.code, code);
   }
+});
+
+Deno.test("une invitation part par courriel, et seulement par courriel", () => {
+  const courriel = lireDemande({ type: "invitation", user_ids: [MEMBRE], channels: ["email"] });
+  assert("demande" in courriel);
+  assertEquals(courriel.demande.channels, ["email"]);
 });
 
 Deno.test("la charge utile commune est fusionnée sous celle de chaque membre", async () => {

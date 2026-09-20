@@ -240,6 +240,14 @@ export function lirePeriode(payload: ChargeUtile): string | null {
  * absente ou mal formée. C'est volontaire : une notification ne se perd pas pour
  * un détail d'itinéraire. Le membre arrive à un endroit utile, et le défaut de
  * l'appelant se voit dans les journaux, pas dans une notification manquante.
+ *
+ * **`invitation` fait exception et sort des quatre destinations.** `/connexion`
+ * n'est pas un lien profond : `destination_push.dart` ne le connaît pas et le
+ * rejette, donc un push qui le porterait n'ouvrirait rien. C'est sans conséquence
+ * parce que ce type ne part **que** par courriel — où le lien est une adresse
+ * complète, pas une destination interne — et parce que `lireDemande` refuse le
+ * canal push pour ce type, plutôt que de laisser un appelant fabriquer un lien
+ * mort.
  */
 export function routePour(type: TypeNotification, payload: ChargeUtile): string {
   const periode = lirePeriode(payload);

@@ -30,7 +30,15 @@ export type MessagePush = {
   corps: string;
   /** Paires de chaînes : FCM refuse tout ce qui n'est pas une chaîne. */
   donnees: Record<string, string>;
-  /** Le lien ouvert au clic, côté web. */
+  /**
+   * Le lien ouvert au clic, côté web (`webpush.fcm_options.link`).
+   *
+   * **Adresse complète en `https://` uniquement.** L'API v1 valide ce champ comme
+   * une URL et refuse tout le reste par un `400 INVALID_ARGUMENT` — donc un chemin
+   * relatif (`/proposals`) fait échouer le message entier. Une valeur non conforme
+   * est écartée ici plutôt qu'envoyée : la notification part sans ce champ, et le
+   * service worker retrouve la destination dans `data.route` (ticket 024).
+   */
   lien?: string;
   /** `Notification.tag` : deux notifications de même étiquette se remplacent. */
   etiquette?: string;
@@ -247,6 +255,29 @@ export function classerErreurFcm(statut: number, corps: string): VerdictJeton {
  * `data.title`, `data.body` et `data.route`. Retirer l'un des deux blocs casse
  * l'un des trois chemins.
  */
+/**
+ * Ce champ accepte-t-il cette valeur ?
+ *
+ * `webpush.fcm_options.link` doit être une adresse **complète** et **sécurisée** :
+ * l'API v1 la valide comme une URL et impose `https`. Un chemin relatif ou une
+ * origine en `http://` (la pile locale) provoquent un `400 INVALID_ARGUMENT` qui
+ * fait échouer tout le message — et `classerErreurFcm` le rangerait en incident
+ * temporaire, donc aucun jeton ne serait perdu mais aucun push ne partirait jamais,
+ * tout basculant en courriel de secours. Le silence parfait.
+ *
+ * L'omettre est sans conséquence : le service worker lit `data.route`, pas ce
+ * champ (`web/firebase-messaging-sw.js`). En développement, où `APP_BASE_URL` est
+ * en `http://127.0.0.1:3000`, le push part donc simplement sans lui.
+ */
+export function lienPubliable(lien: string | undefined): boolean {
+  if (!lien) return false;
+  try {
+    return new URL(lien).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function corpsMessage(jeton: string, message: MessagePush): Record<string, unknown> {
   const donnees: Record<string, string> = {
     ...message.donnees,
@@ -266,7 +297,7 @@ export function corpsMessage(jeton: string, message: MessagePush): Record<string
           body: message.corps,
           tag: message.etiquette,
         },
-        fcm_options: message.lien ? { link: message.lien } : undefined,
+        fcm_options: lienPubliable(message.lien) ? { link: message.lien } : undefined,
       },
     },
   };

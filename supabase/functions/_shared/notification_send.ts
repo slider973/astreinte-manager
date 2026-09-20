@@ -35,6 +35,7 @@ import {
   TYPES_CRITIQUES,
 } from "./notification_content.ts";
 import type { ResultatPush } from "./fcm.ts";
+import { lienApplication } from "./notification_email.ts";
 import type { MailResult } from "./mailer.ts";
 
 // ---------------------------------------------------------------------------
@@ -259,7 +260,12 @@ async function servirUnDestinataire(
       delivered: true,
       error: null,
     });
-    resultat.inapp = true;
+    // Écrite, ou pas. `ecrireNotification` rend `null` quand l'insertion a
+    // échoué, et poser `inapp: true` sans regarder ferait compter le destinataire
+    // comme servi, clore la demande en `sent`, et faire disparaître la
+    // notification sans trace ni reprise — précisément ce que la file d'attente
+    // existe pour rendre impossible.
+    resultat.inapp = notificationId !== null;
     resultat.notification_id = notificationId;
   }
 
@@ -286,7 +292,12 @@ async function servirUnDestinataire(
         titre: contenu.titre,
         corps: contenu.corps,
         donnees: aplatir({ ...donnees, notification_id: notificationId }),
-        lien: contenu.route,
+        // Adresse **complète**, pas le chemin : `webpush.fcm_options.link` est
+        // validé comme une URL par l'API v1, et un chemin relatif ferait échouer
+        // le message entier. `lienPubliable` (fcm.ts) l'écarte si l'origine n'est
+        // pas en `https` — en local, le push part alors sans ce champ, et le
+        // service worker retrouve la destination dans `data.route`.
+        lien: lienApplication(contenu.route),
         etiquette: etiquette(demande.type, destinataire.payload),
       });
 
@@ -461,6 +472,19 @@ export function lireDemande(
     }
     if (lus.length === 0) {
       return { erreur: { code: "invalid_channels", message: "Au moins un canal est attendu." } };
+    }
+    // `invitation` porte `/connexion`, qui n'est pas un des quatre liens profonds
+    // de docs/WORKFLOWS.md § 8 : le client le rejette. Un push le portant
+    // n'ouvrirait rien. Plutôt que de livrer un lien mort, on refuse le canal —
+    // l'appelant s'en aperçoit au développement, pas le pompier sur le terrain.
+    if (type === "invitation" && lus.includes("push")) {
+      return {
+        erreur: {
+          code: "invalid_channels",
+          message:
+            "Une invitation ne part que par courriel : elle n'a pas de destination dans l'application.",
+        },
+      };
     }
     channels = lus;
   }

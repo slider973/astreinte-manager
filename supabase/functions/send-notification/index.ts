@@ -70,7 +70,27 @@ function memeSecret(a: string, b: string): boolean {
   return difference === 0;
 }
 
+/**
+ * Le secret interne, gardé en mémoire pour ne pas interroger Vault à chaque
+ * notification — une publication de planning, c'est une centaine d'appels.
+ *
+ * Le cache est **relu en cas de non-correspondance**, et une seule fois par
+ * requête : le jour où le secret tourne, l'instance déjà chaude refuserait sinon
+ * tous les appels venus de la base jusqu'à son recyclage, et les notifications
+ * s'accumuleraient en file pour une raison invisible. Un attaquant qui présente
+ * un mauvais secret provoque une lecture de Vault, pas davantage.
+ */
 let secretInterne: string | null = null;
+
+async function lireSecretInterne(admin: AdminClient): Promise<string | null> {
+  const { data, error } = await admin.rpc("notify_internal_secret");
+  if (error || typeof data !== "string" || data === "") {
+    console.error("notify_internal_secret", error?.message ?? "secret absent de Vault");
+    return null;
+  }
+  secretInterne = data;
+  return data;
+}
 
 async function appelAutorise(req: Request, admin: AdminClient): Promise<boolean> {
   const entete = req.headers.get("Authorization") ?? "";
@@ -81,15 +101,14 @@ async function appelAutorise(req: Request, admin: AdminClient): Promise<boolean>
   const propose = req.headers.get("x-notify-secret");
   if (!propose) return false;
 
-  if (secretInterne === null) {
-    const { data, error } = await admin.rpc("notify_internal_secret");
-    if (error || typeof data !== "string" || data === "") {
-      console.error("notify_internal_secret", error?.message ?? "secret absent de Vault");
-      return false;
-    }
-    secretInterne = data;
-  }
-  return memeSecret(propose, secretInterne);
+  const enCache = secretInterne ?? await lireSecretInterne(admin);
+  if (enCache !== null && memeSecret(propose, enCache)) return true;
+
+  // Ça ne correspond pas : le secret a peut-être tourné depuis le démarrage de
+  // cette instance. On relit une fois, et une seule.
+  if (enCache === null) return false;
+  const frais = await lireSecretInterne(admin);
+  return frais !== null && memeSecret(propose, frais);
 }
 
 // ---------------------------------------------------------------------------

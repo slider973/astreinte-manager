@@ -12,6 +12,7 @@ import {
   classerErreurFcm,
   corpsMessage,
   envoyerPush,
+  lienPubliable,
   oublierJetonOAuth,
   type Transport,
 } from "../_shared/fcm.ts";
@@ -120,21 +121,23 @@ Deno.test("un corps vide ou illisible ne fait supprimer aucun jeton", () => {
   assertEquals(classerErreurFcm(418, "<html>"), "temporaire");
 });
 
+type CorpsFcm = {
+  message: {
+    token: string;
+    notification: { title: string; body: string };
+    data: Record<string, string>;
+    webpush: { fcm_options?: { link: string } };
+  };
+};
+
 Deno.test("le message porte les blocs notification ET data attendus par le client", () => {
   const corps = corpsMessage("JETON", {
     titre: "Astreinte proposée le 12 octobre, nuit",
     corps: "CIS Saint-Martin te propose une astreinte.",
     donnees: { route: "/proposals", type: "assignment_proposed" },
-    lien: "/proposals",
+    lien: "https://app.astreinte-sp.fr/#/proposals",
     etiquette: "assignment_proposed:2026-10",
-  }) as {
-    message: {
-      token: string;
-      notification: { title: string; body: string };
-      data: Record<string, string>;
-      webpush: { fcm_options?: { link: string } };
-    };
-  };
+  }) as CorpsFcm;
 
   assertEquals(corps.message.token, "JETON");
   // Premier plan : messagerie_push.dart lit notification.title / notification.body.
@@ -143,7 +146,43 @@ Deno.test("le message porte les blocs notification ET data attendus par le clien
   assertEquals(corps.message.data.title, "Astreinte proposée le 12 octobre, nuit");
   assertEquals(corps.message.data.route, "/proposals");
   assertEquals(corps.message.data.tag, "assignment_proposed:2026-10");
-  assertEquals(corps.message.webpush.fcm_options?.link, "/proposals");
+  // Le lien du message est une adresse complète, jamais le chemin interne.
+  assertEquals(corps.message.webpush.fcm_options?.link, "https://app.astreinte-sp.fr/#/proposals");
+});
+
+Deno.test("seule une adresse complète en https est acceptée comme lien", () => {
+  assert(lienPubliable("https://app.astreinte-sp.fr/#/proposals"));
+  // Le chemin interne : c'est lui qui aurait fait échouer tous les messages.
+  assert(!lienPubliable("/proposals"));
+  // La pile locale : `webpush.fcm_options.link` impose https.
+  assert(!lienPubliable("http://127.0.0.1:3000/#/proposals"));
+  assert(!lienPubliable(""));
+  assert(!lienPubliable(undefined));
+  assert(!lienPubliable("javascript:alert(1)"));
+});
+
+Deno.test("un lien inutilisable est omis, pas envoyé — le message part quand même", () => {
+  // Sans ce filtre, l'API v1 renverrait un 400 INVALID_ARGUMENT sur *chaque*
+  // jeton. `classerErreurFcm` le rangerait en incident temporaire — donc aucun
+  // jeton perdu, mais aucun push jamais délivré et tout en courriel de secours.
+  // Un silence parfait, invisible tant que les clés Firebase manquent.
+  const relatif = corpsMessage("JETON", {
+    titre: "t",
+    corps: "c",
+    donnees: { route: "/proposals" },
+    lien: "/proposals",
+  }) as CorpsFcm;
+  assertEquals(relatif.message.webpush.fcm_options, undefined);
+  // La destination, elle, voyage toujours : le service worker lit `data.route`.
+  assertEquals(relatif.message.data.route, "/proposals");
+
+  const local = corpsMessage("JETON", {
+    titre: "t",
+    corps: "c",
+    donnees: {},
+    lien: "http://127.0.0.1:3000/#/proposals",
+  }) as CorpsFcm;
+  assertEquals(local.message.webpush.fcm_options, undefined);
 });
 
 Deno.test("sans compte de service, le push est indisponible et non en échec", async () => {

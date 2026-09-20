@@ -354,6 +354,12 @@ appeler send-notification "$SERVICE_KEY" '{"type":"schedule_validated"}'
 verifier "sans destinataire : code invalid_recipients" "invalid_recipients" \
   "$(jq -r '.error.code' <<<"$CORPS")"
 
+# `/connexion` n'est pas un des quatre liens profonds : un push le portant
+# n'ouvrirait rien. Le canal est refusé plutôt que le lien livré mort.
+appeler send-notification "$SERVICE_KEY" '{"type":"invitation","user_ids":["'"$MEMBRE1_A"'"],"channels":["push"]}'
+verifier "une invitation ne part pas en push : 400" "400" "$STATUT"
+verifier "code invalid_channels" "invalid_channels" "$(jq -r '.error.code' <<<"$CORPS")"
+
 # ---------------------------------------------------------------------------
 echo ''
 echo '--- 9. send-notification : un membre sans appareil reçoit un courriel'
@@ -497,6 +503,15 @@ verifier "la notification interne existe" "Planning d'octobre validé" \
 # Idempotence du rejeu : reposter la même demande ne renvoie rien.
 APPEL="$(sql "select notify_post('$OUTBOX')")"
 verifier "une demande close n'est pas repostée" "f" "$APPEL"
+
+# Et si la reprise la postait quand même, la fonction ne renverrait rien : la
+# prise en charge est exclusive, et une demande close n'est plus prise du tout.
+appeler send-notification "$SERVICE_KEY" "{\"outbox_id\": \"$OUTBOX\"}"
+verifier "rejeu d'une demande close : 200" "200" "$STATUT"
+verifier "rien n'est renvoyé une seconde fois" "already_processed" \
+  "$(jq -r '.skipped' <<<"$CORPS")"
+verifier "toujours une seule notification interne" "1" \
+  "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp'")"
 
 # ---------------------------------------------------------------------------
 echo ''
