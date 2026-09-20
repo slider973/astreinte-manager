@@ -259,49 +259,58 @@ class _ListePeriodes extends StatelessWidget {
     final aVenir = donnees.aVenir(maintenant);
     final ecoulees = donnees.ecoulees(maintenant);
 
-    return CustomScrollView(
-      slivers: <Widget>[
-        SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: marge),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate(<Widget>[
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                AppStrings.periodesSousTitre,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+    // Le registre est une **page**, pas un tableau de bord : au-delà de
+    // 720 dp, la ligne ne s'étire plus et le bouton reste près du texte qu'il
+    // concerne. Sans borne, l'admin sur son ordinateur lisait « Novembre » à
+    // gauche et « Verrouiller » à onze cents pixels de là.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
+        child: CustomScrollView(
+          slivers: <Widget>[
+            SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: marge),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate(<Widget>[
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    AppStrings.periodesSousTitre,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  EnteteSection(
+                    titre: AppStrings.periodesSectionAVenir,
+                    compte: AppStrings.periodesCompte(aVenir.length),
+                  ),
+                ]),
+              ),
+            ),
+            _section(
+              marge: marge,
+              periodes: aVenir,
+              vide: AppStrings.periodesAucunAVenir,
+              theme: theme,
+            ),
+            SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: marge),
+              sliver: SliverToBoxAdapter(
+                child: EnteteSection(
+                  titre: AppStrings.periodesSectionEcoules,
+                  compte: AppStrings.periodesCompte(ecoulees.length),
                 ),
               ),
-              EnteteSection(
-                titre: AppStrings.periodesSectionAVenir,
-                compte: AppStrings.periodesCompte(aVenir.length),
-              ),
-            ]),
-          ),
-        ),
-        _section(
-          marge: marge,
-          periodes: aVenir,
-          vide: AppStrings.periodesAucunAVenir,
-          theme: theme,
-        ),
-        SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: marge),
-          sliver: SliverToBoxAdapter(
-            child: EnteteSection(
-              titre: AppStrings.periodesSectionEcoules,
-              compte: AppStrings.periodesCompte(ecoulees.length),
             ),
-          ),
+            _section(
+              marge: marge,
+              periodes: ecoulees,
+              vide: AppStrings.periodesAucunEcoule,
+              theme: theme,
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+          ],
         ),
-        _section(
-          marge: marge,
-          periodes: ecoulees,
-          vide: AppStrings.periodesAucunEcoule,
-          theme: theme,
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
-      ],
+      ),
     );
   }
 
@@ -313,7 +322,12 @@ class _ListePeriodes extends StatelessWidget {
   }) {
     if (periodes.isEmpty) {
       return SliverPadding(
-        padding: EdgeInsets.fromLTRB(marge, AppSpacing.md, marge, AppSpacing.md),
+        padding: EdgeInsets.fromLTRB(
+          marge,
+          AppSpacing.md,
+          marge,
+          AppSpacing.md,
+        ),
         sliver: SliverToBoxAdapter(
           child: Text(
             vide,
