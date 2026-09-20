@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 005 | [Connexion par email et code OTP](in-progress/005-auth-otp.md) | P0 | 001 002 |  |
 
 ## À faire
 
@@ -52,5 +51,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 002 | [Créer le projet Supabase et les migrations initiales](done/002-supabase-migrations.md) | P0 |  | https://github.com/slider973/astreinte-manager/pull/2 |
 | 003 | [Mettre en place la CI](done/003-ci-github-actions.md) | P1 | 001 002 | https://github.com/slider973/astreinte-manager/pull/5 |
 | 004 | [Thème et composants de base](done/004-design-system.md) | P1 | 001 | https://github.com/slider973/astreinte-manager/pull/4 |
+| 005 | [Connexion par email et code OTP](done/005-auth-otp.md) | P0 | 001 002 |  |
 | 008 | [Row Level Security et fonctions d'accès](done/008-rls-multi-tenant.md) | P0 | 002 | https://github.com/slider973/astreinte-manager/pull/3 |
 
