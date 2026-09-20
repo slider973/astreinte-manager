@@ -57,6 +57,14 @@ abstract final class AppRoutes {
   /// premier niveau qui a sa propre route (« Admin »).
   static const String parametreOnglet = 'onglet';
 
+  /// Le mois affiché par « Mon mois », au format `AAAA-MM` (ticket 011).
+  ///
+  /// L'URL porte l'état : le retour du navigateur et le geste retour iOS
+  /// ramènent au mois précédemment consulté, jamais à un état perdu. La route
+  /// dédiée `/mois` annoncée dans `DESIGN.md § Navigation` attend que la
+  /// coquille d'accueil éclate en routes.
+  static const String parametreMois = 'mois';
+
   /// Administration de la caserne : les membres et les invitations
   /// (ticket 006).
   static const String membres = '/admin/membres';
@@ -161,6 +169,7 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
                 state.uri.queryParameters[AppRoutes.parametreOnglet] ?? '',
               ) ??
               0,
+          mois: state.uri.queryParameters[AppRoutes.parametreMois],
         ),
       ),
       GoRoute(

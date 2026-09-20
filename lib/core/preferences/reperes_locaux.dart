@@ -11,7 +11,16 @@ enum RepereAccueil {
   guide('accueil.guide.vu'),
 
   /// L'aide « Ajouter à l'écran d'accueil ».
-  aideInstallation('accueil.installation.vue');
+  aideInstallation('accueil.installation.vue'),
+
+  /// Le membre a terminé au moins une peinture au glissement sur cet
+  /// appareil : l'astuce du bloc d'aide n'a plus rien à lui apprendre.
+  ///
+  /// Le repère se perd s'il change d'appareil ou vide son navigateur, et le
+  /// bloc réapparaît. C'est accepté (brief 011 § 7.6) : un rappel de trop
+  /// coûte deux lignes, un geste jamais découvert coûte cent vingt touches
+  /// par mois.
+  peintureDispos('dispos.peinture.faite');
 
   const RepereAccueil(this.cle);
 

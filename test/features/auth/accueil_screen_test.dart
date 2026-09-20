@@ -17,6 +17,13 @@ const Appartenance _adminCaserneA = Appartenance(
   statut: StatutMembre.actif,
 );
 
+/// Ouvre l'onglet « Profil », qui porte l'identité et la sortie depuis que
+/// l'onglet 0 est devenu l'écran « Mon mois » (ticket 011).
+Future<void> ouvrirProfil(WidgetTester tester) async {
+  await tester.tap(find.text(AppStrings.navProfil));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('AccueilScreen', () {
     testWidgets('une session existante mène directement à l\'accueil', (
@@ -38,6 +45,7 @@ void main() {
         session: sessionMembre,
         appartenances: const <Appartenance>[appartenanceMembre],
       );
+      await ouvrirProfil(tester);
 
       expect(find.text('CIS Saint-Martin'), findsOneWidget);
       expect(find.text(AppStrings.roleMembre), findsOneWidget);
@@ -52,9 +60,10 @@ void main() {
         session: sessionMembre,
         appartenances: const <Appartenance>[_adminCaserneA],
       );
-
-      expect(find.text(AppStrings.roleAdmin), findsOneWidget);
       expect(find.text(AppStrings.navAdmin), findsOneWidget);
+
+      await ouvrirProfil(tester);
+      expect(find.text(AppStrings.roleAdmin), findsOneWidget);
 
       await monterApp(
         tester,
@@ -72,6 +81,7 @@ void main() {
         session: sessionMembre,
         appartenances: const <Appartenance>[appartenanceMembre],
       );
+      await ouvrirProfil(tester);
 
       await tester.tap(find.text(AppStrings.seDeconnecter));
       await tester.pumpAndSettle();
@@ -87,6 +97,7 @@ void main() {
         session: sessionMembre,
         appartenances: const <Appartenance>[appartenanceMembre],
       );
+      await ouvrirProfil(tester);
       faux.auth.erreurDeconnexion = AuthErreur.reseau;
 
       await tester.tap(find.text(AppStrings.seDeconnecter));

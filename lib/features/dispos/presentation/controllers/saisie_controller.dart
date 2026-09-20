@@ -260,7 +260,17 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     );
   }
 
-  EtatSaisie? get _etat => state.value;
+  /// L'état courant, ou `null` si le provider a été disposé entre-temps.
+  ///
+  /// Toute reprise après un `await` passe par là : une requête peut revenir
+  /// alors que l'écran est fermé ou que le mois a changé, et écrire dans un
+  /// `state` démonté est une erreur de programmation, pas un cas limite.
+  EtatSaisie? get _etat => ref.mounted ? state.value : null;
+
+  void _publier(EtatSaisie etat) {
+    if (!ref.mounted) return;
+    state = AsyncValue<EtatSaisie?>.data(etat);
+  }
 
   // -------------------------------------------------------------------
   // La touche
@@ -288,9 +298,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     _gesteActif = true;
     _moisAvantGeste = etat.mois;
     _fileAvantGeste = Map<CreneauCle, DisponibiliteEtat>.of(_file);
-    state = AsyncValue<EtatSaisie?>.data(
-      etat.copyWith(casesPeintes: 0, annonce: () => null),
-    );
+    _publier(etat.copyWith(casesPeintes: 0, annonce: () => null));
   }
 
   /// Une case passe sous le doigt.
@@ -321,7 +329,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     if (etat == null) return;
 
     final pinceau = etat.pinceau;
-    state = AsyncValue<EtatSaisie?>.data(
+    _publier(
       etat.copyWith(
         pinceau: () => null,
         annonce: () => pinceau == null || etat.casesPeintes == 0
@@ -350,7 +358,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       ..clear()
       ..addAll(fileAvant);
 
-    state = AsyncValue<EtatSaisie?>.data(
+    _publier(
       etat.copyWith(
         mois: avant,
         pinceau: () => null,
@@ -377,7 +385,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
 
     _file.addAll(modifications);
 
-    state = AsyncValue<EtatSaisie?>.data(
+    _publier(
       etat.copyWith(
         mois: etat.mois.avec(modifications),
         // Une case qu'on vient de reposer n'est plus en échec : sa nouvelle
@@ -448,17 +456,13 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     if (ecritures.isEmpty && suppressions.isEmpty) {
       _retirerDeLaFile(lot);
       _appliquerAuServeur(lot);
-      state = AsyncValue<EtatSaisie?>.data(
-        _etat!.copyWith(sync: SyncEtat.enregistre),
-      );
+      _publier(etat.copyWith(sync: SyncEtat.enregistre));
       return;
     }
 
     _envoiEnCours = true;
     if (!etat.horsLigne && etat.sync != SyncEtat.enregistrement) {
-      state = AsyncValue<EtatSaisie?>.data(
-        etat.copyWith(sync: SyncEtat.enregistrement),
-      );
+      _publier(etat.copyWith(sync: SyncEtat.enregistrement));
     }
 
     final depot = ref.read(disposRepositoryProvider);
@@ -499,7 +503,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
 
       final courant = _etat;
       if (courant == null) return;
-      state = AsyncValue<EtatSaisie?>.data(
+      _publier(
         courant.copyWith(
           sync: _file.isEmpty ? SyncEtat.enregistre : SyncEtat.enregistrement,
           enErreur: courant.enErreur.difference(lot.keys.toSet()),
@@ -527,9 +531,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     // Hors ligne n'est pas un échec, c'est une attente : aucune case n'est
     // marquée, rien n'est bloqué, la file reste pleine.
     if (erreur == ErreurDispos.reseau) {
-      state = AsyncValue<EtatSaisie?>.data(
-        etat.copyWith(sync: SyncEtat.horsLigne, horsLigne: true),
-      );
+      _publier(etat.copyWith(sync: SyncEtat.horsLigne, horsLigne: true));
       return;
     }
 
@@ -541,7 +543,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       final courant = _etat;
       if (courant == null) return;
 
-      state = AsyncValue<EtatSaisie?>.data(
+      _publier(
         courant.copyWith(
           sync: SyncEtat.echec,
           enErreur: <CreneauCle>{...courant.enErreur, ...lot.keys},
@@ -555,7 +557,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     }
 
     final derniere = _relance >= relances.length;
-    state = AsyncValue<EtatSaisie?>.data(
+    _publier(
       etat.copyWith(
         sync: SyncEtat.echec,
         enErreur: <CreneauCle>{...etat.enErreur, ...lot.keys},
@@ -616,7 +618,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     final etat = _etat;
     if (etat == null) return;
 
-    state = AsyncValue<EtatSaisie?>.data(
+    _publier(
       etat.copyWith(
         horsLigne: !enLigne,
         sync: enLigne
@@ -634,8 +636,9 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   /// Change de mois. La file est vidée **avant** : le mois quitté ne laisse
   /// jamais de modification derrière lui.
   Future<void> choisirMois(String cle) async {
-    if (ref.read(moisSelectionneProvider) == cle) return;
+    if (!ref.mounted || ref.read(moisSelectionneProvider) == cle) return;
     await viderMaintenant();
+    if (!ref.mounted) return;
     ref.read(moisSelectionneProvider.notifier).definir(cle);
   }
 
@@ -645,6 +648,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     _file.clear();
     _minuteur?.cancel();
     _relance = 0;
+    if (!ref.mounted) return;
     ref.invalidate(periodesProvider);
     ref.invalidateSelf();
   }
@@ -654,7 +658,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   void annonceLue() {
     final etat = _etat;
     if (etat == null || etat.annonce == null) return;
-    state = AsyncValue<EtatSaisie?>.data(etat.copyWith(annonce: () => null));
+    _publier(etat.copyWith(annonce: () => null));
   }
 }
 

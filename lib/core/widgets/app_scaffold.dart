@@ -137,7 +137,13 @@ class AppScaffold extends StatelessWidget {
 
     final corps = Column(
       children: <Widget>[
-        ?banniere,
+        // **La zone de bannière existe toujours**, même vide. Avec un enfant
+        // conditionnel, l'apparition d'une bannière décalait tous les
+        // suivants d'un cran : Flutter n'appariait plus les éléments, jetait
+        // le contenu et le reconstruisait depuis zéro. La grille du mois y
+        // perdait sa position de défilement, et les abonnements Riverpod de
+        // ses lignes se réveillaient sur des éléments déjà démontés.
+        banniere ?? const SizedBox.shrink(),
         Expanded(child: child),
         if (filActions != null)
           SafeArea(

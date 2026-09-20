@@ -12,6 +12,8 @@ import 'package:astreinte_sp/core/session/membership_repository.dart';
 import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/session/session_utilisateur.dart';
 import 'package:astreinte_sp/core/supabase/supabase_bootstrap.dart';
+import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
+import 'package:astreinte_sp/features/dispos/domain/dispos_providers.dart';
 import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart';
 import 'package:astreinte_sp/features/invitation/domain/invitation_providers.dart';
 import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
@@ -23,6 +25,8 @@ import 'package:astreinte_sp/features/parametres/domain/parametres_providers.dar
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'faux_dispos.dart';
 
 /// Environnement de test : configuration Supabase présente, mais aucun réseau
 /// n'est jamais joint — les dépôts sont faux.
@@ -176,9 +180,11 @@ Future<AppMontee> monterApp(
   InvitationRepository? invitations,
   ProfilRepository? profils,
   ParametresRepository? parametres,
+  DisposRepository? dispos,
   ReperesLocaux? reperes,
   ContextePlateforme? plateforme,
   Size taille = const Size(390, 844),
+  bool stabiliser = true,
 }) async {
   tester.view.physicalSize = taille * tester.view.devicePixelRatio;
   addTearDown(tester.view.reset);
@@ -209,6 +215,11 @@ Future<AppMontee> monterApp(
           profilRepositoryProvider.overrideWithValue(profils),
         if (parametres != null)
           parametresRepositoryProvider.overrideWithValue(parametres),
+        // L'onglet 0 est désormais « Mon mois » : sans faux dépôt, il
+        // toucherait un client Supabase qui n'existe pas en test.
+        disposRepositoryProvider.overrideWithValue(
+          dispos ?? FauxDisposRepository(),
+        ),
         reperesLocauxProvider.overrideWithValue(
           reperes ?? ReperesLocauxMemoire(),
         ),
@@ -219,7 +230,15 @@ Future<AppMontee> monterApp(
       child: const AstreinteApp(),
     ),
   );
-  await tester.pumpAndSettle();
+  // `pumpAndSettle` ne rend jamais la main sur un écran qui porte un
+  // squelette de chargement : son balayage tourne en boucle. Les tests qui
+  // veulent observer ce squelette passent `stabiliser: false`.
+  if (stabiliser) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump();
+  }
 
   return (auth: auth, memberships: memberships);
 }

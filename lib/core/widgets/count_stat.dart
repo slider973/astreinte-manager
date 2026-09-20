@@ -20,6 +20,7 @@ class CountStat extends StatelessWidget {
     super.key,
     this.plafond,
     this.grand = false,
+    this.plafondAttendu = true,
   });
 
   /// « Jours », « Nuits », « Weekends ».
@@ -33,6 +34,15 @@ class CountStat extends StatelessWidget {
 
   /// Compteur du mois, gros total : `display-nombre` au lieu de `nombre`.
   final bool grand;
+
+  /// Vrai quand l'absence de plafond doit être **dite** (« illimité »).
+  ///
+  /// Faux pour un total qui n'a pas de plafond par nature : les compteurs du
+  /// mois (ticket 011) ne sont pas des quotas, et « 12 illimité » ne veut
+  /// rien dire — en plus de coûter la largeur de trois colonnes sur un
+  /// téléphone. Le ticket 013 remplira [plafond] et le mot disparaîtra de
+  /// lui-même.
+  final bool plafondAttendu;
 
   /// Vrai si le quota est atteint ou dépassé.
   bool get atteint => plafond != null && valeur >= plafond!;
@@ -53,9 +63,11 @@ class CountStat extends StatelessWidget {
     return Semantics(
       container: true,
       label: libelle,
-      value: limite == null
+      value: limite != null
+          ? AppStrings.compteurSurPlafond(valeur, limite)
+          : plafondAttendu
           ? AppStrings.compteurSansPlafond(valeur)
-          : AppStrings.compteurSurPlafond(valeur, limite),
+          : '$valeur',
       excludeSemantics: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,7 +96,7 @@ class CountStat extends StatelessWidget {
                 if (limite != null) ...<Widget>[
                   Text(' / ', style: stylePlafond),
                   Text('$limite', style: stylePlafond),
-                ] else ...<Widget>[
+                ] else if (plafondAttendu) ...<Widget>[
                   const SizedBox(width: AppSpacing.sm),
                   Text(
                     AppStrings.compteurIllimite,

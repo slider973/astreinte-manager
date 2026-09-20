@@ -10,21 +10,25 @@ import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../dispos/presentation/mois_screen.dart';
 
-/// L'accueil minimal d'après-connexion (ticket 005).
+/// La coquille des destinations de premier niveau.
 ///
-/// Il montre ce que la connexion a rapporté — la caserne et le rôle — et offre
-/// la sortie. La navigation est celle du produit (`DESIGN.md § Navigation`),
-/// avec la destination « Admin » réservée aux administrateurs ; les écrans qui
-/// la suivent arrivent aux tickets suivants et le disent, plutôt que de rester
-/// muets sous le doigt.
+/// Depuis le ticket 011, l'onglet 0 **est** l'écran « Mon mois » : il porte
+/// sa propre bannière, sa barre de compteurs et son panneau latéral, donc
+/// c'est lui qui construit l'`AppScaffold`. La coquille ne garde que le choix
+/// de destination et l'identité, reportée sur l'onglet « Profil » jusqu'à ce
+/// qu'il ait son propre écran.
 class AccueilScreen extends ConsumerStatefulWidget {
-  const AccueilScreen({super.key, this.ongletInitial = 0});
+  const AccueilScreen({super.key, this.ongletInitial = 0, this.mois});
 
   /// L'onglet ouvert à l'arrivée. Porté par l'URL : revenir depuis l'écran
   /// « Membres », qui a sa propre route, ne ramène pas sur « Mon mois » quand
   /// on a demandé « Planning ».
   final int ongletInitial;
+
+  /// Le mois affiché par « Mon mois », au format `AAAA-MM`.
+  final String? mois;
 
   @override
   ConsumerState<AccueilScreen> createState() => _AccueilScreenState();
@@ -36,12 +40,27 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
   /// La destination « Admin » n'est pas un onglet local : c'est une route.
   static const String _routeAdmin = 'admin';
 
+  /// L'onglet qui porte l'identité et la sortie, en attendant son écran.
+  static const String _routeProfil = 'profil';
+
   void _choisir(int index, List<AppDestination> destinations) {
     if (destinations[index].route == _routeAdmin) {
       context.goNamed(AppRoutes.membresName);
       return;
     }
     setState(() => _destination = index);
+  }
+
+  /// Le mois voyage dans l'URL. `goNamed` empile une entrée d'historique :
+  /// le retour du navigateur ramène au mois précédemment consulté.
+  void _changerMois(String cle) {
+    context.goNamed(
+      AppRoutes.accueilName,
+      queryParameters: <String, String>{
+        AppRoutes.parametreOnglet: '$_destination',
+        AppRoutes.parametreMois: cle,
+      },
+    );
   }
 
   @override
@@ -51,13 +70,24 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
       admin: appartenance?.estAdmin ?? false,
     );
     final index = _destination.clamp(0, destinations.length - 1);
+    final route = destinations[index].route;
+
+    if (index == 0) {
+      return MoisScreen(
+        destinations: destinations,
+        indexSelectionne: index,
+        onDestination: (nouvelle) => _choisir(nouvelle, destinations),
+        moisInitial: widget.mois,
+        onMoisChange: _changerMois,
+      );
+    }
 
     return AppScaffold(
       titre: AppStrings.appTitle,
       destinations: destinations,
       indexSelectionne: index,
       onDestination: (nouvelle) => _choisir(nouvelle, destinations),
-      child: index == 0
+      child: route == _routeProfil
           ? _Contenu(appartenance: appartenance)
           : EmptyState(
               titre: AppStrings.accueilAVenirTitre,
