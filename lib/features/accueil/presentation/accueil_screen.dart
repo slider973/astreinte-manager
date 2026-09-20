@@ -51,6 +51,21 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
   /// `/proposals` d'une notification, traduit par `destinationInterne`.
   static const String _routePropositions = 'propositions';
 
+  /// **L'onglet demandé par l'URL gagne sur l'onglet affiché.**
+  ///
+  /// La coquille est déjà montée quand une notification arrive : `go` change
+  /// la chaîne de requête mais réutilise le même `State`, donc `_destination`
+  /// restait sur l'onglet précédent et le lien `/proposals` ramenait sur
+  /// « Mon mois ». Vu en test, et c'est exactement le chemin que le ticket 021
+  /// promet en deux touches.
+  @override
+  void didUpdateWidget(AccueilScreen ancien) {
+    super.didUpdateWidget(ancien);
+    if (widget.ongletInitial != ancien.ongletInitial) {
+      setState(() => _destination = widget.ongletInitial);
+    }
+  }
+
   void _choisir(int index, List<AppDestination> destinations) {
     if (destinations[index].route == _routeAdmin) {
       // La destination « Admin » tombe sur **le travail**, pas sur

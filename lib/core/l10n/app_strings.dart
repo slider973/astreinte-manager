@@ -2032,12 +2032,23 @@ abstract final class AppStrings {
   static String propositionsRefuserCreneau(String creneau) =>
       'Refuser $creneau';
 
-  /// « proposé il y a 2 h ».
-  static String propositionsProposeeDepuis(String depuis) => 'proposé $depuis';
+  /// « proposé il y a 2 h », « proposé hier ».
+  ///
+  /// L'ancienneté arrive avec une capitale quand elle vaut « Hier » : elle est
+  /// écrite pour commencer une phrase, pas pour la continuer.
+  static String propositionsProposeeDepuis(String depuis) =>
+      'proposé ${_enMinuscule(depuis)}';
+
+  /// Abaisse la première lettre d'un fragment qui entre dans une phrase.
+  /// Les dates courtes (« 15 sept. ») n'en sont pas affectées.
+  static String _enMinuscule(String texte) => texte.isEmpty
+      ? texte
+      : '${texte[0].toLowerCase()}${texte.substring(1)}';
 
   /// « relancé hier », ajouté après le précédent quand la base a compté une
   /// relance. Le séparateur est un point médian, comme partout ailleurs.
-  static String propositionsRelanceDepuis(String depuis) => 'relancé $depuis';
+  static String propositionsRelanceDepuis(String depuis) =>
+      'relancé ${_enMinuscule(depuis)}';
 
   /// La phrase complète d'une ligne : « Samedi 12 octobre, nuit. Proposé il y
   /// a 2 h. »
