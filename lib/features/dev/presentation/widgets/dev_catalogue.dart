@@ -292,7 +292,8 @@ class _SectionJours extends StatelessWidget {
       titre: 'DayCell',
       note:
           'Un bloc réglé : filet 1 dp, rayon 8, aucune ombre. Le jour courant '
-          'porte un filet d\'encre en marge.',
+          'porte un filet d\'encre en marge. Chaque créneau porte ses propres '
+          'rappels et son propre état (sélection, erreur, enregistrement).',
       children: <Widget>[
         DevRangee(
           children: <Widget>[
@@ -303,10 +304,8 @@ class _SectionJours extends StatelessWidget {
                   numero: 2,
                   nomJour: 'jeu.',
                   dateLongue: 'Jeudi 2 octobre',
-                  etatJour: DisponibiliteEtat.nonSaisi,
-                  etatNuit: DisponibiliteEtat.nonSaisi,
-                  onTapJour: _rien,
-                  onTapNuit: _rien,
+                  jour: DaySlot(etat: DisponibiliteEtat.nonSaisi, onTap: _rien),
+                  nuit: DaySlot(etat: DisponibiliteEtat.nonSaisi, onTap: _rien),
                 ),
               ),
               (
@@ -316,10 +315,11 @@ class _SectionJours extends StatelessWidget {
                   nomJour: 'sam.',
                   dateLongue: 'Samedi 4 octobre',
                   weekend: true,
-                  etatJour: DisponibiliteEtat.disponible,
-                  etatNuit: DisponibiliteEtat.absent,
-                  onTapJour: _rien,
-                  onTapNuit: _rien,
+                  jour: DaySlot(
+                    etat: DisponibiliteEtat.disponible,
+                    onTap: _rien,
+                  ),
+                  nuit: DaySlot(etat: DisponibiliteEtat.absent, onTap: _rien),
                 ),
               ),
               (
@@ -330,10 +330,14 @@ class _SectionJours extends StatelessWidget {
                   dateLongue: 'Mercredi 1er novembre',
                   weekend: true,
                   nomJourFerie: 'Toussaint',
-                  etatJour: DisponibiliteEtat.disponible,
-                  etatNuit: DisponibiliteEtat.disponible,
-                  onTapJour: _rien,
-                  onTapNuit: _rien,
+                  jour: DaySlot(
+                    etat: DisponibiliteEtat.disponible,
+                    onTap: _rien,
+                  ),
+                  nuit: DaySlot(
+                    etat: DisponibiliteEtat.disponible,
+                    onTap: _rien,
+                  ),
                 ),
               ),
               (
@@ -343,10 +347,50 @@ class _SectionJours extends StatelessWidget {
                   nomJour: 'lun.',
                   dateLongue: 'Lundi 20 octobre',
                   aujourdhui: true,
-                  etatJour: DisponibiliteEtat.disponible,
-                  etatNuit: DisponibiliteEtat.nonSaisi,
-                  onTapJour: _rien,
-                  onTapNuit: _rien,
+                  jour: DaySlot(
+                    etat: DisponibiliteEtat.disponible,
+                    onTap: _rien,
+                  ),
+                  nuit: DaySlot(etat: DisponibiliteEtat.nonSaisi, onTap: _rien),
+                ),
+              ),
+              (
+                'sélection par glissement (ticket 011)',
+                const DayCell(
+                  numero: 5,
+                  nomJour: 'dim.',
+                  dateLongue: 'Dimanche 5 octobre',
+                  weekend: true,
+                  jour: DaySlot(
+                    etat: DisponibiliteEtat.disponible,
+                    selectionne: true,
+                    onTap: _rien,
+                    onDragEnter: _rien,
+                  ),
+                  nuit: DaySlot(
+                    etat: DisponibiliteEtat.disponible,
+                    selectionne: true,
+                    onTap: _rien,
+                    onDragEnter: _rien,
+                  ),
+                ),
+              ),
+              (
+                'erreur et enregistrement par créneau',
+                const DayCell(
+                  numero: 6,
+                  nomJour: 'lun.',
+                  dateLongue: 'Lundi 6 octobre',
+                  jour: DaySlot(
+                    etat: DisponibiliteEtat.absent,
+                    erreur: true,
+                    onTap: _rien,
+                  ),
+                  nuit: DaySlot(
+                    etat: DisponibiliteEtat.disponible,
+                    enEnregistrement: true,
+                    onTap: _rien,
+                  ),
                 ),
               ),
               (
@@ -357,8 +401,8 @@ class _SectionJours extends StatelessWidget {
                   dateLongue: 'Dimanche 12 octobre',
                   weekend: true,
                   verrouille: true,
-                  etatJour: DisponibiliteEtat.disponible,
-                  etatNuit: DisponibiliteEtat.absent,
+                  jour: DaySlot(etat: DisponibiliteEtat.disponible),
+                  nuit: DaySlot(etat: DisponibiliteEtat.absent),
                 ),
               ),
               (
@@ -368,8 +412,8 @@ class _SectionJours extends StatelessWidget {
                   nomJour: 'mar.',
                   dateLongue: 'Mardi 30 septembre',
                   horsMois: true,
-                  etatJour: DisponibiliteEtat.nonSaisi,
-                  etatNuit: DisponibiliteEtat.nonSaisi,
+                  jour: DaySlot(etat: DisponibiliteEtat.nonSaisi),
+                  nuit: DaySlot(etat: DisponibiliteEtat.nonSaisi),
                 ),
               ),
             ])

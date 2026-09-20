@@ -6,6 +6,73 @@ import '../theme/app_status.dart';
 import '../theme/app_typography.dart';
 import 'slot_chip.dart';
 
+/// Un créneau d'une journée, tel que la grille du mois le connaît.
+///
+/// Regroupe l'état affiché **et** tout ce que le parent veut brancher dessus.
+/// Un objet par créneau plutôt que six paramètres `…Jour` / `…Nuit` sur
+/// [DayCell] : la grille du ticket 011 doit pouvoir passer une sélection, une
+/// erreur et un rappel de glissement pour chacun des deux créneaux sans que
+/// [DayCell] soit rouvert à chaque besoin.
+@immutable
+class DaySlot {
+  const DaySlot({
+    required this.etat,
+    this.onTap,
+    this.onDragEnter,
+    this.selectionne = false,
+    this.erreur = false,
+    this.enEnregistrement = false,
+  });
+
+  final DisponibiliteEtat etat;
+
+  /// Appui simple sur la case.
+  final VoidCallback? onTap;
+
+  /// Entrée d'un glissement de sélection dans la case (ticket 011). La case
+  /// publie ce rappel ; c'est la grille qui mène le geste.
+  final VoidCallback? onDragEnter;
+
+  /// Case prise dans la sélection courante : contour 2 dp `primary`.
+  final bool selectionne;
+
+  /// L'enregistrement de ce créneau a échoué : contour 2 dp `error`.
+  final bool erreur;
+
+  /// L'enregistrement de ce créneau est parti : le contour pulse une fois.
+  final bool enEnregistrement;
+
+  DaySlot copyWith({DisponibiliteEtat? etat, VoidCallback? onTap}) => DaySlot(
+    etat: etat ?? this.etat,
+    onTap: onTap ?? this.onTap,
+    onDragEnter: onDragEnter,
+    selectionne: selectionne,
+    erreur: erreur,
+    enEnregistrement: enEnregistrement,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DaySlot &&
+          other.etat == etat &&
+          other.onTap == onTap &&
+          other.onDragEnter == onDragEnter &&
+          other.selectionne == selectionne &&
+          other.erreur == erreur &&
+          other.enEnregistrement == enEnregistrement;
+
+  @override
+  int get hashCode => Object.hash(
+    etat,
+    onTap,
+    onDragEnter,
+    selectionne,
+    erreur,
+    enEnregistrement,
+  );
+}
+
 /// Un jour du mois : un **bloc réglé**, pas une carte.
 ///
 /// `DESIGN.md § Cards / Containers` : fond `surface`, filet 1 dp
@@ -20,8 +87,8 @@ class DayCell extends StatelessWidget {
   const DayCell({
     required this.numero,
     required this.nomJour,
-    required this.etatJour,
-    required this.etatNuit,
+    required this.jour,
+    required this.nuit,
     required this.dateLongue,
     super.key,
     this.densite = SlotChipDensite.confortable,
@@ -30,8 +97,6 @@ class DayCell extends StatelessWidget {
     this.aujourdhui = false,
     this.horsMois = false,
     this.verrouille = false,
-    this.onTapJour,
-    this.onTapNuit,
   });
 
   /// Numéro du jour dans le mois (1 à 31).
@@ -43,8 +108,11 @@ class DayCell extends StatelessWidget {
   /// Date complète pour les lecteurs d'écran : « samedi 4 octobre ».
   final String dateLongue;
 
-  final DisponibiliteEtat etatJour;
-  final DisponibiliteEtat etatNuit;
+  /// Le créneau de jour, avec son état et ses rappels.
+  final DaySlot jour;
+
+  /// Le créneau de nuit, avec son état et ses rappels.
+  final DaySlot nuit;
 
   final SlotChipDensite densite;
 
@@ -61,9 +129,6 @@ class DayCell extends StatelessWidget {
 
   /// Mois verrouillé : les cases restent lisibles, l'interaction disparaît.
   final bool verrouille;
-
-  final VoidCallback? onTapJour;
-  final VoidCallback? onTapNuit;
 
   bool get _inerte => horsMois || verrouille;
 
@@ -114,9 +179,9 @@ class DayCell extends StatelessWidget {
       children: <Widget>[
         enTete,
         const SizedBox(height: AppSpacing.sm),
-        _case(context, CreneauType.jour, etatJour, onTapJour),
+        _case(context, CreneauType.jour, jour),
         const SizedBox(height: AppSpacing.xs),
-        _case(context, CreneauType.nuit, etatNuit, onTapNuit),
+        _case(context, CreneauType.nuit, nuit),
       ],
     );
 
@@ -163,27 +228,25 @@ class DayCell extends StatelessWidget {
     );
   }
 
-  Widget _case(
-    BuildContext context,
-    CreneauType creneau,
-    DisponibiliteEtat etat,
-    VoidCallback? onTap,
-  ) {
+  Widget _case(BuildContext context, CreneauType creneau, DaySlot slot) {
     final descripteurCreneau = context.statuts.creneau(creneau);
-    final libelleCreneau = descripteurCreneau.libelle;
 
     final chip = SlotChip(
-      etat: etat,
+      etat: slot.etat,
       creneau: creneau,
       densite: densite,
       verrouille: verrouille,
-      onTap: _inerte ? null : onTap,
+      selectionne: slot.selectionne,
+      erreur: slot.erreur,
+      enEnregistrement: slot.enEnregistrement,
+      onTap: _inerte ? null : slot.onTap,
+      onDragEnter: _inerte ? null : slot.onDragEnter,
       libelleSemantique: AppStrings.slotSemantique(
         jourEtDate: dateLongue,
-        creneau: libelleCreneau,
-        etat: context.statuts.disponibilite(etat).libelle,
+        creneau: descripteurCreneau.libelle,
+        etat: context.statuts.disponibilite(slot.etat).libelle,
       ),
-      actionSemantique: switch (etat) {
+      actionSemantique: switch (slot.etat) {
         DisponibiliteEtat.nonSaisi => AppStrings.slotActionMarquerDisponible,
         DisponibiliteEtat.disponible => AppStrings.slotActionMarquerAbsent,
         DisponibiliteEtat.absent => AppStrings.slotActionEffacer,
