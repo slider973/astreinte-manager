@@ -47,7 +47,10 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
 
   void _choisir(int index, List<AppDestination> destinations) {
     if (destinations[index].route == _routeAdmin) {
-      context.goNamed(AppRoutes.membresName);
+      // La destination « Admin » tombe sur **le travail**, pas sur
+      // l'annuaire : la matrice du mois (ticket 016, écart reporté dans
+      // `DESIGN.md`). Les trois autres écrans admin sont à un clic de là.
+      context.goNamed(AppRoutes.planningAdminName);
       return;
     }
     setState(() => _destination = index);
