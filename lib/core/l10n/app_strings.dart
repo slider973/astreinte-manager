@@ -1647,7 +1647,16 @@ abstract final class AppStrings {
 
   // --- Création du planning ---------------------------------------------
 
-  static String planningCreer(String mois) => 'Créer le planning de $mois';
+  static String planningCreer(String mois) =>
+      'Créer le planning ${moisAvecDe(mois)}';
+
+  /// « d'octobre » et non « de octobre ». Trois mois commencent par une
+  /// voyelle — avril, août, octobre — et une élision ratée se lit à voix haute
+  /// dans la tête de celui qui lit.
+  static String moisAvecDe(String mois) =>
+      mois.isNotEmpty && 'aeiouyâàéèêîôû'.contains(mois[0].toLowerCase())
+      ? 'd\'$mois'
+      : 'de $mois';
 
   /// Ce que le bouton va faire, écrit avant qu'on l'actionne. Le nombre est
   /// celui du mois affiché : 56, 60 ou 62, jamais un 62 supposé.
@@ -1656,7 +1665,7 @@ abstract final class AppStrings {
       'l\'effectif requis de tes réglages.';
 
   static String planningCreeTexte(String mois, int creneaux) =>
-      'Planning de $mois créé : $creneaux créneaux.';
+      'Planning ${moisAvecDe(mois)} créé : $creneaux créneaux.';
 
   // --- La ligne des créneaux --------------------------------------------
 
@@ -1757,7 +1766,7 @@ abstract final class AppStrings {
       '$membre ${absent ? 's\'est déclaré absent' : 'n\'a pas saisi ses '
                 'disponibilités'} '
       '$jourEtDate, ${creneau.toLowerCase()}. La proposition lui parviendra '
-      'comme aux autres et il pourra la refuser. Cette attribution est '
+      'comme aux autres, et pourra être refusée. Cette attribution est '
       'enregistrée à ton nom dans l\'historique de la caserne.';
 
   static const String planningHorsDispoValider = 'Attribuer quand même';
@@ -1773,8 +1782,10 @@ abstract final class AppStrings {
       'Les modifications des autres administrateurs n\'arrivent plus. '
       'Rafraîchis pour voir l\'état réel.';
 
+  /// « Modifié à l'instant par Marie L. » — sans second point : un nom
+  /// affiché finit souvent par une initiale abrégée.
   static String planningModifieDistant(String qui) =>
-      'Modifié à l\'instant par $qui.';
+      'Modifié à l\'instant par ${qui.endsWith('.') ? qui : '$qui.'}';
   static const String planningModifieDistantAnonyme =
       'Modifié à l\'instant par un autre administrateur.';
 

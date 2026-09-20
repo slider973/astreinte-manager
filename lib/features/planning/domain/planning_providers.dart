@@ -10,6 +10,7 @@ import '../../dispos/domain/periode_saisie.dart';
 import '../data/planning_repository.dart';
 import 'candidat.dart';
 import 'creneau_planning.dart';
+import 'ligne_matrice.dart';
 import 'matrice_providers.dart';
 import 'planning_mois.dart';
 
@@ -496,6 +497,50 @@ planningControllerProvider =
       isAutoDispose: true,
     );
 
+/// Les lignes de la matrice, **avec la charge du mois telle qu'elle est à
+/// l'écran**.
+///
+/// C'est le critère d'acceptation du ticket : « les quotas de la ligne membre
+/// se mettent à jour à chaque attribution ». Ils se mettent à jour **sans
+/// relire la matrice** — le compte est le même que celui de `v_member_load`,
+/// fait sur les attributions déjà chargées.
+final Provider<List<LigneMatrice>> lignesAvecChargeProvider =
+    Provider<List<LigneMatrice>>((ref) {
+      final matrice = ref.watch(matriceControllerProvider).value;
+      if (matrice == null) return const <LigneMatrice>[];
+
+      final etat = ref.watch(planningControllerProvider).value;
+      if (etat == null || !etat.planning.existe) return matrice.matrice.lignes;
+
+      final charges = etat.planning.charges(
+        annee: etat.periode.annee,
+        mois: etat.periode.mois,
+      );
+
+      return <LigneMatrice>[
+        for (final ligne in matrice.matrice.lignes)
+          ligne.avecCharge(
+            astreintes: charges[ligne.userId]?.astreintes ?? 0,
+            unitesWeekend: charges[ligne.userId]?.unitesWeekend ?? 0,
+          ),
+      ];
+    });
+
+/// Les lignes réellement affichées : filtrées, triées, **sans requête**.
+///
+/// Elle vit ici et non avec les autres providers de la matrice parce qu'elle
+/// dépend désormais des deux : la charge d'un membre change avec les
+/// attributions, et le tri « Astreintes restantes » doit suivre.
+///
+/// Mémorisé par Riverpod : le tri de soixante lignes n'est refait que si la
+/// matrice, le planning ou les filtres changent, pas à chaque image.
+final Provider<List<LigneMatrice>> lignesVisiblesProvider =
+    Provider<List<LigneMatrice>>((ref) {
+      final lignes = ref.watch(lignesAvecChargeProvider);
+      if (lignes.isEmpty) return const <LigneMatrice>[];
+      return ref.watch(filtresMatriceProvider).appliquer(lignes);
+    });
+
 /// Ce que le panneau du créneau ouvert affiche, ou `null` si rien n'est
 /// ouvert.
 ///
@@ -510,8 +555,8 @@ final Provider<PanneauCandidats?> panneauCandidatsProvider =
       final creneau = etat?.planning.creneauParId(creneauId);
       if (etat == null || creneau == null) return null;
 
-      final matrice = ref.watch(matriceControllerProvider).value;
-      if (matrice == null) return null;
+      final membres = ref.watch(lignesAvecChargeProvider);
+      if (membres.isEmpty) return null;
 
       return PanneauCandidats.construire(
         creneau: creneau,
@@ -519,7 +564,7 @@ final Provider<PanneauCandidats?> panneauCandidatsProvider =
         // **Les lignes entières, pas les lignes filtrées** : chercher
         // « Dubois » dans la matrice ne doit pas faire disparaître les
         // candidats des autres créneaux.
-        membres: matrice.matrice.lignes,
+        membres: membres,
         planning: etat.planning,
         modifiable: etat.planning.modifiable && !etat.lectureSeule,
       );

@@ -88,6 +88,7 @@ Une migration poussée sur `main` n'est jamais modifiée : on en crée une nouve
 | `0014_notifications_envoi.sql` | ticket 025 : `notification_outbox`, `notify`, `notify_post`, `notify_claim`, `notify_complete`, `cron_dispatch_notifications`, secrets Vault et tâche `dispatch_notifications` |
 | `0016_cron_rappels_saisie.sql` | ticket 015 : `cron_availability_reminders` et la tâche `availability_reminders` (push J-3, courriel J-1) |
 | `0017_matrice_admin.sql` | ticket 016 : calendrier français calculé (`paques_gregorien`, `jours_feries_fr`, `est_jour_ferie`, `unite_weekend`), vue `v_member_load`, fonction `availability_matrix` |
+| `0018_planning_brouillon.sql` | ticket 017 : `station_required_count`, `create_schedule`, triggers `assignments_trace_disponibilite` et `assignments_audit_hors_dispo`, suppression d'attribution réservée au brouillon, vue `v_schedule_progress`, `assignments` inscrite dans `supabase_realtime` |
 
 RLS est activé sur chaque table dès sa création et toutes les tables ont au moins une
 politique depuis `0007`. Les politiques sont posées `to authenticated` : `anon` ne lit rien,
@@ -167,6 +168,16 @@ weekend, restes nuls ou négatifs, historique borné à trois mois, cloisonnemen
 servant dans deux casernes), les droits des deux côtés, et une **mesure** de performance sur
 soixante membres × trente et un jours × deux créneaux.
 
+`supabase/tests/planning_brouillon_test.sql` couvre la construction du planning (`0018`,
+ticket 017) : l'effectif requis et l'ordre de ses surcharges (date, puis jour de semaine,
+puis défaut), `create_schedule` et son idempotence, **le critère du ticket 010** — changer
+l'effectif de la caserne ne touche aucun créneau déjà créé —, `was_available` et `created_by`
+posés par la base même quand le client prétend le contraire, l'audit `assignment.force`, la
+double attribution refusée par la contrainte d'unicité, le retrait qui supprime en brouillon
+et n'emporte rien après publication, `v_schedule_progress`, l'inscription d'`assignments`
+dans `supabase_realtime` avec son identité de réplique, et l'invisibilité du brouillon pour
+les membres.
+
 `deno test supabase/functions/tests/` couvre la logique pure des Edge Functions — libellés
 français par type, regroupement, liens profonds, classement des erreurs FCM, enchaînement
 d'un envoi — avec des dépendances injectées. Ni base, ni réseau, ni clés Firebase : c'est
@@ -230,6 +241,27 @@ exactement comme dans `docs/SCHEMA.md`) et les enums Postgres de la section 1 da
 
 Régénérer les types TypeScript après chaque migration et relire le diff : c'est le moyen
 le plus simple de repérer une colonne oubliée dans un modèle Dart.
+
+## Temps réel
+
+Une seule table est publiée : `assignments` (migration `0018`, ticket 017). Vérifier :
+
+```sql
+select schemaname, tablename from pg_publication_tables where pubname = 'supabase_realtime';
+select relreplident from pg_class where relname = 'assignments';  -- doit valoir « d »
+```
+
+Trois règles avant d'en ajouter une (`docs/SCHEMA.md` § 9) :
+
+1. **Aucun `grant` de colonne restrictif** sur la table — sinon la publication le contourne :
+   une publication diffuse toutes les colonnes, les politiques ne filtrent que des lignes.
+   C'est ce qui interdit `invitations`, dont le `token` est caché à `authenticated`.
+2. Les politiques de `select` suffisent à filtrer les lignes reçues. Un planning en brouillon
+   reste donc invisible des membres par ce canal comme par les autres.
+3. **Ne jamais passer une table publiée en `replica identity full`** : la charge utile d'un
+   `delete` n'est pas filtrée par les politiques, et elle porterait alors toutes les colonnes
+   de chaque ligne supprimée. En `default`, elle ne porte que la clé primaire — et c'est au
+   client de garder ses lignes indexées par identifiant.
 
 ## Edge Functions
 

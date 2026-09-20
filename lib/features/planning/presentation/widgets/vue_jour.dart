@@ -310,6 +310,7 @@ class _BoutonJour extends StatelessWidget {
         dateAvecJourSemaine(date),
         if (ferie != null) AppStrings.jourFerieNomme(ferie),
       ].join(', '),
+      onTap: choisi ? null : onChoisir,
       excludeSemantics: true,
       child: InkWell(
         onTap: choisi ? null : onChoisir,
@@ -621,6 +622,10 @@ class _BoutonCreneau extends StatelessWidget {
         etat: descripteur.libelle,
       ),
       onTapHint: AppStrings.planningCouvertureAction,
+      // L'action vit sur le nœud qui exclut ses enfants : sinon le geste de
+      // l'`InkWell` disparaît avec eux, et le bouton n'est plus activable au
+      // clavier ni au lecteur d'écran.
+      onTap: () => onCreneau(valeur.creneau.id),
       excludeSemantics: true,
       child: InkWell(
         onTap: () => onCreneau(valeur.creneau.id),

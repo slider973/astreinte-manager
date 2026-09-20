@@ -166,6 +166,10 @@ class _CaseCreneau extends StatelessWidget {
         etat: descripteur.libelle,
       ),
       onTapHint: actionnable ? AppStrings.planningCouvertureAction : null,
+      // **L'action est portée par le nœud qui exclut ses enfants.** Sans elle,
+      // le lecteur d'écran annonce un bouton que rien ne permet d'activer :
+      // `excludeSemantics` avale aussi le geste de l'`InkWell`.
+      onTap: actionnable ? () => onCreneau(valeur.creneau.id) : null,
       excludeSemantics: true,
       child: actionnable
           ? InkWell(

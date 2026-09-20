@@ -194,6 +194,43 @@ class LigneMatrice {
     );
   }
 
+  /// La même ligne, avec la charge du mois **recomptée sur les attributions
+  /// déjà à l'écran**.
+  ///
+  /// `v_member_load` compte les mêmes choses — astreintes proposées ou
+  /// acceptées du mois, unités de weekend distinctes — mais elle les a comptées
+  /// au chargement. Attribuer quelqu'un rendrait donc son quota faux jusqu'à la
+  /// prochaine lecture, et **un quota faux est exactement ce que cet écran ne
+  /// doit pas afficher** : c'est sur lui que le chef décide.
+  ///
+  /// Le plafond, lui, ne bouge pas : `null` reste illimité, et le reste peut
+  /// devenir négatif — l'admin a le droit de dépasser.
+  LigneMatrice avecCharge({required int astreintes, required int unitesWeekend}) {
+    if (astreintes == this.astreintes && unitesWeekend == this.unitesWeekend) {
+      return this;
+    }
+    return LigneMatrice(
+      userId: userId,
+      nomAffiche: nomAffiche,
+      prenom: prenom,
+      nom: nom,
+      commentaire: commentaire,
+      maxAstreintes: maxAstreintes,
+      maxWeekends: maxWeekends,
+      astreintes: astreintes,
+      unitesWeekend: unitesWeekend,
+      astreintesRestantes: maxAstreintes == null
+          ? null
+          : maxAstreintes! - astreintes,
+      weekendsRestants: maxWeekends == null
+          ? null
+          : maxWeekends! - unitesWeekend,
+      accepteesPrecedentes: accepteesPrecedentes,
+      jours: _jours.map((CelluleMatrice c) => c.code).join(),
+      nuits: _nuits.map((CelluleMatrice c) => c.code).join(),
+    );
+  }
+
   static List<CelluleMatrice> _decoder(String chaine) =>
       List<CelluleMatrice>.unmodifiable(<CelluleMatrice>[
         for (var index = 0; index < chaine.length; index++)

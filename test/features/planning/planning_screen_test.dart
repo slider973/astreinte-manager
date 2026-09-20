@@ -38,7 +38,8 @@ PeriodeSaisie _periode() =>
 /// Quatre membres, choisis pour que le tri des candidats soit visible :
 ///   - Aubry   : disponible, 3 restantes, 0 acceptée sur trois mois ;
 ///   - Bernard : disponible, 3 restantes, 4 acceptées → derrière Aubry ;
-///   - Camus   : disponible, **quota atteint** → grisé, mais attribuable ;
+///   - Camus   : disponible, plafond de 1 déjà consommé par une attribution
+///               posée le 2 → **quota atteint**, grisé mais attribuable ;
 ///   - Dupuis  : **absent** le 1er en journée → dans les non disponibles.
 List<LigneMatrice> _membres() {
   final reste = '.' * (_joursDuMois - 1);
@@ -61,10 +62,9 @@ List<LigneMatrice> _membres() {
     ligneMatrice(
       userId: 'camus',
       nom: 'Camus Awa',
-      jours: 'D$reste',
+      jours: 'DD${'.' * (_joursDuMois - 2)}',
       nuits: '.$reste',
-      maxAstreintes: 2,
-      astreintes: 2,
+      maxAstreintes: 1,
     ),
     ligneMatrice(
       userId: 'dupuis',
@@ -80,6 +80,7 @@ List<LigneMatrice> _membres() {
 Future<FauxPlanningRepository> _ouvrir(
   WidgetTester tester, {
   FauxPlanningRepository? depot,
+  FauxMatriceRepository? matrice,
   Size taille = _poste,
   Appartenance appartenance = appartenanceAdmin,
 }) async {
@@ -88,6 +89,12 @@ Future<FauxPlanningRepository> _ouvrir(
       FauxPlanningRepository(
         planning: planningBrouillon,
         creneaux: creneauxDuMois(_joursDuMois),
+        // Camus a déjà une astreinte ce mois-ci : son plafond de 1 est donc
+        // atteint, et le quota que l'écran affiche est celui qu'il recompte
+        // sur les attributions, pas celui figé au chargement.
+        attributions: const <Attribution>[
+          Attribution(id: 'a0', creneauId: 'c-2-j', userId: 'camus'),
+        ],
         disponibles: <String>{
           'aubry@c-1-j',
           'bernard@c-1-j',
@@ -102,7 +109,7 @@ Future<FauxPlanningRepository> _ouvrir(
     session: sessionMembre,
     appartenances: <Appartenance>[appartenance],
     dispos: FauxDisposRepository(periodes: <PeriodeSaisie>[_periode()]),
-    matrice: FauxMatriceRepository(lignes: _membres()),
+    matrice: matrice ?? FauxMatriceRepository(lignes: _membres()),
     planning: planning,
     taille: taille,
   );
@@ -333,6 +340,32 @@ void main() {
       expect(_fraction(tester, 'c-1-j'), '1/1');
       expect(find.text(AppStrings.planningSectionAttribues(1)), findsOneWidget);
       expect(find.text(AppStrings.planningPourvu), findsWidgets);
+    });
+
+    testWidgets('les quotas de la ligne membre suivent chaque attribution, '
+        'sans relire la matrice', (tester) async {
+      final lignes = FauxMatriceRepository(lignes: _membres());
+      final depot = await _ouvrir(tester, matrice: lignes);
+      await _ouvrirPanneau(tester, 'c-1-j');
+
+      // Avant : Aubry a ses trois astreintes devant elle, dans la colonne
+      // figée comme dans le panneau.
+      // Aubry et Bernard ont le même plafond : deux lignes, deux « 3/3 ».
+      expect(find.text('3/3'), findsNWidgets(2));
+      expect(_dansPanneau(find.textContaining('3/3 astr.')), findsNWidgets(2));
+
+      await _toucher(tester, _boutonAttribuer('Aubry Irène'));
+
+      // Après : 2/3 des deux côtés. Le compte est le même que celui de
+      // `v_member_load`, refait sur les attributions déjà à l'écran.
+      expect(find.text('2/3'), findsOneWidget);
+      expect(
+        _dansPanneau(find.textContaining('2/3 astr.')),
+        findsOneWidget,
+      );
+      // **Et sans une requête de plus** : la matrice n'a été lue qu'une fois.
+      expect(lignes.lectures, 1);
+      expect(depot.lectures, 1);
     });
 
     testWidgets('attribuer hors disponibilité demande confirmation et laisse '

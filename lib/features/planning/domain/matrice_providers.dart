@@ -303,14 +303,3 @@ matriceControllerProvider =
       MatriceController.new,
       isAutoDispose: true,
     );
-
-/// Les lignes réellement affichées : filtrées, triées, **sans requête**.
-///
-/// Mémorisé par Riverpod : le tri de soixante lignes n'est refait que si la
-/// matrice ou les filtres changent, pas à chaque image de la grille.
-final Provider<List<LigneMatrice>> lignesVisiblesProvider =
-    Provider<List<LigneMatrice>>((ref) {
-      final etat = ref.watch(matriceControllerProvider).value;
-      if (etat == null) return const <LigneMatrice>[];
-      return ref.watch(filtresMatriceProvider).appliquer(etat.matrice.lignes);
-    });

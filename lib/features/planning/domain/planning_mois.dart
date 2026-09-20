@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/theme/app_status.dart';
+import '../../dispos/domain/disponibilite_mois.dart';
 import 'creneau_planning.dart';
 
 /// Le planning d'un mois : ses créneaux et leurs attributions.
@@ -105,6 +106,46 @@ class PlanningMois {
       pourvus: n,
       etat: EtatCouverture.de(pourvus: n, requis: cible.effectifRequis),
     );
+  }
+
+  /// La charge de chaque membre attribué ce mois-ci : astreintes et unités de
+  /// weekend, comptées **comme `v_member_load` les compte**.
+  ///
+  /// C'est ce qui garde les quotas de la matrice vrais entre deux lectures :
+  /// attribuer quelqu'un change son reste tout de suite, sans relire soixante
+  /// lignes pour un nombre qu'on sait déjà calculer.
+  ///
+  /// L'unité de weekend est celle du ticket 011 ([uniteWeekend]), dont la
+  /// parité avec la fonction SQL `unite_weekend` est testée des deux côtés :
+  /// samedi et dimanche font une unité, un férié en semaine en fait une à lui
+  /// seul, et quatre créneaux d'un même weekend comptent pour un.
+  Map<String, ({int astreintes, int unitesWeekend})> charges({
+    required int annee,
+    required int mois,
+  }) {
+    final astreintes = <String, int>{};
+    final unites = <String, Set<DateTime>>{};
+
+    for (final attribution in _attributions.values) {
+      final creneau = _creneaux[attribution.creneauId];
+      if (creneau == null) continue;
+
+      astreintes[attribution.userId] =
+          (astreintes[attribution.userId] ?? 0) + 1;
+
+      final unite = uniteWeekend(DateTime(annee, mois, creneau.jour));
+      if (unite != null) {
+        (unites[attribution.userId] ??= <DateTime>{}).add(unite);
+      }
+    }
+
+    return <String, ({int astreintes, int unitesWeekend})>{
+      for (final entree in astreintes.entries)
+        entree.key: (
+          astreintes: entree.value,
+          unitesWeekend: unites[entree.key]?.length ?? 0,
+        ),
+    };
   }
 
   PlanningMois avecAttribution(Attribution attribution) => _copie(

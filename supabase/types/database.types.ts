@@ -737,6 +737,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "shifts_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "v_schedule_progress"
+            referencedColumns: ["schedule_id"]
+          },
+          {
             foreignKeyName: "shifts_station_id_fkey"
             columns: ["station_id"]
             isOneToOne: false
@@ -921,6 +928,50 @@ export type Database = {
           },
         ]
       }
+      v_schedule_progress: {
+        Row: {
+          assignments_accepted: number | null
+          assignments_declined: number | null
+          assignments_late: number | null
+          assignments_pending: number | null
+          period_id: string | null
+          schedule_id: string | null
+          shifts_filled: number | null
+          shifts_total: number | null
+          station_id: string | null
+          status: Database["public"]["Enums"]["schedule_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "v_member_load"
+            referencedColumns: ["period_id"]
+          },
+          {
+            foreignKeyName: "schedules_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "v_period_completion"
+            referencedColumns: ["period_id"]
+          },
+          {
+            foreignKeyName: "schedules_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_invitation: {
@@ -971,6 +1022,26 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_schedule: {
+        Args: { p_period: string; p_station: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          id: string
+          period_id: string
+          published_at: string | null
+          station_id: string
+          status: Database["public"]["Enums"]["schedule_status"]
+          updated_at: string
+          validated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "schedules"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1057,6 +1128,14 @@ export type Database = {
           p_year: number
         }
         Returns: string
+      }
+      station_required_count: {
+        Args: {
+          p_date: string
+          p_settings: Json
+          p_slot: Database["public"]["Enums"]["slot_type"]
+        }
+        Returns: number
       }
       station_settings_cle_surcharge_valide: {
         Args: { p_cle: string }

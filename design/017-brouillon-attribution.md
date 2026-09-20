@@ -306,12 +306,11 @@ tri « Astreintes restantes » du 016** : le chef retrouve le classement qu'il c
 
 La vue par jour du 016 reçoit les mêmes deux ajouts, à sa densité :
 
-- **Le ruban des jours** porte, sous le compte de disponibles, la fraction de couverture des deux
-  créneaux : on balaie le mois et on voit les trous du planning comme on voit les trous de
-  disponibilité.
 - **Sous le ruban, un bloc réglé** : deux boutons de 48 dp, « Jour 1/1 » et « Nuit 0/1 », avec leur
   icône et leur état. Ils ouvrent le panneau en feuille de bas d'écran. C'est le seul accès au
   panneau sous 840 dp, et il est en pleine cible tactile.
+- **Le ruban des jours ne porte pas la couverture** (décision d'implémentation, § 9) : il garde le
+  seul compte de disponibles du ticket 016.
 - Tout le reste du panneau est identique : mêmes sections, mêmes avertissements, mêmes 48 dp.
 
 **Rien n'est perdu sur téléphone**, contrairement à la matrice. Attribuer est un geste court, sur
@@ -483,3 +482,19 @@ serait payer un canal pour rien.
 
 Aucun nouveau composant dans `lib/core/widgets/` : tout ce que cet écran montre existe déjà en
 tokens et en composants du système.
+
+
+## 9. Écarts d'implémentation (ticket 017)
+
+Écrits après coup, comme le veut la convention du projet : ce document reste normatif, et ces
+lignes sont désormais la référence.
+
+| Point | Ce que disait ce brief | Ce que fait le code | Pourquoi |
+|---|---|---|---|
+| Couverture dans le ruban des jours (§ 6.6) | le ruban porte la fraction sous le compte de disponibles | **non livré** : le bloc des deux créneaux, juste en dessous, la porte seul | 28 dp de plus sur **tous** les téléphones, sur tous les mois, pour redire en petit ce que le bloc dit juste en dessous en toutes lettres et en 48 dp. Le ruban reste ce que le 016 en a fait. |
+| Libellé du bouton d'attribution (§ 6.3) | « Attribuer quand même » sur les lignes à avertissement | toujours **« Attribuer »** ; l'avertissement est sur la ligne, et « quand même » est dans le dialogue | À 360 dp, « Attribuer quand même » ne tient pas dans la ligne sans tronquer un nom ou le libellé lui-même — et un libellé de bouton tronqué est pire qu'un libellé court. Le contexte est déjà porté par la puce « Quota atteint » ou « Absent » posée au-dessus. |
+| Panneau en volet (§ 6.3) | volet à droite en `large`, feuille en dessous | inchangé, et la **feuille couvre donc aussi `expanded`** (840–1199 dp) | `AppScaffold` n'ouvre son `panneauLateral` qu'en `large` (ticket 004). Ouvrir un second mécanisme de volet pour la fenêtre intermédiaire aurait dupliqué la composition de l'ossature. |
+| `StatusBadge` | « aucun nouveau composant » (§ 8.2) | un constructeur de plus, `StatusBadge.descripteur` | La couverture n'a pas de famille dans le thème, mais son descripteur se compose **de ses encres**. Le type continue de garantir l'essentiel : pas d'état sans icône ni libellé. |
+| Quotas de la ligne membre | non traité — le brief renvoyait aux valeurs de `v_member_load` | les quotas sont **recomptés à l'écran** sur les attributions déjà chargées (`PlanningMois.charges`) | C'est un critère d'acceptation du ticket : « les quotas de la ligne membre se mettent à jour à chaque attribution ». Les recompter coûte zéro requête et donne exactement le même nombre que la vue : même définition d'astreinte, même unité de weekend (`uniteWeekend`, parité SQL testée). Relire la matrice à chaque attribution aurait coûté 22 ko et une seconde par créneau posé. |
+| Sémantique des cases de créneau | non traité | l'action est portée par le nœud `Semantics` **qui exclut ses enfants**, pas par l'`InkWell` | `excludeSemantics: true` avale aussi le geste de l'enfant : le lecteur d'écran annonçait un bouton que rien ne permettait d'activer. Vu en vrai dans Chrome, sur l'arbre d'accessibilité. Le même défaut existait sur le bouton de jour du ruban (ticket 016) et est corrigé au passage. |
+| Élision du mois | non traité | `AppStrings.moisAvecDe` : « d'octobre », jamais « de octobre » | Trois mois commencent par une voyelle. Vu en vrai à l'écran. |
