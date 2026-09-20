@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 001, 005
 - **Branche** : `feat/024-fcm-setup`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/14
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
