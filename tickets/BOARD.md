@@ -53,7 +53,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 016 | [Matrice des disponibilités pour l'admin](done/016-matrice-admin.md) | P0 | 008 013 014 | https://github.com/slider973/astreinte-manager/pull/18 |
 | 017 | [Construction du planning en brouillon](done/017-brouillon-attribution.md) | P0 | 016 | https://github.com/slider973/astreinte-manager/pull/19 |
 | 019 | [Publication et suivi des réponses](done/019-publication-suivi.md) | P0 | 017 025 | https://github.com/slider973/astreinte-manager/pull/20 |
-| 021 | [Écran des propositions pour le membre](done/021-ecran-propositions.md) | P0 | 008 024 |  |
+| 021 | [Écran des propositions pour le membre](done/021-ecran-propositions.md) | P0 | 008 024 | https://github.com/slider973/astreinte-manager/pull/21 |
 | 024 | [Push web via Firebase Cloud Messaging (PWA)](done/024-fcm-setup.md) | P0 | 001 005 | https://github.com/slider973/astreinte-manager/pull/14 |
 | 025 | [Edge Function send-notification](done/025-edge-send-notification.md) | P0 | 002 024 | https://github.com/slider973/astreinte-manager/pull/15 |
 | 026 | [Centre de notifications in-app](done/026-centre-notifications.md) | P1 | 025 | https://github.com/slider973/astreinte-manager/pull/16 |
