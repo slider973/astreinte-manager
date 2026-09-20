@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 017, 025
 - **Branche** : `feat/019-publication-suivi`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/20
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Condition d'entrée, relevée en revue du ticket 017
