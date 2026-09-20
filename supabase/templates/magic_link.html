@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Ton code de connexion</title>
+  </head>
+  <body style="margin:0;padding:24px;background:#F1F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#131C23;">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:480px;margin:0 auto;background:#FFFFFF;border:1px solid #C3CDD3;border-radius:8px;">
+      <tr>
+        <td style="padding:24px;">
+          <h1 style="margin:0 0 8px;font-size:22px;line-height:28px;font-weight:700;">Ton code de connexion</h1>
+          <p style="margin:0 0 24px;font-size:16px;line-height:24px;color:#45535C;">
+            Entre ce code dans Astreinte SP pour ouvrir ta session. Il est valable une heure.
+          </p>
+
+          <p style="margin:0 0 24px;padding:16px;background:#F1F4F6;border:1px solid #C3CDD3;border-radius:8px;text-align:center;font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;font-size:32px;line-height:36px;font-weight:700;letter-spacing:8px;">
+            {{ .Token }}
+          </p>
+
+          <p style="margin:0 0 8px;font-size:16px;line-height:24px;">
+            Tu peux aussi te connecter d'un seul geste, depuis cet appareil :
+          </p>
+          <p style="margin:0 0 24px;">
+            <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 20px;background:#16212A;color:#FFFFFF;border-radius:8px;font-size:16px;line-height:24px;font-weight:600;text-decoration:none;">
+              Me connecter
+            </a>
+          </p>
+
+          <p style="margin:0;font-size:14px;line-height:20px;color:#45535C;">
+            Tu n'as rien demandé&nbsp;? Ignore ce message : sans ce code, personne n'ouvre ta session.
+          </p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="max-width:480px;margin:16px auto 0;font-size:13px;line-height:18px;color:#45535C;text-align:center;">
+      Astreinte SP — la gestion des astreintes de ta caserne.
+    </p>
+  </body>
+</html>
