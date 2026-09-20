@@ -247,6 +247,73 @@ void main() {
       );
     });
 
+    testWidgets('un envoi manqué se dit, et ouvre le rattrapage sur le suivi', (
+      tester,
+    ) async {
+      // **La publication est acquise, l'envoi ne l'est pas.** C'est le seul cas
+      // où le chef doit savoir qu'il lui reste quelque chose à faire.
+      final suivi = FauxSuiviRepository()
+        ..membresPublies = 3
+        ..envoiComplet = false
+        ..membresRelances = 3;
+      await _ouvrir(tester, suivi: suivi);
+      await _ouvrirRecapitulatif(tester);
+
+      await tester.tap(find.text(AppStrings.publierConfirmer));
+      await tester.pumpAndSettle();
+
+      // Pas « 3 pompiers notifiés » : personne ne l'a été.
+      expect(
+        find.text(
+          AppStrings.publiePourMois(
+            AppStrings.moisLongs[_moisAffiche.month - 1],
+            3,
+          ),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.text(
+          AppStrings.publiePourMoisSansEnvoi(
+            AppStrings.moisLongs[_moisAffiche.month - 1],
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      // L'écran de suivi porte le bandeau, et l'action qui le lève.
+      expect(find.text(AppStrings.suiviEnvoiManque), findsOneWidget);
+      expect(find.text(AppStrings.suiviPrevenir), findsOneWidget);
+
+      await tester.tap(find.text(AppStrings.suiviPrevenir));
+      await tester.pumpAndSettle();
+
+      // Le rattrapage vise **toutes** les attributions, pas les seuls
+      // retardataires : les pompiers qui n'ont rien reçu ne sont pas en retard.
+      expect(suivi.relances.single.tout, isTrue);
+      expect(find.text(AppStrings.suiviRattrapageFait(3)), findsOneWidget);
+      expect(find.text(AppStrings.suiviEnvoiManque), findsNothing);
+    });
+
+    testWidgets('un rattrapage dédoublonné laisse le bandeau : personne de '
+        'plus n\'a été prévenu', (tester) async {
+      final suivi = FauxSuiviRepository()
+        ..membresPublies = 3
+        ..envoiComplet = false
+        ..membresRelances = 3
+        ..relanceNouvelle = false;
+      await _ouvrir(tester, suivi: suivi);
+      await _ouvrirRecapitulatif(tester);
+
+      await tester.tap(find.text(AppStrings.publierConfirmer));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.suiviPrevenir));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.suiviRelanceDejaFaite), findsOneWidget);
+      expect(find.text(AppStrings.suiviEnvoiManque), findsOneWidget);
+    });
+
     testWidgets('un échec laisse le récapitulatif ouvert : rien n\'est perdu',
         (tester) async {
       final suivi = FauxSuiviRepository()

@@ -16,6 +16,7 @@ import '../../domain/suivi_planning.dart';
 class BlocRetardataires extends StatelessWidget {
   const BlocRetardataires({
     required this.retardataires,
+    required this.compte,
     required this.delaiHeures,
     required this.onRelancer,
     super.key,
@@ -23,7 +24,14 @@ class BlocRetardataires extends StatelessWidget {
     this.raisonInactif,
   });
 
+  /// Les noms que l'écran a su résoudre.
   final List<Retardataire> retardataires;
+
+  /// Le nombre que rend `v_schedule_progress.assignments_late` — **le compte
+  /// fait autorité**, la liste dit qui. Les deux appliquent la même règle et
+  /// ne divergent qu'à la seconde près, au bord du délai ; quand ils
+  /// divergent, c'est la base qui a raison.
+  final int compte;
 
   /// `settings.late_report_hours` de la caserne, jamais un 72 écrit en dur.
   final int delaiHeures;
@@ -59,7 +67,7 @@ class BlocRetardataires extends StatelessWidget {
                   child: Semantics(
                     header: true,
                     child: Text(
-                      AppStrings.suiviRetardatairesTitre(retardataires.length),
+                      AppStrings.suiviRetardatairesTitre(compte),
                       style: theme.textTheme.titleMedium,
                     ),
                   ),

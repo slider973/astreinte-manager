@@ -333,12 +333,22 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       final resultat = await _planning.publier();
       if (resultat == null) return false;
       final etat = ref.read(planningControllerProvider).value;
+      final planning = etat?.planning.planning;
+
+      // **La publication est acquise, l'envoi ne l'est pas toujours**, et le
+      // compte rendu du serveur le dit. Annoncer « 18 pompiers notifiés » quand
+      // aucun téléphone n'a sonné, c'est retirer au chef la seule raison qu'il
+      // aurait d'aller relancer.
+      if (!resultat.envoiComplet && planning != null) {
+        ref.read(alerteEnvoiProvider.notifier).signaler(planning.id);
+      }
+
       if (mounted && etat != null) {
+        final mois = AppStrings.moisLongs[etat.periode.mois - 1];
         _annoncer(
-          AppStrings.publiePourMois(
-            AppStrings.moisLongs[etat.periode.mois - 1],
-            resultat.membres,
-          ),
+          resultat.envoiComplet
+              ? AppStrings.publiePourMois(mois, resultat.membres)
+              : AppStrings.publiePourMoisSansEnvoi(mois),
         );
       }
       return true;

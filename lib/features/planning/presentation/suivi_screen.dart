@@ -86,13 +86,17 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     );
   }
 
-  Future<void> _relancer() async {
-    final resultat = await _controleur.relancer();
+  Future<void> _relancer({bool tout = false}) async {
+    final resultat = await _controleur.relancer(tout: tout);
     if (!mounted || resultat == null) return;
+    if (!resultat.nouvelle) {
+      _annoncer(AppStrings.suiviRelanceDejaFaite);
+      return;
+    }
     _annoncer(
-      resultat.nouvelle
-          ? AppStrings.suiviRelanceFaite(resultat.membres)
-          : AppStrings.suiviRelanceDejaFaite,
+      tout
+          ? AppStrings.suiviRattrapageFait(resultat.membres)
+          : AppStrings.suiviRelanceFaite(resultat.membres),
     );
   }
 
@@ -276,6 +280,12 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
                 const SizedBox(height: AppSpacing.lg),
                 BlocRetardataires(
                   retardataires: retardataires,
+                  // **La base compte, l'écran nomme.** `assignments_late` est
+                  // la seule définition du retard du produit ; la resservir
+                  // depuis la vue évite deux chiffres pour une chose, et la
+                  // relance vise de toute façon ce que la base voit, pas ce que
+                  // la liste affiche.
+                  compte: etat.suivi.progression.enRetard,
                   delaiHeures: etat.suivi.delaiRetardHeures,
                   enVol: etat.relance,
                   raisonInactif: _raisonRelance(etat),
@@ -323,8 +333,15 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     final horsLigne = !(ref.watch(enLigneProvider).value ?? true);
     final valide = etat.suivi.planning?.valideLe;
 
+    // L'envoi de la publication n'a pas abouti et personne n'a encore rattrapé.
+    // Le bandeau reste : il décrit un état persistant, et il porte l'action qui
+    // le lève.
+    final envoiManque =
+        etat.suivi.planning != null &&
+        ref.watch(alerteEnvoiProvider) == etat.suivi.planning!.id;
+
     final variantes = <AppBannerVariante>[
-      if (etat.messageErreur != null) AppBannerVariante.erreur,
+      if (etat.messageErreur != null || envoiManque) AppBannerVariante.erreur,
       if (horsLigne) AppBannerVariante.horsLigne,
       if (etat.lectureSeule) AppBannerVariante.lectureSeule,
       if (valide != null && etat.suivi.etat == PlanningEtat.valide)
@@ -335,12 +352,23 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     if (gagnante == null) return null;
 
     return switch (gagnante) {
-      AppBannerVariante.erreur => AppBanner(
-        variante: AppBannerVariante.erreur,
-        texte: etat.messageErreur!,
-        libelleAction: AppStrings.actionReessayer,
-        onAction: () => unawaited(_controleur.rafraichir()),
-      ),
+      // Un envoi manqué passe devant une erreur de lecture : la lecture se
+      // rattrape d'un bouton, les pompiers non prévenus attendent une action.
+      AppBannerVariante.erreur => envoiManque
+          ? AppBanner(
+              variante: AppBannerVariante.erreur,
+              texte: AppStrings.suiviEnvoiManque,
+              libelleAction: AppStrings.suiviPrevenir,
+              onAction: etat.relance || _raisonRelance(etat) != null
+                  ? null
+                  : () => unawaited(_relancer(tout: true)),
+            )
+          : AppBanner(
+              variante: AppBannerVariante.erreur,
+              texte: etat.messageErreur!,
+              libelleAction: AppStrings.actionReessayer,
+              onAction: () => unawaited(_controleur.rafraichir()),
+            ),
       AppBannerVariante.horsLigne => const AppBanner(
         variante: AppBannerVariante.horsLigne,
         texte: AppStrings.horsLigneDetail,

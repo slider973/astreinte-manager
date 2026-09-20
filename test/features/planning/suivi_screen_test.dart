@@ -37,9 +37,11 @@ FauxSuiviRepository _depot({
   PlanningBrouillon? planning,
   List<AttributionSuivi>? attributions,
   int delaiRetardHeures = 72,
+  int? enRetardAffiche,
 }) => FauxSuiviRepository(
   planning: planning ?? planningPublie(),
   delaiRetardHeures: delaiRetardHeures,
+  enRetardAffiche: enRetardAffiche,
   creneaux: <CreneauPlanning>[
     creneau(id: 'c-1-j', jour: 1),
     creneau(id: 'c-1-n', jour: 1, creneau: CreneauType.nuit),
@@ -246,6 +248,17 @@ void main() {
       expect(find.text(AppStrings.suiviRetardatairesTitre(1)), findsOneWidget);
     });
 
+    testWidgets('le compte affiché est celui de la vue, pas un recomptage', (
+      tester,
+    ) async {
+      // La base fait autorité sur le retard : une seule définition dans tout le
+      // produit (`v_schedule_progress.assignments_late`).
+      await _ouvrir(tester, depot: _depot(enRetardAffiche: 4));
+
+      expect(find.text(AppStrings.suiviRetardatairesTitre(4)), findsOneWidget);
+      expect(find.text(AppStrings.suiviRetardatairesTitre(1)), findsNothing);
+    });
+
     testWidgets('« Relancer maintenant » relance, et le dit', (tester) async {
       final depot = _depot();
       depot.membresRelances = 2;
@@ -255,7 +268,8 @@ void main() {
       await tester.tap(find.text(AppStrings.suiviRelancer));
       await tester.pumpAndSettle();
 
-      expect(depot.relances, <String>['plan-1']);
+      expect(depot.relances.single.planningId, 'plan-1');
+      expect(depot.relances.single.tout, isFalse);
       expect(find.text(AppStrings.suiviRelanceFaite(2)), findsOneWidget);
     });
 

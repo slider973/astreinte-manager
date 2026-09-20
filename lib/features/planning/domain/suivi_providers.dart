@@ -46,6 +46,26 @@ class FiltresSuivi extends Notifier<Set<FiltreSuivi>> {
 final NotifierProvider<FiltresSuivi, Set<FiltreSuivi>> filtresSuiviProvider =
     NotifierProvider<FiltresSuivi, Set<FiltreSuivi>>(FiltresSuivi.new);
 
+/// Le planning dont les notifications de publication ne sont **pas** parties.
+///
+/// `null` quand il n'y a rien à rattraper. C'est un fait qui survit à la
+/// navigation — la publication a lieu sur la matrice, le rattrapage sur le
+/// suivi — et qui ne s'efface que par une relance réussie : un bandeau qu'on
+/// peut fermer sans rien faire est un bandeau qui ment le lendemain.
+class AlerteEnvoi extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void signaler(String planningId) => state = planningId;
+
+  void rattrape(String planningId) {
+    if (state == planningId) state = null;
+  }
+}
+
+final NotifierProvider<AlerteEnvoi, String?> alerteEnvoiProvider =
+    NotifierProvider<AlerteEnvoi, String?>(AlerteEnvoi.new);
+
 /// Ce que l'écran de suivi affiche.
 @immutable
 class EtatSuivi {
@@ -311,7 +331,11 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
 
   /// Relance les retardataires. Rend le compte rendu, ou `null` en cas
   /// d'échec — c'est l'écran qui choisit la surface.
-  Future<ResultatRelance?> relancer() async {
+  ///
+  /// [tout] est le **rattrapage** d'un envoi manqué : il vise toutes les
+  /// attributions sans réponse, pas seulement celles que le délai de la caserne
+  /// déclare en retard.
+  Future<ResultatRelance?> relancer({bool tout = false}) async {
     final courant = state.value;
     final planning = courant?.suivi.planning;
     if (courant == null || planning == null || courant.relance) return null;
@@ -323,7 +347,15 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
     try {
       final resultat = await ref
           .read(suiviRepositoryProvider)
-          .relancer(planningId: planning.id);
+          .relancer(planningId: planning.id, tout: tout);
+
+      // **L'alerte ne se lève que sur un envoi réel.** Une relance écartée par
+      // le dédoublonnage n'a prévenu personne de plus : laisser le bandeau est
+      // la seule chose honnête à faire.
+      if (tout && resultat.nouvelle) {
+        ref.read(alerteEnvoiProvider.notifier).rattrape(planning.id);
+      }
+
       final apres = state.value;
       if (!ref.mounted || apres == null) return resultat;
       state = AsyncValue<EtatSuivi?>.data(apres.copie(relance: false));

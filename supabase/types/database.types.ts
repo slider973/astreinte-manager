@@ -1133,7 +1133,12 @@ export type Database = {
         Args: { p_actor: string; p_schedule: string }
         Returns: Json
       }
-      remind_schedule: { Args: { p_schedule: string }; Returns: Json }
+      remind_schedule: {
+        Args: { p_schedule: string; p_tout?: boolean }
+        Returns: Json
+      }
+      schedule_complet: { Args: { p_schedule: string }; Returns: boolean }
+      schedule_reevaluer: { Args: { p_schedule: string }; Returns: boolean }
       station_required_count: {
         Args: {
           p_date: string

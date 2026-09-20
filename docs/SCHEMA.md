@@ -590,7 +590,9 @@ ticket 010, vérifié par `supabase/tests/planning_brouillon_test.sql § 2`.
 | Fonction | Signature | Rôle |
 |---|---|---|
 | `publish_schedule` | `(p_schedule uuid, p_actor uuid) returns jsonb` `security definer`, **réservée à `service_role`** | La publication, **en une transaction** : droit de l'acteur, statut `draft → published`, `proposed_at` posé sur chaque attribution du brouillon, journal `schedule.published`. Rend les destinataires **déjà groupés par membre** — un objet par pompier, ses créneaux triés — prêts pour `send-notification`. Refus métier en `{"ok": false, "code": …}` : `schedule_not_found`, `not_admin`, `station_suspended`, `schedule_not_draft`. |
-| `remind_schedule` | `(p_schedule uuid) returns jsonb` `security definer`, ouverte à `authenticated` | La relance manuelle des retardataires, celle du bouton « Relancer maintenant ». Le retard a **une seule définition dans tout le produit** : celle de `v_schedule_progress.assignments_late`. Une notification par membre, `reminder_count` et `last_reminder_at` mis à jour, et une clé de dédoublonnage portant l'heure — un double clic ne coûte rien. |
+| `schedule_complet` | `(p_schedule uuid) returns boolean` `stable security definer` | Vrai quand **chaque** créneau atteint son effectif requis en attributions **acceptées**. Écrit une fois, trois appelants : le déclencheur d'acceptation, la fin de `publish_schedule` et le changement d'effectif requis d'un créneau. |
+| `schedule_reevaluer` | `(p_schedule uuid) returns boolean` `security definer` | Verrouille la ligne du planning (**`for update` en première instruction**), teste la complétude et applique la transition : `published → validated` avec notification à tous les membres actifs, ou `validated → published` quand un effectif requis a changé. Le verrou précède le test, et c'est toute l'affaire — voir § 5. |
+| `remind_schedule` | `(p_schedule uuid, p_tout boolean default false) returns jsonb` `security definer`, ouverte à `authenticated` | La relance manuelle, celle du bouton « Relancer maintenant ». Le retard a **une seule définition dans tout le produit** : celle de `v_schedule_progress.assignments_late`. `p_tout` la lève, pour rattraper un envoi de publication qui n'a pas abouti — les pompiers qui n'ont rien reçu ne sont pas « en retard ». Une notification par membre, et **la marque suit l'envoi** : une demande écartée par la clé de dédoublonnage ne touche ni `reminder_count` ni `last_reminder_at`, sans quoi un double clic ferait croire aux crons du ticket 022 qu'un palier est franchi. Un verrou consultatif sérialise les appels concurrents sur un même planning. |
 
 **Le groupement se fait en SQL, pas en TypeScript.** `send-notification` sait regrouper — c'est sa
 promesse et elle est testée chez elle — mais le faire ici le rend vérifiable par
@@ -649,7 +651,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `availabilities` | membre : les siennes ; admin : toutes celles de la caserne | membre : les siennes si période `open` et caserne writable ; admin : toutes |
 | `availability_preferences` | idem availabilities | idem |
 | `schedules` | membre si `status <> 'draft'` ; admin toujours | admin, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0019`), et sauf les transitions de statut interdites par `docs/WORKFLOWS.md § 2`, que `schedules_guard_transition` refuse à tout le monde |
-| `shifts` | membre si le schedule est publié ou validé ; admin toujours | admin |
+| `shifts` | membre si le schedule est publié ou validé ; admin toujours | admin, **sauf le `delete`, réservé aux créneaux d'un planning encore `draft`** (migration `0019`) : supprimer un créneau publié effacerait ses attributions par cascade |
 | `assignments` | membre : les siennes si schedule publié ; tous les membres si validé ; admin toutes | membre : `status` uniquement, de `proposed` vers `accepted` ou `declined`, sur les siennes ; admin : tout, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0018`) |
 | `push_tokens` | soi-même | soi-même |
 | `notifications` | soi-même | soi-même (`read_at` uniquement, imposé par un grant de colonne : `revoke update on notifications from authenticated` puis `grant update (read_at)`) ; insert par service role |
@@ -771,19 +773,46 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   réécrit, `validated_at` est posé à la validation et **effacé** au retour en `published`.
   Security invoker, comme `periods_guard_transition` : une machine à états est une propriété
   du domaine, pas une règle d'interface.
-- `schedules_guard_suppression` (migration `0019`, ticket 019) : `before delete` sur
-  `schedules`. Refuse la suppression d'un planning qui n'est plus en brouillon
-  (`schedule_delete_published`). **C'est lui qui attrape la cascade** : une suppression en
-  cascade depuis `periods` ne consulte aucune politique RLS, mais elle déclenche bien les
-  triggers de ligne de la table enfant. La politique `schedules_delete_admin`, restreinte au
-  brouillon par la même migration, ne suffisait donc pas seule.
+- `schedules_guard_suppression` et `shifts_guard_suppression` (migration `0019`, ticket 019) :
+  `before delete` sur `schedules` et sur `shifts`. Refusent la suppression d'un planning ou
+  d'un créneau qui n'est plus en brouillon (`schedule_delete_published`,
+  `shift_delete_published`). **Ce sont eux qui attrapent la cascade** : une suppression en
+  cascade ne consulte aucune politique RLS, mais elle déclenche bien les triggers de ligne de
+  la table enfant. Garder les plannings seuls ne suffisait pas : `shifts` cascade vers
+  `assignments`, et supprimer **un créneau** d'un planning publié effaçait les attributions
+  qu'un pompier avait déjà reçues — une écriture, aucune trace. Les deux politiques,
+  restreintes au brouillon par la même migration, rendent le refus lisible à un client mais ne
+  suffisent jamais seules.
+- `shifts_effectif_revalide` (migration `0019`, ticket 019) : `after update of required_count`
+  sur `shifts`. Change l'effectif requis d'un créneau, et la **condition de validation** du
+  planning vient de bouger sans qu'aucune réponse ne l'ait fait : ramener un créneau publié de
+  2 à 1 alors qu'une seule personne a accepté rend le planning complet, et aucune réponse ne
+  viendra plus le réveiller ; le porter de 1 à 2 sur un planning validé le rend incomplet, et
+  le laisser « validé » mentirait à toute la caserne. Appelle `schedule_reevaluer`, qui traite
+  les deux sens.
 - `schedule_auto_validate` (migration `0019`, ticket 019) : `after update` sur `assignments`,
-  `when (new.status = 'accepted' and old.status is distinct from new.status)`. Si **chaque**
-  créneau du planning atteint son effectif requis en attributions **acceptées** — la
-  validation se juge sur les acceptations seules, jamais sur `v_schedule_progress.shifts_filled`
-  (§ 6) —, passe le planning en `validated` et notifie `schedule_validated` à tous les membres
-  actifs par `notify(...)`. L'`update … where status = 'published' returning` arbitre la
-  course : deux acceptations simultanées ne produisent **qu'une** salve de notifications.
+  `when (new.status = 'accepted' and old.status is distinct from new.status)`. Délègue à
+  `schedule_reevaluer` : si **chaque** créneau du planning atteint son effectif requis en
+  attributions **acceptées** — la validation se juge sur les acceptations seules, jamais sur
+  `v_schedule_progress.shifts_filled` (§ 6) —, le planning passe en `validated` et
+  `schedule_validated` part à tous les membres actifs.
+
+  **Le verrou de ligne précède le test, et c'est structurel.** Deux membres qui acceptent en
+  même temps les deux places d'un créneau qui en demande deux lisent chacun leur instantané et
+  ne voient pas l'acceptation de l'autre : sans verrou, aucun des deux ne conclut « complet »,
+  le planning reste publié **pour toujours**, et aucune réponse ultérieure ne viendra le
+  réveiller — il n'en reste plus à donner. Arbitrer *après* le test, par un `update … where
+  status = 'published'`, ne sert à rien : aucune des deux transactions n'atteint l'arbitrage.
+  Avec `select … for update` en première instruction, la seconde attend la première et reprend
+  un instantané frais en `read committed`. L'arbitrage reste, en seconde sécurité.
+  Reproduit à deux sessions réelles par `scripts/test_concurrence.sh`.
+
+  **La complétude ne se teste pas qu'à l'acceptation.** Un planning dont tous les créneaux
+  demandent zéro personne est complet avant la moindre réponse ; `publish_schedule` interroge
+  donc `schedule_complet` à son tour, dans la même transaction que la publication. Et
+  `schedule_validated` part **sans clé de dédoublonnage** : l'exclusivité est déjà tenue par
+  la transition, et une clé « par seconde » avalerait une revalidation légitime survenue dans
+  la même seconde.
 - `periods_guard_transition` (migration `0012`, ticket 014) : `before update` sur `periods`.
   Tient `locked_at` à jour avec le statut, gèle la clé (`station_id`, `year`, `month`)
   — `period_key_immutable` — et **refuse une réouverture dont la date limite est déjà
@@ -1112,7 +1141,7 @@ Ordre proposé :
 16. `0016_cron_rappels_saisie.sql` (ticket 015 : `cron_availability_reminders` et la tâche `availability_reminders`)
 17. `0017_matrice_admin.sql` (ticket 016 : calendrier français en base, vue `v_member_load`, fonction `availability_matrix`)
 18. `0018_planning_brouillon.sql` (ticket 017 : `station_required_count`, `create_schedule`, `assignments_trace_disponibilite`, `assignments_audit_hors_dispo`, suppression d'attribution réservée au brouillon, vue `v_schedule_progress`, inscription d'`assignments` dans `supabase_realtime`)
-19. `0019_publication_suivi.sql` (ticket 019 : `schedules_guard_transition`, `schedules_guard_suppression`, suppression d'un planning réservée au brouillon, `publish_schedule`, `schedule_auto_validate`, `remind_schedule`, inscription de `schedules` dans `supabase_realtime`)
+19. `0019_publication_suivi.sql` (ticket 019 : `schedules_guard_transition`, `schedules_guard_suppression` et `shifts_guard_suppression`, suppression d'un planning et d'un créneau réservée au brouillon, `publish_schedule`, `schedule_complet`, `schedule_reevaluer`, `schedule_auto_validate`, `shifts_effectif_revalide`, `remind_schedule`, inscription de `schedules` dans `supabase_realtime`)
 20. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
     `late_responders_report` (ticket 022), `archive_schedules` et `prune_notifications`
 

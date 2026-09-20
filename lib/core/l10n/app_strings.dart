@@ -1877,6 +1877,13 @@ abstract final class AppStrings {
             '$membres pompier${membres > 1 ? 's' : ''} '
             'notifié${membres > 1 ? 's' : ''}.';
 
+  /// **L'envoi a échoué, la publication non.** Le planning est parti en base,
+  /// mais les téléphones n'ont pas sonné : le dire est la seule chose à faire,
+  /// parce qu'un chef qui croit avoir prévenu tout le monde n'ira pas relancer.
+  static String publiePourMoisSansEnvoi(String mois) =>
+      'Planning ${moisAvecDe(mois)} publié, mais les notifications ne sont '
+      'pas parties. Personne n\'a été prévenu.';
+
   static const String publierDejaFait = 'Ce planning a déjà été publié.';
   static const String publierErreur =
       'La publication n\'a pas abouti. Le planning n\'a pas bougé.';
@@ -1922,6 +1929,17 @@ abstract final class AppStrings {
   static String suiviRelanceLe(String depuis) => 'relancé $depuis';
 
   static const String suiviRelancer = 'Relancer maintenant';
+  static const String suiviPrevenir = 'Prévenir maintenant';
+
+  /// La bannière qui reste tant que l'envoi manqué n'est pas rattrapé.
+  static const String suiviEnvoiManque =
+      'Les notifications de publication ne sont pas parties : les pompiers '
+      'attribués n\'ont pas été prévenus.';
+
+  static String suiviRattrapageFait(int membres) => membres == 0
+      ? 'Plus personne n\'attend de notification.'
+      : '$membres pompier${membres > 1 ? 's' : ''} '
+            'prévenu${membres > 1 ? 's' : ''}.';
   static const String suiviRelanceEnCours = 'Relance…';
 
   static String suiviRelanceFaite(int membres) => membres == 0

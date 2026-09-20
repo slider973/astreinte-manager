@@ -57,6 +57,8 @@ class FauxSuiviRepository implements SuiviRepository {
     this.relanceNouvelle = true,
     this.membresPublies = 0,
     this.attributionsPubliees = 0,
+    this.envoiComplet = true,
+    this.enRetardAffiche,
   }) : _planning = planning,
        _creneaux = <CreneauPlanning>[...?creneaux],
        _attributions = <AttributionSuivi>[...?attributions];
@@ -76,10 +78,20 @@ class FauxSuiviRepository implements SuiviRepository {
   int membresPublies;
   int attributionsPubliees;
 
+  /// Faux quand `send-notification` n'a servi personne. **La publication reste
+  /// acquise** : c'est tout l'enjeu du compte rendu.
+  bool envoiComplet;
+
+  /// Force `assignments_late` à une valeur distincte de ce que le client
+  /// recompterait. Sert à prouver que l'écran lit bien la vue.
+  int? enRetardAffiche;
+
   int lectures = 0;
   int lecturesAvancement = 0;
   final List<String> publications = <String>[];
-  final List<String> relances = <String>[];
+  /// Les relances demandées, avec leur portée : `true` pour un rattrapage.
+  final List<({String planningId, bool tout})> relances =
+      <({String planningId, bool tout})>[];
 
   final StreamController<EvenementSuivi> _canal =
       StreamController<EvenementSuivi>.broadcast();
@@ -132,12 +144,16 @@ class FauxSuiviRepository implements SuiviRepository {
     return ResultatPublication(
       membres: membresPublies,
       attributions: attributionsPubliees,
+      envoiComplet: envoiComplet,
     );
   }
 
   @override
-  Future<ResultatRelance> relancer({required String planningId}) async {
-    relances.add(planningId);
+  Future<ResultatRelance> relancer({
+    required String planningId,
+    bool tout = false,
+  }) async {
+    relances.add((planningId: planningId, tout: tout));
     final echec = erreurRelance;
     if (echec != null) throw EchecSuivi(echec);
     return ResultatRelance(
@@ -191,7 +207,7 @@ class FauxSuiviRepository implements SuiviRepository {
       enAttente: enAttente,
       acceptees: acceptees,
       refusees: refusees,
-      enRetard: enRetard,
+      enRetard: enRetardAffiche ?? enRetard,
     );
   }
 }

@@ -149,8 +149,16 @@ abstract interface class SuiviRepository {
   /// Publie le planning : Edge Function `publish-schedule`.
   Future<ResultatPublication> publier({required String planningId});
 
-  /// Relance les retardataires : `remind_schedule(p_schedule)`.
-  Future<ResultatRelance> relancer({required String planningId});
+  /// Relance les retardataires : `remind_schedule(p_schedule, p_tout)`.
+  ///
+  /// [tout] lève la condition d'âge, et il a un appelant précis : **le
+  /// rattrapage d'un envoi manqué**. Les pompiers qui n'ont rien reçu à la
+  /// publication ne sont pas « en retard » — ils viennent d'être proposés — et
+  /// leur faire attendre `late_report_hours` serait absurde.
+  Future<ResultatRelance> relancer({
+    required String planningId,
+    bool tout = false,
+  });
 
   /// Le canal temps réel des attributions **et** des plannings.
   Stream<EvenementSuivi> ecouter({required String stationId});
@@ -305,11 +313,14 @@ class SupabaseSuiviRepository implements SuiviRepository {
   }
 
   @override
-  Future<ResultatRelance> relancer({required String planningId}) async {
+  Future<ResultatRelance> relancer({
+    required String planningId,
+    bool tout = false,
+  }) async {
     try {
       final reponse = await _client.rpc<dynamic>(
         'remind_schedule',
-        params: <String, dynamic>{'p_schedule': planningId},
+        params: <String, dynamic>{'p_schedule': planningId, 'p_tout': tout},
       );
 
       if (reponse is! Map<String, dynamic>) {
@@ -321,9 +332,11 @@ class SupabaseSuiviRepository implements SuiviRepository {
 
       return ResultatRelance(
         membres: (reponse['members'] as int?) ?? 0,
-        // `outbox_id` nul avec des destinataires : la clé de dédoublonnage a
-        // écarté la demande, personne ne recevra rien de plus dans l'heure.
-        nouvelle: reponse['outbox_id'] != null,
+        // La base **dit** si la demande a été écartée par sa clé de
+        // dédoublonnage. Le déduire de `outbox_id` serait le déduire d'un
+        // indice, et l'indice a changé le jour où la fonction s'est mise à
+        // rendre l'identifiant de la ligne déjà en file.
+        nouvelle: (reponse['deduplicated'] as bool?) != true,
       );
     } on Object catch (echec) {
       throw EchecSuivi(_traduire(echec));

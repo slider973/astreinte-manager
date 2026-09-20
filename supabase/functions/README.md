@@ -271,9 +271,12 @@ Content-Type: application/json
 
 1. **`publish_schedule(p_schedule, p_actor)`** — fonction SQL `security definer`, réservée au rôle
    de service. Elle vérifie le droit de l'appelant, passe le planning en `published`, horodate
-   `proposed_at` sur chaque attribution du brouillon et journalise `schedule.published`, **le tout
-   dans une transaction**. Une publication à moitié faite — des attributions horodatées sur un
-   planning resté en brouillon — ne se rattrape par aucune reprise.
+   `proposed_at` sur chaque attribution du brouillon, journalise `schedule.published` puis **teste
+   sa complétude**, **le tout dans une transaction**. Une publication à moitié faite — des
+   attributions horodatées sur un planning resté en brouillon — ne se rattrape par aucune reprise.
+   Le test de complétude en fin de course n'est pas un luxe : un planning dont tous les créneaux
+   demandent zéro personne est complet avant la moindre réponse, et le déclencheur d'acceptation ne
+   se réveillerait jamais. La réponse peut donc rendre `"status": "validated"`.
 2. **`send-notification`**, forme groupée, avec la clé de service en jeton porteur. La fonction SQL
    rend les destinataires **déjà groupés par membre** : sept créneaux font une entrée, pas sept.
    L'envoi vient après la transaction et **ne peut donc pas la défaire** — une notification perdue
@@ -306,7 +309,10 @@ Un planning sans aucune attribution se publie : c'est en ouvrir la lecture aux m
 alors personne à prévenir, et `notification` porte `"skipped": "no_recipients"`.
 
 Un envoi en échec **n'annule pas** la publication : `ok` reste vrai pour le planning et
-`notification` porte `"error": "send_failed"` ou `"unreachable"`.
+`notification` porte `"error": "send_failed"` ou `"unreachable"`. **L'application doit lire
+`notification.ok`** : annoncer « 18 pompiers notifiés » quand aucun téléphone n'a sonné retire au
+chef de centre la seule raison qu'il aurait d'aller relancer. L'écran de suivi porte donc un bandeau
+tant que le rattrapage n'a pas eu lieu.
 
 Erreurs, forme `{"error": {"code", "message"}}` :
 
@@ -328,8 +334,10 @@ Erreurs, forme `{"error": {"code", "message"}}` :
   attributions **acceptées**, et notifie `schedule_validated` à tous les membres actifs. Aucune Edge
   Function n'y participe.
 - **La relance** des retardataires est une fonction SQL appelable par un admin
-  (`remind_schedule(p_schedule)`), pas une Edge Function : elle passe par `notify(...)` et sa file,
-  comme les crons du ticket 022 le feront.
+  (`remind_schedule(p_schedule, p_tout)`), pas une Edge Function : elle passe par `notify(...)` et
+  sa file, comme les crons du ticket 022 le feront. `p_tout` sert au **rattrapage d'un envoi
+  manqué** : quand `notification.ok` vaut faux ci-dessus, les pompiers concernés n'ont rien reçu et
+  ne sont pourtant pas « en retard » — leur faire attendre `late_report_hours` serait absurde.
 
 ---
 
