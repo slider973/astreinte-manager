@@ -381,7 +381,7 @@ create table notification_outbox (
   channels      text[],             -- null = canaux par défaut du type (§ 8 de WORKFLOWS)
   dedupe_key    text,
   status        text not null default 'pending'
-                  check (status in ('pending', 'sent', 'failed')),
+                  check (status in ('pending', 'sending', 'sent', 'failed')),
   attempts      int not null default 0,
   locked_until  timestamptz,
   last_error    text,
@@ -390,7 +390,7 @@ create table notification_outbox (
   processed_at  timestamptz
 );
 create index notification_outbox_pending_idx on notification_outbox (created_at)
-  where status = 'pending';
+  where status in ('pending', 'sending');
 create unique index notification_outbox_dedupe_uniq on notification_outbox (type, dedupe_key)
   where dedupe_key is not null;
 ```
@@ -409,6 +409,15 @@ chaque minute ce qui n'a pas abouti, cinq fois, avant de marquer la ligne `faile
 avec sa dernière erreur. Livraison **au moins une fois**, jamais zéro : un doublon
 de notification est un désagrément, une proposition d'astreinte jamais reçue est
 une faute.
+
+`sending` n'est pas un statut décoratif : c'est lui qui rend la prise en charge
+**exclusive**. `notify_claim` fait passer la ligne de `pending` à `sending` et ne
+rend rien si elle n'y était plus — deux requêtes qui arrivent ensemble (la tentative
+immédiate et une reprise qui n'a pas vu le verrou) n'obtiennent la demande qu'une
+fois, et le membre ne reçoit pas la notification en double. Une Edge Function qui
+meurt après avoir pris la demande la laisse en `sending` ;
+`cron_dispatch_notifications` la ramène à `pending` quand son verrou expire, donc une
+panne coûte deux minutes de retard, jamais une notification.
 
 `dedupe_key` porte les règles d'unicité métier de `docs/WORKFLOWS.md § 8` — « un
 rappel par membre et par échéance » (ticket 015), « un rapport par jour et par
@@ -510,9 +519,9 @@ n'aurait aucun sens.
 |---|---|---|
 | `notify` | `(p_type notification_type, p_user_ids uuid[] default null, p_station uuid default null, p_payload jsonb default '{}', p_channels text[] default null, p_recipients jsonb default null, p_dedupe_key text default null) returns uuid` | Écrit la demande dans `notification_outbox` **dans la transaction métier**, puis tente l'appel immédiat. Deux façons de décrire les destinataires : `p_user_ids` (tout le monde reçoit la même chose) ou `p_recipients` (`[{"user_id", "payload"}]`, une charge utile par membre — c'est le support du regroupement). Renvoie l'identifiant de la ligne de file. |
 | `notify_post` | `(p_outbox uuid) returns boolean` | Poste une ligne vers l'Edge Function par `net.http_post`, incrémente `attempts`, pose un verrou de deux minutes. **Ne lève jamais** : un incident pg_net ne doit pas annuler la publication d'un planning. |
-| `notify_claim` | `(p_outbox uuid) returns notification_outbox` | Relit une demande et pose le verrou. Renvoie `NULL` si elle n'est plus `pending` : c'est l'idempotence du rejeu. Réservée à `service_role`. |
+| `notify_claim` | `(p_outbox uuid) returns notification_outbox` | Prend une demande en charge : `pending` → `sending`, verrou de deux minutes. Renvoie `NULL` si elle est déjà prise ou close — la prise en charge est **exclusive**, pas seulement idempotente. Réservée à `service_role`. |
 | `notify_complete` | `(p_outbox uuid, p_ok boolean, p_error text default null, p_result jsonb default null) returns void` | Clôt la demande, `sent` ou `failed`, avec son compte rendu. Réservée à `service_role`. |
-| `cron_dispatch_notifications` | `(p_reference timestamptz default null, p_limit integer default 100, p_max_attempts integer default 5) returns integer` | Corps de la tâche `dispatch_notifications` (§ 8). Reprend les demandes restées en attente, abandonne au bout de cinq tentatives. Idempotente, paramétrée par un instant de référence comme les tâches de `0012`. |
+| `cron_dispatch_notifications` | `(p_reference timestamptz default null, p_limit integer default 100, p_max_attempts integer default 5) returns integer` | Corps de la tâche `dispatch_notifications` (§ 8). Ramène à `pending` les prises en charge dont le verrou a expiré, reprend les demandes restées en attente, abandonne au bout de cinq tentatives. Idempotente, paramétrée par un instant de référence comme les tâches de `0012`. |
 | `notify_endpoint` | `() returns (o_url text, o_secret text)` | Adresse de l'Edge Function et secret d'appel, lus dans Supabase Vault. |
 | `notify_internal_secret` | `() returns text` | Le secret d'appel, que l'Edge Function lit pour authentifier ce qui vient de pg_net. Réservée à `service_role`. |
 

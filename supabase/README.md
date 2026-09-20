@@ -162,7 +162,7 @@ d'un envoi — avec des dépendances injectées. Ni base, ni réseau, ni clés F
 la tâche `edge-functions` de la CI, moins d'une minute.
 
 `scripts/test_functions.sh` exerce les trois Edge Functions en HTTP contre la pile locale
-(105 assertions, base rendue à l'état du seed). Il n'est pas dans la CI : le workflow
+(110 assertions, base rendue à l'état du seed). Il n'est pas dans la CI : le workflow
 démarre la pile sans `edge-runtime` ni `kong`. Voir
 [`functions/README.md`](functions/README.md).
 

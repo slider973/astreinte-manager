@@ -32,7 +32,7 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
 ```sh
 supabase start
 supabase functions serve          # dans un second terminal, rechargement à chaud
-scripts/test_functions.sh         # 105 assertions de bout en bout
+scripts/test_functions.sh         # 110 assertions de bout en bout
 ```
 
 Sans Docker ni base, la logique pure des fonctions se vérifie seule :
@@ -91,6 +91,10 @@ fonctions : c'est Postgres qui les lit, au moment de l'appel.
 
 Le secret est engendré au hasard par la migration et n'est recopié nulle part — l'Edge Function va
 le lire avec sa clé de service. Il n'y a **rien à faire**.
+
+Il est gardé en mémoire le temps de vie de l'instance, mais **relu en cas de non-correspondance** :
+le jour où il tourne, une instance déjà chaude refuserait sinon tous les appels venus de la base
+jusqu'à son recyclage, et les notifications s'accumuleraient en file pour une raison invisible.
 
 L'adresse, elle, vise la pile locale par défaut. Sur un projet hébergé, une commande, une fois :
 
@@ -284,6 +288,12 @@ Content-Type: application/json
 Pas de file, pas d'attente : la réponse porte le compte rendu, ce qui permet de le montrer à l'admin
 qui vient de cliquer.
 
+**La prise en charge est exclusive.** Une demande venue de la file passe par `notify_claim`, qui la
+fait basculer de `pending` à `sending` : deux requêtes qui arrivent ensemble ne l'obtiennent qu'une
+fois, la seconde répond `{"ok": true, "skipped": "already_processed"}` sans rien envoyer. Une
+fonction qui meurt après la prise en charge laisse la ligne en `sending` ; la tâche
+`dispatch_notifications` la ramène à `pending` quand le verrou de deux minutes expire.
+
 ### Corps de la requête
 
 Deux formes. La courte, quand tout le monde reçoit la même chose :
@@ -355,11 +365,25 @@ client par `lib/features/notifications/domain/destination_push.dart` :
 | `assignment_declined`, `schedule_all_accepted`, `late_responders`  | `/admin/schedule/<AAAA-MM>` |
 | `invitation`                                                       | `/connexion`                |
 
+`/connexion` est une cinquième forme, que `destination_push.dart` ne connaît pas et rejette : un
+push la portant n'ouvrirait rien. C'est sans conséquence parce que `invitation` ne part que par
+courriel, où le lien est une adresse complète. Pour que ça le reste, **le canal `push` est refusé
+pour ce type** (`invalid_channels`) : un appelant qui le forcerait s'en aperçoit au développement,
+pas un pompier sur le terrain.
+
 Le message FCM porte **`notification` et `data`**, et ce n'est pas de la ceinture-bretelles : au
 premier plan `messagerie_push.dart` lit `notification.title` ; en arrière-plan le SDK affiche tout
 seul et `web/firebase-messaging-sw.js` retrouve la destination dans `FCM_MSG.data.route` ; en repli
 « data only », le même service worker lit `data.title`, `data.body` et `data.route`. Retirer l'un
 des deux blocs casse l'un des trois chemins.
+
+**`webpush.fcm_options.link` est une adresse complète, pas la route.** L'API v1 valide ce champ
+comme une URL et impose `https` : un chemin relatif fait échouer le message entier par un
+`400 INVALID_ARGUMENT`, que `classerErreurFcm` range en incident temporaire — donc aucun jeton
+perdu, mais aucun push jamais délivré et tout en courriel de secours. Un silence parfait. L'adresse
+est construite par `lienApplication()` (`APP_BASE_URL` + `APP_LINK_PATH`), et le champ est **omis**
+si l'origine n'est pas en `https` — en développement, le push part donc sans lui, sans conséquence :
+le service worker lit `data.route`.
 
 ### Réponse `200`
 
@@ -400,7 +424,10 @@ Erreurs, forme `{"error": {"code", "message"}}` : `method_not_allowed` (405), `u
 ### Les règles qui ne se voient pas
 
 - **La ligne `inapp` est écrite en premier**, avant tout envoi. Une notification dont le push et le
-  courriel échouent reste lisible dans l'application.
+  courriel échouent reste lisible dans l'application. Si cette écriture **échoue**, le destinataire
+  n'est pas compté comme servi (`inapp: false`, `ok: false`, `code: "no_channel_delivered"`) : la
+  demande n'est pas close en `sent` et la file la reprendra. Compter un envoi qu'on n'a pas fait est
+  la seule façon de perdre une notification malgré la file.
 - **`profiles.push_enabled` est respecté** pour tous les types sauf `assignment_proposed` :
   `docs/PRD.md § 6.5` en fait une notification non désactivable, et l'écran de réglage le dit au
   membre au lieu de le lui cacher. Un push coupé par le réglage **ne bascule pas** sur le courriel :
