@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 005, 008
 - **Branche** : `feat/006-invitations-onboarding`
+- **Statut** : en cours depuis 2026-09-20
 
 ## À faire
 - Edge Function `invite-member` : crée l'invitation, envoie l'email via Resend avec le lien `https://app/…/invite/<token>`.
