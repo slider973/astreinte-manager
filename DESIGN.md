@@ -376,7 +376,7 @@ L'écart de valeur jour/nuit est volontairement faible (1.18:1) : c'est un repè
 
 | État | Marque | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|---|
-| **proposé** | contour 2 dp, fond ocre pâle | `Icons.hourglass_top` | « En attente de ta réponse » / « En attente » | `#7A5200` sur `#FFE9BF` (13.97:1) | `#FFE0A3` sur `#4A3400` (9.23:1) |
+| **proposé** | contour 2 dp, fond ocre pâle | `Icons.hourglass_top` | « En attente de ta réponse » / « En attente » | `#7A5200` sur `#FFE9BF` (5.82:1) | `#FFE0A3` sur `#4A3400` (9.23:1) |
 | **accepté** | plein, tampon | `Icons.task_alt` | « Accepté » | `#05321A` sur `#CFE9D8` (11.03:1) | `#BFEFD1` sur `#0C4A28` (8.14:1) |
 | **refusé** | barré | `Icons.cancel` | « Refusé » | `#3E0A05` sur `#FBDED9` (13.24:1) | `#FFDAD4` sur `#7E1A12` (7.94:1) |
 | **annulé** | barré, atténué | `Icons.block` | « Annulé » | `#2A343A` sur `#E7EBEE` (10.61:1) | `#C4CFD6` sur `#222C33` (8.97:1) |
@@ -388,19 +388,19 @@ produit 5).
 
 #### Planning
 
-| État | Marque | Icône | Libellé | Encre clair |
-|---|---|---|---|---|
-| **brouillon** | contour tireté | `Icons.edit_note` | « Brouillon » | `#45535C` sur `#E7EBEE` |
-| **publié** | plein, bleu de réglure | `Icons.campaign` | « Publié » | `#052B3B` sur `#CDE7F2` (11.52:1) |
-| **validé** | tampon | `Icons.verified` | « Validé » | `#05321A` sur `#CFE9D8` (11.03:1) |
-| **archivé** | atténué | `Icons.inventory_2` | « Archivé » | `#4A5860` sur `#EEF1F3` (6.48:1) |
+| État | Marque | Icône | Libellé | Encre clair | Encre sombre |
+|---|---|---|---|---|---|
+| **brouillon** | contour tireté | `Icons.edit_note` | « Brouillon » | `#45535C` sur `#E7EBEE` (6.62:1) | `#C4CFD6` sur `#222C33` (8.97:1) |
+| **publié** | plein, bleu de réglure | `Icons.campaign` | « Publié » | `#052B3B` sur `#CDE7F2` (11.52:1) | `#C8E9F7` sur `#0B4C66` (7.35:1) |
+| **validé** | tampon | `Icons.verified` | « Validé » | `#05321A` sur `#CFE9D8` (11.03:1) | `#BFEFD1` sur `#0C4A28` (8.14:1) |
+| **archivé** | atténué | `Icons.inventory_2` | « Archivé » | `#4A5860` sur `#EEF1F3` (6.48:1) | `#A4B1B9` sur `#182127` (7.44:1) |
 
 #### Période de saisie
 
-| État | Marque | Icône | Libellé | Encre clair |
-|---|---|---|---|---|
-| **ouverte** | filet bleu en marge | `Icons.lock_open` | « Saisie ouverte jusqu'au {date} » | `#052B3B` sur `#CDE7F2` |
-| **verrouillée** | fond hachuré gris, cases non interactives | `Icons.lock` | « Mois verrouillé » | `#3A464E` sur `#DDE3E7` (7.49:1) |
+| État | Marque | Icône | Libellé | Encre clair | Encre sombre |
+|---|---|---|---|---|---|
+| **ouverte** | filet bleu en marge | `Icons.lock_open` | « Saisie ouverte jusqu'au {date} » | `#052B3B` sur `#CDE7F2` (11.52:1) | `#C8E9F7` sur `#0B4C66` (7.35:1) |
+| **verrouillée** | fond hachuré gris, cases non interactives | `Icons.lock` | « Mois verrouillé » | `#3A464E` sur `#DDE3E7` (7.49:1) | `#B3C0C8` sur `#222C33` (7.65:1) |
 
 Le verrouillage **n'est pas une erreur** : il est gris-encre, jamais rouge. C'est un fait, pas une
 panne. Les cases restent lisibles, seule l'interaction disparaît, et le motif hachuré couvre la
@@ -408,12 +408,18 @@ grille entière pour que l'état soit compris sans lire la bannière.
 
 #### Hors ligne et synchronisation
 
-| État | Icône | Libellé | Encre |
-|---|---|---|---|
-| **hors ligne** | `Icons.cloud_off` | « Hors ligne — tes modifications partiront au retour du réseau » | ocre `#7A5200` sur `#FFE9BF` |
-| **enregistrement** | `Icons.sync` | « Enregistrement… » | `on-surface-variant` |
-| **enregistré** | `Icons.cloud_done` | « Enregistré » | `#145C31` |
-| **échec** | `Icons.error_outline` | « Non enregistré » + action « Réessayer » | `error` |
+| État | Icône | Libellé | Encre clair | Encre sombre |
+|---|---|---|---|---|
+| **au repos** | `Icons.cloud_done_outlined` | « À jour » | `on-surface-variant` sur `surface` (7.94:1) | `#B3C0C8` sur `#0F161B` (9.81:1) |
+| **hors ligne** | `Icons.cloud_off` | « Hors ligne — tes modifications partiront au retour du réseau » | ocre `#7A5200` sur `#FFE9BF` (5.82:1) | `#FFE0A3` sur `#4A3400` (9.23:1) |
+| **enregistrement** | `Icons.sync` | « Enregistrement… » | `on-surface-variant` sur `surface` | `#B3C0C8` sur `#0F161B` |
+| **enregistré** | `Icons.cloud_done` | « Enregistré » | `#145C31` sur `surface` (8.06:1) | `#7ADB9F` sur `#0F161B` (10.83:1) |
+| **échec** | `Icons.error_outline` | « Non enregistré » + action « Réessayer » | `error` sur `surface` (7.47:1) | `#FFB4A6` sur `#0F161B` (10.71:1) |
+
+Un cinquième état, **au repos**, a été ajouté à l'implémentation : `SaveIndicator` doit pouvoir
+exister sur un écran où rien n'est en cours, sans disparaître ni mentir. Les encres sombres de cette
+famille, de « planning » et de « période » réemploient des tokens déjà listés dans l'en-tête de ce
+document ; aucune valeur nouvelle n'a été inventée.
 
 ## Typography
 
@@ -431,9 +437,29 @@ costume technique.
 - **Les deux fontes sont embarquées dans `assets/fonts/`**, jamais chargées depuis un CDN : la PWA
   doit s'ouvrir vite en 4G rurale, et un FOUT sur une grille d'états est un défaut de lecture.
 - Si le cut Mono ne peut pas être obtenu, repli explicite : même famille + `FontFeature.tabularFigures()`
-  sur tous les styles numériques, écart à signaler dans la PR.
+  sur tous les styles numériques, écart à signaler dans la PR. **Ce repli n'a pas été nécessaire :
+  les deux familles sont disponibles.**
 - `FontFeature.tabularFigures()` est appliqué **en plus** sur les styles `nombre*` dans tous les cas.
 - Repli système : `system-ui, -apple-system, Segoe UI, Roboto, sans-serif`.
+
+**Fichiers retenus au ticket 004.** Source : dépôt officiel Google Fonts, `ofl/atkinsonhyperlegiblenext`
+et `ofl/atkinsonhyperlegiblemono`, publiés par le Braille Institute sous licence SIL OFL 1.1. Les deux
+familles n'existent en amont que sous forme **variable** (axe `wght` 200–800) ; l'application embarque
+des **instances statiques sous-ensemblées** au latin et aux diacritiques français, produites avec
+`fontTools` (procédure reproductible dans `assets/fonts/README.md`) :
+
+| Fichier | Graisse | Poids |
+|---|---|---|
+| `AtkinsonHyperlegibleNext-Regular.ttf` | 400 | 42 Ko |
+| `AtkinsonHyperlegibleNext-SemiBold.ttf` | 600 | 42 Ko |
+| `AtkinsonHyperlegibleNext-Bold.ttf` | 700 | 42 Ko |
+| `AtkinsonHyperlegibleMono-SemiBold.ttf` | 600 | 30 Ko |
+| `AtkinsonHyperlegibleMono-Bold.ttf` | 700 | 30 Ko |
+| **Total ajouté au bundle web** | | **188 Ko** |
+
+C'est conforme au budget de ~180 Ko annoncé au brief. Les italiques ne sont pas embarquées
+(l'italique est proscrit comme moyen de hiérarchie) et les graisses 200, 300, 500 et 800 non plus
+(l'échelle n'utilise que 400, 600 et 700).
 
 ### Hierarchy
 
@@ -716,3 +742,20 @@ persistant.
 - Pas de `CircularProgressIndicator` au milieu d'un écran : squelette à la forme du contenu attendu.
 - Pas d'état vide muet : un état vide explique et propose une action.
 - Pas de séquence d'animation au chargement, pas de mouvement qui ne dit pas un changement d'état.
+
+## Écarts d'implémentation (ticket 004)
+
+Ce document reste normatif. Les points ci-dessous sont les endroits où le code a dû trancher, avec
+la raison ; ils sont désormais **la** référence.
+
+| Point | Ce que disait le document | Ce que fait le code | Pourquoi |
+|---|---|---|---|
+| Densité `compacte` de `SlotChip` | 40 dp | 40 dp en lecture seule, **44 dp dès que la case est actionnable** | 40 dp passe sous le plancher tactile WCAG. La valeur d'affichage est conservée, la cible remonte au plancher quand il y a quelque chose à toucher. |
+| Glyphe de la case | `check_box` / `disabled_by_default` / `check_box_outline_blank`, et `check` / `close` / `remove` « dans la grille » | `StatusDescriptor` porte les deux : `icone` pour le badge, `iconeCase` pour la case | Deux glyphes par état, un seul objet. Aucun écran ne peut prendre le mauvais. |
+| `FocusTheme` | listé parmi les thèmes de composant | n'existe pas dans Flutter | L'anneau de focus passe par `ThemeData.focusColor` et par le `WidgetStateProperty` de chaque thème de composant. |
+| `themeMode: ThemeMode.system` | écrit explicitement dans `lib/app.dart` | laissé à la valeur par défaut de `MaterialApp`, qui **est** `ThemeMode.system` | L'écrire est un argument redondant que `flutter analyze` refuse, et `flutter analyze` doit être vierge. |
+| Compteur `CountStat` | échelle de texte respectée sans borne | le **nombre** se réduit jusqu'à la largeur disponible (`BoxFit.scaleDown`), le libellé garde sa taille | Au-delà de ×1.6 un gros total déborde sa colonne. Un compteur un peu plus petit vaut mieux qu'un compteur tronqué. |
+| `NavigationRail` | rail fixe | rail défilant à hauteur pleine | Cinq destinations ne tiennent pas sur un téléphone en paysage (600 × 360) ni à grande échelle de texte. |
+| Fichier `hachures.dart` | absent de la liste des composants | ajouté | Ce n'est pas un composant mais une primitive de dessin, partagée par `SlotChip` et `AppBanner` ; sans elle, une bannière devrait importer une case. |
+| `SyncEtat` | quatre états | cinq, avec `repos` | `SaveIndicator` doit exister sur un écran où rien n'est en cours. |
+| Écrans métier de remplacement | « chaque destination pointe sur un écran de remplacement neutre » | non livrés | Le ticket ne livre que le socle et `/dev/components` ; les destinations sont démontrées dans le catalogue. Les routes arrivent avec leurs tickets. |

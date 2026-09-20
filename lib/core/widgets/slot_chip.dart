@@ -290,7 +290,8 @@ class _Case extends StatelessWidget {
       tween: Tween<double>(begin: 0, end: 1),
       duration: AppDuration.courant,
       curve: AppCurves.sortie,
-      builder: (context, t, enfant) => Opacity(opacity: 0.55 + 0.45 * t, child: enfant),
+      builder: (context, t, enfant) =>
+          Opacity(opacity: 0.55 + 0.45 * t, child: enfant),
       child: contenu,
     );
   }
@@ -329,7 +330,12 @@ class _CasePainter extends CustomPainter {
 
     final demi = epaisseurFilet / 2;
     final contour = RRect.fromRectAndRadius(
-      Rect.fromLTWH(demi, demi, size.width - epaisseurFilet, size.height - epaisseurFilet),
+      Rect.fromLTWH(
+        demi,
+        demi,
+        size.width - epaisseurFilet,
+        size.height - epaisseurFilet,
+      ),
       const Radius.circular(AppRadius.caseRegistre),
     );
 

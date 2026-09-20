@@ -94,10 +94,9 @@ abstract final class AppStrings {
       'Mois verrouillé depuis le $date. Contacte ton chef de centre pour une '
       'modification.';
 
-  static String periodeBientotFermee(int n, String mois) =>
-      n <= 1
-          ? 'Plus qu\'un jour pour saisir $mois'
-          : 'Plus que $n jours pour saisir $mois';
+  static String periodeBientotFermee(int n, String mois) => n <= 1
+      ? 'Plus qu\'un jour pour saisir $mois'
+      : 'Plus que $n jours pour saisir $mois';
 
   // -------------------------------------------------------------------
   // Jours et repères de calendrier
@@ -172,8 +171,7 @@ abstract final class AppStrings {
   static String compteurSurPlafond(int valeur, int plafond) =>
       '$valeur sur $plafond';
 
-  static String compteurSansPlafond(int valeur) =>
-      '$valeur, $compteurIllimite';
+  static String compteurSansPlafond(int valeur) => '$valeur, $compteurIllimite';
 
   // -------------------------------------------------------------------
   // Écran de démonstration (build de développement)
@@ -185,5 +183,6 @@ abstract final class AppStrings {
   static const String devTheme = 'Thème';
   static const String devThemeClair = 'Clair';
   static const String devThemeSombre = 'Sombre';
+  static const String devThemeLesDeux = 'Les deux';
   static const String devEchelleTexte = 'Taille du texte';
 }

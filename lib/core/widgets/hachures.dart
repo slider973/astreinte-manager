@@ -37,7 +37,11 @@ class HachuresPainter extends CustomPainter {
     // Diagonales à 45° : on balaie de -hauteur à +largeur pour que le motif
     // couvre le rectangle entier, coins compris.
     for (var x = -size.height; x < size.width; x += pas) {
-      canvas.drawLine(Offset(x, size.height), Offset(x + size.height, 0), trait);
+      canvas.drawLine(
+        Offset(x, size.height),
+        Offset(x + size.height, 0),
+        trait,
+      );
     }
   }
 

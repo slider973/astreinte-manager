@@ -121,11 +121,7 @@ class _LoadingSkeletonState extends State<LoadingSkeleton>
 
 /// Une ligne de texte en attente.
 class SkeletonLigne extends StatelessWidget {
-  const SkeletonLigne({
-    super.key,
-    this.largeur,
-    this.hauteur = AppSpacing.lg,
-  });
+  const SkeletonLigne({super.key, this.largeur, this.hauteur = AppSpacing.lg});
 
   /// `null` prend toute la largeur disponible.
   final double? largeur;

@@ -20,29 +20,17 @@ abstract final class AppShadows {
 
   /// Niveau 2 — menu, info-bulle, sélecteur.
   static const List<BoxShadow> niveau2 = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x1A0B141A),
-      offset: Offset(0, 2),
-      blurRadius: 8,
-    ),
+    BoxShadow(color: Color(0x1A0B141A), offset: Offset(0, 2), blurRadius: 8),
   ];
 
   /// Niveau 3 — feuille de bas d'écran, dialogue.
   static const List<BoxShadow> niveau3 = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x240B141A),
-      offset: Offset(0, 8),
-      blurRadius: 24,
-    ),
+    BoxShadow(color: Color(0x240B141A), offset: Offset(0, 8), blurRadius: 24),
   ];
 
   /// Niveau 4 — snackbar, bouton flottant.
   static const List<BoxShadow> niveau4 = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x1F0B141A),
-      offset: Offset(0, 4),
-      blurRadius: 12,
-    ),
+    BoxShadow(color: Color(0x1F0B141A), offset: Offset(0, 4), blurRadius: 12),
   ];
 
   /// Variantes sombres : même géométrie, ombre noire au lieu de l'encre.

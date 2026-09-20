@@ -71,15 +71,25 @@ class _SectionTypographie extends StatelessWidget {
           ('libelle-action / labelLarge', theme.textTheme.labelLarge),
           ('etiquette / labelSmall', theme.textTheme.labelSmall),
         ])
-          DevSpecimen(nom: nom, child: Text(echantillon, style: style)),
-        const DevSpecimen(
+          DevSpecimen(
+            nom: nom,
+            child: Text(echantillon, style: style),
+          ),
+        DevSpecimen(
           nom: 'display-nombre / nombre / nombre-petit (chasse fixe)',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('10 / 31', style: AppTextStyles.displayNombre),
-              Text('11 / 31', style: AppTextStyles.nombre),
-              Text('11 / 31', style: AppTextStyles.nombrePetit),
+              // Les styles de token n'ont pas de couleur : elle vient du thème.
+              for (final style in <TextStyle>[
+                AppTextStyles.displayNombre,
+                AppTextStyles.nombre,
+                AppTextStyles.nombrePetit,
+              ])
+                Text(
+                  '10 / 31',
+                  style: style.copyWith(color: theme.colorScheme.onSurface),
+                ),
             ],
           ),
         ),
@@ -257,7 +267,10 @@ class _SectionCases extends StatelessWidget {
                   ),
                 ),
               ])
-                SizedBox(width: 72, child: DevSpecimen(nom: nom, child: chip)),
+                SizedBox(
+                  width: 132,
+                  child: DevSpecimen(nom: nom, child: chip),
+                ),
             ],
           ),
         ),
@@ -600,7 +613,10 @@ class _SectionChargement extends StatelessWidget {
             ),
           ),
         ),
-        DevSpecimen(nom: 'bloc', child: LoadingSkeleton(child: SkeletonBloc())),
+        DevSpecimen(
+          nom: 'bloc',
+          child: LoadingSkeleton(child: SkeletonBloc()),
+        ),
         DevSpecimen(
           nom: 'grille du mois',
           child: LoadingSkeleton(child: SkeletonGrilleMois(jours: 14)),
@@ -685,7 +701,8 @@ class _SectionOssature extends StatelessWidget {
         DevSpecimen(
           nom: 'compact, membre, 3 propositions',
           child: _Fenetre(
-            largeur: 320,
+            // 360 dp : la largeur du plus petit téléphone réellement visé.
+            largeur: 360,
             hauteur: 380,
             admin: false,
             propositions: 3,
@@ -694,7 +711,7 @@ class _SectionOssature extends StatelessWidget {
         DevSpecimen(
           nom: 'compact, admin, 12 propositions (pastille « 9+ »)',
           child: _Fenetre(
-            largeur: 320,
+            largeur: 360,
             hauteur: 380,
             admin: true,
             propositions: 12,

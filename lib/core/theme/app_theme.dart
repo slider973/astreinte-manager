@@ -187,9 +187,7 @@ abstract final class AppTheme {
         systemOverlayStyle: sombre
             ? SystemUiOverlayStyle.light
             : SystemUiOverlayStyle.dark,
-        shape: Border(
-          bottom: BorderSide(color: scheme.outlineVariant),
-        ),
+        shape: Border(bottom: BorderSide(color: scheme.outlineVariant)),
       ),
 
       // --- Boutons : des blocs à rayon 8, jamais des gélules ------------
@@ -417,7 +415,8 @@ abstract final class AppTheme {
   }) {
     return ButtonStyle(
       backgroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.disabled) ? desactiveFond : fond,
+        (states) =>
+            states.contains(WidgetState.disabled) ? desactiveFond : fond,
       ),
       foregroundColor: WidgetStateProperty.resolveWith(
         (states) =>

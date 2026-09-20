@@ -94,7 +94,7 @@ class _DevComponentsScreenState extends State<DevComponentsScreen> {
 }
 
 /// Le catalogue sous un thème et une échelle de texte donnés.
-class _Volet extends StatelessWidget {
+class _Volet extends StatefulWidget {
   const _Volet({
     required this.sombre,
     required this.echelle,
@@ -106,20 +106,40 @@ class _Volet extends StatelessWidget {
   final String titre;
 
   @override
+  State<_Volet> createState() => _VoletState();
+}
+
+class _VoletState extends State<_Volet> {
+  // Chaque volet défile pour son compte : deux ListView `primary` se
+  // disputeraient le PrimaryScrollController de l'écran.
+  final ScrollController _defilement = ScrollController();
+
+  @override
+  void dispose() {
+    _defilement.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = sombre ? AppTheme.sombre : AppTheme.clair;
+    final theme = widget.sombre ? AppTheme.sombre : AppTheme.clair;
 
     return Theme(
       data: theme,
       child: MediaQuery(
         data: MediaQuery.of(
           context,
-        ).copyWith(textScaler: TextScaler.linear(echelle)),
-        child: ColoredBox(
+        ).copyWith(textScaler: TextScaler.linear(widget.echelle)),
+        // `Material` — et non `ColoredBox` — pour que le volet porte le
+        // DefaultTextStyle de **son** thème : un style de token sans couleur
+        // (AppTextStyles.nombre) hériterait sinon de l'encre de l'écran hôte
+        // et disparaîtrait sur le fond sombre.
+        child: Material(
           color: theme.colorScheme.surface,
           child: Scrollbar(
+            controller: _defilement,
             child: ListView(
-              primary: true,
+              controller: _defilement,
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,
                 AppSpacing.lg,
@@ -127,7 +147,7 @@ class _Volet extends StatelessWidget {
                 AppSpacing.xxxl,
               ),
               children: <Widget>[
-                Text(titre, style: theme.textTheme.headlineMedium),
+                Text(widget.titre, style: theme.textTheme.headlineMedium),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   AppStrings.devComposantsSousTitre,
@@ -169,38 +189,48 @@ class _Controles extends StatelessWidget {
         spacing: AppSpacing.xl,
         runSpacing: AppSpacing.md,
         children: <Widget>[
-          SegmentedButton<DevApparence>(
-            segments: const <ButtonSegment<DevApparence>>[
-              ButtonSegment<DevApparence>(
-                value: DevApparence.clair,
-                label: Text(AppStrings.devThemeClair),
-                icon: Icon(Icons.light_mode),
-              ),
-              ButtonSegment<DevApparence>(
-                value: DevApparence.sombre,
-                label: Text(AppStrings.devThemeSombre),
-                icon: Icon(Icons.bedtime),
-              ),
-              ButtonSegment<DevApparence>(
-                value: DevApparence.lesDeux,
-                label: Text(AppStrings.devTheme),
-                icon: Icon(Icons.vertical_split),
-              ),
-            ],
-            selected: <DevApparence>{apparence},
-            onSelectionChanged: (valeurs) => onApparence(valeurs.first),
-          ),
-          SegmentedButton<double>(
-            segments: <ButtonSegment<double>>[
-              for (final valeur in echelles)
-                ButtonSegment<double>(
-                  value: valeur,
-                  label: Text('×$valeur'),
-                  tooltip: '${AppStrings.devEchelleTexte} ×$valeur',
+          // Chaque groupe s'annonce par son rôle ; les segments gardent leur
+          // libellé visible.
+          Semantics(
+            label: AppStrings.devTheme,
+            container: true,
+            child: SegmentedButton<DevApparence>(
+              segments: const <ButtonSegment<DevApparence>>[
+                ButtonSegment<DevApparence>(
+                  value: DevApparence.clair,
+                  label: Text(AppStrings.devThemeClair),
+                  icon: Icon(Icons.light_mode),
                 ),
-            ],
-            selected: <double>{echelle},
-            onSelectionChanged: (valeurs) => onEchelle(valeurs.first),
+                ButtonSegment<DevApparence>(
+                  value: DevApparence.sombre,
+                  label: Text(AppStrings.devThemeSombre),
+                  icon: Icon(Icons.bedtime),
+                ),
+                ButtonSegment<DevApparence>(
+                  value: DevApparence.lesDeux,
+                  label: Text(AppStrings.devThemeLesDeux),
+                  icon: Icon(Icons.vertical_split),
+                ),
+              ],
+              selected: <DevApparence>{apparence},
+              onSelectionChanged: (valeurs) => onApparence(valeurs.first),
+            ),
+          ),
+          Semantics(
+            label: AppStrings.devEchelleTexte,
+            container: true,
+            child: SegmentedButton<double>(
+              segments: <ButtonSegment<double>>[
+                for (final valeur in echelles)
+                  ButtonSegment<double>(
+                    value: valeur,
+                    label: Text('×$valeur'),
+                    tooltip: '${AppStrings.devEchelleTexte} ×$valeur',
+                  ),
+              ],
+              selected: <double>{echelle},
+              onSelectionChanged: (valeurs) => onEchelle(valeurs.first),
+            ),
           ),
         ],
       ),

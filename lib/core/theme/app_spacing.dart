@@ -59,15 +59,18 @@ abstract final class AppRadius {
   /// Avatar et pastille de compteur de notifications **uniquement**.
   static const double pastille = 999;
 
-  static const BorderRadius caseRegistreRadius =
-      BorderRadius.all(Radius.circular(caseRegistre));
-  static const BorderRadius controleRadius =
-      BorderRadius.all(Radius.circular(controle));
+  static const BorderRadius caseRegistreRadius = BorderRadius.all(
+    Radius.circular(caseRegistre),
+  );
+  static const BorderRadius controleRadius = BorderRadius.all(
+    Radius.circular(controle),
+  );
   static const BorderRadius feuilleRadius = BorderRadius.vertical(
     top: Radius.circular(feuille),
   );
-  static const BorderRadius pastilleRadius =
-      BorderRadius.all(Radius.circular(pastille));
+  static const BorderRadius pastilleRadius = BorderRadius.all(
+    Radius.circular(pastille),
+  );
 }
 
 /// Épaisseurs de trait.

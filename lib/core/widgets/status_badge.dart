@@ -142,10 +142,7 @@ class StatusBadge extends StatelessWidget {
             borderRadius: AppRadius.caseRegistreRadius,
             border: descripteur.filet == null
                 ? null
-                : Border.all(
-                    color: descripteur.filet!,
-                    width: AppStroke.etat,
-                  ),
+                : Border.all(color: descripteur.filet!, width: AppStroke.etat),
           ),
           child: Stack(
             children: <Widget>[
@@ -166,12 +163,12 @@ class StatusBadge extends StatelessWidget {
                   children: <Widget>[
                     Icon(
                       descripteur.icone,
-                      size: compact
-                          ? AppTouch.iconePetite
-                          : AppTouch.icone - 2,
+                      size: compact ? AppTouch.iconePetite : AppTouch.icone - 2,
                       color: descripteur.encre,
                     ),
-                    SizedBox(width: compact ? AppSpacing.xs : AppSpacing.xs + 2),
+                    SizedBox(
+                      width: compact ? AppSpacing.xs : AppSpacing.xs + 2,
+                    ),
                     Flexible(
                       child: Text(
                         texte,

@@ -167,23 +167,23 @@ abstract final class AppTextStyles {
   /// police par défaut de la plateforme.
   static TextTheme textTheme(Color onSurface, Color onSurfaceVariant) {
     return TextTheme(
-      displayLarge: displayNombre.copyWith(fontSize: 44, height: 48 / 44),
-      displayMedium: displayNombre.copyWith(fontSize: 38, height: 42 / 38),
-      displaySmall: displayNombre,
-      headlineLarge: titreEcran.copyWith(fontSize: 32, height: 40 / 32),
-      headlineMedium: titreEcran,
-      headlineSmall: titreEcran.copyWith(fontSize: 24, height: 32 / 24),
-      titleLarge: titreSection,
-      titleMedium: titreBloc,
-      titleSmall: libelleChamp,
-      bodyLarge: corps,
-      bodyMedium: corpsSecondaire,
-      bodySmall: mention,
-      labelLarge: libelleAction,
-      labelMedium: libelleChamp,
-      labelSmall: etiquette,
-    ).apply(bodyColor: onSurface, displayColor: onSurface).copyWith(
-      bodySmall: mention.copyWith(color: onSurfaceVariant),
-    );
+          displayLarge: displayNombre.copyWith(fontSize: 44, height: 48 / 44),
+          displayMedium: displayNombre.copyWith(fontSize: 38, height: 42 / 38),
+          displaySmall: displayNombre,
+          headlineLarge: titreEcran.copyWith(fontSize: 32, height: 40 / 32),
+          headlineMedium: titreEcran,
+          headlineSmall: titreEcran.copyWith(fontSize: 24, height: 32 / 24),
+          titleLarge: titreSection,
+          titleMedium: titreBloc,
+          titleSmall: libelleChamp,
+          bodyLarge: corps,
+          bodyMedium: corpsSecondaire,
+          bodySmall: mention,
+          labelLarge: libelleAction,
+          labelMedium: libelleChamp,
+          labelSmall: etiquette,
+        )
+        .apply(bodyColor: onSurface, displayColor: onSurface)
+        .copyWith(bodySmall: mention.copyWith(color: onSurfaceVariant));
   }
 }

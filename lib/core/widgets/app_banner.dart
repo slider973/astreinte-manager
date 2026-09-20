@@ -69,47 +69,49 @@ class AppBanner extends StatelessWidget {
     final statuts = context.statuts;
     final sombre = theme.brightness == Brightness.dark;
 
-    final (Color fond, Color encre, IconData icone, bool hachure) =
-        switch (variante) {
-          AppBannerVariante.erreur => (
-            theme.colorScheme.errorContainer,
-            theme.colorScheme.onErrorContainer,
-            Icons.error_outline,
-            false,
-          ),
-          AppBannerVariante.horsLigne => (
-            statuts.sync(SyncEtat.horsLigne).fond,
-            statuts.sync(SyncEtat.horsLigne).encre,
-            Icons.cloud_off,
-            false,
-          ),
-          AppBannerVariante.lectureSeule => (
-            sombre ? AppColors.darkEtatNeutreFond : AppColors.etatNeutreFond,
-            sombre ? AppColors.darkEtatNeutre : AppColors.etatNeutre,
-            Icons.visibility,
-            true,
-          ),
-          AppBannerVariante.verrouille => (
-            statuts.periode(PeriodeEtat.verrouillee).fond,
-            statuts.periode(PeriodeEtat.verrouillee).encre,
-            Icons.lock,
-            true,
-          ),
-          AppBannerVariante.attention => (
-            sombre ? AppColors.darkEtatAttenteFond : AppColors.etatAttenteFond,
-            sombre
-                ? AppColors.darkEtatAttenteSurFond
-                : AppColors.etatAttente,
-            Icons.schedule,
-            false,
-          ),
-          AppBannerVariante.information => (
-            statuts.periode(PeriodeEtat.ouverte).fond,
-            statuts.periode(PeriodeEtat.ouverte).encre,
-            Icons.info_outline,
-            false,
-          ),
-        };
+    final (
+      Color fond,
+      Color encre,
+      IconData icone,
+      bool hachure,
+    ) = switch (variante) {
+      AppBannerVariante.erreur => (
+        theme.colorScheme.errorContainer,
+        theme.colorScheme.onErrorContainer,
+        Icons.error_outline,
+        false,
+      ),
+      AppBannerVariante.horsLigne => (
+        statuts.sync(SyncEtat.horsLigne).fond,
+        statuts.sync(SyncEtat.horsLigne).encre,
+        Icons.cloud_off,
+        false,
+      ),
+      AppBannerVariante.lectureSeule => (
+        sombre ? AppColors.darkEtatNeutreFond : AppColors.etatNeutreFond,
+        sombre ? AppColors.darkEtatNeutre : AppColors.etatNeutre,
+        Icons.visibility,
+        true,
+      ),
+      AppBannerVariante.verrouille => (
+        statuts.periode(PeriodeEtat.verrouillee).fond,
+        statuts.periode(PeriodeEtat.verrouillee).encre,
+        Icons.lock,
+        true,
+      ),
+      AppBannerVariante.attention => (
+        sombre ? AppColors.darkEtatAttenteFond : AppColors.etatAttenteFond,
+        sombre ? AppColors.darkEtatAttenteSurFond : AppColors.etatAttente,
+        Icons.schedule,
+        false,
+      ),
+      AppBannerVariante.information => (
+        statuts.periode(PeriodeEtat.ouverte).fond,
+        statuts.periode(PeriodeEtat.ouverte).encre,
+        Icons.info_outline,
+        false,
+      ),
+    };
 
     return Semantics(
       container: true,

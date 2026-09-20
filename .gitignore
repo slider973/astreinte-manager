@@ -57,3 +57,4 @@ env/*
 !env/dev.json
 !env/*.example
 !env/README.md
+.gstack/
