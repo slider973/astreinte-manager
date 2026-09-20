@@ -837,3 +837,14 @@ qui attrape un blocage ou une régression d'un facteur dix, et rien de plus fin.
 dense inerte ne coûte plus aucun `State`, et un tiers d'éléments en moins. **Ce qui reste à faire
 au ticket 016**, c'est mesurer le budget de deux secondes sur un build `--profile` dans un vrai
 navigateur, avec la matrice réelle et ses en-têtes collants.
+
+## Écarts d'implémentation (ticket 024)
+
+| Point | Ce que disait le document | Ce que fait le code | Pourquoi |
+|---|---|---|---|
+| `AppBanner` | « porte les faits qui changent tout ce qui est en dessous », sous la barre d'application, non fermable pour un état persistant | trois ajouts optionnels : `detail` (seconde ligne), `icone` (remplace celle de la famille), `onFermer` + `libelleFermer` | Une notification reçue au premier plan est un **événement**, pas un état : elle a un titre et un corps, une icône qui lui est propre (`notifications_active_outlined`) et elle se ferme. Une assertion interdit `onFermer` sur toute variante autre qu'`information`, la seule que le document déclare non persistante. |
+| Position de la bannière | sous la barre d'application, dans l'écran | la bannière de push est posée **au-dessus du navigateur**, dans `MaterialApp.builder` | Un push ne choisit pas l'écran sur lequel il tombe. La poser dans chaque écran serait la répéter treize fois et l'oublier la quatorzième. Conséquence : pas d'`Overlay` au-dessus d'elle, donc **pas d'info-bulle** — le bouton de fermeture porte son nom par `Icon.semanticLabel`. |
+| Durée d'un message passager | non traitée | **8 s**, pas les 3 à 5 s d'usage | Téléphone posé, regardé avec un temps de retard, souvent manipulé avec des gants. Rien ne se perd à l'effacement : le centre de notifications garde tout (ticket 026). |
+| Réglage des notifications | l'écran « Profil » est le ticket 007 | le bloc réglé `ReglageNotifications` est posé dans l'onglet « Profil » de la coquille d'accueil | Le ticket 024 doit livrer le réglage que le PRD exige (§ 6.5) sans attendre l'écran complet. Le bloc déménagera tel quel. |
+| `ContextePlateforme` | navigateur + mode d'affichage | porte en plus `libelleAppareil` (« Pixel 7 · Chrome ») | `push_tokens.device_label` se lit par un humain et se déduit du **même** agent utilisateur que la détection d'installation. Un second détecteur aurait divergé. Ni version, ni système : rien qui distingue deux téléphones du même modèle. |
+| Route `/mois` et paramètre perdu au démarrage à froid | limite connue, inscrite aux écarts du ticket 011 | **corrigée** : `DestinationInitiale` garde la destination demandée pendant la restauration de session | La même panne cassait l'ouverture depuis une notification, cœur du ticket 024. Livrer l'un sans l'autre aurait donné une fonctionnalité qui ramène à l'accueil une fois sur deux. Ferme le ticket 039. |
