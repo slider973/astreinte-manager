@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 002, 024
 - **Branche** : `feat/025-edge-send-notification`
-- **Statut** : en cours depuis 2026-09-20
+- **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
 - Function `send-notification` : entrée `{type, user_ids, station_id, payload, channels?}`. Construit titre et corps en français par type, insère la ligne `inapp`, envoie via FCM (HTTP v1, service account) à tous les tokens du membre, envoie via Resend si canal email demandé ou si aucun token push. Trace chaque envoi dans `notifications` avec `delivered` et `error`.
