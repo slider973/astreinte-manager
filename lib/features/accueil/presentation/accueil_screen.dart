@@ -11,6 +11,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../dispos/presentation/mois_screen.dart';
+import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../notifications/presentation/widgets/reglage_notifications.dart';
 
 /// La coquille des destinations de premier niveau.
@@ -88,6 +89,7 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
       destinations: destinations,
       indexSelectionne: index,
       onDestination: (nouvelle) => _choisir(nouvelle, destinations),
+      actions: const <Widget>[BoutonNotifications()],
       child: route == _routeProfil
           ? _Contenu(appartenance: appartenance)
           : EmptyState(

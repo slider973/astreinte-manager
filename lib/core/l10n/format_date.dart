@@ -63,3 +63,34 @@ DateTime depuisIsoJour(String valeur) {
   final brut = DateTime.parse(valeur);
   return DateTime(brut.year, brut.month, brut.day);
 }
+
+/// L'ancienneté d'un événement, dite comme on la dit : « il y a 20 min »,
+/// « hier », puis « 15 sept. » au-delà d'une semaine.
+///
+/// Entre deux activités, on ne compte pas des jours : le relatif est ce qui se
+/// lit sans réfléchir. Mais il ment passé quelques jours — « il y a 23 j » ne
+/// dit plus rien à personne — donc on repasse à la date, et à la date avec
+/// l'année dès qu'on change d'année.
+///
+/// [maintenant] n'existe que pour les tests : une horloge injectée évite un
+/// test qui échoue à minuit.
+String formaterInstantRelatif(DateTime instant, {DateTime? maintenant}) {
+  final reference = (maintenant ?? DateTime.now()).toLocal();
+  final locale = instant.toLocal();
+  final ecart = reference.difference(locale);
+
+  // Une date future — horloge du téléphone en retard sur le serveur — se dit
+  // « à l'instant » plutôt que « il y a -3 min ».
+  if (ecart.inMinutes < 1) return AppStrings.instantMaintenant;
+  if (ecart.inMinutes < 60) return AppStrings.instantMinutes(ecart.inMinutes);
+
+  final jour = DateTime(reference.year, reference.month, reference.day);
+  final jourDeLInstant = DateTime(locale.year, locale.month, locale.day);
+  final jours = jour.difference(jourDeLInstant).inDays;
+
+  if (jours == 0) return AppStrings.instantHeures(ecart.inHours);
+  if (jours == 1) return AppStrings.instantHier;
+  if (jours < 7) return AppStrings.instantJours(jours);
+  if (locale.year == reference.year) return formaterDateCourte(locale);
+  return formaterDateLongue(locale);
+}

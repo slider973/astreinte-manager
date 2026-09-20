@@ -13,6 +13,7 @@ import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/peinture_grille.dart';
+import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../domain/dispos_providers.dart';
 import '../domain/periode_saisie.dart';
 import 'controllers/saisie_controller.dart';
@@ -227,6 +228,9 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
       destinations: widget.destinations,
       indexSelectionne: widget.indexSelectionne,
       onDestination: widget.onDestination,
+      // La cloche du centre de notifications (ticket 026). Elle vit ici et non
+      // dans la navigation : cinq destinations, c'est plein.
+      actions: const <Widget>[BoutonNotifications()],
       banniere: _banniere(etat, periodes),
       filActions: etat == null || classe.estLarge
           ? null

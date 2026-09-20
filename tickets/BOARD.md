@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 026 | [Centre de notifications in-app](in-progress/026-centre-notifications.md) | P1 | 025 |  |
 
 ## À faire
 
@@ -34,6 +33,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 037 | [Supprimer la dépendance à fonts.gstatic.com au démarrage](backlog/037-canvaskit-autoheberge.md) | P1 | 004 032 |  |
 | 038 | [Limiter le débit des invitations](backlog/038-limite-debit-invitations.md) | P1 | 006 |  |
+| 040 | [Rendre visible une notification définitivement perdue](backlog/040-ligne-interne-echec-definitif.md) | P0 | 025 026 |  |
 
 ## Terminés
 
@@ -54,4 +54,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 014 | [Périodes, date limite et verrouillage](done/014-periodes-verrouillage.md) | P0 | 008 010 | https://github.com/slider973/astreinte-manager/pull/13 |
 | 024 | [Push web via Firebase Cloud Messaging (PWA)](done/024-fcm-setup.md) | P0 | 001 005 | https://github.com/slider973/astreinte-manager/pull/14 |
 | 025 | [Edge Function send-notification](done/025-edge-send-notification.md) | P0 | 002 024 | https://github.com/slider973/astreinte-manager/pull/15 |
+| 026 | [Centre de notifications in-app](done/026-centre-notifications.md) | P1 | 025 | https://github.com/slider973/astreinte-manager/pull/16 |
 

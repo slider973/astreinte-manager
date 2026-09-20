@@ -22,6 +22,8 @@ import 'package:astreinte_sp/features/invitation/domain/invitation_providers.dar
 import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
 import 'package:astreinte_sp/features/membres/domain/membres_providers.dart';
 import 'package:astreinte_sp/features/notifications/data/jeton_local.dart';
+import 'package:astreinte_sp/features/notifications/data/notifications_repository.dart';
+import 'package:astreinte_sp/features/notifications/domain/centre_providers.dart';
 import 'package:astreinte_sp/features/notifications/domain/notifications_providers.dart';
 import 'package:astreinte_sp/features/onboarding/data/profil_repository.dart';
 import 'package:astreinte_sp/features/onboarding/domain/profil_providers.dart';
@@ -35,6 +37,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'faux_dispos.dart';
 import 'faux_invitations.dart';
+import 'faux_notifications.dart';
 import 'faux_push.dart';
 
 /// Environnement de test : configuration Supabase présente, mais aucun réseau
@@ -211,6 +214,7 @@ Future<AppMontee> monterApp(
   FirebaseDemarrage firebase = FirebaseDemarrage.configurationAbsente,
   FauxMessageriePush? messagerie,
   FauxPushTokensRepository? jetons,
+  NotificationsRepository? notifications,
   JetonLocal? jetonLocal,
   Size taille = const Size(390, 844),
   bool stabiliser = true,
@@ -276,6 +280,12 @@ Future<AppMontee> monterApp(
         messageriePushProvider.overrideWithValue(push),
         pushTokensRepositoryProvider.overrideWithValue(depotJetons),
         jetonLocalProvider.overrideWithValue(jetonLocal ?? JetonLocalMemoire()),
+        // Le centre de notifications (ticket 026) est lu par la cloche de la
+        // barre d'application, donc par **tous** les écrans de la coquille :
+        // sans faux, chaque test toucherait un client Supabase inexistant.
+        notificationsRepositoryProvider.overrideWithValue(
+          notifications ?? FauxNotificationsRepository(),
+        ),
       ],
       child: const AstreinteApp(),
     ),

@@ -1424,4 +1424,65 @@ abstract final class AppStrings {
   /// Une notification sans titre : le canal a au moins un corps, sinon rien
   /// ne s'affiche.
   static const String notifBanniereSansTitre = 'Nouvelle notification';
+
+  // -------------------------------------------------------------------
+  // Ancienneté d'un événement (ticket 026)
+  // -------------------------------------------------------------------
+
+  static const String instantMaintenant = 'À l\'instant';
+  static const String instantHier = 'Hier';
+
+  static String instantMinutes(int n) => 'il y a $n min';
+  static String instantHeures(int n) => 'il y a $n h';
+  static String instantJours(int n) => 'il y a $n j';
+
+  // -------------------------------------------------------------------
+  // Centre de notifications (ticket 026)
+  // -------------------------------------------------------------------
+
+  static const String centreTitre = 'Notifications';
+
+  /// La cloche de la barre d'application. La pastille est plafonnée à « 9+ »,
+  /// mais le nombre réel est annoncé aux lecteurs d'écran.
+  static const String centreOuvrir = 'Notifications';
+
+  static String centreNonLuesBadge(int n) => n <= 1
+      ? '$n notification non lue'
+      : '$n notifications non lues';
+
+  /// Le compte de l'en-tête de liste. Il dit combien de lignes suivent, et
+  /// combien restent à lire.
+  static String centreCompte(int total, int nonLues) {
+    final lignes = total <= 1 ? '$total notification' : '$total notifications';
+    if (nonLues == 0) return '$lignes, tout est lu';
+    return '$lignes, $nonLues non lue${nonLues > 1 ? 's' : ''}';
+  }
+
+  /// Annoncé en tête du libellé d'une ligne : l'état ne tient jamais à la
+  /// seule couleur ni à la seule marque.
+  static const String centreNonLue = 'Non lue';
+
+  static const String centreToutMarquerLu = 'Tout marquer comme lu';
+  static const String centreToutMarqueLuConfirmation = 'Tout est marqué lu.';
+  static const String centreRafraichir = 'Relire les notifications';
+
+  static const String centreVideTitre = 'Rien pour l\'instant';
+  static const String centreVideTexte =
+      'Les propositions d\'astreinte et les infos de ta caserne arriveront '
+      'ici, même si ton téléphone ne sonne pas.';
+
+  static const String centreErreurTexte =
+      'Impossible de lire tes notifications. Vérifie ta connexion.';
+  static const String centreEchecLecture =
+      'Notification non marquée lue. Réessaie dans un instant.';
+
+  /// Une ligne dont la colonne `error` est renseignée : l'envoi n'a pas
+  /// abouti, et le membre doit savoir qu'il ne l'a peut-être jamais reçue
+  /// (`design/026 § 7`).
+  static const String centreEnvoiEchoue =
+      'L\'envoi a échoué, tu ne l\'as peut-être pas reçue.';
+
+  /// Une notification dont le titre est vide. Le canal interne en garantit un,
+  /// mais une ligne écrite à la main n'en aurait pas.
+  static const String centreSansTitre = 'Notification';
 }

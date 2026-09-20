@@ -8,6 +8,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
+import '../domain/centre_providers.dart';
 import '../domain/destination_push.dart';
 import '../domain/message_push.dart';
 import '../domain/notifications_providers.dart';
@@ -15,7 +16,7 @@ import '../domain/notifications_providers.dart';
 /// La couche qui branche les notifications sur l'application entière.
 ///
 /// Posée dans `MaterialApp.router`, au-dessus de toutes les routes, parce
-/// qu'un push ne choisit pas l'écran sur lequel il tombe. Elle fait trois
+/// qu'un push ne choisit pas l'écran sur lequel il tombe. Elle fait quatre
 /// choses, et rien d'autre :
 ///
 /// 1. **publie le jeton** de cet appareil dès qu'il y a une session et une
@@ -23,10 +24,26 @@ import '../domain/notifications_providers.dart';
 /// 2. **montre la bannière** quand un message arrive au premier plan, cas où
 ///    le système n'affiche rien ;
 /// 3. **ouvre la destination** quand une notification est touchée pendant que
-///    l'application tourne en arrière-plan.
+///    l'application tourne en arrière-plan ;
+/// 4. **tient le centre de notifications à jour** (ticket 026).
 ///
-/// Sans configuration Firebase, les trois flux sont vides et cette couche ne
-/// coûte qu'un `Stack` d'un seul enfant.
+/// Le quatrième point mérite son explication. `docs/SCHEMA.md § 9` annonce le
+/// temps réel sur `notifications`, mais **il n'est pas encore posé** : aucune
+/// table n'est dans la publication `supabase_realtime`, ce qui se vérifie en
+/// une requête sur la base locale, et aucune migration ne l'y met. S'abonner
+/// quand même donnerait un canal silencieux qui ne lève jamais — la pire des
+/// pannes, celle qui a l'air de marcher.
+///
+/// La liste et la pastille sont donc relues à trois moments : un push reçu au
+/// premier plan (le message **est** le signal), une notification touchée
+/// depuis l'arrière-plan, et le retour de l'application au premier plan. Ils
+/// sont ici, et pas dans l'écran, pour que la pastille se mette à jour quel
+/// que soit l'écran affiché. À reprendre quand le ticket 017 posera la
+/// publication.
+///
+/// Sans configuration Firebase, les flux de push sont vides et cette couche se
+/// réduit à la relecture du centre au premier plan, dans un `Stack` d'un seul
+/// enfant.
 class CoucheNotifications extends ConsumerStatefulWidget {
   const CoucheNotifications({required this.child, super.key});
 
@@ -49,10 +66,28 @@ class _CoucheNotificationsState extends ConsumerState<CoucheNotifications> {
   MessagePush? _message;
   Timer? _effacement;
 
+  /// Le retour de l'application au premier plan relit le centre, comme
+  /// l'écran « Membres » relit ses invitations (ticket 009). C'est le seul
+  /// moment où l'on peut apprendre ce qui est arrivé pendant que la PWA était
+  /// rangée et que le push n'a rien affiché.
+  late final AppLifecycleListener _cycleDeVie;
+
+  @override
+  void initState() {
+    super.initState();
+    _cycleDeVie = AppLifecycleListener(onResume: _relireLeCentre);
+  }
+
   @override
   void dispose() {
+    _cycleDeVie.dispose();
     _effacement?.cancel();
     super.dispose();
+  }
+
+  void _relireLeCentre() {
+    if (!mounted) return;
+    unawaited(ref.read(centreNotificationsProvider.notifier).rafraichir());
   }
 
   void _montrer(MessagePush message) {
@@ -91,12 +126,20 @@ class _CoucheNotificationsState extends ConsumerState<CoucheNotifications> {
 
     ref.listen(messagesPremierPlanProvider, (_, suivant) {
       final message = suivant.value;
-      if (message != null) _montrer(message);
+      if (message == null) return;
+      _montrer(message);
+      // La ligne interne a été écrite **avant** l'envoi (ticket 025) : elle
+      // est donc déjà en base quand le message arrive. C'est ce qui permet de
+      // tenir « la notification apparaît dans la liste sans relancer l'app »
+      // sans temps réel.
+      _relireLeCentre();
     });
 
     ref.listen(routesServiceWorkerProvider, (_, suivant) {
       final route = suivant.value;
-      if (route != null) _ouvrir(route);
+      if (route == null) return;
+      _relireLeCentre();
+      _ouvrir(route);
     });
 
     final message = _message;

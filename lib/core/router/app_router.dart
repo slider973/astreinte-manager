@@ -14,6 +14,7 @@ import '../../features/membres/presentation/inviter_screen.dart';
 import '../../features/membres/presentation/membres_screen.dart';
 import '../../features/notifications/domain/destination_push.dart';
 import '../../features/notifications/presentation/activation_notifications_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/onboarding/presentation/guide_screen.dart';
 import '../../features/onboarding/presentation/installation_screen.dart';
 import '../../features/onboarding/presentation/profil_accueil_screen.dart';
@@ -122,6 +123,14 @@ abstract final class AppRoutes {
   static const String activationNotifications =
       '$prefixeBienvenue/notifications';
   static const String activationNotificationsName = 'activationNotifications';
+
+  /// Le centre de notifications (ticket 026).
+  ///
+  /// **Pas une destination de navigation** : `DESIGN.md § Navigation` en fixe
+  /// cinq au maximum et un admin les a toutes. On y va par la cloche de la
+  /// barre d'application, et le retour du navigateur ramène d'où l'on vient.
+  static const String notifications = '/notifications';
+  static const String notificationsName = 'notifications';
 
   // --- Liens publics des notifications (docs/WORKFLOWS.md § 8) -------------
 
@@ -292,6 +301,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.activationNotifications,
         name: AppRoutes.activationNotificationsName,
         builder: (context, state) => const ActivationNotificationsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.notifications,
+        name: AppRoutes.notificationsName,
+        builder: (context, state) => const NotificationsScreen(),
       ),
 
       // Les quatre liens publics des notifications. Ils n'ont pas d'écran à
