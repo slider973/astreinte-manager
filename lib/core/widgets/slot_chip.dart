@@ -313,6 +313,12 @@ class _Apparence {
     final descripteur = statuts.disponibilite(etat);
     final verrouillee = statuts.periode(PeriodeEtat.verrouillee);
 
+    // Sur un mois verrouillé, **le contour devient gris comme le reste**.
+    // Le filet vermillon d'« absent » y serait lu comme une alarme alors que
+    // le verrouillage est un fait (`DESIGN.md § Do's`) ; la valeur, elle,
+    // reste parfaitement lisible, portée par son glyphe et par sa texture.
+    final filetEtat = verrouille ? verrouillee.encre : descripteur.filet;
+
     // Un seul contour à la fois, par ordre de priorité : erreur, puis
     // sélection, puis le filet propre à l'état.
     final (
@@ -329,12 +335,12 @@ class _Apparence {
         true,
       ),
       _ when etat == DisponibiliteEtat.nonSaisi => (
-        descripteur.filet,
+        filetEtat,
         AppStroke.filet,
         true,
         false,
       ),
-      _ => (descripteur.filet, AppStroke.etat, false, false),
+      _ => (filetEtat, AppStroke.etat, false, false),
     };
 
     // Le créneau ne porte aucune teinte : il ne se voit que là où l'état ne

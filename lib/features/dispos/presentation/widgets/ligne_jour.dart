@@ -65,6 +65,7 @@ class JourDeGrille extends ConsumerWidget {
       jour: DaySlot(
         etat: etat.jour,
         erreur: etat.erreurJour,
+        selectionne: etat.origineJour,
         onTap: actionnable ? () => controleur.basculer(cleJour) : null,
         onDragEnter: actionnable
             ? () => controleur.toucherPendantGeste(cleJour)
@@ -73,6 +74,7 @@ class JourDeGrille extends ConsumerWidget {
       nuit: DaySlot(
         etat: etat.nuit,
         erreur: etat.erreurNuit,
+        selectionne: etat.origineNuit,
         onTap: actionnable ? () => controleur.basculer(cleNuit) : null,
         onDragEnter: actionnable
             ? () => controleur.toucherPendantGeste(cleNuit)

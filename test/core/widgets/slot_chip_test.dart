@@ -347,6 +347,73 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  group('SlotChip — mois verrouillé', () {
+    testWidgets('le contour d\'« absent » devient gris, jamais rouge', (
+      tester,
+    ) async {
+      Color filetDe(WidgetTester tester) {
+        final peinture = tester.widget<CustomPaint>(
+          find
+              .descendant(
+                of: find.byType(SlotChip),
+                matching: find.byType(CustomPaint),
+              )
+              .first,
+        );
+        final couleurs = <Color>[];
+        peinture.painter!.paint(_CanvasEspion(couleurs), const Size(104, 48));
+        // Le premier trait est le fond, le second le contour.
+        return couleurs[1];
+      }
+
+      await monter(
+        tester,
+        SizedBox(height: 48, child: _case(DisponibiliteEtat.absent)),
+      );
+      final libre = filetDe(tester);
+
+      await monter(
+        tester,
+        SizedBox(
+          height: 48,
+          child: _case(DisponibiliteEtat.absent, verrouille: true),
+        ),
+      );
+      final verrouille = filetDe(tester);
+
+      expect(verrouille, isNot(libre));
+      // Gris : les trois canaux se tiennent, contrairement au vermillon.
+      final ecart =
+          <int>[
+            verrouille.r.toInt(),
+            verrouille.g.toInt(),
+            verrouille.b.toInt(),
+          ].reduce((a, b) => a > b ? a : b) -
+          <int>[
+            verrouille.r.toInt(),
+            verrouille.g.toInt(),
+            verrouille.b.toInt(),
+          ].reduce((a, b) => a < b ? a : b);
+      expect(ecart, lessThan(40), reason: 'un fait gris, pas une alarme');
+    });
+
+    testWidgets('la valeur reste lisible : chaque état garde son glyphe', (
+      tester,
+    ) async {
+      for (final etat in DisponibiliteEtat.values) {
+        await monter(
+          tester,
+          SizedBox(height: 48, child: _case(etat, verrouille: true)),
+        );
+        expect(
+          find.byIcon(AppStatusColors.clair.disponibilite(etat).iconeCase),
+          findsOneWidget,
+          reason: 'l\'état ${etat.name} doit rester reconnaissable',
+        );
+      }
+    });
+  });
+
   group('SlotChip — état pressé (brief 011 § 6.1)', () {
     /// La peinture de fond de la case, telle que le `CustomPaint` la porte.
     Color fond(WidgetTester tester) {
@@ -359,10 +426,7 @@ void main() {
             .first,
       );
       final couleurs = <Color>[];
-      peinture.painter!.paint(
-        _CanvasEspion(couleurs),
-        const Size(104, 48),
-      );
+      peinture.painter!.paint(_CanvasEspion(couleurs), const Size(104, 48));
       return couleurs.first;
     }
 

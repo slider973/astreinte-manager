@@ -92,20 +92,30 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    final initial = widget.moisInitial;
-    if (initial != null) {
-      ref.read(moisSelectionneProvider.notifier).definir(initial);
-    }
+    _suivreUrl();
   }
 
   @override
   void didUpdateWidget(MoisScreen ancien) {
     super.didUpdateWidget(ancien);
-    // Le retour du navigateur change le paramètre d'URL : l'écran suit.
-    final initial = widget.moisInitial;
-    if (initial != null && initial != ancien.moisInitial) {
-      ref.read(moisSelectionneProvider.notifier).definir(initial);
-    }
+    if (widget.moisInitial != ancien.moisInitial) _suivreUrl();
+  }
+
+  /// Aligne le mois affiché sur celui de l'URL.
+  ///
+  /// **Y compris vers `null`** : l'entrée d'historique précédente n'avait pas
+  /// de mois, c'est-à-dire le mois par défaut. Ne traiter que les valeurs non
+  /// nulles laissait l'écran sur le mois qu'on venait de quitter, l'URL
+  /// disant le contraire. Vu en vrai dans Chrome.
+  ///
+  /// Reporté d'une image : modifier un provider depuis `initState` ou
+  /// `didUpdateWidget` est interdit par Riverpod, et pour une bonne raison —
+  /// deux widgets abonnés au même provider liraient des états différents.
+  void _suivreUrl() {
+    final cle = widget.moisInitial;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(moisSelectionneProvider.notifier).definir(cle);
+    });
   }
 
   @override

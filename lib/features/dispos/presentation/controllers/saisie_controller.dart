@@ -25,6 +25,8 @@ class EtatJour {
     required this.erreurJour,
     required this.erreurNuit,
     required this.verrouille,
+    this.origineJour = false,
+    this.origineNuit = false,
   });
 
   static const EtatJour vide = EtatJour(
@@ -41,6 +43,12 @@ class EtatJour {
   final bool erreurNuit;
   final bool verrouille;
 
+  /// Case d'où part la peinture en cours : contour 2 dp `primary`. C'est
+  /// elle qui annonce, au moment exact où le geste devient disponible, que
+  /// le doigt a pris la case.
+  final bool origineJour;
+  final bool origineNuit;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -49,11 +57,20 @@ class EtatJour {
           other.nuit == nuit &&
           other.erreurJour == erreurJour &&
           other.erreurNuit == erreurNuit &&
-          other.verrouille == verrouille;
+          other.verrouille == verrouille &&
+          other.origineJour == origineJour &&
+          other.origineNuit == origineNuit;
 
   @override
-  int get hashCode =>
-      Object.hash(jour, nuit, erreurJour, erreurNuit, verrouille);
+  int get hashCode => Object.hash(
+    jour,
+    nuit,
+    erreurJour,
+    erreurNuit,
+    verrouille,
+    origineJour,
+    origineNuit,
+  );
 }
 
 /// L'état complet de l'écran « Mon mois ».
@@ -65,6 +82,7 @@ class EtatSaisie {
     this.enErreur = const <CreneauCle>{},
     this.sync = SyncEtat.repos,
     this.pinceau,
+    this.origine,
     this.casesPeintes = 0,
     this.horsLigne = false,
     this.lectureSeule = false,
@@ -87,6 +105,9 @@ class EtatSaisie {
 
   /// Non nul pendant une peinture : la valeur en cours de pose.
   final DisponibiliteEtat? pinceau;
+
+  /// La case d'où part la peinture en cours.
+  final CreneauCle? origine;
 
   /// Le nombre de cases que le geste courant a changées.
   final int casesPeintes;
@@ -126,6 +147,8 @@ class EtatSaisie {
       erreurJour: enErreur.contains(jour),
       erreurNuit: enErreur.contains(nuit),
       verrouille: !modifiable,
+      origineJour: origine == jour,
+      origineNuit: origine == nuit,
     );
   }
 
@@ -135,6 +158,7 @@ class EtatSaisie {
     Set<CreneauCle>? enErreur,
     SyncEtat? sync,
     DisponibiliteEtat? Function()? pinceau,
+    CreneauCle? Function()? origine,
     int? casesPeintes,
     bool? horsLigne,
     bool? lectureSeule,
@@ -147,6 +171,7 @@ class EtatSaisie {
     enErreur: enErreur ?? this.enErreur,
     sync: sync ?? this.sync,
     pinceau: pinceau == null ? this.pinceau : pinceau(),
+    origine: origine == null ? this.origine : origine(),
     casesPeintes: casesPeintes ?? this.casesPeintes,
     horsLigne: horsLigne ?? this.horsLigne,
     lectureSeule: lectureSeule ?? this.lectureSeule,
@@ -310,12 +335,14 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     final etat = _etat;
     if (etat == null || !etat.modifiable || !_gesteActif) return;
 
+    final premiere = etat.pinceau == null;
     final pinceau = etat.pinceau ?? cranSuivant(etat.etat(cle));
-    if (etat.pinceau != null && etat.etat(cle) == pinceau) return;
+    if (!premiere && etat.etat(cle) == pinceau) return;
 
     _poser(
       <CreneauCle, DisponibiliteEtat>{cle: pinceau},
       pinceau: pinceau,
+      origine: premiere ? cle : null,
       casesPeintes: etat.casesPeintes + 1,
     );
   }
@@ -332,6 +359,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     _publier(
       etat.copyWith(
         pinceau: () => null,
+        origine: () => null,
         annonce: () => pinceau == null || etat.casesPeintes == 0
             ? null
             : AppStrings.peintureResultat(
@@ -362,6 +390,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       etat.copyWith(
         mois: avant,
         pinceau: () => null,
+        origine: () => null,
         casesPeintes: 0,
         sync: _file.isEmpty && etat.sync == SyncEtat.enregistrement
             ? SyncEtat.repos
@@ -378,6 +407,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   void _poser(
     Map<CreneauCle, DisponibiliteEtat> modifications, {
     DisponibiliteEtat? pinceau,
+    CreneauCle? origine,
     int? casesPeintes,
   }) {
     final etat = _etat;
@@ -397,6 +427,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
         sync: etat.horsLigne ? SyncEtat.horsLigne : SyncEtat.enregistrement,
         echecPersistant: false,
         pinceau: pinceau == null ? null : () => pinceau,
+        origine: origine == null ? null : () => origine,
         casesPeintes: casesPeintes,
       ),
     );

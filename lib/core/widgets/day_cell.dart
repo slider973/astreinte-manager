@@ -194,9 +194,7 @@ class DayCell extends StatelessWidget {
           : _Bloc(cellule: this, fond: fond, ferie: ferie, statuts: statuts),
     );
 
-    return horsMois
-        ? Opacity(opacity: 0.45, child: semantique)
-        : semantique;
+    return horsMois ? Opacity(opacity: 0.45, child: semantique) : semantique;
   }
 
   /// Le numéro du jour et le nom du jour, communs aux deux orientations.

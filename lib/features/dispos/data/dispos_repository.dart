@@ -123,8 +123,11 @@ class SupabaseDisposRepository implements DisposRepository {
           .from('periods')
           .select(_colonnesPeriode)
           .eq('station_id', stationId)
-          .order('year')
-          .order('month');
+          // `ascending` vaut **false** par défaut dans postgrest-dart : sans
+          // ces deux drapeaux, le sélecteur de mois affichait décembre avant
+          // octobre. Vu en vrai dans Chrome.
+          .order('year', ascending: true)
+          .order('month', ascending: true);
 
       return <PeriodeSaisie>[
         for (final ligne in lignes) PeriodeSaisie.depuisJson(ligne),

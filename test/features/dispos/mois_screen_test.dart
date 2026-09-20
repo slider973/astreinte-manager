@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
@@ -15,8 +16,10 @@ import 'package:astreinte_sp/core/widgets/slot_chip.dart';
 import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
+import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -51,6 +54,22 @@ Future<void> ouvrirMois(
     taille: taille,
   );
 }
+
+/// Choisit un mois dans le sélecteur, en l'amenant d'abord sous le doigt :
+/// la rangée de mois défile horizontalement dès que les boutons ne tiennent
+/// plus côte à côte.
+Future<void> choisirMois(WidgetTester tester, int mois, int annee) async {
+  final bouton = find.text(AppStrings.moisNomEtAnnee(mois, annee));
+  await tester.ensureVisible(bouton);
+  await tester.pumpAndSettle();
+  await tester.tap(bouton);
+  await tester.pumpAndSettle();
+}
+
+/// L'URL courante, telle que la barre d'adresse la montre.
+String adresse(WidgetTester tester) => ProviderScope.containerOf(
+  tester.element(find.byType(MoisScreen)),
+).read(appRouterProvider).routerDelegate.currentConfiguration.uri.toString();
 
 /// Un appui long, puis un glissement vertical : la peinture.
 Future<void> peindre(
@@ -218,10 +237,20 @@ void main() {
         findsNothing,
         reason: 'l\'indicateur laisse la place au pinceau',
       );
+      expect(
+        tester.widget<SlotChip>(caseDe(0, CreneauType.nuit)).selectionne,
+        isTrue,
+        reason: 'la case d\'origine prend le contour de sélection',
+      );
 
       await geste.up();
       await tester.pump();
       expect(find.byType(SaveIndicator), findsOneWidget);
+      expect(
+        tester.widget<SlotChip>(caseDe(0, CreneauType.nuit)).selectionne,
+        isFalse,
+        reason: 'le contour part avec le doigt',
+      );
       await tester.pump(const Duration(seconds: 1));
     });
 
@@ -466,6 +495,24 @@ void main() {
       expect(find.text(AppStrings.moisVerrouilleCourt), findsOneWidget);
     });
 
+    testWidgets('range les mois du plus ancien au plus récent', (tester) async {
+      final depot = FauxDisposRepository(
+        periodes: <PeriodeSaisie>[
+          periodeVerrouillee(annee: 2026, mois: 9),
+          periodeOuverte(annee: 2026, mois: 10),
+          periodeOuverte(annee: 2026, mois: 11),
+        ],
+      );
+      await ouvrirMois(tester, depot: depot);
+
+      double gaucheDe(int mois) => tester
+          .getTopLeft(find.text(AppStrings.moisNomEtAnnee(mois, 2026)))
+          .dx;
+
+      expect(gaucheDe(9), lessThan(gaucheDe(10)));
+      expect(gaucheDe(10), lessThan(gaucheDe(11)));
+    });
+
     testWidgets('changer de mois vide la file avant de partir', (tester) async {
       final depot = FauxDisposRepository(
         periodes: <PeriodeSaisie>[
@@ -477,12 +524,60 @@ void main() {
 
       await tester.tap(caseDe(0, CreneauType.jour));
       await tester.pump();
-      await tester.tap(find.text(AppStrings.moisNomEtAnnee(11, 2026)));
-      await tester.pumpAndSettle();
+      await choisirMois(tester, 11, 2026);
 
       expect(depot.requetes, 1);
       expect(depot.base.keys.single, jour(1));
-      expect(find.text(AppStrings.moisNomEtAnnee(11, 2026)), findsOneWidget);
+      expect(
+        tester.widgetList<DayCell>(find.byType(DayCell)).first.nomJour,
+        'dim.',
+        reason: 'le 1er novembre 2026 est un dimanche',
+      );
+    });
+  });
+
+  group('MoisScreen — le mois dans l\'URL', () {
+    testWidgets('le mois choisi part dans l\'URL', (tester) async {
+      final depot = FauxDisposRepository(
+        periodes: <PeriodeSaisie>[
+          periodeOuverte(annee: 2026, mois: 10),
+          periodeOuverte(annee: 2026, mois: 11),
+        ],
+      );
+      await ouvrirMois(tester, depot: depot);
+
+      await choisirMois(tester, 11, 2026);
+
+      expect(adresse(tester), contains('mois=2026-11'));
+    });
+
+    testWidgets('le retour du navigateur ramène au mois précédent', (
+      tester,
+    ) async {
+      final depot = FauxDisposRepository(
+        periodes: <PeriodeSaisie>[
+          periodeOuverte(annee: 2026, mois: 10),
+          periodeOuverte(annee: 2026, mois: 11),
+        ],
+      );
+      await ouvrirMois(tester, depot: depot);
+      expect(find.byType(DayCell), findsWidgets);
+
+      await choisirMois(tester, 11, 2026);
+      expect(
+        tester.widgetList<DayCell>(find.byType(DayCell)).first.nomJour,
+        'dim.',
+        reason: 'le 1er novembre 2026 est un dimanche',
+      );
+
+      // Le retour du navigateur ramène à l'entrée précédente, sans mois :
+      // c'est le mois par défaut qui doit revenir.
+      await ouvrirRoute(tester, '/?onglet=0');
+      expect(
+        tester.widgetList<DayCell>(find.byType(DayCell)).first.nomJour,
+        'jeu.',
+        reason: 'le 1er octobre 2026 est un jeudi',
+      );
     });
   });
 
