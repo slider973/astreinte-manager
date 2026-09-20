@@ -10,9 +10,14 @@ TODAY="$(date +%Y-%m-%d)"
 
 die() { echo "erreur : $*" >&2; exit 1; }
 
-find_ticket() {            # $1 = numéro → chemin du fichier
-  local n; n="$(printf '%03d' "$((10#$1))")"
-  ls "$TICKETS"/{backlog,in-progress,done}/"$n"-*.md 2>/dev/null | head -1
+find_ticket() {            # $1 = numéro → chemin du fichier (vide si absent)
+  local n d f; n="$(printf '%03d' "$((10#$1))")"
+  for d in backlog in-progress done; do
+    for f in "$TICKETS/$d/$n"-*.md; do
+      [ -e "$f" ] && { echo "$f"; return 0; }
+    done
+  done
+  return 0
 }
 state_of() { basename "$(dirname "$1")"; }
 num_of()   { basename "$1" | cut -d- -f1; }
