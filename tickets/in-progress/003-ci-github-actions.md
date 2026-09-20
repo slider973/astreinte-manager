@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 001, 002
 - **Branche** : `feat/003-ci-github-actions`
+- **Statut** : en cours depuis 2026-09-20
 
 ## À faire
 - Workflow GitHub Actions sur PR : `flutter analyze`, `flutter test`, `flutter build web`.
