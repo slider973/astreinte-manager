@@ -81,12 +81,14 @@ Une migration poussée sur `main` n'est jamais modifiée : on en crée une nouve
 | `0007_functions_rls.sql` | `is_member`, `is_admin`, `is_super_admin`, `station_writable`, toutes les politiques RLS, trigger `assignments_member_transition` |
 | `0008_rls_durcissement.sql` | revue du ticket 008 : `search_path = public, pg_temp`, liste blanche des colonnes dans le trigger, cohérence du `station_id` avec la ligne parente, `invitations.token` retiré du grant de select |
 | `0009_invitation_functions.sql` | ticket 006 : `mask_email`, `create_invitation`, `accept_invitation`, exécution réservée à `service_role` |
+| `0010_memberships_administration.sql` | ticket 009 : trigger `memberships_guard_admin` (dernier admin, pas soi-même, identité gelée, `disabled_at`), vue `v_member_last_availability`, profils des membres désactivés visibles par leur admin |
+| `0011_station_settings.sql` | ticket 010 : `station_settings_valid` et la contrainte `stations_settings_valide`, nom non vide, trigger `stations_check_timezone`, `period_deadline_at`, trigger `stations_recalcule_deadlines` |
 
 RLS est activé sur chaque table dès sa création et toutes les tables ont au moins une
 politique depuis `0007`. Les politiques sont posées `to authenticated` : `anon` ne lit rien,
-`service_role` et `postgres` ont `bypassrls`. Les vues arrivent au ticket 016
-(`0010_views.sql`), le cron au ticket 022 (`0011_cron.sql`) : `0009` a pris le numéro des
-vues au ticket 006, `docs/SCHEMA.md` section 10 a été décalé en conséquence.
+`service_role` et `postgres` ont `bypassrls`. La numérotation a glissé d'un ticket à l'autre
+(`0009` a pris au ticket 006 le numéro prévu pour les vues) : `docs/SCHEMA.md` section 10 fait
+foi, et le prochain numéro libre est toujours celui qui suit le dernier fichier de ce tableau.
 
 Deux pièges à ne pas rouvrir, documentés dans `docs/SCHEMA.md` section 3 :
 
@@ -127,6 +129,12 @@ dans l'état du seed. Le script rend un code non nul au premier test rouge.
 `accept_invitation` de `0009` : droit d'inviter, renvoi sans doublon, adresse déjà membre,
 token inconnu, invitation expirée ou déjà acceptée, adresse de session différente de
 l'adresse invitée, et fermeture des deux fonctions au rôle `authenticated`.
+
+`supabase/tests/memberships_admin_test.sql` couvre le déclencheur `memberships_guard_admin`
+de `0010`, et `supabase/tests/station_settings_test.sql` les paramètres de caserne de `0011` :
+documents `settings` refusés et acceptés, nom, fuseau inconnu, recalcul des dates limites des
+périodes ouvertes (fuseau compris), immobilité de `shifts.required_count`, et droits
+d'écriture sur `stations`.
 
 `scripts/test_functions.sh` exerce les deux Edge Functions en HTTP contre la pile locale
 (69 assertions, base rendue à l'état du seed). Il n'est pas dans la CI : le workflow

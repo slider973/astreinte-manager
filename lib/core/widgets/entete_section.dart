@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/widgets/app_divider.dart';
+import '../theme/app_spacing.dart';
+import 'app_divider.dart';
 
 /// Un en-tête de section : le titre, son compte, et le filet qui ouvre la
 /// liste.

@@ -15,6 +15,7 @@ import '../../features/membres/presentation/membres_screen.dart';
 import '../../features/onboarding/presentation/guide_screen.dart';
 import '../../features/onboarding/presentation/installation_screen.dart';
 import '../../features/onboarding/presentation/profil_accueil_screen.dart';
+import '../../features/parametres/presentation/parametres_screen.dart';
 import '../env.dart';
 import '../session/email.dart';
 import '../session/etat_auth.dart';
@@ -65,6 +66,12 @@ abstract final class AppRoutes {
   /// navigateur ramène à la liste.
   static const String inviterChemin = 'inviter';
   static const String inviterName = 'inviterMembres';
+
+  /// Les réglages de la caserne (ticket 010). Second écran de la destination
+  /// « Admin », pas un enfant de « Membres » : on y va et on en revient par la
+  /// barre d'application, sans empiler.
+  static const String parametres = '/admin/parametres';
+  static const String parametresName = 'parametresCaserne';
 
   /// Le lien reçu par courriel. **Il ne porte que le jeton** : ni l'adresse
   /// invitée, ni le nom de la caserne (`supabase/functions/README.md`).
@@ -167,6 +174,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const InviterScreen(),
           ),
         ],
+      ),
+      GoRoute(
+        path: AppRoutes.parametres,
+        name: AppRoutes.parametresName,
+        builder: (context, state) => const ParametresScreen(),
       ),
       GoRoute(
         path: AppRoutes.invitation,
