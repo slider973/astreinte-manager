@@ -9,8 +9,8 @@ import 'faux_invitations.dart';
 const String membreTest = 'aaaaaaaa-0000-4000-8000-000000000101';
 
 PeriodeSaisie periodeOuverte({
-  int annee = 2026,
-  int mois = 10,
+  required int annee,
+  required int mois,
   String? id,
   DateTime? dateLimite,
 }) => PeriodeSaisie(
@@ -22,7 +22,7 @@ PeriodeSaisie periodeOuverte({
   dateLimite: dateLimite ?? DateTime(annee, mois - 1, 15, 23, 59, 59),
 );
 
-PeriodeSaisie periodeVerrouillee({int annee = 2026, int mois = 9}) =>
+PeriodeSaisie periodeVerrouillee({required int annee, required int mois}) =>
     PeriodeSaisie(
       id: 'periode-$annee-$mois',
       stationId: stationTest,
@@ -43,7 +43,8 @@ class FauxDisposRepository implements DisposRepository {
   FauxDisposRepository({
     List<PeriodeSaisie>? periodes,
     Map<CreneauCle, DisponibiliteEtat>? disponibilites,
-  }) : _periodes = periodes ?? <PeriodeSaisie>[periodeOuverte()],
+  }) : _periodes =
+           periodes ?? <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 10)],
        base = <CreneauCle, DisponibiliteEtat>{...?disponibilites};
 
   final List<PeriodeSaisie> _periodes;
