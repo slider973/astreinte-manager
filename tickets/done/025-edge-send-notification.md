@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 002, 024
 - **Branche** : `feat/025-edge-send-notification`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/15
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
