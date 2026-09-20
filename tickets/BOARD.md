@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 008 | [Row Level Security et fonctions d'accès](in-progress/008-rls-multi-tenant.md) | P0 | 002 |  |
 
 ## À faire
 
@@ -16,7 +17,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 005 | [Connexion par email et code OTP](backlog/005-auth-otp.md) | P0 | 001 002 |  |
 | 006 | [Invitations et onboarding des membres](backlog/006-invitations-onboarding.md) | P0 | 005 008 |  |
 | 007 | [Profil utilisateur](backlog/007-profil.md) | P1 | 005 |  |
-| 008 | [Row Level Security et fonctions d'accès](backlog/008-rls-multi-tenant.md) | P0 | 002 |  |
 | 009 | [Gestion des membres par l'admin](backlog/009-gestion-membres.md) | P0 | 006 008 |  |
 | 010 | [Paramètres de la caserne](backlog/010-parametres-caserne.md) | P1 | 008 |  |
 | 011 | [Grille de saisie des disponibilités](backlog/011-saisie-dispos-grille.md) | P0 | 004 008 |  |
