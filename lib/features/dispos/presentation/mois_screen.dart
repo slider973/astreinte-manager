@@ -17,6 +17,7 @@ import '../domain/dispos_providers.dart';
 import '../domain/periode_saisie.dart';
 import 'controllers/saisie_controller.dart';
 import 'widgets/barre_compteurs.dart';
+import 'widgets/barre_raccourcis.dart';
 import 'widgets/bloc_astuce.dart';
 import 'widgets/entete_colonnes.dart';
 import 'widgets/grille_calendrier.dart';
@@ -232,6 +233,7 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
       periodes: periodes.value ?? const <PeriodeSaisie>[],
       calendrier: calendrier,
       deuxNiveaux: deuxNiveaux,
+      classe: classe,
     );
 
     return _borner(
@@ -277,6 +279,7 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     required List<PeriodeSaisie> periodes,
     required bool calendrier,
     required bool deuxNiveaux,
+    required AppWindowClass classe,
   }) {
     final aujourdhui = DateTime.now();
     final astuce = _astuce(etat);
@@ -294,8 +297,16 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
             ),
           ),
         ),
-        // Emplacement réservé au ticket 012 (raccourcis de sélection).
-        // Rien n'y est posé : pas de bouton fantôme, pas de place vide.
+        // La place que le brief du 011 avait gardée aux raccourcis : entre le
+        // sélecteur de mois et l'en-tête épinglé. En `large`, la bande n'est
+        // pas ici mais en tête du panneau de droite.
+        if (!classe.estLarge)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.only(top: AppSpacing.md),
+              child: BarreRaccourcis(),
+            ),
+          ),
         if (astuce != null) SliverToBoxAdapter(child: astuce),
         SliverToBoxAdapter(child: _Annonce(texte: etat.annonce)),
         const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
@@ -370,8 +381,15 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
   /// du panneau de droite.
   Widget _panneau(EtatSaisie etat) => SingleChildScrollView(
     padding: const EdgeInsets.all(AppSpacing.xl),
-    // Emplacement réservé au ticket 012 au-dessus, au ticket 013 en dessous.
-    child: _barre(etat, grand: true),
+    // Emplacement réservé au ticket 013 en dessous.
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const BarreRaccourcis(vertical: true),
+        const SizedBox(height: AppSpacing.xl),
+        _barre(etat, grand: true),
+      ],
+    ),
   );
 
   // -------------------------------------------------------------------

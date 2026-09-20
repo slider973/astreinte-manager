@@ -963,6 +963,99 @@ abstract final class AppStrings {
       'Impossible de lire tes disponibilités. Vérifie ta connexion, puis '
       'réessaie.';
 
+  // -------------------------------------------------------------------
+  // Raccourcis de sélection (ticket 012)
+  // -------------------------------------------------------------------
+
+  static const String raccourcisTitre = 'Remplir vite';
+
+  /// Le libellé lu par un lecteur d'écran avant d'entrer dans la bande.
+  static const String raccourcisSemantique =
+      'Raccourcis de remplissage du mois';
+
+  /// La raison affichée à côté des raccourcis inertes. `DESIGN.md § Do` :
+  /// un contrôle désactivé dit pourquoi, à côté du contrôle.
+  static const String raccourcisVerrouilles =
+      'Mois verrouillé : les raccourcis ne s\'appliquent plus.';
+  static const String raccourcisLectureSeule =
+      'Caserne en lecture seule : les raccourcis ne s\'appliquent plus.';
+
+  // --- Les cinq portées ---------------------------------------------------
+
+  static const String raccourciWeekends = 'Les weekends';
+  static const String raccourciWeekendsDetail =
+      'Tous les samedis et dimanches du mois. Les jours fériés en semaine ne '
+      'sont pas concernés.';
+
+  static const String raccourciSemaine = 'La semaine';
+  static const String raccourciSemaineDetail =
+      'Du lundi au vendredi, jours fériés compris.';
+
+  static const String raccourciMois = 'Tout le mois';
+  static const String raccourciMoisDetail =
+      'Tous les jours du mois, weekends compris.';
+
+  static const String raccourciCopie = 'Copier le mois précédent';
+  static const String raccourciCopieDetail =
+      'Reprend le mois précédent en alignant les jours de la semaine : un '
+      'samedi reste un samedi. Remplace ce qui est déjà saisi.';
+
+  static const String raccourciEffacer = 'Tout effacer';
+  static const String raccourciEffacerDetail =
+      'Remet le mois à zéro. Les cases redeviennent « non saisi ».';
+
+  // --- Le créneau visé ----------------------------------------------------
+
+  static const String raccourciCibleJour = 'Jour';
+  static const String raccourciCibleNuit = 'Nuit';
+  static const String raccourciCibleLesDeux = 'Jour et nuit';
+
+  /// Le nombre de cases qu'un choix de la feuille va changer.
+  static String raccourciCasesConcernees(int n) =>
+      n <= 1 ? '$n case' : '$n cases';
+
+  static const String raccourciAucunChangement =
+      'Rien à changer : ces cases sont déjà comme ça.';
+
+  // --- Confirmation -------------------------------------------------------
+
+  static String raccourciConfirmerEffacerTitre(int n) => n <= 1
+      ? 'Effacer 1 saisie ?'
+      : 'Effacer $n saisies ?';
+  static const String raccourciConfirmerEffacerTexte =
+      'Les cases redeviennent « non saisi ». Tu pourras annuler juste après.';
+  static const String raccourciConfirmerEffacerAction = 'Effacer';
+
+  static String raccourciConfirmerCopieTitre(int n) => n <= 1
+      ? 'Remplacer 1 saisie ?'
+      : 'Remplacer $n saisies ?';
+  static const String raccourciConfirmerCopieTexte =
+      'Le mois précédent prend la place de ce que tu as saisi. Tu pourras '
+      'annuler juste après.';
+  static const String raccourciConfirmerCopieAction = 'Remplacer';
+
+  // --- Résultat et annulation ---------------------------------------------
+
+  /// « 22 cases mises à jour ». Le même compte que la peinture, parce que
+  /// c'est le même geste vu de plus loin.
+  static String raccourciResultat(int n) => n <= 1
+      ? '$n case mise à jour'
+      : '$n cases mises à jour';
+
+  /// L'annonce complète, pour le lecteur d'écran : le compte, le raccourci,
+  /// et la sortie.
+  static String raccourciResultatSemantique(String raccourci, int n) =>
+      '${raccourciResultat(n)} : $raccourci. Annulation possible.';
+
+  static const String raccourciAnnulerLabel = 'Annuler';
+  static String raccourciAnnulerSemantique(String raccourci) =>
+      'Annuler le raccourci $raccourci';
+  static const String raccourciAnnule = 'Raccourci annulé';
+
+  static const String raccourciCopieIllisible =
+      'Impossible de lire le mois précédent. Vérifie ta connexion, puis '
+      'réessaie.';
+
   // --- Jours fériés ------------------------------------------------------
 
   static const String feriePremierJanvier = 'Jour de l\'an';

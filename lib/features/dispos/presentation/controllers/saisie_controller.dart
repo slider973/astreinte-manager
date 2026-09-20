@@ -13,6 +13,7 @@ import '../../domain/creneau_cle.dart';
 import '../../domain/disponibilite_mois.dart';
 import '../../domain/dispos_providers.dart';
 import '../../domain/periode_saisie.dart';
+import '../../domain/raccourci.dart';
 
 /// Ce que la ligne d'un jour a besoin de savoir, et **rien d'autre**.
 ///
@@ -91,6 +92,9 @@ class EtatSaisie {
     this.echecPersistant = false,
     this.filePerimee = false,
     this.annonce,
+    this.dernierRaccourci,
+    this.raccourciEnCours,
+    this.messageRaccourci,
   });
 
   final PeriodeSaisie periode;
@@ -133,6 +137,26 @@ class EtatSaisie {
   /// La dernière phrase à annoncer sans déplacer le focus.
   final String? annonce;
 
+  /// Le dernier raccourci appliqué, tant qu'il est annulable.
+  ///
+  /// Non nul veut dire exactement une chose : **la ligne de résultat et son
+  /// bouton « Annuler » sont à l'écran**. La première retouche à la main le
+  /// remet à `null` — l'utilisateur est passé à autre chose, et une annulation
+  /// qui emporterait sa retouche serait pire que pas d'annulation du tout.
+  final RaccourciApplique? dernierRaccourci;
+
+  /// La portée dont la lecture du mois précédent est en vol. Le bouton garde
+  /// son libellé et sa largeur, un indicateur de 20 dp prend la place de son
+  /// icône.
+  final PorteeRaccourci? raccourciEnCours;
+
+  /// Ce qu'un raccourci a à dire quand il n'a rien changé, ou qu'il n'a pas
+  /// pu : « Rien à changer », « Impossible de lire le mois précédent ».
+  ///
+  /// Visible à l'écran, à la place de la ligne de résultat. Une annonce
+  /// `Semantics` seule laisserait un voyant devant un bouton muet.
+  final String? messageRaccourci;
+
   bool get enPeinture => pinceau != null;
 
   /// Vrai quand la grille accepte une saisie.
@@ -172,6 +196,9 @@ class EtatSaisie {
     bool? echecPersistant,
     bool? filePerimee,
     String? Function()? annonce,
+    RaccourciApplique? Function()? dernierRaccourci,
+    PorteeRaccourci? Function()? raccourciEnCours,
+    String? Function()? messageRaccourci,
   }) => EtatSaisie(
     periode: periode ?? this.periode,
     mois: mois ?? this.mois,
@@ -186,6 +213,15 @@ class EtatSaisie {
     echecPersistant: echecPersistant ?? this.echecPersistant,
     filePerimee: filePerimee ?? this.filePerimee,
     annonce: annonce == null ? this.annonce : annonce(),
+    dernierRaccourci: dernierRaccourci == null
+        ? this.dernierRaccourci
+        : dernierRaccourci(),
+    raccourciEnCours: raccourciEnCours == null
+        ? this.raccourciEnCours
+        : raccourciEnCours(),
+    messageRaccourci: messageRaccourci == null
+        ? this.messageRaccourci
+        : messageRaccourci(),
   );
 }
 
@@ -201,6 +237,11 @@ class EtatSaisie {
 ///    construction : la dernière valeur d'une case gagne, et quarante touches
 ///    sur la même case ne produisent qu'une ligne. Elle part en **deux
 ///    requêtes au plus** — un envoi groupé, une suppression groupée.
+/// 3. **Il n'y a qu'un chemin d'écriture** : `_poser`. La touche, la peinture,
+///    les raccourcis du ticket 012 et leur annulation y descendent tous. Un
+///    raccourci de soixante-deux cases n'est donc pas un cas particulier du
+///    réseau : c'est une seule `_poser` de soixante-deux entrées, qui paie le
+///    même délai et les mêmes deux requêtes qu'une case unique.
 class SaisieController extends AsyncNotifier<EtatSaisie?> {
   /// Le calme après lequel la file part.
   static const Duration delaiEnvoi = Duration(milliseconds: 500);
@@ -220,6 +261,11 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   /// La file d'écriture : une entrée par case, la dernière valeur gagne.
   final Map<CreneauCle, DisponibiliteEtat> _file =
       <CreneauCle, DisponibiliteEtat>{};
+
+  /// Les valeurs d'**avant** le dernier raccourci, pour les seules cases
+  /// qu'il a changées. C'est tout ce que coûte l'annulation : une carte d'au
+  /// plus soixante-deux entrées, rejouée par le même chemin d'écriture.
+  Map<CreneauCle, DisponibiliteEtat>? _annulationRaccourci;
 
   /// Les mois dont une tranche de file est **gardée sur l'appareil**.
   /// Sert à oublier une tranche dès qu'elle est confirmée par le serveur.
@@ -265,6 +311,10 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
         (_stationId != null && _stationId != appartenance.stationId) ||
         (_userId != null && _userId != session.userId);
     final premiereOuverture = _stationId == null;
+
+    // L'annulation ne traverse ni un changement de mois, ni un rechargement :
+    // elle porte sur des cases d'un registre qui n'est plus à l'écran.
+    _annulationRaccourci = null;
 
     if (autreCompte) {
       _file.clear();
@@ -480,18 +530,169 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
   }
 
   // -------------------------------------------------------------------
+  // Les raccourcis
+  // -------------------------------------------------------------------
+
+  /// Applique un raccourci : `portee` × `cible`.
+  ///
+  /// **Aucun chemin d'écriture nouveau.** Le lot calculé descend dans le même
+  /// `_poser` qu'une touche unique, donc dans la même file coalescée : les
+  /// soixante-deux modifications d'un « tout le mois, jour et nuit » forment
+  /// **une** entrée par case dans une `Map`, partent après le même délai de
+  /// 500 ms, et coûtent **une requête par type d'opération** — un envoi
+  /// groupé, une suppression groupée.
+  ///
+  /// La seule lecture supplémentaire du ticket est celle du mois précédent,
+  /// et elle n'a lieu que pour [PorteeRaccourci.copieMoisPrecedent].
+  Future<void> appliquerRaccourci(
+    PorteeRaccourci portee,
+    CibleCreneau cible,
+  ) async {
+    final etat = _etat;
+    // Une période verrouillée, une caserne suspendue : le raccourci est aussi
+    // inerte que les cases. Le bouton est déjà désactivé à l'écran ; ce garde
+    // est là pour l'appel qui arriverait par un autre chemin.
+    if (etat == null || !etat.modifiable) return;
+    if (etat.raccourciEnCours != null) return;
+
+    var moisPrecedent = const <CreneauCle, DisponibiliteEtat>{};
+    if (portee.litLeMoisPrecedent) {
+      final lu = await _lireMoisPrecedent(portee);
+      if (lu == null) return;
+      moisPrecedent = lu;
+    }
+
+    final courant = _etat;
+    if (courant == null || !courant.modifiable) return;
+
+    final modifications = modificationsRaccourci(
+      periode: courant.periode,
+      portee: portee,
+      cible: cible,
+      courant: courant.mois,
+      moisPrecedent: moisPrecedent,
+    );
+
+    // Rien à changer : pas de file, pas de requête, pas d'annulation à
+    // proposer — mais une phrase, parce qu'un bouton qui ne fait rien sans le
+    // dire passe pour cassé.
+    if (modifications.isEmpty) {
+      _publier(
+        courant.copyWith(
+          raccourciEnCours: () => null,
+          dernierRaccourci: () => null,
+          messageRaccourci: () => AppStrings.raccourciAucunChangement,
+          annonce: () => AppStrings.raccourciAucunChangement,
+        ),
+      );
+      _annulationRaccourci = null;
+      return;
+    }
+
+    final avant = <CreneauCle, DisponibiliteEtat>{
+      for (final cle in modifications.keys) cle: courant.etat(cle),
+    };
+
+    _poser(
+      modifications,
+      raccourci: RaccourciApplique(
+        portee: portee,
+        cible: cible,
+        cases: modifications.length,
+      ),
+      annonce: AppStrings.raccourciResultatSemantique(
+        portee.libelle,
+        modifications.length,
+      ),
+    );
+    _annulationRaccourci = avant;
+    _planifier();
+  }
+
+  /// Remet les cases du dernier raccourci dans l'état exact d'avant.
+  ///
+  /// Ce n'est pas un historique : **un seul cran**, celui du dernier
+  /// raccourci, et il tombe dès qu'une case est touchée à la main. Les
+  /// anciennes valeurs repartent par la file ordinaire — l'annulation coûte
+  /// donc le même prix que le raccourci, y compris quand il est déjà arrivé
+  /// en base.
+  void annulerRaccourci() {
+    final etat = _etat;
+    final avant = _annulationRaccourci;
+    if (etat == null || avant == null || !etat.modifiable) return;
+
+    _poser(avant, annonce: AppStrings.raccourciAnnule);
+    _planifier();
+  }
+
+  Future<Map<CreneauCle, DisponibiliteEtat>?> _lireMoisPrecedent(
+    PorteeRaccourci portee,
+  ) async {
+    final etat = _etat;
+    final stationId = _stationId;
+    final userId = _userId;
+    if (etat == null || stationId == null || userId == null) return null;
+
+    _publier(
+      etat.copyWith(
+        raccourciEnCours: () => portee,
+        messageRaccourci: () => null,
+      ),
+    );
+    final precedent = DateTime(etat.periode.annee, etat.periode.mois - 1);
+
+    try {
+      final lues = await ref
+          .read(disposRepositoryProvider)
+          .lireMois(
+            stationId: stationId,
+            userId: userId,
+            annee: precedent.year,
+            mois: precedent.month,
+          );
+      final courant = _etat;
+      if (courant == null) return null;
+      _publier(courant.copyWith(raccourciEnCours: () => null));
+      return lues;
+    } on Object {
+      final courant = _etat;
+      if (courant == null) return null;
+      _publier(
+        courant.copyWith(
+          raccourciEnCours: () => null,
+          messageRaccourci: () => AppStrings.raccourciCopieIllisible,
+          annonce: () => AppStrings.raccourciCopieIllisible,
+        ),
+      );
+      return null;
+    }
+  }
+
+  // -------------------------------------------------------------------
   // La file
   // -------------------------------------------------------------------
 
+  /// Pose [modifications] sur l'écran et dans la file. **Le seul chemin
+  /// d'écriture** : une touche, une case peinte, un raccourci de soixante-deux
+  /// cases et son annulation passent tous par ici, et bénéficient donc de la
+  /// même coalescence, de la même persistance locale et du même traitement des
+  /// refus.
+  ///
+  /// [raccourci] non nul arme la ligne de résultat et son bouton « Annuler ».
+  /// Nul — c'est-à-dire pour toute saisie à la main — la **désarme** : voir
+  /// [EtatSaisie.dernierRaccourci].
   void _poser(
     Map<CreneauCle, DisponibiliteEtat> modifications, {
     DisponibiliteEtat? pinceau,
     CreneauCle? origine,
     int? casesPeintes,
+    RaccourciApplique? raccourci,
+    String? annonce,
   }) {
     final etat = _etat;
     if (etat == null) return;
 
+    if (raccourci == null) _annulationRaccourci = null;
     _file.addAll(modifications);
 
     _publier(
@@ -508,6 +709,10 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
         pinceau: pinceau == null ? null : () => pinceau,
         origine: origine == null ? null : () => origine,
         casesPeintes: casesPeintes,
+        dernierRaccourci: () => raccourci,
+        raccourciEnCours: () => null,
+        messageRaccourci: () => null,
+        annonce: annonce == null ? null : () => annonce,
       ),
     );
   }
