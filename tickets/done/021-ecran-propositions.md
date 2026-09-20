@@ -4,7 +4,8 @@
 - **Priorité** : P0
 - **Dépend de** : 008, 024
 - **Branche** : `feat/021-ecran-propositions`
-- **Statut** : en cours depuis 2026-09-21
+- **PR** : https://github.com/slider973/astreinte-manager/pull/21
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
 Deuxième écran le plus important. Il doit permettre de répondre en deux touches depuis la notification.

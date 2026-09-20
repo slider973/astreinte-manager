@@ -183,7 +183,7 @@ abstract final class AppStrings {
 
   static const String videTitreGenerique = 'Rien à afficher';
   static const String videTexteGenerique = 'Il n\'y a encore rien ici.';
-  static const String videPropositionsTitre = 'Aucune proposition';
+  static const String videPropositionsTitre = 'Aucune proposition en attente';
   static const String videPropositionsTexte =
       'Quand ton chef de centre publiera le planning, tes astreintes '
       'proposées s\'afficheront ici.';
@@ -1712,8 +1712,7 @@ abstract final class AppStrings {
 
   static String planningSectionAttribues(int n) => 'Attribués ($n)';
   static String planningSectionDisponibles(int n) => 'Disponibles ($n)';
-  static String planningSectionNonDisponibles(int n) =>
-      'Non disponibles ($n)';
+  static String planningSectionNonDisponibles(int n) => 'Non disponibles ($n)';
 
   static const String planningAucunAttribue = 'Personne pour l\'instant.';
   static const String planningAttribuer = 'Attribuer';
@@ -1814,8 +1813,9 @@ abstract final class AppStrings {
   /// Ce que le bouton va faire, avant qu'on l'actionne. Le nombre compte les
   /// **membres** : c'est le nombre de téléphones qui vont sonner.
   static String publierDetail(int membres) => switch (membres) {
-    0 => 'Aucun pompier n\'est attribué : le planning deviendra simplement '
-        'visible de tous.',
+    0 =>
+      'Aucun pompier n\'est attribué : le planning deviendra simplement '
+          'visible de tous.',
     1 => '1 pompier recevra une notification.',
     _ => '$membres pompiers recevront une notification.',
   };
@@ -1923,8 +1923,7 @@ abstract final class AppStrings {
   static String suiviRetardataireLigne({
     required int creneaux,
     required String depuis,
-  }) =>
-      '$creneaux créneau${creneaux > 1 ? 'x' : ''} · proposé $depuis';
+  }) => '$creneaux créneau${creneaux > 1 ? 'x' : ''} · proposé $depuis';
 
   static String suiviRelanceLe(String depuis) => 'relancé $depuis';
 
@@ -1973,8 +1972,7 @@ abstract final class AppStrings {
   static const String suiviPersonne = 'personne';
 
   /// « en attente depuis 3 j », « accepté hier », « refusé il y a 2 h ».
-  static String suiviEtatDepuis(String etat, String depuis) =>
-      '$etat $depuis';
+  static String suiviEtatDepuis(String etat, String depuis) => '$etat $depuis';
 
   /// Le motif d'un refus, entre guillemets français.
   static String suiviMotifRefus(String motif) => '« $motif »';
@@ -1994,7 +1992,8 @@ abstract final class AppStrings {
   static String suiviValideLe(String date) =>
       'Planning validé le $date. Tout le monde peut le voir.';
 
-  static const String suiviBrouillonTitre = 'Le planning est encore en '
+  static const String suiviBrouillonTitre =
+      'Le planning est encore en '
       'brouillon';
   static const String suiviBrouillonTexte =
       'Rien n\'est parti : il n\'y a pas encore de réponse à suivre.';
@@ -2008,4 +2007,126 @@ abstract final class AppStrings {
       'Impossible de charger le suivi du planning.';
   static const String suiviReserveAdmin =
       'Le suivi du planning est réservé aux administrateurs de la caserne.';
+
+  // -------------------------------------------------------------------
+  // Les propositions du membre (ticket 021)
+  // -------------------------------------------------------------------
+
+  static const String propositionsTitre = 'Propositions';
+  static const String propositionsRafraichir = 'Rafraîchir la liste';
+
+  /// Le sous-titre d'un en-tête de mois : « 3 propositions ».
+  static String propositionsCompte(int n) =>
+      n <= 1 ? '$n proposition' : '$n propositions';
+
+  // --- La ligne -----------------------------------------------------------
+
+  static const String propositionsAccepter = 'Accepter';
+  static const String propositionsRefuser = 'Refuser';
+
+  /// Chaque bouton nomme **son** créneau : un écran qui annonce quatre fois
+  /// « Accepter » est un écran inutilisable au lecteur d'écran.
+  static String propositionsAccepterCreneau(String creneau) =>
+      'Accepter $creneau';
+  static String propositionsRefuserCreneau(String creneau) =>
+      'Refuser $creneau';
+
+  /// « proposé il y a 2 h », « proposé hier ».
+  ///
+  /// L'ancienneté arrive avec une capitale quand elle vaut « Hier » : elle est
+  /// écrite pour commencer une phrase, pas pour la continuer.
+  static String propositionsProposeeDepuis(String depuis) =>
+      'proposé ${_enMinuscule(depuis)}';
+
+  /// Abaisse la première lettre d'un fragment qui entre dans une phrase.
+  /// Les dates courtes (« 15 sept. ») n'en sont pas affectées.
+  static String _enMinuscule(String texte) =>
+      texte.isEmpty ? texte : '${texte[0].toLowerCase()}${texte.substring(1)}';
+
+  /// « relancé hier », ajouté après le précédent quand la base a compté une
+  /// relance. Le séparateur est un point médian, comme partout ailleurs.
+  static String propositionsRelanceDepuis(String depuis) =>
+      'relancé ${_enMinuscule(depuis)}';
+
+  /// La phrase complète d'une ligne : « Samedi 12 octobre, nuit. Proposé il y
+  /// a 2 h. »
+  static String propositionsLigneSemantique({
+    required String jourEtDate,
+    required String creneau,
+    required String detail,
+  }) {
+    final debut = '$jourEtDate, ${creneau.toLowerCase()}.';
+    return detail.isEmpty
+        ? debut
+        : '$debut ${detail[0].toUpperCase()}${detail.substring(1)}.';
+  }
+
+  // --- Les réponses -------------------------------------------------------
+
+  /// « Samedi 12 octobre, nuit : acceptée. »
+  static String propositionsAcceptee(String creneau) => '$creneau : acceptée.';
+
+  static String propositionsRefusee(String creneau) =>
+      '$creneau : refusée. Ton chef de centre est prévenu.';
+
+  /// Le créneau n'est plus proposé : annulé ou confié à quelqu'un d'autre
+  /// pendant que le pompier lisait sa notification. **Un fait, pas une
+  /// panne** : bannière d'information, jamais de rouge.
+  static const String propositionsDisparue =
+      'Ce créneau ne t\'est plus proposé.';
+
+  /// La seconde ligne de la bannière. Deux lignes au plus : le créneau
+  /// d'abord — c'est ce qu'on cherche — puis la raison en trois mots.
+  static String propositionsDisparueDetail(String creneau) {
+    final debut = '${creneau[0].toUpperCase()}${creneau.substring(1)}';
+    return '$debut : ton chef de centre l\'a repris ou confié à '
+        'quelqu\'un d\'autre.';
+  }
+
+  static const String propositionsDisparueFermer = 'Masquer ce message';
+
+  static const String propositionsEchecTitre = 'Ta réponse n\'est pas partie.';
+
+  /// Le mois s'est validé sur cette réponse : c'était la dernière qu'il
+  /// attendait. Le seul endroit où cet écran parle du planning entier.
+  static String propositionsPlanningValide(String mois) =>
+      'Planning ${moisAvecDe(mois)} validé : tout le monde peut le voir '
+      'maintenant.';
+  static const String propositionsPlanningValideFermer = 'Masquer ce message';
+
+  // --- Les empêchements ---------------------------------------------------
+
+  static const String propositionsHorsLigneRaison =
+      'Une réponse a besoin du réseau. Elle repartira dès qu\'il revient.';
+  static const String propositionsLectureSeuleRaison =
+      'Caserne suspendue : les réponses sont bloquées. Contacte ton chef de '
+      'centre.';
+  static const String propositionsErreurTexte =
+      'Impossible de charger tes propositions.';
+  static const String propositionsVideAction = 'Voir mon mois';
+
+  // --- La feuille de refus ------------------------------------------------
+
+  /// Le titre dit ce que la feuille va faire, jamais « Êtes-vous sûr ? ».
+  static String refusTitre(String creneau) => 'Refuser $creneau';
+
+  static const String refusMotifLibelle = 'Motif (facultatif)';
+  static const String refusMotifInvite = 'ex. en formation ce week-end';
+  static const String refusMotifAide =
+      'Ton chef de centre le verra en cherchant quelqu\'un d\'autre.';
+
+  /// Le bouton qui recule **nomme l'action**, il ne dit pas « Annuler ».
+  static const String refusGarder = 'Garder le créneau';
+  static const String refusConfirmer = 'Refuser le créneau';
+
+  /// Un refus ne se reprend pas : `declined` est terminal
+  /// (`docs/WORKFLOWS.md § 3`). Le dire avant vaut mieux que de proposer une
+  /// annulation qui échouerait.
+  static const String refusDefinitif =
+      'Un refus ne se reprend pas. Ton chef de centre proposera le créneau à '
+      'quelqu\'un d\'autre.';
+
+  /// La limite du motif : court par construction, parce qu'il se lit dans une
+  /// liste de trente lignes.
+  static const int refusMotifLongueurMax = 120;
 }

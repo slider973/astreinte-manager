@@ -156,7 +156,7 @@ class PlanningBrouillon {
   factory PlanningBrouillon.depuisJson(Map<String, dynamic> ligne) =>
       PlanningBrouillon(
         id: ligne['id']! as String,
-        etat: _etatDepuisSql(ligne['status'] as String?),
+        etat: PlanningSql.depuisSql(ligne['status'] as String?),
         publieLe: _instant(ligne['published_at']),
         valideLe: _instant(ligne['validated_at']),
       );
@@ -180,13 +180,6 @@ class PlanningBrouillon {
   static DateTime? _instant(Object? valeur) =>
       valeur is String ? DateTime.tryParse(valeur)?.toLocal() : null;
 
-  static PlanningEtat _etatDepuisSql(String? valeur) => switch (valeur) {
-    'draft' => PlanningEtat.brouillon,
-    'published' => PlanningEtat.publie,
-    'validated' => PlanningEtat.valide,
-    'archived' => PlanningEtat.archive,
-    _ => PlanningEtat.publie,
-  };
 }
 
 /// La date ISO d'un créneau, pour l'écriture. Le mois vient de la période :
