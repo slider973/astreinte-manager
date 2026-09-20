@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 021 | [Écran des propositions pour le membre](in-progress/021-ecran-propositions.md) | P0 | 008 024 |  |
 
 ## À faire
 
@@ -14,7 +15,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 007 | [Profil utilisateur](backlog/007-profil.md) | P1 | 005 |  |
 | 018 | [Proposition automatique de remplissage](backlog/018-proposition-automatique.md) | P1 | 017 |  |
 | 020 | [Réattribution d'un créneau refusé ou modifié](backlog/020-reattribution.md) | P0 | 019 |  |
-| 021 | [Écran des propositions pour le membre](backlog/021-ecran-propositions.md) | P0 | 008 024 |  |
 | 022 | [Relances automatiques](backlog/022-relances-auto.md) | P0 | 019 025 |  |
 | 023 | [Vue du planning de la caserne pour les membres](backlog/023-planning-caserne.md) | P1 | 019 |  |
 | 027 | [Écran Mes astreintes](backlog/027-mes-astreintes.md) | P0 | 021 |  |
