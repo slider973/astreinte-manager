@@ -77,48 +77,79 @@ L'ordre de lecture devient : *quel mois* → *comment remplir vite* → **combie
 vraiment** → *le détail jour par jour*. C'est l'ordre du sens : on déclare une intention, puis on
 la détaille.
 
-**Ce que cette place coûte, et comment il est payé.** La section complète mesure environ 230 dp,
-soit quatre lignes de jour. C'est trop cher pour être payé tous les mois. D'où deux formes :
+**Ce que cette place coûte, et comment il est payé.** Mesuré sur le build web, iPhone de
+390 × 844 : la section avec ses contrôles et son commentaire fait **330 dp**, six lignes de jour.
+Trop cher pour être payé tous les mois, au-dessus de l'écran le plus ouvert du produit. Deux
+leviers, tous deux vérifiés au navigateur.
 
-| Forme | Quand | Hauteur |
+**Premier levier : deux formes.**
+
+| Forme | Quand | Hauteur mesurée |
 |---|---|---|
-| **Complète** | tant qu'aucune ligne de préférences n'existe pour ce mois — donc au premier passage, y compris quand les valeurs sont reprises du mois précédent | ~230 dp |
-| **Résumée** | dès qu'une ligne existe : le membre s'est déjà prononcé | **56 dp**, une ligne de jour |
+| **Compacte** — le titre, la valeur, la leçon, l'écart, le commentaire tronqué | au repos, toujours, en `compact` et `medium` | **94 dp** sans leçon, **150 dp** avec |
+| **Complète** — la compacte plus les deux contrôles et le champ de commentaire | au toucher, et en permanence dans le panneau `large` | ~330 dp |
 
-La forme résumée n'est pas un repli qui cache : elle **énonce les valeurs** — « Au maximum :
-4 astreintes, 1 weekend » — et elle s'ouvre d'une touche sur toute sa largeur. Ce qu'elle range,
-c'est l'explication et les contrôles, pas l'information.
+La forme compacte ne cache pas l'information : elle **énonce les valeurs** — « 4 astreintes,
+1 weekend » —, la leçon, l'écart et le commentaire. Ce qu'elle range, ce sont les **contrôles**,
+qui n'ont de sens qu'au moment où on les touche. Toute sa surface ouvre la forme complète.
 
-En `large`, la section est **toujours complète** : le panneau a la place, et rien n'y est en
-concurrence avec la grille.
+**Second levier : elle arrive quand elle a quelque chose à dire.** Tant que le mois est vierge,
+la section n'existe pas — il n'y a rien à plafonner, et le bloc d'aide du 011 (« Appuie sur une
+case… ») tient le haut de l'écran pour apprendre le geste. Deux leçons empilées au-dessus d'une
+grille, ce sont deux leçons non lues.
+
+Elle apparaît **à la première case posée**. Pour le membre que ce ticket vise, c'est la seconde
+exacte où son raccourci vient de cocher tous ses weekends : la leçon arrive avec l'écart qu'elle
+explique, pas avant. Son apparition est **figée le temps d'un geste** — la faire naître sous un
+doigt qui peint déplacerait la grille de 94 dp au pire moment (même précaution que le bloc d'aide,
+011 § 6.7).
+
+En `large`, la section est **toujours complète**, sous les compteurs, à la place exacte que le 011
+lui avait réservée : le panneau a la place, et rien n'y est en concurrence avec la grille.
 
 ## 4. La composition de la section
 
 Un **bloc réglé** (`DESIGN.md § Cards / Containers`) : fond `surface`, filet 1 dp
 `outline-variant`, rayon 8, aucune ombre. Marge de page de sa classe de fenêtre.
 
-### 4.1 Forme complète, de haut en bas
+### 4.1 Les deux formes, de haut en bas
+
+**Compacte** — toute la surface est une cible, et elle ouvre la complète.
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ Ce mois, je veux faire au maximum               │  titre-bloc 18/600
+│ Ce mois, je veux faire au maximum            ›  │  titre-bloc 18/600
+│ 4 astreintes, 1 weekend                         │  corps 16
 │                                                 │
-│ Cocher tous tes weekends ne t'engage pas à      │  corps-secondaire 14
-│ tous les faire. Dis ici combien tu en veux      │  on-surface-variant
-│ vraiment : c'est ce que ton chef regarde.       │
-│                                                 │
+│ Cocher tous tes weekends ne t'engage pas à      │  corps-secondaire 14,
+│ tous les faire. Dis ici combien tu en veux      │  tant que le membre ne
+│ vraiment.                                       │  s'est pas prononcé
+│ ⟲ Repris d'octobre. Change-le si ce n'est plus  │  s'il y a reprise
+│   vrai.                                         │
+│ Pas plus d'un weekend, garde des enfants.       │  commentaire, 2 lignes
+│ ┌─────────────────────────────────────────────┐ │
+│ │ ⓘ Tu as coché 5 weekends pour 1 voulu.      │ │  ligne d'écart (§ 4.4)
+│ │   C'est normal : tu laisses le choix à ton  │ │
+│ │   chef.                                     │ │
+│ └─────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────┘
+```
+
+**Complète** — la même chose, plus les contrôles.
+
+```
+│ Ce mois, je veux faire au maximum               │
+│ Cocher tous tes weekends ne t'engage pas…       │
+│ ⟲ Repris d'octobre…                             │
 │ ─────────────────────────────────────────────── │  filet 1 dp
-│ Astreintes                            4      › │  56 dp, touchable
+│ Astreintes                            4      ›  │  56 dp, touchable
 │ 33 cochées ce mois                              │
 │ ─────────────────────────────────────────────── │
-│ Weekends                              1      › │  56 dp, touchable
+│ Weekends                              1      ›  │  56 dp, touchable
 │ 5 cochés ce mois                                │
+│   ⓘ écart                                       │
 │ ─────────────────────────────────────────────── │
-│ ⓘ Tu as coché 5 weekends pour 1 voulu.          │  ligne d'écart
-│   C'est normal : tu laisses le choix à ton chef.│  (§ 4.4)
-│ ─────────────────────────────────────────────── │
-│ 💬 Un mot pour ton chef                      › │  56 dp, touchable
-└─────────────────────────────────────────────────┘
+│ Un mot pour ton chef                         ›  │  56 dp, ou le champ
 ```
 
 Rythme : 16 de rembourrage, 24 au-dessus du titre et 8 en dessous, filets pleine largeur entre
@@ -182,7 +213,8 @@ Elle n'existe **que** quand un plafond est posé et que le coché le dépasse.
 
 > ⓘ Tu as coché 5 weekends pour 1 voulu. C'est normal : tu laisses le choix à ton chef.
 
-Elle est en **`etat-info`** (`#0F5C7A` sur `#CDE7F2`, 7.41:1) avec `Icons.info_outline`. **Jamais
+Elle est en encre d'information — le descripteur de la période ouverte, `#052B3B` sur `#CDE7F2`,
+**11.52:1** — avec `Icons.info_outline`. **Jamais
 en rouge, jamais en ocre, jamais un avertissement** : l'écart n'est pas une faute, c'est le
 comportement que le produit cherche à obtenir. Une alerte ici ferait exactement le contraire de ce
 que le ticket veut — elle apprendrait au membre à décocher.
@@ -263,7 +295,7 @@ Concrètement, dans `SaisieController` :
   peindre dix cases dans la même seconde coûte donc **trois requêtes au plus, en parallèle**, et
   **une** transition d'indicateur ;
 - `_persister` garde la préférence en attente dans `localStorage` à côté de la file, sous
-  `dispos.prefs.<caserne>.<membre>.<AAAA-MM>`. La bannière hors ligne promet que rien n'est perdu :
+  `dispos.prefs.<caserne>.<membre>.<période>`. La bannière hors ligne promet que rien n'est perdu :
   elle doit être vraie pour un maximum comme pour une case ;
 - le refus RLS se détecte comme ailleurs, **en comptant les lignes rendues** : la clause `using`
   d'une politique filtre sans lever, et un `upsert` refusé répond « 0 ligne, tout va bien »
@@ -283,13 +315,14 @@ arrière : c'est la règle du 011 § 5.3, et elle vaut ici.
 Comme la grille et comme les raccourcis du 012 : **la section reste en place, en lecture seule.**
 
 - Les deux rangées perdent leur chevron, leur `InkWell` et leur focus ; elles gardent leurs
-  nombres, parfaitement lisibles.
+  nombres, parfaitement lisibles. La leçon disparaît : il n'y a plus rien à apprendre sur un mois
+  qu'on ne peut plus changer.
 - Le commentaire reste affiché **en entier** : ce sont les mots du membre, il a le droit de les
   relire.
 - La raison est écrite juste en dessous : « Mois verrouillé : tu ne peux plus changer tes
   maximums. » (`DESIGN.md § Do` — un contrôle inerte dit pourquoi, à côté du contrôle).
-- Forme **toujours complète** sur un mois verrouillé : la forme résumée ne sert qu'à récupérer de
-  la place pour saisir, et il n'y a plus rien à saisir.
+- La forme compacte reste le défaut, et elle s'ouvre de la même façon : sur un mois verrouillé, le
+  membre vient **relire**, et le commentaire entier l'attend dans la forme complète.
 - Rien de vide et de muet : sans préférence enregistrée, « Aucun maximum indiqué pour ce mois. »
 - Le contrôleur garde la règle une seconde fois : aucune écriture n'est tentée sur un mois non
   modifiable, même appelée par un autre chemin.
@@ -298,16 +331,17 @@ Comme la grille et comme les raccourcis du 012 : **la section reste en place, en
 
 | État | Rendu |
 |---|---|
-| **Vierge, jamais repris** | Forme complète, « autant que nécessaire » aux deux rangées, leçon visible, pas de ligne d'écart. |
-| **Repris du mois précédent** | Forme complète + rangée « Repris de septembre. Change-le si ce n'est plus vrai. » |
-| **Réglé** | Forme résumée : « Au maximum : 4 astreintes, 1 weekend », plus le commentaire tronqué s'il existe. |
-| **Réglé, sans limite** | Forme résumée : « Au maximum : autant que nécessaire. » |
-| **Écart** | Ligne d'écart en `etat-info`, dans la forme complète ; le rapport `5 / 1` reste visible dans la barre du bas dans les deux formes. |
+| **Mois vierge** | La section n'existe pas : rien de coché, rien à plafonner (§ 3). |
+| **Vierge, jamais repris** | Forme compacte, « autant que nécessaire », leçon visible, pas de ligne d'écart. |
+| **Repris du mois précédent** | Forme compacte + « Repris de septembre. Change-le si ce n'est plus vrai. » |
+| **Réglé** | Forme compacte : « 4 astreintes, 1 weekend », plus le commentaire tronqué s'il existe, et plus de leçon. |
+| **Réglé, sans limite** | Forme compacte : « autant que nécessaire ». |
+| **Écart** | Ligne d'écart en `etat-info`, dans les deux formes ; le rapport `6 / 1` reste visible dans la barre du bas quelle que soit la forme. |
 | **Feuille ouverte** | Titre = le plafond réglé, valeur courante cochée. |
 | **Enregistrement** | L'indicateur de la barre du bas, partagé avec la grille. |
 | **Échec** | Filet 2 dp `error` sur la section, valeur conservée, bannière et « Réessayer » de l'écran. |
 | **Hors ligne** | Rien de particulier : la préférence s'empile comme une case et part au retour du réseau. |
-| **Verrouillé / lecture seule** | § 8. |
+| **Verrouillé / lecture seule** | § 8. Sans préférence enregistrée, la section n'apparaît pas : poser une question sans réponse possible ne sert personne. |
 | **Chargement** | La section n'apparaît qu'avec l'état : pas de squelette pour 56 dp. |
 
 ## 10. Textes
@@ -349,6 +383,7 @@ suppression de ligne de préférence. Un second minuteur d'enregistrement.
 
 ## 12. Tests attendus
 
+- Mois vierge : la section n'est pas à l'écran ; elle apparaît à la première case cochée.
 - Mois sans préférence et sans mois précédent : deux « autant que nécessaire », aucune écriture.
 - Mois précédent renseigné : les trois valeurs sont reprises, **écrites**, et la mention « Repris
   de » est à l'écran.
@@ -370,7 +405,8 @@ suppression de ligne de préférence. Un second minuteur d'enregistrement.
 
 | Point | Ce que disait la référence | Ce que fait ce brief | Pourquoi |
 |---|---|---|---|
-| Place de la section en `compact`/`medium` | 011 § 4 : sous le dernier jour du mois | entre les raccourcis et l'en-tête épinglé, en deux formes (complète / résumée à 56 dp) | Trois écrans de défilement contre deux touches de raccourci : la section ne serait jamais vue par la personne que le ticket vise (§ 3). |
+| Place de la section en `compact`/`medium` | 011 § 4 : sous le dernier jour du mois | entre les raccourcis et l'en-tête épinglé, en deux formes (compacte 94 dp / complète au toucher) | Trois écrans de défilement contre deux touches de raccourci : la section ne serait jamais vue par la personne que le ticket vise (§ 3). |
+| Présence de la section | 011 § 4 : un emplacement permanent | **rien tant que le mois est vierge** | Deux blocs d'apprentissage empilés au-dessus de la grille sont deux blocs non lus. La section naît avec la première case, c'est-à-dire avec la question qu'elle pose (§ 3). |
 | Marqueur « quota atteint » sur `CountStat` | 011 § 6.4 : le 013 l'ajoute | non livré | Dépasser son maximum est ici le résultat recherché (`PRD § 7.4`). Le marqueur appartient à la matrice admin du 016 (§ 5). |
 | Plafond sur les trois compteurs | 011 § 6.4 : « 013 n'a qu'à le remplir » | seul **Weekends** le reçoit | Aucun compteur ne totalise les astreintes, et un quatrième coûterait 40 dp de grille en permanence (§ 5). |
 | Retour au vide = suppression de la ligne | 011 § 7.1, pour `availabilities` | **jamais** de suppression de préférence | « A dit : sans limite » n'est pas « n'a rien dit » : supprimer relancerait la reprise du mois précédent au prochain chargement (§ 6). |
@@ -380,7 +416,7 @@ suppression de ligne de préférence. Un second minuteur d'enregistrement.
 
 | Point | État |
 |---|---|
-| **Contraste** | Aucune encre nouvelle. Ligne d'écart `#0F5C7A` sur `#CDE7F2` (7.41:1) ; sous-lignes `on-surface-variant` sur `surface` (7.94:1) ; filet d'erreur `error` (7.47:1). ✓ |
+| **Contraste** | Aucune encre nouvelle. Ligne d'écart `#052B3B` sur `#CDE7F2` (11.52:1) ; sous-lignes `on-surface-variant` sur `surface` (7.94:1) ; filet d'erreur `error` (7.47:1). ✓ |
 | **Profondeur** | Aucune ombre. Bloc réglé, filets, rangées séparées par un trait. La feuille de bas d'écran est le seul niveau 3, et elle existait déjà. ✓ |
 | **Espacement** | Échelle de 4. Rangées 56 dp, 24 au-dessus du titre, 8 en dessous, 16 de rembourrage. ✓ |
 | **Typographie** | `titre-bloc`, `corps-secondaire`, `nombre` mono tabulaire sur les plafonds et les comptes. Rien sous 14 sp. Prose bornée à 420 dp. ✓ |
