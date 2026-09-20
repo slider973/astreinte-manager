@@ -6,13 +6,13 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 017 | [Construction du planning en brouillon](in-progress/017-brouillon-attribution.md) | P0 | 016 |  |
 
 ## À faire
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 007 | [Profil utilisateur](backlog/007-profil.md) | P1 | 005 |  |
-| 017 | [Construction du planning en brouillon](backlog/017-brouillon-attribution.md) | P0 | 016 |  |
 | 018 | [Proposition automatique de remplissage](backlog/018-proposition-automatique.md) | P1 | 017 |  |
 | 019 | [Publication et suivi des réponses](backlog/019-publication-suivi.md) | P0 | 017 025 |  |
 | 020 | [Réattribution d'un créneau refusé ou modifié](backlog/020-reattribution.md) | P0 | 019 |  |

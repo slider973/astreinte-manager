@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 016
 - **Branche** : `feat/017-brouillon-attribution`
+- **Statut** : en cours depuis 2026-09-20
 
 ## À faire
 - Création du planning du mois : génère les `shifts` (chaque jour × jour/nuit) avec `required_count` depuis les settings et les surcharges.
