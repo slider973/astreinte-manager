@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : aucune
 - **Branche** : `feat/002-supabase-migrations`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/2
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte
