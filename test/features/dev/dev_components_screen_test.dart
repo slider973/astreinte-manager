@@ -1,6 +1,7 @@
 import 'package:astreinte_sp/core/env.dart';
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
+import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/theme/app_theme.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
 import 'package:astreinte_sp/core/widgets/count_stat.dart';
@@ -11,7 +12,6 @@ import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/core/widgets/save_indicator.dart';
 import 'package:astreinte_sp/core/widgets/slot_chip.dart';
 import 'package:astreinte_sp/core/widgets/status_badge.dart';
-import 'package:astreinte_sp/features/auth/data/auth_providers.dart';
 import 'package:astreinte_sp/features/dev/presentation/dev_components_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

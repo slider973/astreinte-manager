@@ -1,7 +1,7 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
+import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
-import 'package:astreinte_sp/features/auth/domain/appartenance.dart';
-import 'package:astreinte_sp/features/auth/domain/auth_erreur.dart';
 import 'package:astreinte_sp/features/auth/presentation/aucune_caserne_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/connexion_screen.dart';
 import 'package:astreinte_sp/features/demarrage/presentation/demarrage_screen.dart';

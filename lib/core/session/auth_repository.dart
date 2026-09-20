@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../domain/auth_erreur.dart';
-import '../domain/session_utilisateur.dart';
+import 'auth_erreur.dart';
+import 'session_utilisateur.dart';
 
 /// Tout ce que l'app sait faire de l'authentification.
 ///

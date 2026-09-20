@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/l10n/app_strings.dart';
+import '../l10n/app_strings.dart';
 
 /// L'étape où l'erreur est survenue. Le même code HTTP ne dit pas la même
 /// chose selon qu'on demandait un code ou qu'on le vérifiait.
@@ -17,7 +17,14 @@ enum AuthEtape { envoi, verification }
 enum AuthErreur {
   emailInvalide(AppStrings.authEmailInvalide),
   compteInconnu(AppStrings.authCompteInconnu),
+
+  /// Code faux **ou** périmé. GoTrue répond la même chose aux deux : un 403
+  /// `otp_expired` dont le message est « Token has expired or is invalid ».
+  /// Prétendre distinguer les deux, c'est deviner ; le message nomme donc les
+  /// deux causes et les deux sorties.
   codeInvalide(AppStrings.authCodeInvalide),
+
+  /// Réservé au cas où le serveur dirait un jour « périmé » sans « invalide ».
   codeExpire(AppStrings.authCodeExpire),
   tropDeTentatives(AppStrings.authTropDeTentatives),
   reseau(AppStrings.erreurReseauTexte),
@@ -73,7 +80,9 @@ AuthErreur traduireErreurAuth(Object erreur, {required AuthEtape etape}) {
 
   switch (erreur.code) {
     case 'otp_expired':
-      return AuthErreur.codeExpire;
+      // Vérifié en bout en bout contre la pile locale : un code faux tapé à
+      // la main revient avec ce code-là, pas avec un code « invalide ».
+      return AuthErreur.codeInvalide;
     case 'otp_disabled':
     case 'signup_disabled':
     case 'email_provider_disabled':
@@ -90,7 +99,12 @@ AuthErreur traduireErreurAuth(Object erreur, {required AuthEtape etape}) {
   if (erreur.statusCode == '429') return AuthErreur.tropDeTentatives;
 
   final message = erreur.message.toLowerCase();
-  if (message.contains('expired')) return AuthErreur.codeExpire;
+  if (message.contains('expired') && !message.contains('invalid')) {
+    return AuthErreur.codeExpire;
+  }
+  if (message.contains('invalid') && etape == AuthEtape.verification) {
+    return AuthErreur.codeInvalide;
+  }
   if (message.contains('signups not allowed') ||
       message.contains('user not found')) {
     return AuthErreur.compteInconnu;

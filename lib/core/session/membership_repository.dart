@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../domain/appartenance.dart';
-import '../domain/auth_erreur.dart';
+import 'appartenance.dart';
+import 'auth_erreur.dart';
 
 /// Lecture des appartenances de l'utilisateur connecté.
 abstract interface class MembershipRepository {

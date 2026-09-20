@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:astreinte_sp/features/auth/domain/auth_erreur.dart';
+import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/features/auth/domain/email.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -8,10 +8,30 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
   group('traduireErreurAuth', () {
-    test('un code périmé est nommé comme tel', () {
+    test('un code faux et un code périmé partagent le même message', () {
+      // GoTrue répond la même chose aux deux : prétendre les distinguer
+      // reviendrait à deviner devant l'utilisateur.
       expect(
         traduireErreurAuth(
-          const AuthException('Token has expired', code: 'otp_expired'),
+          const AuthException(
+            'Token has expired or is invalid',
+            statusCode: '403',
+            code: 'otp_expired',
+          ),
+          etape: AuthEtape.verification,
+        ),
+        AuthErreur.codeInvalide,
+      );
+      expect(
+        AuthErreur.codeInvalide.message,
+        allOf(contains('incorrect'), contains('expiré')),
+      );
+    });
+
+    test('un serveur qui ne dirait que « périmé » est entendu', () {
+      expect(
+        traduireErreurAuth(
+          const AuthException('Token has expired', statusCode: '403'),
           etape: AuthEtape.verification,
         ),
         AuthErreur.codeExpire,

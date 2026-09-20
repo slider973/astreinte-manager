@@ -1,9 +1,9 @@
 import 'package:astreinte_sp/app.dart';
 import 'package:astreinte_sp/core/env.dart';
+import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/supabase/supabase_bootstrap.dart';
 import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
-import 'package:astreinte_sp/features/auth/data/auth_providers.dart';
-import 'package:astreinte_sp/features/auth/domain/appartenance.dart';
 import 'package:astreinte_sp/features/auth/presentation/connexion_screen.dart';
 import 'package:astreinte_sp/features/demarrage/presentation/configuration_absente_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

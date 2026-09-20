@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../core/l10n/app_strings.dart';
+import '../l10n/app_strings.dart';
 
 /// `membership_role` (`docs/SCHEMA.md § 1`).
 enum RoleMembre {

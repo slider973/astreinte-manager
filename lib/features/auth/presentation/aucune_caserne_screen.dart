@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/session/appartenance.dart';
+import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/primary_button.dart';
-import '../data/auth_providers.dart';
-import '../domain/appartenance.dart';
 
 /// Connecté, mais rattaché à aucune caserne active.
 ///

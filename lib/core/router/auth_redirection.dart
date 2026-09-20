@@ -1,4 +1,4 @@
-import '../../features/auth/domain/etat_auth.dart';
+import '../session/etat_auth.dart';
 import 'app_router.dart';
 
 /// Où l'état d'authentification oblige à aller, ou `null` pour « reste ici ».

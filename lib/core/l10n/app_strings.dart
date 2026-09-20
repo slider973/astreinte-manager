@@ -206,8 +206,12 @@ abstract final class AppStrings {
       'centre.';
   static const String authCodeIncomplet =
       'Il manque des chiffres. Le code en compte six.';
+  /// Couvre le code faux **et** le code périmé : le serveur ne les distingue
+  /// pas (voir `AuthErreur.codeInvalide`). La phrase nomme donc les deux
+  /// causes et les deux sorties.
   static const String authCodeInvalide =
-      'Code incorrect. Vérifie les 6 chiffres ou demande un nouveau code.';
+      'Code incorrect ou expiré. Vérifie les 6 chiffres ou demande un nouveau '
+      'code.';
   static const String authCodeExpire =
       'Ce code a expiré. Demande un nouveau code.';
   static const String authTropDeTentatives =

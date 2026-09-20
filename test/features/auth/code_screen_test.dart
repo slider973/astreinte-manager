@@ -1,7 +1,7 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
+import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
-import 'package:astreinte_sp/features/auth/domain/appartenance.dart';
-import 'package:astreinte_sp/features/auth/domain/auth_erreur.dart';
 import 'package:astreinte_sp/features/auth/presentation/code_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/connexion_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/controllers/code_controller.dart';
@@ -83,7 +83,7 @@ void main() {
       await demonter(tester);
     });
 
-    testWidgets('un code expiré le dit et renvoie vers un nouveau code', (
+    testWidgets('un code périmé le dit et renvoie vers un nouveau code', (
       tester,
     ) async {
       await allerAuCode(tester, erreurVerification: AuthErreur.codeExpire);

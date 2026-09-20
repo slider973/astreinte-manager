@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/supabase/supabase_bootstrap.dart';
-import '../domain/appartenance.dart';
-import '../domain/etat_auth.dart';
-import '../domain/session_utilisateur.dart';
+import '../supabase/supabase_bootstrap.dart';
+import 'appartenance.dart';
 import 'auth_repository.dart';
+import 'etat_auth.dart';
 import 'membership_repository.dart';
+import 'session_utilisateur.dart';
 
 /// Le dépôt d'authentification. Surchargé par un faux dans les tests.
 final Provider<AuthRepository> authRepositoryProvider = Provider<AuthRepository>(

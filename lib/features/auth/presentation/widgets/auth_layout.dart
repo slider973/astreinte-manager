@@ -45,29 +45,40 @@ class AuthLayout extends StatelessWidget {
           children: <Widget>[
             ?banniere,
             Expanded(
-              child: SingleChildScrollView(
-                child: Center(
+              // Centré quand la place le permet, défilant dès que le clavier
+              // ou une grande échelle de texte mange la hauteur : sur un
+              // écran de bureau, une colonne de 420 collée en haut laisse un
+              // demi-écran de vide.
+              child: LayoutBuilder(
+                builder: (context, contraintes) => SingleChildScrollView(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: marge,
-                        vertical: AppSpacing.xl,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          ?enTete,
-                          Semantics(
-                            header: true,
-                            child: Text(
-                              titre,
-                              style: theme.textTheme.headlineMedium,
-                            ),
+                    constraints: BoxConstraints(
+                      minHeight: contraintes.maxHeight,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: marge,
+                            vertical: AppSpacing.xl,
                           ),
-                          const SizedBox(height: AppSpacing.sousTitre),
-                          ...children,
-                        ],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: <Widget>[
+                              ?enTete,
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  titre,
+                                  style: theme.textTheme.headlineMedium,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sousTitre),
+                              ...children,
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),

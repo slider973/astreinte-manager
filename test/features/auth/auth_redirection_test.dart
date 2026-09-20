@@ -1,6 +1,6 @@
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/router/auth_redirection.dart';
-import 'package:astreinte_sp/features/auth/domain/etat_auth.dart';
+import 'package:astreinte_sp/core/session/etat_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

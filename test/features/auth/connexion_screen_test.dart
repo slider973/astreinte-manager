@@ -1,5 +1,5 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
-import 'package:astreinte_sp/features/auth/domain/auth_erreur.dart';
+import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/features/auth/presentation/code_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/connexion_screen.dart';
 import 'package:flutter/material.dart';

@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/accueil/presentation/accueil_screen.dart';
-import '../../features/auth/data/auth_providers.dart';
-import '../../features/auth/domain/etat_auth.dart';
 import '../../features/auth/presentation/aucune_caserne_screen.dart';
 import '../../features/auth/presentation/code_screen.dart';
 import '../../features/auth/presentation/connexion_screen.dart';
@@ -12,6 +10,8 @@ import '../../features/demarrage/presentation/configuration_absente_screen.dart'
 import '../../features/demarrage/presentation/demarrage_screen.dart';
 import '../../features/dev/presentation/dev_components_screen.dart';
 import '../env.dart';
+import '../session/etat_auth.dart';
+import '../session/session_providers.dart';
 import '../supabase/supabase_bootstrap.dart';
 import 'auth_redirection.dart';
 
