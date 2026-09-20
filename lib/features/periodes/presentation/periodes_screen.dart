@@ -351,6 +351,7 @@ class _ListePeriodes extends StatelessWidget {
             children: <Widget>[
               LignePeriode(
                 periode: periode,
+                taux: donnees.tauxDe(periode),
                 occupee: occupee == periode.id,
                 onVerrouiller: () => onVerrouiller(periode),
                 onRouvrir: () => onRouvrir(periode),

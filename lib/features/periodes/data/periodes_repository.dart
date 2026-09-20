@@ -4,6 +4,7 @@ import '../../../core/l10n/app_strings.dart';
 import '../../../core/supabase/enums.dart';
 import '../../../core/theme/app_status.dart';
 import '../../dispos/domain/periode_saisie.dart';
+import '../domain/taux_saisie.dart';
 
 /// Pourquoi la base a refusé une action sur une période.
 ///
@@ -34,6 +35,12 @@ enum ErreurPeriodes {
   /// repousser la date limite est une action que la tâche horaire défait dans
   /// l'heure.
   dateLimitePassee(AppStrings.periodeRefusDeadlinePassee),
+
+  /// `period_deadline_in_past` (migration `0013`) : la même règle, sur un mois
+  /// **déjà ouvert**. L'écran y arrive quand deux adjoints agissent en même
+  /// temps — le second croit rouvrir un mois que le premier vient de rouvrir,
+  /// et sa date limite, elle, est restée dans le passé.
+  dateLimiteDansLePasse(AppStrings.periodeRefusDeadlineDansLePasse),
 
   /// Réseau, panne, réponse illisible : la sortie est la même, réessayer.
   inconnue(AppStrings.periodeEchecGenerique);
@@ -93,19 +100,15 @@ abstract interface class PeriodesRepository {
     required DateTime dateLimite,
   });
 
-  /// Les membres **actifs** de la caserne : le dénominateur du taux de saisie.
+  /// Le taux de saisie de **toutes** les périodes de la caserne, par
+  /// identifiant de période, en une seule requête.
   ///
-  /// Des identifiants et non un compte, parce que le numérateur doit s'y
-  /// intersecter : un membre désactivé qui avait saisi son mois compterait
-  /// sinon dans « 10 membres sur 9 ».
-  Future<Set<String>> membresActifs(String stationId);
-
-  /// Les membres ayant au moins une disponibilité saisie sur ce mois.
-  Future<Set<String>> membresAyantSaisi({
-    required String stationId,
-    required int annee,
-    required int mois,
-  });
+  /// Les deux nombres sont comptés **en base** (`v_period_completion`,
+  /// migration `0013`). Ils ne se comptent plus côté client : PostgREST
+  /// plafonne une réponse à mille lignes et rend `200` sans rien signaler, et
+  /// à soixante-deux lignes de disponibilités par membre et par mois, le
+  /// compte devenait faux dès dix-sept membres.
+  Future<Map<String, TauxSaisie>> tauxParPeriode(String stationId);
 }
 
 /// Implémentation Supabase.
@@ -123,6 +126,11 @@ class SupabasePeriodesRepository implements PeriodesRepository {
   /// lecteur : elles ne sont pas demandées.
   static const String _colonnes =
       'id, station_id, year, month, status, deadline_at, locked_at';
+
+  /// Les colonnes de `v_period_completion` (§ 6). `station_id` sert au filtre,
+  /// pas à l'affichage : il n'est pas demandé.
+  static const String _colonnesTaux =
+      'period_id, year, month, active_members, members_with_availability';
 
   @override
   Future<List<PeriodeSaisie>> lister(String stationId) async {
@@ -220,56 +228,37 @@ class SupabasePeriodesRepository implements PeriodesRepository {
   }
 
   @override
-  Future<Set<String>> membresActifs(String stationId) async {
+  Future<Map<String, TauxSaisie>> tauxParPeriode(String stationId) async {
     try {
+      // **Une requête pour tout l'écran.** Le coût ne dépend plus de
+      // l'effectif de la caserne — deux nombres par période, comptés en base —
+      // mais du seul nombre de mois, et la réponse ne peut plus être tronquée
+      // en silence (`docs/SCHEMA.md § 6`).
       final lignes = await _client
-          .from('memberships')
-          .select('user_id')
-          .eq('station_id', stationId)
-          .eq('status', 'active');
-      return _identifiants(lignes);
-    } on Object catch (echec) {
-      throw _traduire(echec);
-    }
-  }
+          .from('v_period_completion')
+          .select(_colonnesTaux)
+          .eq('station_id', stationId);
 
-  @override
-  Future<Set<String>> membresAyantSaisi({
-    required String stationId,
-    required int annee,
-    required int mois,
-  }) async {
-    try {
-      // **Une requête par mois affiché, et seulement les mois affichés**
-      // (`design/014 § 7`). Une seule colonne est demandée : la réponse tient
-      // en un identifiant par ligne saisie, et le comptage des membres
-      // distincts se fait ici. Le jour où la matrice admin aura besoin des
-      // mêmes chiffres, une vue les rendra en une ligne par mois.
-      final lignes = await _client
-          .from('availabilities')
-          .select('user_id')
-          .eq('station_id', stationId)
-          .gte('date', _premierJour(annee, mois))
-          .lt('date', _premierJour(annee, mois + 1));
-
-      return _identifiants(lignes);
-    } on Object catch (echec) {
-      throw _traduire(echec);
-    }
-  }
-
-  static Set<String> _identifiants(List<Map<String, dynamic>> lignes) =>
-      <String>{
+      return <String, TauxSaisie>{
         for (final ligne in lignes)
-          if (ligne['user_id'] is String) ligne['user_id']! as String,
+          if (ligne['period_id'] is String)
+            ligne['period_id']! as String: TauxSaisie(
+              saisis: _entier(ligne['members_with_availability']),
+              effectif: _entier(ligne['active_members']),
+            ),
       };
-
-  /// Le premier jour d'un mois, au format d'une colonne `date`. `mois + 1`
-  /// vaut 13 en décembre : `DateTime` le normalise en janvier suivant.
-  static String _premierJour(int annee, int mois) {
-    final jour = DateTime(annee, mois);
-    return '${jour.year}-${jour.month.toString().padLeft(2, '0')}-01';
+    } on Object catch (echec) {
+      throw _traduire(echec);
+    }
   }
+
+  /// Un `count(*)` PostgreSQL voyage en `bigint` : PostgREST le rend en
+  /// nombre JSON, que le SDK peut livrer en `int` comme en `num`.
+  static int _entier(Object? valeur) => switch (valeur) {
+    final int nombre => nombre,
+    final num nombre => nombre.toInt(),
+    _ => 0,
+  };
 
   /// Traduit ce que le SDK a levé.
   static EchecPeriodes _traduire(Object echec) {
@@ -283,6 +272,8 @@ class SupabasePeriodesRepository implements PeriodesRepository {
     final erreur = switch (message) {
       _ when message.contains('period_reopen_deadline_passed') =>
         ErreurPeriodes.dateLimitePassee,
+      _ when message.contains('period_deadline_in_past') =>
+        ErreurPeriodes.dateLimiteDansLePasse,
       _ when message.contains('station_suspended') => ErreurPeriodes.suspendue,
       _ when message.contains('period_month_in_past') =>
         ErreurPeriodes.moisPasse,

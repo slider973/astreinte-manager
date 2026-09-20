@@ -1,6 +1,7 @@
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/periodes/data/periodes_repository.dart';
+import 'package:astreinte_sp/features/periodes/domain/taux_saisie.dart';
 
 import 'faux_invitations.dart';
 
@@ -16,6 +17,7 @@ class FauxPeriodesRepository implements PeriodesRepository {
     Set<String>? actifs,
     Map<String, Set<String>>? saisies,
     this.erreurLecture = false,
+    this.erreurTaux = false,
     this.erreurEcriture,
   }) : periodes = <PeriodeSaisie>[...?periodes],
        actifs = actifs ?? const <String>{'u1', 'u2', 'u3', 'u4'},
@@ -23,13 +25,17 @@ class FauxPeriodesRepository implements PeriodesRepository {
 
   List<PeriodeSaisie> periodes;
 
-  /// Les membres actifs de la caserne.
+  /// Les membres actifs de la caserne, comme les compterait
+  /// `v_period_completion`.
   Set<String> actifs;
 
   /// Les membres ayant saisi, par clé de mois (`2026-11`).
   Map<String, Set<String>> saisies;
 
   bool erreurLecture;
+
+  /// Le comptage échoue, la liste non : l'écran doit rester utilisable.
+  bool erreurTaux;
 
   /// Le refus opposé à la prochaine écriture, ou `null`.
   ErreurPeriodes? erreurEcriture;
@@ -50,21 +56,28 @@ class FauxPeriodesRepository implements PeriodesRepository {
     return <PeriodeSaisie>[...periodes];
   }
 
+  /// Le comptage de `v_period_completion` : **une** requête pour toutes les
+  /// périodes, et deux nombres par ligne.
+  ///
+  /// Le faux compte comme la vue : le numérateur est intersecté avec les
+  /// membres actifs, et une caserne sans membre actif rend `0` et `0` plutôt
+  /// qu'une ligne absente.
   @override
-  Future<Set<String>> membresActifs(String stationId) async {
-    if (erreurLecture) throw const EchecPeriodes(ErreurPeriodes.inconnue);
-    return actifs;
-  }
-
-  @override
-  Future<Set<String>> membresAyantSaisi({
-    required String stationId,
-    required int annee,
-    required int mois,
-  }) async {
+  Future<Map<String, TauxSaisie>> tauxParPeriode(String stationId) async {
     comptages++;
-    if (erreurLecture) throw const EchecPeriodes(ErreurPeriodes.inconnue);
-    return saisies[PeriodeSaisie.cleDe(annee, mois)] ?? const <String>{};
+    if (erreurLecture || erreurTaux) {
+      throw const EchecPeriodes(ErreurPeriodes.inconnue);
+    }
+
+    return <String, TauxSaisie>{
+      for (final periode in periodes)
+        periode.id: TauxSaisie(
+          saisis: (saisies[periode.cle] ?? const <String>{})
+              .intersection(actifs)
+              .length,
+          effectif: actifs.length,
+        ),
+    };
   }
 
   @override

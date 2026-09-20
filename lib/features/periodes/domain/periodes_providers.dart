@@ -1,10 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// `FutureProviderFamily` n'est pas dans l'export principal de Riverpod 3 : il
-// vit dans `misc.dart`. Il est nommé ici parce que tous les providers du
-// projet portent leur type, et qu'une famille inférée `dynamic` casse le
-// typage de `ref.watch` chez l'appelant.
-import 'package:flutter_riverpod/misc.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
@@ -25,11 +20,19 @@ final Provider<PeriodesRepository> periodesRepositoryProvider =
 /// ancien au plus récent.
 @immutable
 class EtatPeriodes {
-  const EtatPeriodes({this.periodes = const <PeriodeSaisie>[]});
+  const EtatPeriodes({this.periodes = const <PeriodeSaisie>[], this.taux});
 
   final List<PeriodeSaisie> periodes;
 
+  /// Le taux de saisie par identifiant de période, lu en **une** requête
+  /// (`v_period_completion`). `null` quand le comptage n'a pas pu être lu :
+  /// la liste reste utilisable, chaque ligne dit que son compte manque.
+  final Map<String, TauxSaisie>? taux;
+
   bool get vide => periodes.isEmpty;
+
+  /// Le taux d'une période, ou `null` s'il n'a pas pu être lu.
+  TauxSaisie? tauxDe(PeriodeSaisie periode) => taux?[periode.id];
 
   /// Les mois qui restent à vivre, **du plus proche au plus lointain** :
   /// c'est là que l'admin agit.
@@ -66,7 +69,10 @@ class EtatPeriodes {
         if (existante.id != periode.id) existante,
       periode,
     ]..sort((a, b) => a.cle.compareTo(b.cle));
-    return EtatPeriodes(periodes: List<PeriodeSaisie>.unmodifiable(autres));
+    return EtatPeriodes(
+      periodes: List<PeriodeSaisie>.unmodifiable(autres),
+      taux: taux,
+    );
   }
 }
 
@@ -93,21 +99,45 @@ class PeriodesController extends AsyncNotifier<EtatPeriodes> {
     return _lire(appartenance.stationId);
   }
 
+  /// Deux requêtes, lancées ensemble : la liste des mois, et leurs taux de
+  /// saisie.
+  ///
+  /// Le coût ne dépend plus de l'effectif de la caserne — deux nombres par
+  /// période, comptés en base — mais du seul nombre de mois. Le chargement
+  /// ligne par ligne du premier jet n'a donc plus lieu d'être.
   Future<EtatPeriodes> _lire(String stationId) async {
-    final periodes = await ref.read(periodesRepositoryProvider).lister(stationId);
-    return EtatPeriodes(periodes: List<PeriodeSaisie>.unmodifiable(periodes));
+    final depot = ref.read(periodesRepositoryProvider);
+
+    // Le comptage part en même temps que la liste, mais son échec ne fait pas
+    // tomber l'écran : sans les mois il n'y a rien à montrer, sans les taux il
+    // reste tout le reste.
+    final tauxEnVol = _taux(depot, stationId);
+    final periodes = await depot.lister(stationId);
+
+    return EtatPeriodes(
+      periodes: List<PeriodeSaisie>.unmodifiable(periodes),
+      taux: await tauxEnVol,
+    );
+  }
+
+  Future<Map<String, TauxSaisie>?> _taux(
+    PeriodesRepository depot,
+    String stationId,
+  ) async {
+    try {
+      return await depot.tauxParPeriode(stationId);
+    } on Object {
+      return null;
+    }
   }
 
   /// Relit la liste **en la gardant à l'écran** : un rafraîchissement ne vide
-  /// pas la page sous les yeux de qui l'utilise. Les comptes de saisie sont
-  /// jetés en même temps, sans quoi « Relire » mentirait sur la moitié de
-  /// l'écran.
+  /// pas la page sous les yeux de qui l'utilise. Les taux repartent avec elle,
+  /// sans quoi « Relire » mentirait sur la moitié de l'écran.
   Future<void> rafraichir() async {
     final stationId = ref.read(appartenanceCouranteProvider)?.stationId;
     if (stationId == null) return;
 
-    ref.invalidate(membresActifsProvider);
-    ref.invalidate(tauxSaisieProvider);
     state = await AsyncValue.guard(() => _lire(stationId));
   }
 
@@ -120,18 +150,16 @@ class PeriodesController extends AsyncNotifier<EtatPeriodes> {
   );
 
   /// Rouvre le mois **en repoussant sa date limite dans le même geste**.
-  Future<ResultatPeriode> rouvrir(
-    PeriodeSaisie periode,
-    DateTime dateLimite,
-  ) => _agir(
-    () => ref
-        .read(periodesRepositoryProvider)
-        .rouvrir(periodeId: periode.id, dateLimite: dateLimite),
-    (PeriodeSaisie ecrite) => AppStrings.periodeRouverteConfirmation(
-      ecrite.libelle,
-      formaterDateLongue(ecrite.dateLimite),
-    ),
-  );
+  Future<ResultatPeriode> rouvrir(PeriodeSaisie periode, DateTime dateLimite) =>
+      _agir(
+        () => ref
+            .read(periodesRepositoryProvider)
+            .rouvrir(periodeId: periode.id, dateLimite: dateLimite),
+        (PeriodeSaisie ecrite) => AppStrings.periodeRouverteConfirmation(
+          ecrite.libelle,
+          formaterDateLongue(ecrite.dateLimite),
+        ),
+      );
 
   /// Ouvre un mois à la saisie. La fonction `create_period` est idempotente :
   /// un mois déjà ouvert est rendu tel quel, et l'écran le dit au lieu de
@@ -179,6 +207,24 @@ class PeriodesController extends AsyncNotifier<EtatPeriodes> {
       final ecrite = await action();
       state = AsyncValue<EtatPeriodes>.data(etat.avec(ecrite));
 
+      // Ouvrir un mois ajoute une période, donc un taux qui n'était pas dans
+      // la carte. Une requête de plus après une action rare, contre une ligne
+      // qui afficherait « comptage indisponible » sur un mois qui vient de
+      // naître.
+      final stationId = ref.read(appartenanceCouranteProvider)?.stationId;
+      final courant = state.value;
+      if (stationId != null && courant != null) {
+        final taux = await _taux(
+          ref.read(periodesRepositoryProvider),
+          stationId,
+        );
+        if (taux != null && ref.mounted) {
+          state = AsyncValue<EtatPeriodes>.data(
+            EtatPeriodes(periodes: courant.periodes, taux: taux),
+          );
+        }
+      }
+
       // L'écran « Mon mois » lit sa propre liste de périodes, et il la garde
       // pour la session. Sans cette invalidation, l'admin qui vient de rouvrir
       // un mois retrouve son sélecteur en disant « Verrouillé ». Vu en vrai
@@ -203,47 +249,3 @@ periodesControllerProvider =
       PeriodesController.new,
       isAutoDispose: true,
     );
-
-/// Les membres actifs de la caserne, lus **une fois** pour toute la liste :
-/// c'est le dénominateur commun de tous les taux de saisie.
-final FutureProvider<Set<String>> membresActifsProvider =
-    FutureProvider<Set<String>>((ref) async {
-      final appartenance = ref.watch(appartenanceCouranteProvider);
-      if (appartenance == null || !appartenance.estAdmin) {
-        return const <String>{};
-      }
-      return ref
-          .watch(periodesRepositoryProvider)
-          .membresActifs(appartenance.stationId);
-    }, isAutoDispose: true);
-
-/// Le taux de saisie d'un mois, **compté à la demande**.
-///
-/// Une instance par mois affiché, et une seule requête chacune. C'est ce qui
-/// rend l'écran tenable : `SliverList.builder` ne construit que les lignes
-/// visibles, donc un admin qui ne défile pas ne paie que les mois qu'il voit
-/// (`design/014 § 7`).
-final FutureProviderFamily<TauxSaisie, CleMois> tauxSaisieProvider =
-    FutureProvider.family<TauxSaisie, CleMois>((ref, cle) async {
-      final appartenance = ref.watch(appartenanceCouranteProvider);
-      if (appartenance == null || !appartenance.estAdmin) {
-        return const TauxSaisie(saisis: 0, effectif: 0);
-      }
-
-      final actifs = await ref.watch(membresActifsProvider.future);
-      final saisis = await ref
-          .read(periodesRepositoryProvider)
-          .membresAyantSaisi(
-            stationId: appartenance.stationId,
-            annee: cle.annee,
-            mois: cle.mois,
-          );
-
-      // Le comptage ne se refait pas quand la ligne sort de l'écran et y
-      // revient : il est gardé tant que l'écran vit.
-      ref.keepAlive();
-      return TauxSaisie(
-        saisis: saisis.intersection(actifs).length,
-        effectif: actifs.length,
-      );
-    }, isAutoDispose: true);

@@ -260,22 +260,69 @@ void main() {
       );
     });
 
-    test('relire jette les comptes de saisie en même temps que la liste',
+    test('le taux arrive avec la liste, en une requête pour tout l\'écran',
         () async {
+      final depot = FauxPeriodesRepository(
+        periodes: <PeriodeSaisie>[
+          periodeOuverte(annee: 2026, mois: 11),
+          periodeOuverte(annee: 2026, mois: 12),
+        ],
+        actifs: const <String>{'u1', 'u2', 'u3', 'u4'},
+        saisies: <String, Set<String>>{
+          '2026-11': const <String>{'u1', 'u2', 'u3'},
+        },
+      );
+      final (conteneur, _) = await _ouvrir(depot);
+
+      expect(
+        depot.comptages,
+        1,
+        reason: 'le coût ne dépend plus que du nombre de mois',
+      );
+      final etat = _etat(conteneur);
+      expect(etat.tauxDe(etat.periodes.first)?.saisis, 3);
+      expect(etat.tauxDe(etat.periodes.first)?.effectif, 4);
+      expect(etat.tauxDe(etat.periodes.last)?.saisis, 0);
+    });
+
+    test('un comptage en échec ne fait pas tomber la liste', () async {
+      final depot = FauxPeriodesRepository(
+        periodes: <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 11)],
+        erreurTaux: true,
+      );
+      final (conteneur, _) = await _ouvrir(depot);
+
+      final etat = _etat(conteneur);
+      expect(etat.periodes, hasLength(1));
+      expect(etat.taux, isNull);
+      expect(etat.tauxDe(etat.periodes.single), isNull);
+    });
+
+    test('ouvrir un mois recompte : le nouveau mois a son taux', () async {
       final depot = FauxPeriodesRepository(
         periodes: <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 11)],
       );
       final (conteneur, controleur) = await _ouvrir(depot);
 
-      conteneur.listen(
-        tauxSaisieProvider((annee: 2026, mois: 11)),
-        (_, _) {},
+      await controleur.creer(2026, 12);
+
+      final etat = _etat(conteneur);
+      expect(etat.periodes, hasLength(2));
+      expect(
+        etat.tauxDe(etat.periodes.last),
+        isNotNull,
+        reason: 'un mois qui vient de naître affiche « 0 sur 9 », pas un trou',
       );
-      await conteneur.read(tauxSaisieProvider((annee: 2026, mois: 11)).future);
+    });
+
+    test('relire recompte en même temps qu\'elle relit', () async {
+      final depot = FauxPeriodesRepository(
+        periodes: <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 11)],
+      );
+      final (_, controleur) = await _ouvrir(depot);
       expect(depot.comptages, 1);
 
       await controleur.rafraichir();
-      await conteneur.read(tauxSaisieProvider((annee: 2026, mois: 11)).future);
 
       expect(depot.lectures, 2);
       expect(depot.comptages, 2);

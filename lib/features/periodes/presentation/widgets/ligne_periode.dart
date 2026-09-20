@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/l10n/format_date.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/widgets/loading_skeleton.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../dispos/domain/periode_saisie.dart';
-import '../../domain/periodes_providers.dart';
 import '../../domain/taux_saisie.dart';
 import 'jauge_saisie.dart';
 
@@ -20,16 +17,21 @@ import 'jauge_saisie.dart';
 ///
 /// Ce n'est pas une carte : les lignes sont séparées par le filet du registre
 /// (`DESIGN.md § Cards / Containers`).
-class LignePeriode extends ConsumerWidget {
+class LignePeriode extends StatelessWidget {
   const LignePeriode({
     required this.periode,
     required this.onVerrouiller,
     required this.onRouvrir,
     super.key,
+    this.taux,
     this.occupee = false,
   });
 
   final PeriodeSaisie periode;
+
+  /// Le taux de saisie du mois, compté en base. `null` quand la lecture de
+  /// `v_period_completion` a échoué : la ligne le dit, elle n'invente pas.
+  final TauxSaisie? taux;
 
   /// Une écriture est en vol sur ce mois : le bouton garde sa place et son
   /// libellé, et porte l'indicateur.
@@ -48,11 +50,8 @@ class LignePeriode extends ConsumerWidget {
         );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final taux = ref.watch(
-      tauxSaisieProvider((annee: periode.annee, mois: periode.mois)),
-    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
@@ -102,43 +101,28 @@ class LignePeriode extends ConsumerWidget {
   }
 }
 
-/// Le taux, dans ses trois états : compté, en cours, indisponible.
+/// Le taux, ou son absence.
 ///
-/// L'attente garde exactement la hauteur du résultat : la ligne ne saute pas
-/// quand le compte arrive.
+/// Il n'y a plus d'attente par ligne : les taux arrivent avec la liste, en une
+/// requête pour tout l'écran. Reste le cas où la vue n'a pas pu être lue —
+/// la ligne le dit, plutôt que d'afficher un zéro qui ressemblerait à
+/// « personne n'a saisi ».
 class _Taux extends StatelessWidget {
   const _Taux({required this.taux});
 
-  final AsyncValue<TauxSaisie> taux;
+  final TauxSaisie? taux;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final valeur = taux.value;
+    final valeur = taux;
 
     if (valeur != null) return JaugeSaisie(taux: valeur);
 
-    if (taux.hasError) {
-      return Text(
-        AppStrings.periodeTauxIndisponible,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      );
-    }
-
-    return LoadingSkeleton(
-      child: Semantics(
-        label: AppStrings.periodeTauxEnCours,
-        excludeSemantics: true,
-        child: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            SkeletonLigne(largeur: 180),
-            SizedBox(height: AppSpacing.xs),
-            SkeletonLigne(hauteur: JaugeSaisie.hauteur),
-          ],
-        ),
+    return Text(
+      AppStrings.periodeTauxIndisponible,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
       ),
     );
   }

@@ -125,6 +125,56 @@ void main() {
       expect(find.text(AppStrings.periodeTauxSaisie(1, 2)), findsOneWidget);
     });
 
+    testWidgets(
+      'une caserne de soixante membres n\'est pas plafonnée à seize',
+      (tester) async {
+        // La régression de la revue : le comptage côté client rapatriait les
+        // lignes de `availabilities`, PostgREST plafonne une réponse à mille
+        // lignes et rend 200 sans rien dire. Soixante membres × 62 créneaux =
+        // 3 720 lignes : l'écran affichait « 16 membres sur 60 ont saisi »
+        // alors que les soixante avaient saisi, et le chef de centre rouvrait
+        // un mois pour rien. Les deux nombres sont désormais comptés en base.
+        final caserne = <String>{
+          for (var numero = 0; numero < 60; numero++) 'membre-$numero',
+        };
+        await _ouvrirPeriodes(
+          tester,
+          depot: FauxPeriodesRepository(
+            periodes: <PeriodeSaisie>[_ouverte(1)],
+            actifs: caserne,
+            saisies: <String, Set<String>>{_ouverte(1).cle: caserne},
+          ),
+        );
+
+        expect(find.text(AppStrings.periodeTauxSaisie(60, 60)), findsOneWidget);
+        expect(
+          find.text(AppStrings.periodeTauxPourcentage(100)),
+          findsOneWidget,
+        );
+        expect(find.text(AppStrings.periodeTauxSaisie(16, 60)), findsNothing);
+      },
+    );
+
+    testWidgets('un comptage indisponible se dit, il ne s\'invente pas', (
+      tester,
+    ) async {
+      await _ouvrirPeriodes(
+        tester,
+        depot: FauxPeriodesRepository(
+          periodes: <PeriodeSaisie>[_ouverte(1)],
+          erreurTaux: true,
+        ),
+      );
+
+      expect(find.text(_libelle(1)), findsOneWidget);
+      expect(find.text(AppStrings.periodeTauxIndisponible), findsOneWidget);
+      expect(
+        find.text(AppStrings.periodeTauxPourcentage(0)),
+        findsNothing,
+        reason: 'un comptage manquant n\'est pas « personne n\'a saisi »',
+      );
+    });
+
     testWidgets('verrouiller demande confirmation, puis ferme le mois', (
       tester,
     ) async {
@@ -303,6 +353,31 @@ void main() {
       expect(find.text(AppStrings.periodeRefusSuspendue), findsOneWidget);
       expect(find.text(AppStrings.periodeOuverte), findsOneWidget);
       expect(depot.verrouillages, hasLength(1));
+    });
+
+    testWidgets('une date limite ramenée dans le passé est refusée et dite', (
+      tester,
+    ) async {
+      // Deux adjoints en même temps : le second croit rouvrir un mois que le
+      // premier vient de rouvrir. La base refuse (`period_deadline_in_past`).
+      await _ouvrirPeriodes(
+        tester,
+        depot: FauxPeriodesRepository(
+          periodes: <PeriodeSaisie>[_fermee(-1)],
+          erreurEcriture: ErreurPeriodes.dateLimiteDansLePasse,
+        ),
+      );
+
+      await tester.tap(find.text(AppStrings.periodeActionRouvrir));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.periodeRouvrirConfirmer));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(AppStrings.periodeRefusDeadlineDansLePasse),
+        findsOneWidget,
+      );
+      expect(find.text(AppStrings.periodeVerrouillee), findsOneWidget);
     });
 
     testWidgets('ouvrir un mois propose les mois suivants et marque les déjà '

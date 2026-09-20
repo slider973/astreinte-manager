@@ -61,7 +61,7 @@ est un filet plein de 6 dp sur fond réglé, jamais un anneau ni une courbe ; el
 phrase dit déjà, elle ne la remplace pas. Quand la caserne n'a aucun membre actif, la ligne le dit
 au lieu d'afficher « 0 % ».
 
-Le compte est chargé **par ligne** et non pour toute la liste : voir § 7.
+Les deux nombres sont comptés en base et arrivent avec la liste : voir § 7.
 
 ## 5. Rouvrir, c'est dire jusqu'à quand
 
@@ -89,22 +89,29 @@ ouvert », « déjà verrouillé ») — montrer ce qui est déjà fait évite l
 « pourquoi rien ne s'est passé ». Aucun mois écoulé n'est proposé : la base les refuse
 (`period_month_in_past`), l'écran ne les offre donc pas.
 
-## 7. Le compte des saisies, et son coût
+## 7. Le compte des saisies
 
-Aucune vue n'expose le taux. Il est compté côté client : une requête par mois affiché, qui ne
-demande que la colonne `user_id` des disponibilités du mois, et compte les membres distincts.
+**Compté en base**, par la vue `v_period_completion` (migration `0013`, revue du ticket 014) :
+une ligne par période, `active_members` et `members_with_availability`. Une requête pour tout
+l'écran, filtrée sur la caserne. Le coût ne dépend pas de l'effectif — deux nombres par mois —
+mais du seul nombre de périodes.
 
-Le compte est donc **paresseux** : `SliverList.builder` ne construit que les lignes visibles, et
-chaque ligne demande son propre compte, gardé ensuite pour la durée de l'écran. Un admin qui ne
-défile pas ne paie que les deux ou trois mois qu'il voit. Ce qui serait intenable, et qui n'est
-pas fait, c'est une requête unique couvrant toute l'histoire de la caserne : à 60 membres et
-36 lignes par membre et par mois, une année de périodes pèserait plus d'un mégaoctet.
+Le premier jet comptait côté client, en rapatriant la colonne `user_id` des disponibilités du
+mois. C'était **faux sans le dire** : PostgREST plafonne une réponse à mille lignes et rend `200`
+sans en-tête d'alerte. À ~62 lignes par membre et par mois, le compte devenait faux dès dix-sept
+membres et plafonnait vers seize — « 16 membres sur 60 ont saisi » quand les soixante avaient
+saisi, et un chef de centre qui rouvre un mois pour rien. Une erreur de lecture qui provoque une
+mauvaise décision sans jamais lever d'exception.
 
-À la taille haute du produit (60 membres, `PRODUCT.md`), une ligne coûte environ 2 200 lignes de
-`user_id`, soit ~100 ko. C'est acceptable pour un écran d'administration ouvert rarement, et ce
-n'est pas un état durable : dès que la matrice admin (ticket 016) demandera les mêmes chiffres,
-une vue `v_period_completion` (une ligne par période : membres actifs, membres ayant saisi) devra
-être ajoutée par `supabase-dev`, et cet écran la lira sans changer d'apparence.
+Conséquences sur l'écran, toutes des simplifications : plus de chargement paresseux ligne par
+ligne, plus de squelette dans la ligne — les taux arrivent avec la liste. Reste un seul état
+particulier, quand la vue elle-même n'a pas pu être lue : la ligne écrit « Comptage
+indisponible » plutôt qu'un zéro qui se lirait « personne n'a saisi », et le reste de l'écran
+continue de fonctionner.
+
+Le numérateur se construisant sur le même ensemble que le dénominateur, un pompier désactivé
+depuis qu'il a saisi ne produit plus « 10 membres sur 9 », et une caserne sans membre actif rend
+`0` et `0` — l'écran dit alors « Aucun membre actif ».
 
 ## 8. Le message du membre sur un mois verrouillé
 
@@ -125,6 +132,7 @@ dire non n'apprend rien de plus que la période déjà lue.
 | chargement | squelette à la forme de trois lignes de période, jamais une roue |
 | vide | « Aucun mois n'est encore ouvert » + l'action « Ouvrir un mois » |
 | erreur de lecture | état d'erreur plein écran avec « Réessayer » ; si la liste est déjà à l'écran, bannière |
+| comptage illisible | la liste reste, chaque ligne écrit « Comptage indisponible » |
 | refus serveur | bannière d'erreur avec la phrase de la base (droits, caserne suspendue, mois écoulé) |
 | action en cours | la ligne concernée garde sa place, son bouton passe en chargement |
 | non admin | « Réservé aux administrateurs », comme « Membres » et « Paramètres » |

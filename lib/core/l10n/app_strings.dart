@@ -1232,7 +1232,6 @@ abstract final class AppStrings {
 
   static const String periodeTauxAucunMembre =
       'Aucun membre actif dans la caserne.';
-  static const String periodeTauxEnCours = 'Comptage des saisies…';
   static const String periodeTauxIndisponible = 'Comptage indisponible.';
 
   /// Le pourcentage, annoncé avec son unité : la jauge n'est qu'un rappel.
@@ -1310,6 +1309,9 @@ abstract final class AppStrings {
   static const String periodeRefusDeadlinePassee =
       'Rouvrir un mois demande de repousser sa date limite : sinon la tâche '
       'horaire le reverrouille dans l\'heure.';
+  static const String periodeRefusDeadlineDansLePasse =
+      'La date limite d\'un mois ouvert doit rester dans le futur. Pour fermer '
+      'ce mois, verrouille-le.';
   static const String periodeEchecGenerique =
       'Impossible de modifier ce mois. Réessaie dans un instant.';
 
