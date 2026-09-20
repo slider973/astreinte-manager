@@ -1,0 +1,101 @@
+# Intégration continue d'Astreinte SP.
+#
+# Deux tâches en parallèle, chacune autosuffisante :
+#   - « flutter »      : analyse, tests unitaires et de widgets, build web (le canal principal) ;
+#   - « base-donnees » : rejeu complet des migrations, tests RLS et lint du schéma.
+#
+# Budget visé : moins de dix minutes de bout en bout. Toute étape lente ou instable doit
+# être retirée plutôt que tolérée : une CI qui échoue au hasard ne protège plus rien.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Une seule exécution utile par branche : les poussées successives annulent la précédente.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Épinglée sur la version du poste de développement (flutter --version).
+  # À remonter en même temps que l'équipe, jamais automatiquement.
+  FLUTTER_VERSION: 3.38.10
+
+jobs:
+  flutter:
+    name: Flutter — analyse, tests, build web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Restaurer le cache pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-
+
+      - name: Récupérer les dépendances
+        run: flutter pub get
+
+      # `--fatal-infos` : le dépôt est vierge d'infos, on garde ce niveau d'exigence.
+      - name: Analyser
+        run: flutter analyze --fatal-infos
+
+      - name: Tester
+        run: flutter test
+
+      # Le build web est la cible qui part en production (PWA). Mesuré à ~35 s en local,
+      # il reste dans cette tâche ; s'il dépassait cinq minutes sur l'exécuteur, l'isoler.
+      - name: Construire la PWA
+        run: flutter build web --dart-define-from-file=env/dev.json
+
+  base-donnees:
+    name: Base de données — migrations, RLS, lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer le CLI Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      # Stack réduite au strict nécessaire pour les migrations et la RLS :
+      # Postgres (le schéma) et GoTrue (qui crée auth.users, référencé par 0002).
+      # Les autres conteneurs ne servent qu'au développement local et coûteraient
+      # plus de 4 Go de téléchargement d'images à chaque exécution.
+      - name: Démarrer Supabase (Postgres + Auth)
+        run: |
+          supabase start \
+            -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,postgres-meta,storage-api,realtime,postgrest,kong
+
+      # Rejeu depuis zéro : une migration non rejouable ou un seed cassé échoue ici.
+      - name: Rejouer les migrations et le seed
+        run: supabase db reset
+
+      - name: Tests Row Level Security
+        run: scripts/test_rls.sh
+        env:
+          DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+      - name: Lint du schéma
+        run: supabase db lint --local --fail-on error

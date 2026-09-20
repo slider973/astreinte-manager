@@ -4,6 +4,10 @@
 #   scripts/test_rls.sh              # base locale (supabase start)
 #   DB_URL=postgresql://… scripts/test_rls.sh
 #
+# En CI (.github/workflows/ci.yml) : même commande, DB_URL fourni par le workflow.
+# Le script n'a besoin que d'un Postgres joignable — soit via `psql`, soit via le
+# conteneur de la stack locale quand `psql` n'est pas installé.
+#
 # Sortie non nulle dès qu'un test échoue (ON_ERROR_STOP + exceptions SQL).
 # Les tests tournent dans une transaction annulée à la fin : la base n'est pas modifiée.
 set -euo pipefail
@@ -19,15 +23,21 @@ fi
 # Par défaut : la base locale de `supabase start` (voir `supabase status`).
 DB_URL="${DB_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
 
+# Nom du conteneur Postgres de la stack locale, dérivé de `project_id` (supabase/config.toml)
+# pour rester juste si le projet est renommé.
+projet="$(sed -n 's/^[[:space:]]*project_id[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' \
+  "$racine/supabase/config.toml" | head -1)"
+conteneur="supabase_db_${projet:-pompier}"
+
 lancer_psql() {
   if command -v psql >/dev/null 2>&1; then
     psql "$DB_URL" -v ON_ERROR_STOP=1 -X -q -f "$1"
-  elif docker ps --format '{{.Names}}' | grep -qx supabase_db_pompier; then
+  elif docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$conteneur"; then
     # Pas de psql sur la machine : on passe par le conteneur de la stack locale.
-    docker exec -i supabase_db_pompier \
+    docker exec -i "$conteneur" \
       psql -U postgres -d postgres -v ON_ERROR_STOP=1 -X -q -f - < "$1"
   else
-    echo "Ni psql ni le conteneur supabase_db_pompier ne sont disponibles." >&2
+    echo "Ni psql ni le conteneur $conteneur ne sont disponibles." >&2
     echo "Démarrer la stack avec « supabase start » ou installer psql." >&2
     exit 1
   fi

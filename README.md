@@ -24,6 +24,11 @@ et de validation du planning.
 
 ## Démarrage
 
+[![CI](https://github.com/slider973/astreinte-manager/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/slider973/astreinte-manager/actions/workflows/ci.yml)
+
+Chaque PR vers `main` déclenche [la CI](.github/workflows/ci.yml) : analyse, tests et build web
+d'un côté, rejeu des migrations, tests RLS et lint du schéma de l'autre.
+
 Prérequis : Flutter 3.38+ (Dart 3.10+), Xcode 16 pour iOS, Android Studio ou SDK Android pour
 Android, Chrome pour le web. Vérifier avec `flutter doctor -v`.
 
