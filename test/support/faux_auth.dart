@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:astreinte_sp/app.dart';
 import 'package:astreinte_sp/core/env.dart';
+import 'package:astreinte_sp/core/plateforme/contexte_plateforme.dart';
+import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/core/session/auth_repository.dart';
@@ -9,6 +12,12 @@ import 'package:astreinte_sp/core/session/membership_repository.dart';
 import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/session/session_utilisateur.dart';
 import 'package:astreinte_sp/core/supabase/supabase_bootstrap.dart';
+import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart';
+import 'package:astreinte_sp/features/invitation/domain/invitation_providers.dart';
+import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
+import 'package:astreinte_sp/features/membres/domain/membres_providers.dart';
+import 'package:astreinte_sp/features/onboarding/data/profil_repository.dart';
+import 'package:astreinte_sp/features/onboarding/domain/profil_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -140,18 +149,32 @@ class FauxMembershipRepository implements MembershipRepository {
   }
 }
 
+/// Ce que [monterApp] rend : les faux dépôts de la session.
+typedef AppMontee = ({
+  FauxAuthRepository auth,
+  FauxMembershipRepository memberships,
+});
+
 /// Monte l'application entière avec des dépôts faux.
 ///
 /// C'est le routeur réel qui décide de l'écran : les tests vérifient donc la
 /// redirection telle qu'elle sera vécue, sans toucher au réseau.
-Future<({FauxAuthRepository auth, FauxMembershipRepository memberships})>
-monterApp(
+///
+/// Les dépôts des fonctionnalités sont facultatifs : un écran qui ne les
+/// touche pas n'a pas à les fournir. Le type `Override` de Riverpod 3 n'étant
+/// pas exporté, ils sont nommés un par un plutôt que passés en liste.
+Future<AppMontee> monterApp(
   WidgetTester tester, {
   SessionUtilisateur? session,
   List<Appartenance> appartenances = const <Appartenance>[],
   AuthErreur? erreurEnvoi,
   AuthErreur? erreurVerification,
   AuthErreur? erreurAppartenances,
+  MembresRepository? membres,
+  InvitationRepository? invitations,
+  ProfilRepository? profils,
+  ReperesLocaux? reperes,
+  ContextePlateforme? plateforme,
   Size taille = const Size(390, 844),
 }) async {
   tester.view.physicalSize = taille * tester.view.devicePixelRatio;
@@ -175,6 +198,18 @@ monterApp(
         supabaseDemarrageProvider.overrideWithValue(SupabaseDemarrage.pret),
         authRepositoryProvider.overrideWithValue(auth),
         membershipRepositoryProvider.overrideWithValue(memberships),
+        if (membres != null)
+          membresRepositoryProvider.overrideWithValue(membres),
+        if (invitations != null)
+          invitationRepositoryProvider.overrideWithValue(invitations),
+        if (profils != null)
+          profilRepositoryProvider.overrideWithValue(profils),
+        reperesLocauxProvider.overrideWithValue(
+          reperes ?? ReperesLocauxMemoire(),
+        ),
+        contextePlateformeProvider.overrideWithValue(
+          plateforme ?? ContextePlateforme.natif,
+        ),
       ],
       child: const AstreinteApp(),
     ),
@@ -182,6 +217,16 @@ monterApp(
   await tester.pumpAndSettle();
 
   return (auth: auth, memberships: memberships);
+}
+
+/// Ouvre un chemin comme le ferait un lien reçu par courriel ou une barre
+/// d'adresse : c'est le routeur réel de l'application qui décide de la suite.
+Future<void> ouvrirRoute(WidgetTester tester, String chemin) async {
+  final conteneur = ProviderScope.containerOf(
+    tester.element(find.byType(AstreinteApp)),
+  );
+  conteneur.read(appRouterProvider).go(chemin);
+  await tester.pumpAndSettle();
 }
 
 /// Démonte l'arbre pour libérer les minuteries des contrôleurs.

@@ -19,10 +19,7 @@ void main() {
         );
       }
       expect(
-        redirectionAuth(
-          etat: EtatAuth.chargement,
-          chemin: AppRoutes.demarrage,
-        ),
+        redirectionAuth(etat: EtatAuth.chargement, chemin: AppRoutes.demarrage),
         isNull,
       );
     });
@@ -107,6 +104,65 @@ void main() {
           etat: EtatAuth.deconnecte,
           chemin: AppRoutes.devComponents,
         ),
+        AppRoutes.connexion,
+      );
+    });
+  });
+
+  group('redirectionAuth et le lien d\'invitation', () {
+    const lien = '/invite/a1b2c3';
+
+    test('le lien s\'ouvre dans tous les états, session inconnue comprise', () {
+      for (final etat in EtatAuth.values) {
+        expect(
+          redirectionAuth(etat: etat, chemin: lien),
+          isNull,
+          reason:
+              'Le jeton n\'existe que dans l\'URL : la perdre perd '
+              'l\'invitation (état $etat).',
+        );
+      }
+    });
+
+    test('connecté sans caserne, on revient à l\'invitation en cours', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.sansCaserne,
+          chemin: AppRoutes.aucuneCaserne,
+          cheminInvitationEnAttente: lien,
+        ),
+        lien,
+      );
+    });
+
+    test('sans invitation en attente, rien ne change', () {
+      expect(
+        redirectionAuth(etat: EtatAuth.sansCaserne, chemin: AppRoutes.accueil),
+        AppRoutes.aucuneCaserne,
+      );
+    });
+
+    test(
+      'l\'accueil du nouveau membre n\'est ouvert qu\'une fois connecté',
+      () {
+        expect(
+          redirectionAuth(etat: EtatAuth.connecte, chemin: AppRoutes.guide),
+          isNull,
+        );
+        expect(
+          redirectionAuth(etat: EtatAuth.deconnecte, chemin: AppRoutes.guide),
+          AppRoutes.connexion,
+        );
+      },
+    );
+
+    test('l\'écran des membres suit les mêmes règles que l\'accueil', () {
+      expect(
+        redirectionAuth(etat: EtatAuth.connecte, chemin: AppRoutes.membres),
+        isNull,
+      );
+      expect(
+        redirectionAuth(etat: EtatAuth.deconnecte, chemin: AppRoutes.membres),
         AppRoutes.connexion,
       );
     });

@@ -1,0 +1,179 @@
+import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart';
+import 'package:astreinte_sp/features/invitation/domain/acceptation.dart';
+import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
+import 'package:astreinte_sp/features/membres/domain/invitation.dart';
+import 'package:astreinte_sp/features/membres/domain/membre_caserne.dart';
+import 'package:astreinte_sp/features/onboarding/data/profil_repository.dart';
+
+const String stationTest = 'aaaaaaaa-0000-4000-8000-000000000001';
+
+const Appartenance appartenanceAdmin = Appartenance(
+  id: 'm-admin',
+  stationId: stationTest,
+  nomCaserne: 'CIS Saint-Martin',
+  role: RoleMembre.admin,
+  statut: StatutMembre.actif,
+  nomAffiche: 'Jean D.',
+);
+
+const MembreCaserne membreMarie = MembreCaserne(
+  id: 'm-1',
+  userId: 'u-1',
+  role: RoleMembre.membre,
+  statut: StatutMembre.actif,
+  prenom: 'Marie',
+  nom: 'Lefebvre',
+  email: 'membre1@caserne-a.test',
+);
+
+const MembreCaserne membreJean = MembreCaserne(
+  id: 'm-admin',
+  userId: 'u-0',
+  role: RoleMembre.admin,
+  statut: StatutMembre.actif,
+  prenom: 'Jean',
+  nom: 'Dupont',
+  email: 'admin@caserne-a.test',
+);
+
+/// Une invitation qui court encore.
+Invitation invitationEnAttente({
+  String id = 'i-1',
+  String email = 'recrue@exemple.fr',
+  RoleMembre role = RoleMembre.membre,
+  Duration restant = const Duration(days: 10),
+}) => Invitation(
+  id: id,
+  email: email,
+  role: role,
+  expireLe: DateTime.now().add(restant),
+  creeLe: DateTime.now().subtract(const Duration(days: 4)),
+);
+
+/// Un [MembresRepository] sans réseau, qui compte ce qu'on lui demande.
+class FauxMembresRepository implements MembresRepository {
+  FauxMembresRepository({
+    this.membresActifs = const <MembreCaserne>[],
+    List<Invitation>? invitations,
+    this.erreurLecture = false,
+    this.echecInvitation,
+    this.rapport,
+    this.echecAnnulation = false,
+  }) : invitations = invitations ?? <Invitation>[];
+
+  List<MembreCaserne> membresActifs;
+  List<Invitation> invitations;
+
+  /// Vrai pour faire échouer les deux lectures.
+  bool erreurLecture;
+
+  /// Refus de la requête entière d'invitation, ou `null`.
+  ErreurInvitation? echecInvitation;
+
+  /// Rapport rendu par [inviter]. Par défaut : une adresse invitée.
+  RapportInvitations? rapport;
+
+  bool echecAnnulation;
+
+  int lectures = 0;
+  final List<List<String>> envois = <List<String>>[];
+  final List<RoleMembre> rolesEnvoyes = <RoleMembre>[];
+  final List<String> annulations = <String>[];
+
+  @override
+  Future<List<MembreCaserne>> membres(String stationId) async {
+    lectures++;
+    if (erreurLecture) throw const FormatException('lecture refusée');
+    return membresActifs;
+  }
+
+  @override
+  Future<List<Invitation>> invitationsEnAttente(String stationId) async {
+    if (erreurLecture) throw const FormatException('lecture refusée');
+    return invitations;
+  }
+
+  @override
+  Future<RapportInvitations> inviter({
+    required String stationId,
+    required List<String> emails,
+    required RoleMembre role,
+  }) async {
+    envois.add(emails);
+    rolesEnvoyes.add(role);
+
+    final echec = echecInvitation;
+    if (echec != null) throw EchecInvitation(echec);
+
+    return rapport ??
+        RapportInvitations(
+          resultats: <ResultatInvitation>[
+            for (final email in emails)
+              ResultatInvitation(
+                email: email,
+                statut: StatutResultatInvitation.invitee,
+              ),
+          ],
+        );
+  }
+
+  @override
+  Future<void> annuler(String invitationId) async {
+    if (echecAnnulation) throw const FormatException('suppression refusée');
+    annulations.add(invitationId);
+    invitations = invitations
+        .where((Invitation i) => i.id != invitationId)
+        .toList();
+  }
+}
+
+/// Un [InvitationRepository] sans réseau.
+class FauxInvitationRepository implements InvitationRepository {
+  FauxInvitationRepository({this.resultat, this.echec, this.auSucces});
+
+  AcceptationInvitation? resultat;
+  EchecAcceptation? echec;
+
+  /// Joué juste avant de rendre la main : c'est là que le test fait
+  /// apparaître la nouvelle appartenance, comme la base le ferait.
+  void Function()? auSucces;
+
+  final List<String> jetons = <String>[];
+
+  @override
+  Future<AcceptationInvitation> accepter(String jeton) async {
+    jetons.add(jeton);
+    final refus = echec;
+    if (refus != null) throw refus;
+    auSucces?.call();
+    return resultat ??
+        const AcceptationInvitation(
+          dejaAcceptee: false,
+          role: RoleMembre.membre,
+          caserne: CaserneInvitation(nom: 'CIS Saint-Martin'),
+          inviteur: InviteurInvitation(libelle: 'Jean Dupont'),
+        );
+  }
+}
+
+/// Un [ProfilRepository] sans réseau.
+class FauxProfilRepository implements ProfilRepository {
+  FauxProfilRepository({this.echoue = false});
+
+  bool echoue;
+
+  final List<({String prenom, String nom, String? telephone})> ecritures =
+      <({String prenom, String nom, String? telephone})>[];
+
+  @override
+  Future<void> completer({
+    required String userId,
+    required String prenom,
+    required String nom,
+    String? telephone,
+  }) async {
+    if (echoue) throw const FormatException('écriture refusée');
+    ecritures.add((prenom: prenom, nom: nom, telephone: telephone));
+  }
+}
