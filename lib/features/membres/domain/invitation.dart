@@ -67,11 +67,18 @@ enum StatutResultatInvitation {
 }
 
 /// Pourquoi une adresse n'a pas été invitée. Chaque motif porte sa phrase.
+///
+/// Deux codes de refus global — caserne suspendue, appelant qui n'est plus
+/// admin — redescendent ici quand l'état change entre le contrôle préalable
+/// et la création : le serveur les rend alors **par adresse**. Les ranger en
+/// « incident serveur » enverrait réessayer quelque chose qui ne passera pas.
 enum MotifEchecInvitation {
   dejaMembre(AppStrings.inviteDejaMembre),
   adresseInvalide(AppStrings.inviteAdresseInvalide),
   conflit(AppStrings.inviteConflit),
   compteImpossible(AppStrings.inviteCompteImpossible),
+  caserneSuspendue(AppStrings.inviteCaserneSuspendue),
+  nonAdmin(AppStrings.inviteNonAdmin),
   erreurServeur(AppStrings.inviteErreurServeur);
 
   const MotifEchecInvitation(this.message);
@@ -83,6 +90,8 @@ enum MotifEchecInvitation {
     'invalid_email' => adresseInvalide,
     'conflict' => conflit,
     'account_failed' => compteImpossible,
+    'station_suspended' => caserneSuspendue,
+    'not_admin' => nonAdmin,
     _ => erreurServeur,
   };
 }

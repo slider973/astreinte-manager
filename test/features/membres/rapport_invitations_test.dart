@@ -84,6 +84,16 @@ void main() {
         MotifEchecInvitation.depuisCode('conflict'),
         MotifEchecInvitation.conflit,
       );
+      // Deux refus globaux qui redescendent par adresse quand l'état change
+      // entre le contrôle préalable et la création.
+      expect(
+        MotifEchecInvitation.depuisCode('station_suspended'),
+        MotifEchecInvitation.caserneSuspendue,
+      );
+      expect(
+        MotifEchecInvitation.depuisCode('not_admin'),
+        MotifEchecInvitation.nonAdmin,
+      );
       for (final motif in MotifEchecInvitation.values) {
         expect(motif.message, isNotEmpty);
       }
