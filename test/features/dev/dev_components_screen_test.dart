@@ -11,11 +11,23 @@ import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/core/widgets/save_indicator.dart';
 import 'package:astreinte_sp/core/widgets/slot_chip.dart';
 import 'package:astreinte_sp/core/widgets/status_badge.dart';
+import 'package:astreinte_sp/features/auth/data/auth_providers.dart';
 import 'package:astreinte_sp/features/dev/presentation/dev_components_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../support/faux_auth.dart';
+
+/// Les dépôts faux évitent que la construction du routeur touche au client
+/// Supabase, qui n'est pas initialisé dans un test.
+List<Override> _overrides(Env env) => <Override>[
+  envProvider.overrideWithValue(env),
+  authRepositoryProvider.overrideWithValue(FauxAuthRepository()),
+  membershipRepositoryProvider.overrideWithValue(FauxMembershipRepository()),
+];
 
 const Env _dev = Env.fromDefines;
 
@@ -49,7 +61,7 @@ void main() {
   group('Route /dev/components', () {
     test('existe en développement, pas en production', () {
       final routesDev =
-          ProviderContainer(overrides: [envProvider.overrideWithValue(_dev)])
+          ProviderContainer(overrides: _overrides(_dev))
               .read(appRouterProvider)
               .configuration
               .routes
@@ -58,7 +70,7 @@ void main() {
               .toList();
 
       final routesProd =
-          ProviderContainer(overrides: [envProvider.overrideWithValue(_prod)])
+          ProviderContainer(overrides: _overrides(_prod))
               .read(appRouterProvider)
               .configuration
               .routes
@@ -68,7 +80,7 @@ void main() {
 
       expect(routesDev, contains(AppRoutes.devComponents));
       expect(routesProd, isNot(contains(AppRoutes.devComponents)));
-      expect(routesProd, contains(AppRoutes.home));
+      expect(routesProd, contains(AppRoutes.accueil));
     });
   });
 
