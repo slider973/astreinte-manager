@@ -461,6 +461,26 @@ C'est conforme au budget de ~180 Ko annoncé au brief. Les italiques ne sont pas
 (l'italique est proscrit comme moyen de hiérarchie) et les graisses 200, 300, 500 et 800 non plus
 (l'échelle n'utilise que 400, 600 et 700).
 
+**Pourquoi du TTF et pas du WOFF2.** Essayé et mesuré au ticket 004 : les cinq fichiers convertis
+en WOFF2 pèsent 72 Ko au lieu de 184 Ko, mais **Flutter web ne sait pas les décoder**. Le moteur
+passe les octets de la police à Skia, dont le gestionnaire de fontes ne lit que du `sfnt` (TTF,
+OTF) ; à l'exécution, les cinq WOFF2 se téléchargent bien (200), échouent silencieusement au
+décodage, et l'application **retombe sur un Roboto téléchargé depuis `fonts.gstatic.com`** —
+exactement la dépendance réseau et le FOUT que ce document interdit. Vérifié au navigateur, capture
+et journal réseau à l'appui.
+
+Le bon levier est donc la compression de transport, que tout hébergeur statique applique :
+
+| Format | Poids sur le fil |
+|---|---|
+| TTF brut | 184 Ko |
+| TTF + gzip | 92 Ko |
+| **TTF + brotli** | **83 Ko** |
+| WOFF2 (inutilisable ici) | 72 Ko |
+
+Brotli sur le TTF arrive à 11 Ko du WOFF2. L'exigence opérationnelle est donc : **servir
+`assets/fonts/*.ttf` avec `Content-Encoding: br`**, pas convertir les fichiers.
+
 ### Hierarchy
 
 Échelle fixe en `rem`/`sp`, ratio ≈ 1.2. Pas de typographie fluide : l'utilisateur lit à DPI
@@ -751,6 +771,7 @@ la raison ; ils sont désormais **la** référence.
 | Point | Ce que disait le document | Ce que fait le code | Pourquoi |
 |---|---|---|---|
 | Densité `compacte` de `SlotChip` | 40 dp | 40 dp en lecture seule, **44 dp dès que la case est actionnable** | 40 dp passe sous le plancher tactile WCAG. La valeur d'affichage est conservée, la cible remonte au plancher quand il y a quelque chose à toucher. |
+| Densité `dense` de `SlotChip` | « jamais servie au tactile » | actionnable **au pointeur fin**, inerte au doigt | La matrice du ticket 016 se clique. Ce qui est interdit à 28 px, c'est le doigt, pas la souris. |
 | Glyphe de la case | `check_box` / `disabled_by_default` / `check_box_outline_blank`, et `check` / `close` / `remove` « dans la grille » | `StatusDescriptor` porte les deux : `icone` pour le badge, `iconeCase` pour la case | Deux glyphes par état, un seul objet. Aucun écran ne peut prendre le mauvais. |
 | `FocusTheme` | listé parmi les thèmes de composant | n'existe pas dans Flutter | L'anneau de focus passe par `ThemeData.focusColor` et par le `WidgetStateProperty` de chaque thème de composant. |
 | `themeMode: ThemeMode.system` | écrit explicitement dans `lib/app.dart` | laissé à la valeur par défaut de `MaterialApp`, qui **est** `ThemeMode.system` | L'écrire est un argument redondant que `flutter analyze` refuse, et `flutter analyze` doit être vierge. |
@@ -759,3 +780,45 @@ la raison ; ils sont désormais **la** référence.
 | Fichier `hachures.dart` | absent de la liste des composants | ajouté | Ce n'est pas un composant mais une primitive de dessin, partagée par `SlotChip` et `AppBanner` ; sans elle, une bannière devrait importer une case. |
 | `SyncEtat` | quatre états | cinq, avec `repos` | `SaveIndicator` doit exister sur un écran où rien n'est en cours. |
 | Écrans métier de remplacement | « chaque destination pointe sur un écran de remplacement neutre » | non livrés | Le ticket ne livre que le socle et `/dev/components` ; les destinations sont démontrées dans le catalogue. Les routes arrivent avec leurs tickets. |
+
+### Coût de la case dense, mesuré
+
+Le brief exige une case `dense` « sans état, sans animation, `const` autant que possible ». La
+version livrée le tient : `SlotChip` est un `StatelessWidget`, le halo de focus est relu depuis le
+`Focus` englobant au lieu d'un `setState`, et `Focus`, `MouseRegion`, `GestureDetector` et
+`MetaData` n'existent que si la case est respectivement actionnable ou branchée sur un glissement.
+
+Coût structurel d'**une** case dense, compté sur l'arbre d'éléments
+(`test/core/widgets/matrice_dense_test.dart`) :
+
+| | Éléments | Objets de rendu | `State` |
+|---|---|---|---|
+| Avant (ticket 004, première version) | 22 | 14 | 4 |
+| **Après, case inerte** | **13** | **9** | **0** |
+| **Après, case actionnable** | 25 | 13 | 3 |
+
+Sur les 3 720 cases du pire cas (60 membres × 62 créneaux), une matrice en lecture seule économise
+donc ~33 000 éléments, ~18 000 objets de rendu et **14 880 `State`**. La case actionnable compte
+trois éléments de plus qu'avant parce que `Actions`, `Focus` et `MouseRegion` y sont désormais
+explicites au lieu d'être empaquetés dans un `FocusableActionDetector` — mais elle crée un `State`
+de moins, un objet de rendu de moins, et surtout **elle fonctionne**, ce qui n'était pas le cas.
+
+Temps de première image, `flutter test` en mode debug sur un poste de développement :
+
+| Cas | Cases construites | Fichier seul | Suite complète en parallèle |
+|---|---|---|---|
+| Sans virtualisation, cases inertes | 3 720 | ~830 ms | ~1 675 ms |
+| Sans virtualisation, cases actionnables | 3 720 | ~940 ms | ~1 496 ms |
+| **Virtualisée (ce que fera le ticket 016)** | 2 790 visibles | ~800 ms | ~1 769 ms |
+| Défilement d'une page | — | ~600 ms | ~615 ms |
+
+⚠️ **Ces durées ne sont pas un budget, et le tableau dit pourquoi.** La même mesure double selon
+que le fichier tourne seul ou que la suite occupe tous les cœurs. Elles viennent d'un test de
+widgets en mode debug, où les assertions et l'absence de JIT chaud dominent ; l'ancienne
+implémentation mesure la même chose à ce bruit près. Le test ne pose donc qu'un garde-fou à 10 s,
+qui attrape un blocage ou une régression d'un facteur dix, et rien de plus fin.
+
+**Ce qui est acquis au ticket 004, c'est la structure**, elle parfaitement déterministe : une case
+dense inerte ne coûte plus aucun `State`, et un tiers d'éléments en moins. **Ce qui reste à faire
+au ticket 016**, c'est mesurer le budget de deux secondes sur un build `--profile` dans un vrai
+navigateur, avec la matrice réelle et ses en-têtes collants.

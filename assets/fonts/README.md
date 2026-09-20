@@ -32,3 +32,15 @@ fichier, aucun caractère manquant sur le français.
 Les italiques ne sont pas embarquées : `DESIGN.md § Typography` interdit l'italique comme moyen
 de hiérarchie. Les graisses 200, 300, 500 et 800 ne le sont pas non plus : l'échelle
 typographique n'utilise que 400, 600 et 700.
+
+## Pourquoi pas de WOFF2
+
+Essayé et mesuré au ticket 004. Les cinq fichiers en WOFF2 pèsent 72 Ko au lieu de 184, mais
+**Flutter web ne sait pas les décoder** : le moteur remet les octets à Skia, dont le gestionnaire de
+fontes ne lit que du `sfnt` (TTF, OTF). Au navigateur, les WOFF2 se téléchargent (200), échouent
+silencieusement au décodage, et l'application retombe sur un **Roboto téléchargé depuis
+`fonts.gstatic.com`** — la dépendance réseau que ces fichiers embarqués servent justement à éviter.
+
+Le levier correct est la compression de transport : TTF + brotli donne 83 Ko, soit 11 Ko de plus
+que le WOFF2, sans rien casser. Exigence d'hébergement : servir ce répertoire avec
+`Content-Encoding: br`.
