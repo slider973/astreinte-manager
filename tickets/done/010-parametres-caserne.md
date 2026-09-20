@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 008
 - **Branche** : `feat/010-parametres-caserne`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/9
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
