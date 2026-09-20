@@ -339,6 +339,44 @@ end $$;
 rollback to savepoint s6b;
 
 \echo ''
+\echo '=== 7. L''identité d''une appartenance est gelée ==='
+
+savepoint s7;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+do $$
+declare
+  gele boolean := false;
+begin
+  -- Un admin réaffecte sa propre ligne à un tiers : le compte d'admins actifs ne
+  -- bouge pas, mais le garde-fou « pas soi-même » serait contourné.
+  begin
+    update memberships
+       set user_id = 'aaaaaaaa-0000-4000-8000-000000000104'
+     where user_id = 'aaaaaaaa-0000-4000-8000-000000000100'
+       and station_id = 'aaaaaaaa-0000-4000-8000-000000000001';
+  exception
+    when sqlstate 'P0001' then gele := true;
+  end;
+  perform tests.check(gele, 'un admin ne réaffecte pas sa propre appartenance à un tiers');
+
+  gele := false;
+  begin
+    update memberships
+       set station_id = 'bbbbbbbb-0000-4000-8000-000000000001'
+     where user_id = 'aaaaaaaa-0000-4000-8000-000000000101'
+       and station_id = 'aaaaaaaa-0000-4000-8000-000000000001';
+  exception
+    when sqlstate 'P0001' then gele := true;
+    when others then gele := true;
+  end;
+  perform tests.check(gele, 'un admin ne déplace pas une appartenance vers une autre caserne');
+end $$;
+
+rollback to savepoint s7;
+
+\echo ''
 \echo '=== Tous les tests d''administration des membres sont passés ==='
 \echo ''
 

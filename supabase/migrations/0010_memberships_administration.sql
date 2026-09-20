@@ -52,6 +52,17 @@ begin
     if suppression then return old; else return new; end if;
   end if;
 
+  -- L'identité d'une appartenance ne se réécrit pas. Sans ce gel, un admin
+  -- réaffecte sa propre ligne à un tiers : la caserne garde bien un admin actif,
+  -- mais le garde-fou « pas soi-même » est contourné et l'auteur perd son accès
+  -- sans trace. Promouvoir quelqu'un se fait en modifiant SA ligne.
+  if not suppression
+     and (new.user_id is distinct from old.user_id
+          or new.station_id is distinct from old.station_id) then
+    raise exception 'membership_identity_frozen'
+      using hint = 'Le titulaire et la caserne d''une appartenance ne changent pas.';
+  end if;
+
   -- Seule la perte d'un admin actif est arbitrée ici. Renommer, promouvoir,
   -- réactiver : rien à protéger.
   if old.role <> 'admin' or old.status <> 'active' then
