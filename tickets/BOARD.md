@@ -6,13 +6,13 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 011 | [Grille de saisie des disponibilités](in-progress/011-saisie-dispos-grille.md) | P0 | 004 008 |  |
 
 ## À faire
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 007 | [Profil utilisateur](backlog/007-profil.md) | P1 | 005 |  |
-| 011 | [Grille de saisie des disponibilités](backlog/011-saisie-dispos-grille.md) | P0 | 004 008 |  |
 | 012 | [Raccourcis de sélection](backlog/012-raccourcis-selection.md) | P0 | 011 |  |
 | 013 | [Préférences de charge par mois](backlog/013-preferences-quotas.md) | P0 | 011 |  |
 | 014 | [Périodes, date limite et verrouillage](backlog/014-periodes-verrouillage.md) | P0 | 008 010 |  |
