@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 019 | [Publication et suivi des réponses](in-progress/019-publication-suivi.md) | P0 | 017 025 |  |
 
 ## À faire
 
@@ -13,7 +14,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 |---|---|---|---|---|
 | 007 | [Profil utilisateur](backlog/007-profil.md) | P1 | 005 |  |
 | 018 | [Proposition automatique de remplissage](backlog/018-proposition-automatique.md) | P1 | 017 |  |
-| 019 | [Publication et suivi des réponses](backlog/019-publication-suivi.md) | P0 | 017 025 |  |
 | 020 | [Réattribution d'un créneau refusé ou modifié](backlog/020-reattribution.md) | P0 | 019 |  |
 | 021 | [Écran des propositions pour le membre](backlog/021-ecran-propositions.md) | P0 | 008 024 |  |
 | 022 | [Relances automatiques](backlog/022-relances-auto.md) | P0 | 019 025 |  |
