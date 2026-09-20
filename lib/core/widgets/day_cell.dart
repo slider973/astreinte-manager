@@ -73,16 +73,41 @@ class DaySlot {
   );
 }
 
+/// Les deux façons de composer un jour, pour la **même** donnée.
+///
+/// Le choix n'est pas esthétique, il est arithmétique (brief 011 § 3) : sept
+/// colonnes de cases réclament `7 × 48 + 6 × 8 = 384 dp`, un téléphone de
+/// 360 dp n'en offre que 328 entre ses marges. La forme calendaire ne rentre
+/// pas sur un téléphone, et la faire rentrer coûterait soit des cases sous le
+/// plancher WCAG, soit des écarts de 2 dp entre deux cibles.
+enum DayCellOrientation {
+  /// Le bloc du calendrier : en-tête, puis les deux cases empilées, chacune
+  /// précédée de son icône de créneau. Employée dès `expanded` (≥ 840 dp).
+  colonne,
+
+  /// La ligne du registre : trois colonnes de largeur égale, `Date | Jour |
+  /// Nuit`. La composition de référence sur téléphone.
+  ///
+  /// L'icône du créneau n'y est **pas** répétée dans chaque cellule : elle
+  /// vit dans l'en-tête de colonnes épinglé, et c'est la position en colonne
+  /// qui distingue le jour de la nuit. Soixante-deux petits soleils et lunes
+  /// seraient du bruit sur un registre. La sémantique de chaque case, elle,
+  /// continue de dire « nuit » en toutes lettres.
+  ligne,
+}
+
 /// Un jour du mois : un **bloc réglé**, pas une carte.
 ///
 /// `DESIGN.md § Cards / Containers` : fond `surface`, filet 1 dp
 /// `outline-variant`, rayon 8, **sans ombre**. Les blocs ne s'imbriquent
 /// jamais.
 ///
-/// Composition, de haut en bas : le numéro du jour en `nombre-petit`, le nom
-/// du jour en `etiquette`, le marqueur de jour férié, puis les deux cases —
-/// jour au-dessus, nuit en dessous. Le jour courant porte un filet `primary`
-/// de 2 dp sur son bord gauche et le mot « Aujourd'hui » en semantics.
+/// En [DayCellOrientation.colonne], de haut en bas : le numéro du jour en
+/// `nombre-petit`, le nom du jour en `etiquette`, le marqueur de jour férié,
+/// puis les deux cases — jour au-dessus, nuit en dessous. En
+/// [DayCellOrientation.ligne], de gauche à droite : la date, la case du jour,
+/// la case de la nuit. Le jour courant porte un filet `primary` de 2 dp sur
+/// son bord gauche et le mot « Aujourd'hui » en semantics.
 class DayCell extends StatelessWidget {
   const DayCell({
     required this.numero,
@@ -91,12 +116,14 @@ class DayCell extends StatelessWidget {
     required this.nuit,
     required this.dateLongue,
     super.key,
+    this.orientation = DayCellOrientation.colonne,
     this.densite = SlotChipDensite.confortable,
     this.weekend = false,
     this.nomJourFerie,
     this.aujourdhui = false,
     this.horsMois = false,
     this.verrouille = false,
+    this.deuxNiveaux = false,
   });
 
   /// Numéro du jour dans le mois (1 à 31).
@@ -114,12 +141,17 @@ class DayCell extends StatelessWidget {
   /// Le créneau de nuit, avec son état et ses rappels.
   final DaySlot nuit;
 
+  /// Registre (une ligne) ou calendrier (un bloc). Défaut : le calendrier,
+  /// pour que l'existant ne bouge pas.
+  final DayCellOrientation orientation;
+
   final SlotChipDensite densite;
 
   /// Samedi, dimanche ou jour férié : fond `surface-dim`, nom en gras.
   final bool weekend;
 
-  /// Nom du jour férié, si c'en est un. Affiché en info-bulle **et** annoncé.
+  /// Nom du jour férié, si c'en est un. Affiché **en clair** en orientation
+  /// ligne, en info-bulle en orientation colonne, et annoncé dans les deux.
   final String? nomJourFerie;
 
   final bool aujourdhui;
@@ -129,6 +161,11 @@ class DayCell extends StatelessWidget {
 
   /// Mois verrouillé : les cases restent lisibles, l'interaction disparaît.
   final bool verrouille;
+
+  /// En orientation ligne et à très grande échelle de texte (> ×1.6), la
+  /// ligne passe à deux niveaux : la date au-dessus, les deux cases pleine
+  /// largeur en dessous. Rien n'est rogné, la hauteur devient libre.
+  final bool deuxNiveaux;
 
   bool get _inerte => horsMois || verrouille;
 
@@ -142,7 +179,30 @@ class DayCell extends StatelessWidget {
         ? theme.colorScheme.surfaceDim
         : theme.colorScheme.surface;
 
-    final enTete = Row(
+    final semantique = Semantics(
+      container: true,
+      label: <String>[
+        dateLongue,
+        if (aujourdhui) AppStrings.jourAujourdhui,
+        if (ferie) AppStrings.jourFerieNomme(nomJourFerie!),
+        if (weekend && !ferie) AppStrings.jourWeekend,
+        if (horsMois) AppStrings.jourHorsMois,
+        if (verrouille) AppStrings.periodeVerrouillee,
+      ].join('. '),
+      child: orientation == DayCellOrientation.ligne
+          ? _Ligne(cellule: this, fond: fond, ferie: ferie)
+          : _Bloc(cellule: this, fond: fond, ferie: ferie, statuts: statuts),
+    );
+
+    return horsMois
+        ? Opacity(opacity: 0.45, child: semantique)
+        : semantique;
+  }
+
+  /// Le numéro du jour et le nom du jour, communs aux deux orientations.
+  Widget _numeroEtNom(BuildContext context, {required bool ferie}) {
+    final theme = Theme.of(context);
+    return Row(
       children: <Widget>[
         Text(
           '$numero',
@@ -161,74 +221,16 @@ class DayCell extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        if (ferie)
-          Tooltip(
-            message: AppStrings.jourFerieNomme(nomJourFerie!),
-            child: Icon(
-              Icons.star,
-              size: AppTouch.iconePetite,
-              color: theme.colorScheme.tertiary,
-            ),
-          ),
       ],
-    );
-
-    final contenu = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        enTete,
-        const SizedBox(height: AppSpacing.sm),
-        _case(context, CreneauType.jour, jour),
-        const SizedBox(height: AppSpacing.xs),
-        _case(context, CreneauType.nuit, nuit),
-      ],
-    );
-
-    return Semantics(
-      container: true,
-      label: <String>[
-        dateLongue,
-        if (aujourdhui) AppStrings.jourAujourdhui,
-        if (ferie) AppStrings.jourFerieNomme(nomJourFerie!),
-        if (weekend && !ferie) AppStrings.jourWeekend,
-        if (horsMois) AppStrings.jourHorsMois,
-        if (verrouille) AppStrings.periodeVerrouillee,
-      ].join('. '),
-      child: Opacity(
-        opacity: horsMois ? 0.45 : 1,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: fond,
-            borderRadius: AppRadius.controleRadius,
-            border: Border.all(color: statuts.filetDecoratif),
-          ),
-          child: Stack(
-            children: <Widget>[
-              // Le jour courant se signe par un filet d'encre en marge, pas
-              // par une pastille colorée.
-              if (aujourdhui)
-                PositionedDirectional(
-                  top: 0,
-                  bottom: 0,
-                  start: 0,
-                  child: ColoredBox(
-                    color: theme.colorScheme.primary,
-                    child: const SizedBox(width: AppStroke.etat),
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                child: contenu,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _case(BuildContext context, CreneauType creneau, DaySlot slot) {
+  Widget _case(
+    BuildContext context,
+    CreneauType creneau,
+    DaySlot slot, {
+    required bool avecIcone,
+  }) {
     final descripteurCreneau = context.statuts.creneau(creneau);
 
     final chip = SlotChip(
@@ -253,7 +255,7 @@ class DayCell extends StatelessWidget {
       },
     );
 
-    if (densite == SlotChipDensite.dense) return chip;
+    if (!avecIcone || densite == SlotChipDensite.dense) return chip;
 
     // Jour et nuit se distinguent par l'icône et par la position — le fond ne
     // fait que confirmer (`DESIGN.md § Créneau`).
@@ -267,6 +269,200 @@ class DayCell extends StatelessWidget {
         const SizedBox(width: AppSpacing.xs),
         Expanded(child: chip),
       ],
+    );
+  }
+}
+
+/// La composition calendaire : un bloc réglé, deux cases empilées.
+class _Bloc extends StatelessWidget {
+  const _Bloc({
+    required this.cellule,
+    required this.fond,
+    required this.ferie,
+    required this.statuts,
+  });
+
+  final DayCell cellule;
+  final Color fond;
+  final bool ferie;
+  final AppStatusColors statuts;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final enTete = Row(
+      children: <Widget>[
+        Expanded(child: cellule._numeroEtNom(context, ferie: ferie)),
+        if (ferie)
+          Tooltip(
+            message: AppStrings.jourFerieNomme(cellule.nomJourFerie!),
+            child: Icon(
+              Icons.star,
+              size: AppTouch.iconePetite,
+              color: theme.colorScheme.tertiary,
+            ),
+          ),
+      ],
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: fond,
+        borderRadius: AppRadius.controleRadius,
+        border: Border.all(color: statuts.filetDecoratif),
+      ),
+      child: Stack(
+        children: <Widget>[
+          // Le jour courant se signe par un filet d'encre en marge, pas par
+          // une pastille colorée.
+          if (cellule.aujourdhui)
+            PositionedDirectional(
+              top: 0,
+              bottom: 0,
+              start: 0,
+              child: ColoredBox(
+                color: theme.colorScheme.primary,
+                child: const SizedBox(width: AppStroke.etat),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                enTete,
+                const SizedBox(height: AppSpacing.sm),
+                cellule._case(
+                  context,
+                  CreneauType.jour,
+                  cellule.jour,
+                  avecIcone: true,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                cellule._case(
+                  context,
+                  CreneauType.nuit,
+                  cellule.nuit,
+                  avecIcone: true,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// La composition du registre : `Date | Jour | Nuit`, trois colonnes égales.
+///
+/// Ce n'est pas un bloc réglé mais une **ligne de registre** : pas de filet
+/// qui l'entoure, pas de rayon. La réglure entre deux jours est posée par la
+/// grille, qui seule sait où commencent les lundis.
+class _Ligne extends StatelessWidget {
+  const _Ligne({
+    required this.cellule,
+    required this.fond,
+    required this.ferie,
+  });
+
+  final DayCell cellule;
+  final Color fond;
+  final bool ferie;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final date = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        cellule._numeroEtNom(context, ferie: ferie),
+        if (ferie)
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.star,
+                size: AppTouch.iconePetite,
+                color: theme.colorScheme.tertiary,
+              ),
+              const SizedBox(width: AppSpacing.xxs),
+              // Le nom du férié en clair : la place existe dans la colonne,
+              // et une info-bulle au survol ne serait pas un accès.
+              Expanded(
+                child: Text(
+                  cellule.nomJourFerie!,
+                  style: theme.textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+
+    final caseJour = cellule._case(
+      context,
+      CreneauType.jour,
+      cellule.jour,
+      avecIcone: false,
+    );
+    final caseNuit = cellule._case(
+      context,
+      CreneauType.nuit,
+      cellule.nuit,
+      avecIcone: false,
+    );
+
+    final contenu = cellule.deuxNiveaux
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              date,
+              const SizedBox(height: AppSpacing.sm),
+              caseJour,
+              const SizedBox(height: AppSpacing.entreCibles),
+              caseNuit,
+            ],
+          )
+        : Row(
+            children: <Widget>[
+              Expanded(child: date),
+              const SizedBox(width: AppSpacing.entreCibles),
+              Expanded(child: caseJour),
+              const SizedBox(width: AppSpacing.entreCibles),
+              Expanded(child: caseNuit),
+            ],
+          );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(color: fond),
+      child: Stack(
+        children: <Widget>[
+          if (cellule.aujourdhui)
+            PositionedDirectional(
+              top: 0,
+              bottom: 0,
+              start: 0,
+              child: ColoredBox(
+                color: theme.colorScheme.primary,
+                child: const SizedBox(width: AppStroke.etat),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
+            child: contenu,
+          ),
+        ],
+      ),
     );
   }
 }

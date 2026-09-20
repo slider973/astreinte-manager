@@ -1,6 +1,7 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/slot_chip.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -345,4 +346,147 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  group('SlotChip — état pressé (brief 011 § 6.1)', () {
+    /// La peinture de fond de la case, telle que le `CustomPaint` la porte.
+    Color fond(WidgetTester tester) {
+      final peinture = tester.widget<CustomPaint>(
+        find
+            .descendant(
+              of: find.byType(SlotChip),
+              matching: find.byType(CustomPaint),
+            )
+            .first,
+      );
+      final couleurs = <Color>[];
+      peinture.painter!.paint(
+        _CanvasEspion(couleurs),
+        const Size(104, 48),
+      );
+      return couleurs.first;
+    }
+
+    testWidgets('le fond s\'assombrit au contact et revient au relâchement', (
+      tester,
+    ) async {
+      await monter(
+        tester,
+        SizedBox(
+          height: 48,
+          child: _case(DisponibiliteEtat.nonSaisi, onTap: () {}),
+        ),
+      );
+
+      final repos = fond(tester);
+      final geste = await tester.startGesture(
+        tester.getCenter(find.byType(SlotChip)),
+      );
+      await tester.pump();
+      final presse = fond(tester);
+      expect(presse, isNot(repos));
+
+      await geste.up();
+      await tester.pump();
+      expect(fond(tester), repos);
+    });
+
+    testWidgets('rien ne bouge sous le doigt : ni taille, ni bordure', (
+      tester,
+    ) async {
+      await monter(
+        tester,
+        SizedBox(
+          height: 48,
+          child: _case(DisponibiliteEtat.disponible, onTap: () {}),
+        ),
+      );
+
+      final avant = tester.getRect(find.byType(SlotChip));
+      final geste = await tester.startGesture(
+        tester.getCenter(find.byType(SlotChip)),
+      );
+      await tester.pump();
+
+      expect(tester.getRect(find.byType(SlotChip)), avant);
+      await geste.up();
+      await tester.pump();
+    });
+
+    testWidgets('un défilement annule l\'appui au lieu de le laisser posé', (
+      tester,
+    ) async {
+      await monter(
+        tester,
+        ListView(
+          children: <Widget>[
+            for (var index = 0; index < 40; index++)
+              SizedBox(
+                height: 48,
+                child: _case(DisponibiliteEtat.nonSaisi, onTap: () {}),
+              ),
+          ],
+        ),
+      );
+
+      final repos = fond(tester);
+      final geste = await tester.startGesture(
+        tester.getCenter(find.byType(SlotChip).first),
+      );
+      // Dans un défilant, `onTapDown` attend le délai d'appui : la case ne
+      // s'assombrit pas sous un doigt qui passe.
+      await tester.pump(kPressTimeout + const Duration(milliseconds: 20));
+      expect(fond(tester), isNot(repos));
+
+      // Le doigt part : le Scrollable gagne l'arène, la case se rend.
+      await geste.moveBy(const Offset(0, -200));
+      await tester.pump();
+      expect(fond(tester), repos);
+
+      await geste.up();
+      await tester.pump();
+    });
+
+    testWidgets('une case verrouillée ne crée aucun état d\'appui', (
+      tester,
+    ) async {
+      await monter(
+        tester,
+        SizedBox(
+          height: 48,
+          child: _case(
+            DisponibiliteEtat.disponible,
+            onTap: () {},
+            verrouille: true,
+          ),
+        ),
+      );
+
+      expect(
+        find.descendant(
+          of: find.byType(SlotChip),
+          matching: find.byType(GestureDetector),
+        ),
+        findsNothing,
+      );
+    });
+  });
+}
+
+/// Un `Canvas` qui ne dessine rien et retient les couleurs demandées.
+///
+/// Le seul moyen honnête de vérifier le fond d'une case : il est peint, pas
+/// posé dans une `BoxDecoration` qu'un test pourrait lire.
+class _CanvasEspion implements Canvas {
+  _CanvasEspion(this.couleurs);
+
+  final List<Color> couleurs;
+
+  @override
+  void drawRRect(RRect rrect, Paint paint) => couleurs.add(paint.color);
+
+  @override
+  void drawPath(Path path, Paint paint) => couleurs.add(paint.color);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
 }

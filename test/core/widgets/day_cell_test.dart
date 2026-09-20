@@ -336,4 +336,150 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('DayCell — orientation ligne (registre, ticket 011)', () {
+    DayCell ligne({
+      bool weekend = false,
+      String? ferie,
+      bool aujourdhui = false,
+      bool verrouille = false,
+      bool deuxNiveaux = false,
+    }) => DayCell(
+      numero: 4,
+      nomJour: 'sam.',
+      dateLongue: 'Samedi 4 octobre',
+      orientation: DayCellOrientation.ligne,
+      weekend: weekend,
+      nomJourFerie: ferie,
+      aujourdhui: aujourdhui,
+      verrouille: verrouille,
+      deuxNiveaux: deuxNiveaux,
+      jour: const DaySlot(etat: DisponibiliteEtat.disponible),
+      nuit: const DaySlot(etat: DisponibiliteEtat.nonSaisi),
+    );
+
+    for (final brightness in Brightness.values) {
+      testWidgets('${brightness.name} : la ligne se rend', (tester) async {
+        await monter(
+          tester,
+          SizedBox(width: 358, child: ligne(weekend: true, ferie: 'Toussaint')),
+          brightness: brightness,
+        );
+
+        expect(find.byType(SlotChip), findsNWidgets(2));
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('pose les trois colonnes de gauche à droite', (tester) async {
+      await monter(tester, SizedBox(width: 358, child: ligne()));
+
+      final date = tester.getRect(find.text('4'));
+      final jour = tester.getRect(find.byType(SlotChip).first);
+      final nuit = tester.getRect(find.byType(SlotChip).last);
+
+      expect(date.left, lessThan(jour.left));
+      expect(jour.right, lessThanOrEqualTo(nuit.left));
+      // Les deux cases se partagent la même largeur, à 1 dp près.
+      expect((jour.width - nuit.width).abs(), lessThan(1));
+    });
+
+    testWidgets('ne répète pas l\'icône du créneau dans chaque cellule', (
+      tester,
+    ) async {
+      await monter(tester, SizedBox(width: 358, child: ligne()));
+
+      // L'icône vit dans l'en-tête de colonnes épinglé (brief § 6.5).
+      expect(find.byIcon(Icons.light_mode), findsNothing);
+      expect(find.byIcon(Icons.bedtime), findsNothing);
+    });
+
+    testWidgets('affiche le nom du férié en clair, pas en info-bulle', (
+      tester,
+    ) async {
+      await monter(
+        tester,
+        SizedBox(width: 358, child: ligne(weekend: true, ferie: 'Toussaint')),
+      );
+
+      expect(find.text('Toussaint'), findsOneWidget);
+      expect(find.byIcon(Icons.star), findsOneWidget);
+    });
+
+    testWidgets('la case garde ses 48 dp et sa cible tactile', (tester) async {
+      await monter(
+        tester,
+        SizedBox(
+          width: 358,
+          child: DayCell(
+            numero: 4,
+            nomJour: 'sam.',
+            dateLongue: 'Samedi 4 octobre',
+            orientation: DayCellOrientation.ligne,
+            jour: DaySlot(etat: DisponibiliteEtat.nonSaisi, onTap: () {}),
+            nuit: DaySlot(etat: DisponibiliteEtat.nonSaisi, onTap: () {}),
+          ),
+        ),
+      );
+
+      verifierCiblesTactiles(tester, find.byType(SlotChip));
+      for (var index = 0; index < 2; index++) {
+        // ~104 dp de large sur un téléphone de 360 : un couloir de peinture
+        // large comme un pouce ganté (brief § 3).
+        expect(
+          tester.getSize(find.byType(SlotChip).at(index)).width,
+          greaterThan(100),
+        );
+      }
+    });
+
+    testWidgets('la sémantique de la case dit toujours « nuit »', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await monter(tester, SizedBox(width: 358, child: ligne()));
+
+      expect(
+        _chip(tester, 1).libelleSemantique,
+        contains(AppStrings.creneauNuit.toLowerCase()),
+      );
+
+      handle.dispose();
+    });
+
+    testWidgets('à deux niveaux, les cases passent pleine largeur', (
+      tester,
+    ) async {
+      await monter(
+        tester,
+        SizedBox(width: 358, child: ligne(deuxNiveaux: true)),
+        echelleTexte: 2,
+      );
+
+      final jour = tester.getRect(find.byType(SlotChip).first);
+      final nuit = tester.getRect(find.byType(SlotChip).last);
+      expect(jour.bottom, lessThanOrEqualTo(nuit.top));
+      expect(jour.width, greaterThan(300));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('verrouillée, la ligne n\'est ni actionnable ni focalisable', (
+      tester,
+    ) async {
+      await monter(
+        tester,
+        SizedBox(width: 358, child: ligne(verrouille: true)),
+      );
+
+      expect(_chip(tester, 0).onTap, isNull);
+      expect(_chip(tester, 0).verrouille, isTrue);
+      expect(
+        find.descendant(
+          of: find.byType(DayCell),
+          matching: find.byType(Focus),
+        ),
+        findsNothing,
+      );
+    });
+  });
 }
