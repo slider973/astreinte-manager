@@ -385,6 +385,32 @@ language sql stable security definer set search_path = public, pg_temp as $$
 $$;
 ```
 
+### Fonctions d'invitation (migration `0009`, ticket 006)
+
+Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
+les Edge Functions `invite-member` et `accept-invitation`, jamais par un client.
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `create_invitation` | `(p_station uuid, p_email text, p_role membership_role, p_invited_by uuid) returns jsonb` | Vérifie que `p_invited_by` est admin actif de `p_station`, crée ou prolonge la ligne `invitations`, journalise dans `audit_log`. Renvoie le token. |
+| `accept_invitation` | `(p_token text, p_user_id uuid, p_email text) returns jsonb` | Vérifie le token, son expiration, qu'il n'est pas déjà accepté et que `p_email` est bien l'adresse invitée ; crée la `memberships` active et marque `accepted_at`, en une transaction. |
+| `mask_email` | `(p_email text) returns text` | Masque la partie locale d'une adresse, pour les messages rendus à un porteur de lien qui n'est pas le destinataire. |
+
+Ni exception ni `raise` pour les refus métier : les deux fonctions renvoient
+`{"ok": false, "code": …}` et l'Edge Function traduit le code en statut HTTP. La liste des
+codes et la forme des réponses HTTP sont dans
+[`supabase/functions/README.md`](../supabase/functions/README.md).
+
+Pourquoi du SQL plutôt que plusieurs requêtes depuis Deno : chaque parcours touche
+`invitations`, `memberships` et `audit_log` et doit être tout ou rien. Une fonction plpgsql
+s'exécute dans une transaction implicite ; trois appels PostgREST, non.
+
+L'exécution est révoquée de `public`, **et nommément de `anon` et `authenticated`** :
+`api.auto_expose_new_tables` pose des privilèges par défaut qui accordent `execute` à ces
+deux rôles sur toute fonction créée dans `public`, qu'un simple `revoke from public` ne
+retire pas. Sans ce verrou, un admin lirait le token en RPC PostgREST — celui-là même que
+`0008` a retiré de son `grant` de `select`.
+
 ## 4. Row Level Security
 
 RLS activé sur toutes les tables. Principes :
@@ -530,8 +556,8 @@ refusées, retardataires (proposées depuis plus de `late_report_hours`).
 | `publish-schedule` | app admin | Passe le planning en `published`, renseigne `proposed_at`, déclenche les notifications groupées |
 | `reassign-shift` | app admin | Marque l'ancienne attribution `replaced`, crée la nouvelle, notifie le nouveau membre et l'admin |
 | `auto-propose` | app admin | Heuristique de remplissage du brouillon |
-| `invite-member` | app admin | Crée l'invitation et envoie l'email |
-| `accept-invitation` | app, après login | Vérifie le token, crée la membership |
+| `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`) |
+| `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006) |
 | `stripe-webhook` | Stripe | Met à jour `subscriptions` |
 | `create-checkout` | app admin | Crée une session Stripe Checkout |
 | `ics-feed` | GET public avec token par membre | Génère le flux calendrier des astreintes acceptées |
@@ -558,7 +584,15 @@ Les index listés dans les DDL couvrent :
 - le centre de notifications : `notifications (user_id) where read_at is null`.
 
 Realtime activé sur `assignments`, `schedules`, `notifications` uniquement, filtré par
-`station_id` côté client.
+`station_id` côté client. Aucune table n'est encore dans la publication `supabase_realtime`
+(elle sera posée avec les plannings, ticket 017).
+
+`invitations` **n'y entrera pas**, et c'est une décision de sécurité, pas un oubli : la
+charge utile de `postgres_changes` porte toutes les colonnes publiées. Les politiques RLS
+filtrent les *lignes*, pas les *colonnes* — le `grant` de colonne qui cache
+`invitations.token` au rôle `authenticated` (`0008`) ne s'applique pas à ce canal. Publier
+cette table distribuerait le jeton d'invitation à tous les admins à l'écoute. La liste des
+invitations en attente se relit donc par requête (après une action, au retour sur l'écran).
 
 ## 10. Migrations
 
@@ -571,14 +605,18 @@ Ordre proposé :
 6. `0006_subscriptions_audit_super_admins.sql`
 7. `0007_functions_rls.sql`
 8. `0008_rls_durcissement.sql` (revue du ticket 008 : `pg_temp`, liste blanche du trigger, cohérence du `station_id` avec la ligne parente, token d'invitation)
-9. `0009_views.sql`
-10. `0010_cron.sql`
+9. `0009_invitation_functions.sql` (ticket 006 : `mask_email`, `create_invitation`, `accept_invitation`, exécution réservée à `service_role`)
+10. `0010_views.sql`
+11. `0011_cron.sql`
 
 Chaque migration est rejouable sur un projet vide et testée en local avec `supabase start`.
 
 Les politiques RLS sont couvertes par `supabase/tests/rls_test.sql`, exécuté par
 `scripts/test_rls.sh` (pas de pgTAP : le script lève une exception et rend un code non nul
-dès qu'une politique fuit).
+dès qu'une politique fuit). Les fonctions d'invitation de `0009` sont couvertes par
+`supabase/tests/invitations_test.sql`, joué par le même script. La couche HTTP des Edge
+Functions est testée par `scripts/test_functions.sh`, qui a besoin de
+`supabase functions serve` et reste donc local : la CI démarre la pile sans `edge-runtime`.
 
 `supabase/types/database.types.ts` est généré par `scripts/gen_types.sh` et versionné
 volontairement : les Edge Functions (section 7) l'importent et la CI doit pouvoir les typer sans

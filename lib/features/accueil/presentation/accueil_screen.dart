@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/session/appartenance.dart';
 import '../../../core/session/deconnexion.dart';
 import '../../../core/session/session_providers.dart';
@@ -17,14 +19,30 @@ import '../../../core/widgets/empty_state.dart';
 /// la suivent arrivent aux tickets suivants et le disent, plutôt que de rester
 /// muets sous le doigt.
 class AccueilScreen extends ConsumerStatefulWidget {
-  const AccueilScreen({super.key});
+  const AccueilScreen({super.key, this.ongletInitial = 0});
+
+  /// L'onglet ouvert à l'arrivée. Porté par l'URL : revenir depuis l'écran
+  /// « Membres », qui a sa propre route, ne ramène pas sur « Mon mois » quand
+  /// on a demandé « Planning ».
+  final int ongletInitial;
 
   @override
   ConsumerState<AccueilScreen> createState() => _AccueilScreenState();
 }
 
 class _AccueilScreenState extends ConsumerState<AccueilScreen> {
-  int _destination = 0;
+  late int _destination = widget.ongletInitial;
+
+  /// La destination « Admin » n'est pas un onglet local : c'est une route.
+  static const String _routeAdmin = 'admin';
+
+  void _choisir(int index, List<AppDestination> destinations) {
+    if (destinations[index].route == _routeAdmin) {
+      context.goNamed(AppRoutes.membresName);
+      return;
+    }
+    setState(() => _destination = index);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +56,7 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
       titre: AppStrings.appTitle,
       destinations: destinations,
       indexSelectionne: index,
-      onDestination: (nouvelle) => setState(() => _destination = nouvelle),
+      onDestination: (nouvelle) => _choisir(nouvelle, destinations),
       child: index == 0
           ? _Contenu(appartenance: appartenance)
           : EmptyState(

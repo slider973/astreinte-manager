@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../core/theme/app_spacing.dart';
+import '../theme/app_spacing.dart';
 
 /// Un champ de saisie du système, avec son libellé **au-dessus** et son
 /// message d'erreur annoncé.
@@ -10,8 +10,8 @@ import '../../../../core/theme/app_spacing.dart';
 /// texte d'invite), texte à 16 sp minimum, erreur avec filet 2 dp, icône
 /// `error_outline`, message sous le champ et annonce sans déplacer le focus.
 /// Le libellé et le champ sont fusionnés en un seul nœud d'accessibilité.
-class ChampAuth extends StatelessWidget {
-  const ChampAuth({
+class ChampTexte extends StatelessWidget {
+  const ChampTexte({
     required this.libelle,
     required this.controleur,
     required this.clavier,
@@ -27,6 +27,7 @@ class ChampAuth extends StatelessWidget {
     this.onSoumission,
     this.autofocus = false,
     this.actif = true,
+    this.lignes = 1,
   });
 
   final String libelle;
@@ -49,9 +50,14 @@ class ChampAuth extends StatelessWidget {
   final bool autofocus;
   final bool actif;
 
+  /// Nombre de lignes visibles. Au-delà d'une, le champ accepte les retours à
+  /// la ligne : la touche entrée saute une ligne au lieu de valider.
+  final int lignes;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final multiligne = lignes > 1;
 
     return MergeSemantics(
       child: Column(
@@ -61,9 +67,11 @@ class ChampAuth extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           TextField(
             controller: controleur,
-            keyboardType: clavier,
+            keyboardType: multiligne ? TextInputType.multiline : clavier,
             autofillHints: actif ? indicesRemplissage : null,
             maxLength: longueurMax,
+            maxLines: lignes,
+            minLines: multiligne ? lignes : null,
             inputFormatters: formateurs,
             style: style,
             textAlign: alignement,
@@ -71,10 +79,13 @@ class ChampAuth extends StatelessWidget {
             enabled: actif,
             onChanged: onChanged,
             onSubmitted: onSoumission,
-            textInputAction: TextInputAction.done,
+            textInputAction: multiligne
+                ? TextInputAction.newline
+                : TextInputAction.done,
             decoration: InputDecoration(
               hintText: texteInvite,
               counterText: '',
+              alignLabelWithHint: multiligne,
               error: erreur == null ? null : _MessageErreur(texte: erreur!),
             ),
           ),

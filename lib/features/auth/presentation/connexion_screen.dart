@@ -10,10 +10,10 @@ import '../../../core/router/app_router.dart';
 import '../../../core/session/email.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
+import '../../../core/widgets/champ_texte.dart';
+import '../../../core/widgets/ecran_simple.dart';
 import '../../../core/widgets/primary_button.dart';
 import 'controllers/connexion_controller.dart';
-import 'widgets/auth_layout.dart';
-import 'widgets/champ_auth.dart';
 
 /// Première étape : l'adresse e-mail.
 ///
@@ -57,7 +57,7 @@ class _ConnexionScreenState extends ConsumerState<ConnexionScreen> {
     final erreur = etat.erreur;
     final erreurDeChamp = erreur != null && erreur.estErreurDeChamp;
 
-    return AuthLayout(
+    return EcranSimple(
       titre: AppStrings.connexionTitre,
       banniere: erreur != null && !erreurDeChamp
           ? AppBanner(
@@ -75,7 +75,7 @@ class _ConnexionScreenState extends ConsumerState<ConnexionScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        ChampAuth(
+        ChampTexte(
           libelle: AppStrings.connexionEmailLabel,
           controleur: _email,
           clavier: TextInputType.emailAddress,

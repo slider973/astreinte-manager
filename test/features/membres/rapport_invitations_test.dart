@@ -1,0 +1,175 @@
+import 'package:astreinte_sp/core/l10n/app_strings.dart';
+import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/features/membres/domain/invitation.dart';
+import 'package:astreinte_sp/features/membres/domain/membre_caserne.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// Les corps de réponse viennent de `supabase/functions/README.md`.
+void main() {
+  group('RapportInvitations', () {
+    test('lit un lot mêlant invitée, renvoyée et erreur', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'ok': false,
+        'invited': 2,
+        'failed': 1,
+        'results': <dynamic>[
+          {
+            'email': 'recrue@exemple.fr',
+            'status': 'invited',
+            'invitation_id': 'i-1',
+            'role': 'member',
+            'email_sent': true,
+          },
+          {
+            'email': 'ancien@exemple.fr',
+            'status': 'resent',
+            'email_sent': true,
+          },
+          {
+            'email': 'deja@exemple.fr',
+            'status': 'error',
+            'code': 'already_member',
+          },
+        ],
+      });
+
+      expect(rapport.envoyees, 2);
+      expect(rapport.echecs, 1);
+      expect(rapport.toutEstPasse, isFalse);
+      expect(rapport.adressesEnEchec, <String>['deja@exemple.fr']);
+      expect(rapport.resultats[1].statut, StatutResultatInvitation.renvoyee);
+      expect(rapport.resultats[2].detail, AppStrings.inviteDejaMembre);
+    });
+
+    test('un courriel non parti n\'est pas un échec, mais se dit', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'results': <dynamic>[
+          {
+            'email': 'recrue@exemple.fr',
+            'status': 'invited',
+            'email_sent': false,
+          },
+        ],
+      });
+
+      expect(rapport.echecs, 0);
+      expect(rapport.resultats.single.enEchec, isFalse);
+      expect(
+        rapport.resultats.single.detail,
+        AppStrings.resultatCourrielNonParti,
+      );
+    });
+
+    test('un statut inconnu est traité comme une erreur', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'results': <dynamic>[
+          {'email': 'x@exemple.fr', 'status': 'surprise'},
+        ],
+      });
+
+      expect(rapport.resultats.single.enEchec, isTrue);
+      expect(rapport.resultats.single.detail, AppStrings.inviteErreurServeur);
+    });
+
+    test('chaque code de refus a sa phrase', () {
+      expect(
+        MotifEchecInvitation.depuisCode('invalid_email'),
+        MotifEchecInvitation.adresseInvalide,
+      );
+      expect(
+        MotifEchecInvitation.depuisCode('account_failed'),
+        MotifEchecInvitation.compteImpossible,
+      );
+      expect(
+        MotifEchecInvitation.depuisCode('conflict'),
+        MotifEchecInvitation.conflit,
+      );
+      // Deux refus globaux qui redescendent par adresse quand l'état change
+      // entre le contrôle préalable et la création.
+      expect(
+        MotifEchecInvitation.depuisCode('station_suspended'),
+        MotifEchecInvitation.caserneSuspendue,
+      );
+      expect(
+        MotifEchecInvitation.depuisCode('not_admin'),
+        MotifEchecInvitation.nonAdmin,
+      );
+      for (final motif in MotifEchecInvitation.values) {
+        expect(motif.message, isNotEmpty);
+      }
+    });
+
+    test('les refus de la requête entière sont nommés', () {
+      expect(
+        ErreurInvitation.depuisCode('not_admin'),
+        ErreurInvitation.nonAdmin,
+      );
+      expect(
+        ErreurInvitation.depuisCode('station_suspended'),
+        ErreurInvitation.caserneSuspendue,
+      );
+      expect(
+        ErreurInvitation.depuisCode('station_not_found'),
+        ErreurInvitation.caserneInconnue,
+      );
+      expect(
+        ErreurInvitation.depuisCode('inattendu'),
+        ErreurInvitation.inconnue,
+      );
+    });
+  });
+
+  group('Invitation', () {
+    test('lit une ligne de invitations sans jamais attendre le jeton', () {
+      final invitation = Invitation.depuisJson(const <String, dynamic>{
+        'id': 'i-1',
+        'email': 'recrue@exemple.fr',
+        'role': 'admin',
+        'expires_at': '2026-10-04T13:27:19.268869+00:00',
+        'created_at': '2026-09-20T13:27:19.268869+00:00',
+      });
+
+      expect(invitation.role, RoleMembre.admin);
+      expect(invitation.expireLe.isAfter(invitation.creeLe), isTrue);
+      expect(
+        invitation.expiree(DateTime.parse('2026-10-05T00:00:00Z')),
+        isTrue,
+      );
+      expect(
+        invitation.expiree(DateTime.parse('2026-10-01T00:00:00Z')),
+        isFalse,
+      );
+    });
+  });
+
+  group('MembreCaserne', () {
+    test('joint le profil et ne laisse jamais une ligne muette', () {
+      final avecNom = MembreCaserne.depuisJson(const <String, dynamic>{
+        'id': 'm-1',
+        'user_id': 'u-1',
+        'role': 'member',
+        'status': 'active',
+        'display_name': 'Marie L.',
+        'profiles': <String, dynamic>{
+          'first_name': 'Marie',
+          'last_name': 'Lefebvre',
+          'email': 'membre1@caserne-a.test',
+        },
+      });
+      expect(avecNom.libelle, 'Marie Lefebvre');
+
+      final sansNom = MembreCaserne.depuisJson(const <String, dynamic>{
+        'id': 'm-2',
+        'user_id': 'u-2',
+        'role': 'member',
+        'status': 'active',
+        'profiles': <String, dynamic>{
+          'first_name': '',
+          'last_name': '',
+          'email': 'nouveau@caserne-a.test',
+        },
+      });
+      expect(sansNom.libelle, 'nouveau@caserne-a.test');
+    });
+  });
+}

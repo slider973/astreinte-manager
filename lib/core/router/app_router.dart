@@ -9,9 +9,16 @@ import '../../features/auth/presentation/connexion_screen.dart';
 import '../../features/demarrage/presentation/configuration_absente_screen.dart';
 import '../../features/demarrage/presentation/demarrage_screen.dart';
 import '../../features/dev/presentation/dev_components_screen.dart';
+import '../../features/invitation/presentation/invitation_screen.dart';
+import '../../features/membres/presentation/inviter_screen.dart';
+import '../../features/membres/presentation/membres_screen.dart';
+import '../../features/onboarding/presentation/guide_screen.dart';
+import '../../features/onboarding/presentation/installation_screen.dart';
+import '../../features/onboarding/presentation/profil_accueil_screen.dart';
 import '../env.dart';
 import '../session/email.dart';
 import '../session/etat_auth.dart';
+import '../session/jeton_invitation.dart';
 import '../session/session_providers.dart';
 import '../supabase/supabase_bootstrap.dart';
 import 'auth_redirection.dart';
@@ -44,6 +51,39 @@ abstract final class AppRoutes {
   /// Connecté, mais sans appartenance active à une caserne.
   static const String aucuneCaserne = '/aucune-caserne';
   static const String aucuneCaserneName = 'aucuneCaserne';
+
+  /// L'onglet à ouvrir sur l'accueil, quand on y revient depuis un écran de
+  /// premier niveau qui a sa propre route (« Admin »).
+  static const String parametreOnglet = 'onglet';
+
+  /// Administration de la caserne : les membres et les invitations
+  /// (ticket 006).
+  static const String membres = '/admin/membres';
+  static const String membresName = 'membres';
+
+  /// Le formulaire d'invitation, enfant de l'écran des membres : le retour du
+  /// navigateur ramène à la liste.
+  static const String inviterChemin = 'inviter';
+  static const String inviterName = 'inviterMembres';
+
+  /// Le lien reçu par courriel. **Il ne porte que le jeton** : ni l'adresse
+  /// invitée, ni le nom de la caserne (`supabase/functions/README.md`).
+  static const String invitation = '/invite/:$parametreJeton';
+  static const String invitationName = 'invitation';
+  static const String parametreJeton = 'jeton';
+  static const String prefixeInvitation = '/invite/';
+
+  /// Le chemin d'un jeton donné, tel que le construit l'Edge Function.
+  static String cheminInvitation(String jeton) => '$prefixeInvitation$jeton';
+
+  /// L'accueil d'un nouveau membre : profil, guide, aide à l'installation.
+  static const String prefixeBienvenue = '/bienvenue';
+  static const String profilAccueil = '$prefixeBienvenue/profil';
+  static const String profilAccueilName = 'profilAccueil';
+  static const String guide = '$prefixeBienvenue/guide';
+  static const String guideName = 'guideAccueil';
+  static const String installation = '$prefixeBienvenue/installation';
+  static const String installationName = 'installation';
 
   /// L'app n'a pas reçu son URL Supabase à la compilation.
   static const String configuration = '/configuration';
@@ -80,10 +120,14 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             ? null
             : AppRoutes.configuration;
       }
+      final jeton = ref.read(jetonInvitationProvider);
       final redirection = redirectionAuth(
         etat: ref.read(etatAuthProvider),
         chemin: state.matchedLocation,
         outilsDevAutorises: env.isDev,
+        cheminInvitationEnAttente: jeton == null
+            ? null
+            : AppRoutes.cheminInvitation(jeton),
       );
       if (redirection != null) return redirection;
 
@@ -104,7 +148,47 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.accueil,
         name: AppRoutes.accueilName,
-        builder: (context, state) => const AccueilScreen(),
+        builder: (context, state) => AccueilScreen(
+          ongletInitial:
+              int.tryParse(
+                state.uri.queryParameters[AppRoutes.parametreOnglet] ?? '',
+              ) ??
+              0,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.membres,
+        name: AppRoutes.membresName,
+        builder: (context, state) => const MembresScreen(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: AppRoutes.inviterChemin,
+            name: AppRoutes.inviterName,
+            builder: (context, state) => const InviterScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: AppRoutes.invitation,
+        name: AppRoutes.invitationName,
+        builder: (context, state) => InvitationScreen(
+          jeton: state.pathParameters[AppRoutes.parametreJeton] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.profilAccueil,
+        name: AppRoutes.profilAccueilName,
+        builder: (context, state) => const ProfilAccueilScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.guide,
+        name: AppRoutes.guideName,
+        builder: (context, state) => const GuideScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.installation,
+        name: AppRoutes.installationName,
+        builder: (context, state) => const InstallationScreen(),
       ),
       GoRoute(
         path: AppRoutes.demarrage,

@@ -14,8 +14,7 @@ import '../../support/faux_auth.dart';
 
 /// Va jusqu'à l'écran du code en passant par la saisie de l'adresse, comme un
 /// utilisateur.
-Future<({FauxAuthRepository auth, FauxMembershipRepository memberships})>
-allerAuCode(
+Future<AppMontee> allerAuCode(
   WidgetTester tester, {
   AuthErreur? erreurVerification,
   AuthErreur? erreurEnvoi,
@@ -99,7 +98,10 @@ void main() {
     });
 
     testWidgets('trop de tentatives passe par une bannière', (tester) async {
-      await allerAuCode(tester, erreurVerification: AuthErreur.tropDeTentatives);
+      await allerAuCode(
+        tester,
+        erreurVerification: AuthErreur.tropDeTentatives,
+      );
 
       await tester.enterText(find.byType(TextField), '123456');
       await tester.pumpAndSettle();
