@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 008, 013, 014
 - **Branche** : `feat/016-matrice-admin`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/18
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte

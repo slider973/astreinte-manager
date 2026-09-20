@@ -53,7 +53,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 013 | [Préférences de charge par mois](done/013-preferences-quotas.md) | P0 | 011 | https://github.com/slider973/astreinte-manager/pull/12 |
 | 014 | [Périodes, date limite et verrouillage](done/014-periodes-verrouillage.md) | P0 | 008 010 | https://github.com/slider973/astreinte-manager/pull/13 |
 | 015 | [Rappels de saisie des disponibilités](done/015-rappels-saisie.md) | P1 | 014 025 | https://github.com/slider973/astreinte-manager/pull/17 |
-| 016 | [Matrice des disponibilités pour l'admin](done/016-matrice-admin.md) | P0 | 008 013 014 |  |
+| 016 | [Matrice des disponibilités pour l'admin](done/016-matrice-admin.md) | P0 | 008 013 014 | https://github.com/slider973/astreinte-manager/pull/18 |
 | 024 | [Push web via Firebase Cloud Messaging (PWA)](done/024-fcm-setup.md) | P0 | 001 005 | https://github.com/slider973/astreinte-manager/pull/14 |
 | 025 | [Edge Function send-notification](done/025-edge-send-notification.md) | P0 | 002 024 | https://github.com/slider973/astreinte-manager/pull/15 |
 | 026 | [Centre de notifications in-app](done/026-centre-notifications.md) | P1 | 025 | https://github.com/slider973/astreinte-manager/pull/16 |
