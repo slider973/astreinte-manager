@@ -136,11 +136,11 @@ class ActivationNotificationsScreen extends ConsumerWidget {
         PrimaryButton(
           libelle: AppStrings.notifActiver,
           icone: Icons.notifications_active_outlined,
-          chargement: enCours,
-          onPressed: etat == null ? null : () => unawaited(activer()),
-          raisonDesactivation: etat == null
-              ? AppStrings.notifReglageRaisonInactive
-              : null,
+          // Tant que le navigateur n'a pas répondu, le bouton porte son
+          // indicateur plutôt que d'être grisé : il n'y a pas de raison à
+          // afficher, seulement une attente d'un dixième de seconde.
+          chargement: enCours || etat == null,
+          onPressed: () => unawaited(activer()),
         ),
         const SizedBox(height: AppSpacing.sm),
         _Passer(libelle: AppStrings.notifPlusTard, onPressed: continuer),
