@@ -1,0 +1,12 @@
+.DS_Store
+.claude/settings.local.json
+.impeccable/config.local.json
+.impeccable/live/
+node_modules/
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+__pycache__/
+*.pyc
