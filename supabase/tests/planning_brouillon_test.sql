@@ -456,8 +456,11 @@ begin
     '23505', 'deux fois le même membre sur le même créneau : refusé');
 
   -- Mais une attribution close ne bloque pas : la contrainte est partielle, et
-  -- c'est ce qui rend la réattribution possible au ticket 019.
-  update assignments set status = 'cancelled'
+  -- c'est ce qui rend la réattribution possible au ticket 020. On la ferme ici
+  -- par un refus — `cancelled` et `replaced` sont réservés depuis la migration
+  -- 0020 aux fonctions qui notifient le pompier concerné, et la contrainte
+  -- partielle les traite de toute façon exactement comme `declined`.
+  update assignments set status = 'declined', responded_at = now()
    where shift_id = creneau_jour
      and user_id = '33333333-0000-4000-8000-000000000101';
 
@@ -470,7 +473,7 @@ begin
     (select count(*)::int from assignments
       where shift_id = creneau_jour
         and user_id = '33333333-0000-4000-8000-000000000101'),
-    2, 'une attribution annulée laisse place à une nouvelle');
+    2, 'une attribution close laisse place à une nouvelle');
 end $$;
 
 reset role;
@@ -529,8 +532,13 @@ begin
     'planning publié : la suppression n''emporte rien');
 
   -- Ce qui reste possible : l'annuler. L'historique n'est jamais supprimé, il
-  -- change de statut (docs/PRD.md § 7.6).
-  update assignments set status = 'cancelled' where id = pose;
+  -- change de statut (docs/PRD.md § 7.6). Depuis la migration 0020, ce
+  -- changement-là passe par `cancel_assignment`, qui prévient le pompier
+  -- concerné dans la même transaction — un `update` direct est refusé
+  -- (supabase/tests/reattribution_test.sql § 1).
+  perform tests_plan.check(
+    (cancel_assignment(pose) ->> 'ok')::boolean,
+    'une attribution publiée s''annule par cancel_assignment');
   perform tests_plan.egal(
     (select status::text from assignments where id = pose), 'cancelled',
     'une attribution publiée s''annule');
