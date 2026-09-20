@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : aucune
 - **Branche** : `feat/002-supabase-migrations`
-- **Statut** : en cours depuis 2026-09-20
+- **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## Contexte
 Référence : `docs/SCHEMA.md`. Un projet Supabase unique, région Europe.

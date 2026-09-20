@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 002 | [Créer le projet Supabase et les migrations initiales](in-progress/002-supabase-migrations.md) | P0 |  |  |
 
 ## À faire
 
@@ -52,4 +51,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 001 | [Initialiser le projet Flutter et l'architecture](done/001-setup-flutter.md) | P0 |  | https://github.com/slider973/astreinte-manager/pull/1 |
+| 002 | [Créer le projet Supabase et les migrations initiales](done/002-supabase-migrations.md) | P0 |  |  |
 
