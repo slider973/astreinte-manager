@@ -34,6 +34,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 | 038 | [Limiter le débit des invitations](backlog/038-limite-debit-invitations.md) | P1 | 006 |  |
 | 040 | [Rendre visible une notification définitivement perdue](backlog/040-ligne-interne-echec-definitif.md) | P0 | 025 026 |  |
 | 041 | [Envoyer les rappels à une heure décente dans chaque fuseau](backlog/041-heure-locale-rappels.md) | P1 | 015 |  |
+| 042 | [Réduire le coût d'une transition de route](backlog/042-transition-de-route.md) | P1 | 016 |  |
 
 ## Terminés
 
