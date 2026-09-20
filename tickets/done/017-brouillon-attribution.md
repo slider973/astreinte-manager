@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 016
 - **Branche** : `feat/017-brouillon-attribution`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/19
 - **Statut** : terminé le 2026-09-20 (PR créée)
 
 ## À faire
