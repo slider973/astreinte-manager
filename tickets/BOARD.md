@@ -6,13 +6,13 @@ Généré par `scripts/ticket.sh board` le 2026-09-20. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 015 | [Rappels de saisie des disponibilités](in-progress/015-rappels-saisie.md) | P1 | 014 025 |  |
 
 ## À faire
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 007 | [Profil utilisateur](backlog/007-profil.md) | P1 | 005 |  |
-| 015 | [Rappels de saisie des disponibilités](backlog/015-rappels-saisie.md) | P1 | 014 025 |  |
 | 016 | [Matrice des disponibilités pour l'admin](backlog/016-matrice-admin.md) | P0 | 008 013 014 |  |
 | 017 | [Construction du planning en brouillon](backlog/017-brouillon-attribution.md) | P0 | 016 |  |
 | 018 | [Proposition automatique de remplissage](backlog/018-proposition-automatique.md) | P1 | 017 |  |

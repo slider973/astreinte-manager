@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 014, 025
 - **Branche** : `feat/015-rappels-saisie`
+- **Statut** : en cours depuis 2026-09-20
 
 ## À faire
 - Cron `availability_reminders` : J-3 push, J-1 email, aux membres actifs sans aucune ligne `availabilities` pour la période.
