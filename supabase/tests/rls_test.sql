@@ -125,6 +125,24 @@ values
    '11111111-0000-4000-8000-000000000005', 'aaaaaaaa-0000-4000-8000-000000000101',
    'accepted', now(), 'aaaaaaaa-0000-4000-8000-000000000100');
 
+-- Caserne B : période, planning `draft` et créneau, pour les tests de cohérence du
+-- station_id avec la ligne parente. Le planning reste `draft` : un membre de B ne voit
+-- donc toujours rien (section 1b).
+insert into periods (id, station_id, year, month, status, deadline_at)
+values ('11111111-0000-4000-8000-000000000021', 'bbbbbbbb-0000-4000-8000-000000000001',
+        2099, 1, 'open', '2098-12-15 23:59:59+01');
+
+insert into schedules (id, station_id, period_id, status, created_by)
+values ('11111111-0000-4000-8000-000000000022',
+        'bbbbbbbb-0000-4000-8000-000000000001',
+        '11111111-0000-4000-8000-000000000021',
+        'draft',
+        'bbbbbbbb-0000-4000-8000-000000000100');
+
+insert into shifts (id, station_id, schedule_id, date, slot, required_count)
+values ('11111111-0000-4000-8000-000000000023', 'bbbbbbbb-0000-4000-8000-000000000001',
+        '11111111-0000-4000-8000-000000000022', '2099-01-10', 'day', 1);
+
 \echo ''
 \echo '=== Tests RLS — Astreinte SP ==='
 
@@ -772,6 +790,339 @@ begin
 end $$;
 
 rollback to savepoint s9;
+
+-- ===========================================================================
+-- 10. Bloquant 1 — pg_temp ne masque pas les tables du schéma public
+-- ===========================================================================
+\echo ''
+\echo '--- 10. pg_temp ne détourne ni les fonctions security definer ni les politiques'
+savepoint s10;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"bbbbbbbb-0000-4000-8000-000000000101","role":"authenticated"}';
+
+-- L'exploit : un membre de la caserne B se fabrique une appartenance admin à la
+-- caserne A dans son schéma temporaire.
+create temp table memberships (station_id uuid, user_id uuid, status text, role text);
+insert into memberships
+values ('aaaaaaaa-0000-4000-8000-000000000001',
+        'bbbbbbbb-0000-4000-8000-000000000101', 'active', 'admin');
+
+do $$
+begin
+  perform tests.check(
+    is_admin('aaaaaaaa-0000-4000-8000-000000000001') is false,
+    'is_admin() ignore pg_temp.memberships');
+  perform tests.check(
+    is_member('aaaaaaaa-0000-4000-8000-000000000001') is false,
+    'is_member() ignore pg_temp.memberships');
+  perform tests.check(
+    (select count(*) from public.availabilities
+     where station_id = 'aaaaaaaa-0000-4000-8000-000000000001') = 0,
+    'aucune disponibilité de la caserne A visible malgré pg_temp.memberships');
+  perform tests.check(
+    (select count(*) from public.stations
+     where id = 'aaaaaaaa-0000-4000-8000-000000000001') = 0,
+    'la caserne A reste invisible malgré pg_temp.memberships');
+end $$;
+
+select tests.denied(
+  $q$ insert into public.availabilities (station_id, user_id, date, slot, status, set_by)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              'aaaaaaaa-0000-4000-8000-000000000101', '2099-01-10', 'day', 'available',
+              'bbbbbbbb-0000-4000-8000-000000000101') $q$,
+  'écriture dans la caserne A refusée malgré pg_temp.memberships');
+
+rollback to savepoint s10;
+
+\echo ''
+\echo '--- 10b. pg_temp.periods ne déverrouille pas une période locked'
+savepoint s10b;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000101","role":"authenticated"}';
+
+-- Les expressions des politiques sont analysées à la création et stockées avec les OID
+-- résolus : elles ne sont pas sensibles au search_path de l'appelant. Vérifié ici.
+create temp table periods (id uuid, station_id uuid, year int, month int, status text);
+insert into periods
+values (gen_random_uuid(), 'aaaaaaaa-0000-4000-8000-000000000001', 2099, 2, 'open');
+
+select tests.denied(
+  $q$ insert into public.availabilities (station_id, user_id, date, slot, status, set_by)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              'aaaaaaaa-0000-4000-8000-000000000101', '2099-02-10', 'day', 'available',
+              'aaaaaaaa-0000-4000-8000-000000000101') $q$,
+  'période locked : pg_temp.periods ne déverrouille pas la saisie');
+
+rollback to savepoint s10b;
+
+\echo ''
+\echo '--- 10c. Toutes les fonctions du schéma public nomment pg_temp en dernier'
+savepoint s10c;
+
+do $$
+declare
+  fautives text;
+begin
+  select string_agg(p.proname || ' -> ' || coalesce(array_to_string(p.proconfig, ' '), '(aucun)'),
+                    ', ' order by p.proname)
+    into fautives
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and (p.proconfig is null
+         or not exists (
+           select 1 from unnest(p.proconfig) c
+           where c = 'search_path=public, pg_temp'));
+  perform tests.check(fautives is null,
+    coalesce('fonctions au search_path incorrect : ' || fautives,
+             'toutes les fonctions ont search_path = public, pg_temp'));
+end $$;
+
+rollback to savepoint s10c;
+
+-- ===========================================================================
+-- 11. Bloquant 2 — un membre ne déplace pas son attribution d'une caserne à l'autre
+-- ===========================================================================
+\echo ''
+\echo '--- 11. Le station_id d''une attribution est gelé pour un membre'
+savepoint s11;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000101","role":"authenticated"}';
+
+select tests.denied(
+  $q$ update assignments
+      set status = 'accepted', station_id = 'bbbbbbbb-0000-4000-8000-000000000001'
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'un membre ne déplace pas son attribution vers la caserne B');
+
+do $$
+begin
+  perform tests.check(
+    (select station_id from public.assignments
+     where id = '11111111-0000-4000-8000-000000000006')
+      = 'aaaaaaaa-0000-4000-8000-000000000001',
+    'l''attribution est restée dans la caserne A');
+  perform tests.check(
+    (select status from public.assignments
+     where id = '11111111-0000-4000-8000-000000000006') = 'proposed',
+    'le statut n''a pas changé non plus');
+end $$;
+
+rollback to savepoint s11;
+
+-- ===========================================================================
+-- 12. Bloquant 3 — liste blanche des colonnes modifiables par un membre
+-- ===========================================================================
+-- Les tests de la section 4 sur was_available passaient pour une mauvaise raison :
+-- c'est la transition proposed -> proposed qui était refusée. Ici, la transition est
+-- valide et c'est bien la colonne interdite qui doit provoquer le refus.
+\echo ''
+\echo '--- 12. Colonnes interdites modifiées pendant une transition valide'
+savepoint s12;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000101","role":"authenticated"}';
+
+select tests.denied(
+  $q$ update assignments set status = 'accepted', was_available = false
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'transition valide + was_available : refusé');
+
+select tests.denied(
+  $q$ update assignments set status = 'accepted', reminder_count = 99
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'transition valide + reminder_count : refusé');
+
+select tests.denied(
+  $q$ update assignments set status = 'accepted', proposed_at = null
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'transition valide + proposed_at : refusé');
+
+select tests.denied(
+  $q$ update assignments set status = 'accepted', last_reminder_at = now()
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'transition valide + last_reminder_at : refusé');
+
+select tests.denied(
+  $q$ update assignments set status = 'accepted',
+             replaced_by = '11111111-0000-4000-8000-000000000007'
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'transition valide + replaced_by : refusé');
+
+select tests.denied(
+  $q$ update assignments set status = 'accepted',
+             created_by = 'aaaaaaaa-0000-4000-8000-000000000101'
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'transition valide + created_by : refusé');
+
+do $$
+begin
+  perform tests.check(
+    (select status from public.assignments
+     where id = '11111111-0000-4000-8000-000000000006') = 'proposed',
+    'aucune de ces tentatives n''a fait passer l''attribution à accepted');
+  perform tests.check(
+    (select reminder_count from public.assignments
+     where id = '11111111-0000-4000-8000-000000000006') = 0,
+    'reminder_count est intact');
+end $$;
+
+-- La transition seule reste possible, avec le motif de refus.
+select tests.allowed(
+  $q$ update assignments set status = 'declined', decline_reason = 'En intervention'
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'status + decline_reason seuls : toujours autorisé');
+
+rollback to savepoint s12;
+
+-- ===========================================================================
+-- 13. Bloquant 4 — cohérence du station_id avec la ligne parente
+-- ===========================================================================
+\echo ''
+\echo '--- 13. Un admin n''écrit pas via une ligne parente d''une autre caserne'
+savepoint s13;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+select tests.denied(
+  $q$ insert into shifts (station_id, schedule_id, date, slot)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              '11111111-0000-4000-8000-000000000022', '2099-01-11', 'day') $q$,
+  'shifts : un admin A n''insère pas de créneau dans un planning de B');
+
+select tests.denied(
+  $q$ update shifts set schedule_id = '11111111-0000-4000-8000-000000000022'
+      where id = '11111111-0000-4000-8000-000000000004' $q$,
+  'shifts : un admin A ne rattache pas son créneau à un planning de B');
+
+select tests.denied(
+  $q$ insert into assignments (station_id, shift_id, user_id, status, created_by)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              '11111111-0000-4000-8000-000000000023',
+              'aaaaaaaa-0000-4000-8000-000000000101', 'proposed',
+              'aaaaaaaa-0000-4000-8000-000000000100') $q$,
+  'assignments : un admin A n''attribue pas un créneau de B');
+
+select tests.denied(
+  $q$ insert into assignments (station_id, shift_id, user_id, status, created_by)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              '11111111-0000-4000-8000-000000000004',
+              'bbbbbbbb-0000-4000-8000-000000000101', 'proposed',
+              'aaaaaaaa-0000-4000-8000-000000000100') $q$,
+  'assignments : un admin A n''attribue pas un créneau à un membre de B');
+
+select tests.denied(
+  $q$ update assignments set user_id = 'bbbbbbbb-0000-4000-8000-000000000101'
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'assignments : un admin A ne réattribue pas vers un membre de B');
+
+select tests.denied(
+  $q$ insert into schedules (station_id, period_id, status, created_by)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              '11111111-0000-4000-8000-000000000021', 'draft',
+              'aaaaaaaa-0000-4000-8000-000000000100') $q$,
+  'schedules : un admin A ne crée pas de planning sur une période de B');
+
+select tests.denied(
+  $q$ insert into availabilities (station_id, user_id, date, slot, status, set_by)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              'bbbbbbbb-0000-4000-8000-000000000101', '2099-01-10', 'day', 'available',
+              'aaaaaaaa-0000-4000-8000-000000000100') $q$,
+  'availabilities : un admin A n''écrit pas pour un membre de B');
+
+select tests.denied(
+  $q$ insert into availability_preferences (station_id, user_id, period_id, max_shifts)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              'aaaaaaaa-0000-4000-8000-000000000101',
+              '11111111-0000-4000-8000-000000000021', 3) $q$,
+  'availability_preferences : un admin A n''écrit pas sur une période de B');
+
+-- Les écritures légitimes de l'admin restent possibles.
+select tests.allowed(
+  $q$ insert into shifts (station_id, schedule_id, date, slot)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              '11111111-0000-4000-8000-000000000003', '2099-01-12', 'day') $q$,
+  'shifts : un admin A insère bien dans son propre planning');
+
+select tests.allowed(
+  $q$ insert into assignments (station_id, shift_id, user_id, status, created_by)
+      values ('aaaaaaaa-0000-4000-8000-000000000001',
+              '11111111-0000-4000-8000-000000000004',
+              'aaaaaaaa-0000-4000-8000-000000000103', 'proposed',
+              'aaaaaaaa-0000-4000-8000-000000000100') $q$,
+  'assignments : un admin A attribue bien un créneau à un membre de A');
+
+rollback to savepoint s13;
+
+-- ===========================================================================
+-- 14. Améliorations — planning draft et token d'invitation
+-- ===========================================================================
+\echo ''
+\echo '--- 14. Un membre ne répond pas à l''aveugle à un planning draft'
+savepoint s14;
+update schedules set status = 'draft', published_at = null
+where id = '11111111-0000-4000-8000-000000000003';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000101","role":"authenticated"}';
+
+do $$
+begin
+  perform tests.check((select count(*) from public.assignments) = 0,
+    'aucune attribution d''un brouillon n''est lisible');
+end $$;
+
+-- Sans clause where citant une colonne, un update ne sollicite pas les politiques de
+-- select : c'est la politique d'update qui doit porter la condition sur le planning.
+select tests.denied(
+  $q$ update assignments set status = 'accepted' $q$,
+  'update sans where : aucune attribution de brouillon acceptée à l''aveugle');
+
+select tests.denied(
+  $q$ update assignments set status = 'accepted'
+      where id = '11111111-0000-4000-8000-000000000006' $q$,
+  'update ciblé : refusé aussi sur un brouillon');
+
+rollback to savepoint s14;
+
+\echo ''
+\echo '--- 14b. Le token d''invitation n''est pas lisible par le rôle authenticated'
+savepoint s14b;
+insert into invitations (id, station_id, email, invited_by)
+values ('11111111-0000-4000-8000-000000000030',
+        'aaaaaaaa-0000-4000-8000-000000000001',
+        'nouveau@caserne-a.test',
+        'aaaaaaaa-0000-4000-8000-000000000100');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
+
+do $$
+declare
+  jete text;
+begin
+  begin
+    select token into jete from public.invitations limit 1;
+    raise exception 'ECHEC : le token d''invitation a été lu par un admin';
+  exception
+    when insufficient_privilege then
+      raise notice '  ok   invitations : select token refusé (%)', sqlerrm;
+  end;
+
+  begin
+    perform 1 from public.invitations i where i.token is not null;
+    raise exception 'ECHEC : le token d''invitation a été lu dans un where par un admin';
+  exception
+    when insufficient_privilege then
+      raise notice '  ok   invitations : token refusé aussi dans un where (%)', sqlerrm;
+  end;
+
+  perform tests.check(
+    (select email from public.invitations
+     where id = '11111111-0000-4000-8000-000000000030') = 'nouveau@caserne-a.test',
+    'invitations : les autres colonnes restent lisibles par l''admin');
+end $$;
+
+rollback to savepoint s14b;
 
 \echo ''
 \echo '=== Tous les tests RLS sont passés ==='
