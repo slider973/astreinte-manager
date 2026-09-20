@@ -118,6 +118,8 @@ scripts/test_rls.sh        # joue supabase/tests/*.sql contre la base locale
 DB_URL=postgresql://… scripts/test_rls.sh
 
 scripts/test_functions.sh  # Edge Functions, exige « supabase functions serve »
+
+deno test supabase/functions/tests/ --allow-env   # logique pure des fonctions, sans Docker
 ```
 
 `supabase/tests/rls_test.sql` simule un utilisateur connecté comme le fait PostgREST
@@ -147,8 +149,20 @@ fonctions de cron y sont appelées **directement avec un instant de référence*
 n'attend l'ordonnanceur, et la CI couvre toute la logique sans dépendre de `pg_cron` pour
 l'exécuter.
 
-`scripts/test_functions.sh` exerce les deux Edge Functions en HTTP contre la pile locale
-(69 assertions, base rendue à l'état du seed). Il n'est pas dans la CI : le workflow
+`supabase/tests/notifications_test.sql` couvre le chemin d'appel des notifications (`0014`,
+ticket 025) : écriture de la demande dans `notification_outbox`, forme imposée des
+destinataires, clé de dédoublonnage idempotente, relecture qui n'a lieu qu'une fois,
+reprise qui respecte le verrou et abandonne au bout de cinq tentatives, fermeture de la
+file à tout client. `notify_post` y est remplacée le temps du test par une version sans
+appel HTTP : la CI n'a ni Edge Functions ni réseau sortant.
+
+`deno test supabase/functions/tests/` couvre la logique pure des Edge Functions — libellés
+français par type, regroupement, liens profonds, classement des erreurs FCM, enchaînement
+d'un envoi — avec des dépendances injectées. Ni base, ni réseau, ni clés Firebase : c'est
+la tâche `edge-functions` de la CI, moins d'une minute.
+
+`scripts/test_functions.sh` exerce les trois Edge Functions en HTTP contre la pile locale
+(110 assertions, base rendue à l'état du seed). Il n'est pas dans la CI : le workflow
 démarre la pile sans `edge-runtime` ni `kong`. Voir
 [`functions/README.md`](functions/README.md).
 

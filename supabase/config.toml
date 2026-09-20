@@ -423,6 +423,17 @@ verify_jwt = true
 enabled = true
 verify_jwt = true
 
+# Edge Function du ticket 025. `verify_jwt = false`, et c'est raisonné : cette
+# fonction n'est jamais appelée par un client, mais par pg_net (migration 0014) et
+# par d'autres Edge Functions. pg_net ne porte aucun JWT, et lui en donner un
+# supposerait de ranger la clé de service en clair dans la base. La fonction
+# authentifie donc elle-même ses appelants : clé de service en jeton porteur, ou
+# en-tête `x-notify-secret` comparé au secret engendré dans Vault par la migration.
+# Tout le reste est rejeté en 401. Voir supabase/functions/README.md.
+[functions.send-notification]
+enabled = true
+verify_jwt = false
+
 # Désactivé en local : Logflare et Vector échouent leur bilan de santé sous Rancher Desktop
 # et ne servent qu'aux journaux dans Studio. Aucun effet sur le projet hébergé.
 [analytics]

@@ -248,6 +248,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "availability_preferences_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "v_period_completion"
+            referencedColumns: ["period_id"]
+          },
+          {
             foreignKeyName: "availability_preferences_station_id_fkey"
             columns: ["station_id"]
             isOneToOne: false
@@ -367,6 +374,65 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_outbox: {
+        Row: {
+          attempts: number
+          channels: string[] | null
+          created_at: string
+          dedupe_key: string | null
+          id: string
+          last_error: string | null
+          locked_until: string | null
+          payload: Json
+          processed_at: string | null
+          recipients: Json
+          result: Json | null
+          station_id: string | null
+          status: string
+          type: Database["public"]["Enums"]["notification_type"]
+        }
+        Insert: {
+          attempts?: number
+          channels?: string[] | null
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          last_error?: string | null
+          locked_until?: string | null
+          payload?: Json
+          processed_at?: string | null
+          recipients: Json
+          result?: Json | null
+          station_id?: string | null
+          status?: string
+          type: Database["public"]["Enums"]["notification_type"]
+        }
+        Update: {
+          attempts?: number
+          channels?: string[] | null
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          last_error?: string | null
+          locked_until?: string | null
+          payload?: Json
+          processed_at?: string | null
+          recipients?: Json
+          result?: Json | null
+          station_id?: string | null
+          status?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_outbox_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
             referencedColumns: ["id"]
           },
         ]
@@ -602,6 +668,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "schedules_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "v_period_completion"
+            referencedColumns: ["period_id"]
+          },
+          {
             foreignKeyName: "schedules_station_id_fkey"
             columns: ["station_id"]
             isOneToOne: false
@@ -783,6 +856,25 @@ export type Database = {
           },
         ]
       }
+      v_period_completion: {
+        Row: {
+          active_members: number | null
+          members_with_availability: number | null
+          month: number | null
+          period_id: string | null
+          station_id: string | null
+          year: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "periods_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_invitation: {
@@ -798,10 +890,115 @@ export type Database = {
         }
         Returns: Json
       }
+      create_period: {
+        Args: { p_month: number; p_station: string; p_year: number }
+        Returns: {
+          created_at: string
+          deadline_at: string
+          id: string
+          locked_at: string | null
+          month: number
+          station_id: string
+          status: Database["public"]["Enums"]["period_status"]
+          updated_at: string
+          year: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "periods"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      cron_create_periods: { Args: { p_reference?: string }; Returns: number }
+      cron_dispatch_notifications: {
+        Args: {
+          p_limit?: number
+          p_max_attempts?: number
+          p_reference?: string
+        }
+        Returns: number
+      }
+      cron_lock_periods: { Args: { p_reference?: string }; Returns: number }
       is_admin: { Args: { p_station: string }; Returns: boolean }
       is_member: { Args: { p_station: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       mask_email: { Args: { p_email: string }; Returns: string }
+      notification_outbox_recipients_valides: {
+        Args: { p_recipients: Json }
+        Returns: boolean
+      }
+      notify: {
+        Args: {
+          p_channels?: string[]
+          p_dedupe_key?: string
+          p_payload?: Json
+          p_recipients?: Json
+          p_station?: string
+          p_type: Database["public"]["Enums"]["notification_type"]
+          p_user_ids?: string[]
+        }
+        Returns: string
+      }
+      notify_claim: {
+        Args: { p_outbox: string }
+        Returns: {
+          attempts: number
+          channels: string[] | null
+          created_at: string
+          dedupe_key: string | null
+          id: string
+          last_error: string | null
+          locked_until: string | null
+          payload: Json
+          processed_at: string | null
+          recipients: Json
+          result: Json | null
+          station_id: string | null
+          status: string
+          type: Database["public"]["Enums"]["notification_type"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "notification_outbox"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      notify_complete: {
+        Args: {
+          p_error?: string
+          p_ok: boolean
+          p_outbox: string
+          p_result?: Json
+        }
+        Returns: undefined
+      }
+      notify_endpoint: { Args: never; Returns: Record<string, unknown> }
+      notify_internal_secret: { Args: never; Returns: string }
+      notify_post: { Args: { p_outbox: string }; Returns: boolean }
+      period_deadline_at: {
+        Args: {
+          p_deadline_day: number
+          p_month: number
+          p_timezone: string
+          p_year: number
+        }
+        Returns: string
+      }
+      station_settings_cle_surcharge_valide: {
+        Args: { p_cle: string }
+        Returns: boolean
+      }
+      station_settings_entier_valide: {
+        Args: { p_max: number; p_min: number; p_valeur: Json }
+        Returns: boolean
+      }
+      station_settings_heure_valide: {
+        Args: { p_valeur: Json }
+        Returns: boolean
+      }
+      station_settings_valid: { Args: { p_settings: Json }; Returns: boolean }
       station_writable: { Args: { p_station: string }; Returns: boolean }
     }
     Enums: {

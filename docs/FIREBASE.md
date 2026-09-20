@@ -142,9 +142,11 @@ Les cinq valeurs ci-dessus permettent à un téléphone de **recevoir**. Pour qu
 supabase secrets set FIREBASE_SERVICE_ACCOUNT="$(cat chemin/vers/le-fichier.json)"
 ```
 
-C'est l'Edge Function `send-notification` (ticket 025) qui s'en sert. Tant que ce ticket n'est pas
-livré, cette étape peut attendre : elle n'empêche pas de vérifier la réception avec l'outil de test
-de Firebase (§ 6).
+C'est l'Edge Function `send-notification` qui s'en sert. Elle existe depuis le ticket 025, et elle
+**fonctionne sans cette clé** : tant qu'elle est absente, le push est déclaré indisponible, la
+notification reste lisible dans l'application et part par courriel. Aucun jeton d'appareil n'est
+perdu. Poser cette clé, c'est donc allumer les alertes sur les téléphones, pas réparer quelque
+chose de cassé.
 
 ## 6. Vérifier que ça marche
 
@@ -202,7 +204,7 @@ pratique. Aucune carte n'est demandée sur le plan Spark.
 **« Est-ce que Google voit les données de la caserne ? »** Non. Les notifications ne transportent
 qu'un titre, une phrase et une destination (« /proposals »). Les disponibilités, les noms et les
 plannings restent dans Supabase. Le contenu des notifications est écrit par l'Edge Function
-(ticket 025) et ne contient pas de donnée de santé ni d'adresse.
+(ticket 025) : une date, un créneau, le nom de la caserne. Ni donnée de santé, ni adresse.
 
 **« J'ai refusé les notifications par erreur, comment revenir en arrière ? »** L'application ne
 peut pas redemander : c'est le navigateur qui décide. Sur Chrome, clique sur le cadenas à gauche de
@@ -231,3 +233,4 @@ l'enregistrement du jeton échoue en arrière-plan sans message clair.
 | Le service worker, configuré par son URL | `web/firebase-messaging-sw.js` |
 | Les destinations des liens | `lib/features/notifications/domain/destination_push.dart` et `docs/WORKFLOWS.md § 8` |
 | La table des jetons | `docs/SCHEMA.md § 2.11` |
+| L'envoi côté serveur | `supabase/functions/send-notification/`, contrat dans `supabase/functions/README.md` |

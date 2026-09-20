@@ -369,6 +369,66 @@ create table super_admins (
 );
 ```
 
+### 2.16 `notification_outbox` — file d'attente des envois *(migration `0014`, ticket 025)*
+
+```sql
+create table notification_outbox (
+  id            uuid primary key default gen_random_uuid(),
+  station_id    uuid references stations(id) on delete cascade,
+  type          notification_type not null,
+  recipients    jsonb not null,     -- [{"user_id": uuid, "payload": {…}}]
+  payload       jsonb not null default '{}'::jsonb,
+  channels      text[],             -- null = canaux par défaut du type (§ 8 de WORKFLOWS)
+  dedupe_key    text,
+  status        text not null default 'pending'
+                  check (status in ('pending', 'sending', 'sent', 'failed')),
+  attempts      int not null default 0,
+  locked_until  timestamptz,
+  last_error    text,
+  result        jsonb,
+  created_at    timestamptz not null default now(),
+  processed_at  timestamptz
+);
+create index notification_outbox_pending_idx on notification_outbox (created_at)
+  where status in ('pending', 'sending');
+create unique index notification_outbox_dedupe_uniq on notification_outbox (type, dedupe_key)
+  where dedupe_key is not null;
+```
+
+**Pourquoi cette table existe, alors que le ticket 025 disait « appel direct par
+pg_net ».** `net.http_post` est asynchrone et sans mémoire : il pousse une requête,
+un worker la tire, et si l'Edge Function ne répond pas (déploiement en cours, 500,
+quota), la requête disparaît. Comme c'est l'Edge Function qui écrit la ligne
+`notifications`, une perte ne laisse **aucune trace** : un pompier à qui on a
+attribué une astreinte ne l'apprend jamais, et personne ne le sait.
+
+La demande est donc écrite ici, **dans la transaction métier** : elle existe, ou
+l'événement n'a pas eu lieu. `notify()` tente ensuite l'appel immédiat — la latence
+reste celle d'un appel HTTP — et la tâche `dispatch_notifications` (§ 8) reprend
+chaque minute ce qui n'a pas abouti, cinq fois, avant de marquer la ligne `failed`
+avec sa dernière erreur. Livraison **au moins une fois**, jamais zéro : un doublon
+de notification est un désagrément, une proposition d'astreinte jamais reçue est
+une faute.
+
+`sending` n'est pas un statut décoratif : c'est lui qui rend la prise en charge
+**exclusive**. `notify_claim` fait passer la ligne de `pending` à `sending` et ne
+rend rien si elle n'y était plus — deux requêtes qui arrivent ensemble (la tentative
+immédiate et une reprise qui n'a pas vu le verrou) n'obtiennent la demande qu'une
+fois, et le membre ne reçoit pas la notification en double. Une Edge Function qui
+meurt après avoir pris la demande la laisse en `sending` ;
+`cron_dispatch_notifications` la ramène à `pending` quand son verrou expire, donc une
+panne coûte deux minutes de retard, jamais une notification.
+
+`dedupe_key` porte les règles d'unicité métier de `docs/WORKFLOWS.md § 8` — « un
+rappel par membre et par échéance » (ticket 015), « un rapport par jour et par
+planning » (ticket 022) : deux appels de même type et même clé ne produisent
+qu'une ligne, et `notify()` rend l'identifiant de celle qui existe déjà.
+
+RLS activée **sans aucune politique**, et les privilèges retirés à `anon` et
+`authenticated` : cette table porte les charges utiles de toutes les casernes à
+la fois et n'est lue que par le rôle de service. C'est la seule table du schéma
+dans ce cas, et `supabase/tests/rls_test.sql § 9` le vérifie nommément.
+
 ## 3. Fonctions utilitaires (SQL, `security definer`)
 
 `pg_temp` est **nommé explicitement et en dernier** dans le `search_path` de toutes les
@@ -447,6 +507,36 @@ seule façon de vérifier en CI, en quelques millisecondes, un comportement dont
 le mois. L'ordonnanceur appelle toujours la forme sans argument. Leur exécution est révoquée
 de `public`, `anon` et `authenticated` : une tâche qui tourne avec des droits élevés ne doit
 pas être un bouton accessible depuis un client.
+
+### Fonctions d'envoi des notifications (migration `0014`, ticket 025)
+
+Le point d'entrée des déclencheurs et des tâches planifiées est `notify(...)`. Tout le
+reste — contenu français, regroupement, FCM, courriel, nettoyage des jetons — vit dans
+l'Edge Function `send-notification` (§ 7) : signer un jeton OAuth Google en plpgsql
+n'aurait aucun sens.
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `notify` | `(p_type notification_type, p_user_ids uuid[] default null, p_station uuid default null, p_payload jsonb default '{}', p_channels text[] default null, p_recipients jsonb default null, p_dedupe_key text default null) returns uuid` | Écrit la demande dans `notification_outbox` **dans la transaction métier**, puis tente l'appel immédiat. Deux façons de décrire les destinataires : `p_user_ids` (tout le monde reçoit la même chose) ou `p_recipients` (`[{"user_id", "payload"}]`, une charge utile par membre — c'est le support du regroupement). Renvoie l'identifiant de la ligne de file. |
+| `notify_post` | `(p_outbox uuid) returns boolean` | Poste une ligne vers l'Edge Function par `net.http_post`, incrémente `attempts`, pose un verrou de deux minutes. **Ne lève jamais** : un incident pg_net ne doit pas annuler la publication d'un planning. |
+| `notify_claim` | `(p_outbox uuid) returns notification_outbox` | Prend une demande en charge : `pending` → `sending`, verrou de deux minutes. Renvoie `NULL` si elle est déjà prise ou close — la prise en charge est **exclusive**, pas seulement idempotente. Réservée à `service_role`. |
+| `notify_complete` | `(p_outbox uuid, p_ok boolean, p_error text default null, p_result jsonb default null) returns void` | Clôt la demande, `sent` ou `failed`, avec son compte rendu. Réservée à `service_role`. |
+| `cron_dispatch_notifications` | `(p_reference timestamptz default null, p_limit integer default 100, p_max_attempts integer default 5) returns integer` | Corps de la tâche `dispatch_notifications` (§ 8). Ramène à `pending` les prises en charge dont le verrou a expiré, reprend les demandes restées en attente, abandonne au bout de cinq tentatives. Idempotente, paramétrée par un instant de référence comme les tâches de `0012`. |
+| `notify_endpoint` | `() returns (o_url text, o_secret text)` | Adresse de l'Edge Function et secret d'appel, lus dans Supabase Vault. |
+| `notify_internal_secret` | `() returns text` | Le secret d'appel, que l'Edge Function lit pour authentifier ce qui vient de pg_net. Réservée à `service_role`. |
+
+**Le secret d'appel n'est recopié nulle part.** La migration l'engendre au hasard et
+le range dans Vault ; l'Edge Function va l'y chercher avec sa clé de service. La base
+ne peut pas porter la clé de service (ce serait l'écrire en clair dans le seed), et la
+fonction ne peut pas deviner un mot de passe qu'on ne lui a pas donné. Aucune étape
+manuelle, aucun secret dans le dépôt, la même chose en local et en production.
+
+L'adresse, elle, vise la pile locale par défaut et se remplace en une commande sur un
+projet hébergé (`supabase/functions/README.md`).
+
+Exécution révoquée de `public`, `anon` et `authenticated` pour toutes : écrire une
+notification à qui l'on veut, dans la caserne que l'on veut, n'est pas un bouton de
+client.
 
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
@@ -711,7 +801,7 @@ refusées, retardataires (proposées depuis plus de `late_report_hours`).
 
 | Fonction | Déclencheur | Rôle |
 |---|---|---|
-| `send-notification` | appel interne (pg_net, cron, autres functions) | Prend un `notification_type`, un `user_id`, un payload ; écrit `notifications`, envoie push FCM et/ou email Resend selon les préférences et le fallback |
+| `send-notification` | appel interne : `public.notify(...)` → pg_net (déclencheurs, crons), ou HTTP direct depuis une autre Edge Function | Prend un `notification_type`, des destinataires, une caserne et une charge utile ; regroupe, construit le texte français, écrit la ligne `inapp`, envoie le push FCM à tous les appareils du membre, envoie le courriel si le canal est demandé ou si le membre n'a aucun appareil, supprime les jetons définitivement rejetés (ticket 025, contrat dans `supabase/functions/README.md`) |
 | `publish-schedule` | app admin | Passe le planning en `published`, renseigne `proposed_at`, déclenche les notifications groupées |
 | `reassign-shift` | app admin | Marque l'ancienne attribution `replaced`, crée la nouvelle, notifie le nouveau membre et l'admin |
 | `auto-propose` | app admin | Heuristique de remplissage du brouillon |
@@ -728,6 +818,7 @@ refusées, retardataires (proposées depuis plus de `late_report_hours`).
 |---|---|---|
 | `create_periods` | 1er du mois, 02:00 | `select public.cron_create_periods();` — crée les périodes M+1 et M+2 manquantes pour chaque caserne *(migration `0012`)* |
 | `lock_periods` | toutes les heures | `select public.cron_lock_periods();` — passe en `locked` les périodes dont `deadline_at < now()` *(migration `0012`)* |
+| `dispatch_notifications` | chaque minute | `select public.cron_dispatch_notifications();` — repose les demandes de `notification_outbox` restées en attente, abandonne au bout de cinq tentatives *(migration `0014`)* |
 | `availability_reminders` | tous les jours 09:00 | Push J-3 et email J-1 aux membres sans saisie |
 | `assignment_reminders` | toutes les heures | Rappel push à `response_reminder_hours`, email à `response_email_hours` |
 | `late_responders_report` | toutes les heures | Notifie les admins des attributions en attente depuis `late_report_hours` |
@@ -777,8 +868,13 @@ Ordre proposé :
 11. `0011_station_settings.sql` (ticket 010 : validation de `settings`, garde-fou de fuseau, `period_deadline_at`, recalcul des dates limites)
 12. `0012_cron_periodes.sql` (ticket 014 : `cron_create_periods`, `cron_lock_periods`, `create_period`, transitions et audit des périodes, `set_by` imposé sur `availabilities`, les deux tâches `pg_cron` des périodes)
 13. `0013_periodes_completion_audit.sql` (revue du ticket 014 : vue `v_period_completion`, audit de la création et de la suppression d'une période, date limite qui ne recule plus dans le passé)
-14. `0014_views.sql` (les trois vues restantes du § 6)
-15. `0015_cron_notifications.sql` (les cinq tâches restantes du § 8)
+14. `0014_notifications_envoi.sql` (ticket 025 : `notification_outbox`, `notify`, `notify_post`, `notify_claim`, `notify_complete`, `cron_dispatch_notifications`, secrets Vault et tâche `dispatch_notifications`)
+15. `0015_views.sql` (les trois vues restantes du § 6)
+16. `0016_cron_notifications.sql` (les cinq tâches restantes du § 8)
+
+Les deux dernières ont glissé d'un rang au ticket 025 : le chemin d'appel des
+notifications devait exister avant les tâches qui s'en servent, et une migration déjà
+poussée sur `main` ne se renumérote pas.
 
 Chaque migration est rejouable sur un projet vide et testée en local avec `supabase start`.
 
@@ -787,8 +883,12 @@ Les politiques RLS sont couvertes par `supabase/tests/rls_test.sql`, exécuté p
 dès qu'une politique fuit). Les fonctions d'invitation de `0009` sont couvertes par
 `supabase/tests/invitations_test.sql`, et le déclencheur de `0010` par
 `supabase/tests/memberships_admin_test.sql`, les paramètres de caserne de `0011` par
-`supabase/tests/station_settings_test.sql` et le cycle de vie des périodes de `0012` par
-`supabase/tests/periods_cron_test.sql`, joués par le même script. La couche HTTP des Edge
+`supabase/tests/station_settings_test.sql` le cycle de vie des périodes de `0012` par
+`supabase/tests/periods_cron_test.sql` et le chemin d'appel des notifications de `0014`
+par `supabase/tests/notifications_test.sql`, joués par le même script. La logique pure
+des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
+enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
+demande ni base ni réseau et tourne en CI. La couche HTTP des Edge
 Functions est testée par `scripts/test_functions.sh`, qui a besoin de
 `supabase functions serve` et reste donc local : la CI démarre la pile sans `edge-runtime`.
 
