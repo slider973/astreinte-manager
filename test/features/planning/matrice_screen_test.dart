@@ -618,6 +618,58 @@ void main() {
       expect(construites, greaterThan(0));
     });
 
+    testWidgets('soixante membres ne coûtent **qu\'une** lecture, et rien ne '
+        'la redéclenche', (tester) async {
+      final jours = _joursDuMois(0);
+      final depot = await _ouvrir(
+        tester,
+        taille: const Size(1920, 1080),
+        lignes: <LigneMatrice>[
+          for (var index = 0; index < 60; index++)
+            ligneMatrice(
+              userId: 'u$index',
+              nom: 'Pompier ${index.toString().padLeft(2, '0')}',
+              jours: index.isEven ? 'D' * jours : '.' * jours,
+              nuits: '.' * jours,
+              maxAstreintes: 4,
+              astreintes: index % 5,
+            ),
+        ],
+      );
+
+      // **Une ligne par membre ne veut pas dire une requête par membre.**
+      // Soixante appels de quinze millisecondes feraient exactement les neuf
+      // cents millisecondes d'un budget perdu — c'est le piège trouvé au
+      // ticket 014 sur le taux de saisie, et il ne reviendra pas ici sans
+      // faire rougir ce test.
+      expect(depot.lectures, 1);
+
+      // Défiler ne relit rien : la virtualisation construit des cases, elle
+      // ne redemande pas de données.
+      final defilements = find.descendant(
+        of: find.byType(GrilleMatrice),
+        matching: find.byType(Scrollable),
+      );
+      tester.state<ScrollableState>(defilements.at(3)).position.jumpTo(600);
+      tester.state<ScrollableState>(defilements.at(2)).position.jumpTo(900);
+      await tester.pumpAndSettle();
+      expect(depot.lectures, 1);
+
+      // Filtrer, chercher et trier non plus.
+      await tester.tap(find.text(AppStrings.matriceMasquerNonSaisis));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'pompier 1');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining(AppStrings.matriceTrier));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.matriceTriAstreintes).last);
+      await tester.pumpAndSettle();
+
+      expect(depot.lectures, 1);
+      expect(find.byType(GrilleMatrice), findsOneWidget);
+    });
+
     testWidgets('la destination « Admin » ouvre la matrice', (tester) async {
       await _ouvrir(tester);
 
