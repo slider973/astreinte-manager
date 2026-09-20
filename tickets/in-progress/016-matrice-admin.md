@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 008, 013, 014
 - **Branche** : `feat/016-matrice-admin`
+- **Statut** : en cours depuis 2026-09-20
 
 ## Contexte
 Vue centrale de l'admin. Sur ordinateur en priorité, utilisable sur tablette, consultable sur téléphone.
