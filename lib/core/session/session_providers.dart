@@ -8,10 +8,9 @@ import 'membership_repository.dart';
 import 'session_utilisateur.dart';
 
 /// Le dépôt d'authentification. Surchargé par un faux dans les tests.
-final Provider<AuthRepository> authRepositoryProvider =
-    Provider<AuthRepository>(
-      (ref) => SupabaseAuthRepository(ref.watch(supabaseClientProvider)),
-    );
+final Provider<AuthRepository> authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => SupabaseAuthRepository(ref.watch(supabaseClientProvider)),
+);
 
 /// Le dépôt des appartenances. Surchargé par un faux dans les tests.
 final Provider<MembershipRepository> membershipRepositoryProvider =
@@ -56,7 +55,9 @@ final Provider<List<Appartenance>> appartenancesActivesProvider =
     Provider<List<Appartenance>>((ref) {
       final toutes =
           ref.watch(appartenancesProvider).value ?? const <Appartenance>[];
-      final actives = toutes.where((Appartenance a) => a.estActive).toList()
+      final actives = toutes
+          .where((Appartenance a) => a.estActive)
+          .toList()
         ..sort(
           (Appartenance a, Appartenance b) =>
               a.nomCaserne.compareTo(b.nomCaserne),

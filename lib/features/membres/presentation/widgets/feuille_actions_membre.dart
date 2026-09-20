@@ -58,10 +58,7 @@ class _FeuilleActionsMembre extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
-              _Fait(
-                libelle: AppStrings.membreRole,
-                valeur: membre.role.libelle,
-              ),
+              _Fait(libelle: AppStrings.membreRole, valeur: membre.role.libelle),
               _Fait(
                 libelle: AppStrings.membreStatut,
                 valeur: membre.estDesactive
@@ -158,7 +155,9 @@ class _LigneAction extends StatelessWidget {
       enabled: motif == null,
       hint: motif?.message,
       child: InkWell(
-        onTap: motif == null ? () => Navigator.of(context).pop(action) : null,
+        onTap: motif == null
+            ? () => Navigator.of(context).pop(action)
+            : null,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: AppTouch.cible),
           child: Padding(

@@ -68,13 +68,12 @@ Future<SupabaseDemarrage> demarrerSupabase(Env env) async {
 /// l'écran « Application non configurée » au lieu d'appeler un client absent.
 /// Les tests la surchargent avec [SupabaseDemarrage.pret].
 final Provider<SupabaseDemarrage> supabaseDemarrageProvider =
-    Provider<SupabaseDemarrage>(
-      (ref) => SupabaseDemarrage.configurationAbsente,
-    );
+    Provider<SupabaseDemarrage>((ref) => SupabaseDemarrage.configurationAbsente);
 
 /// Le client Supabase de l'application.
 ///
 /// Lire ce provider avant un démarrage réussi est une erreur de programmation :
 /// le routeur garantit qu'aucun écran qui en dépend n'est monté dans ce cas.
-final Provider<SupabaseClient> supabaseClientProvider =
-    Provider<SupabaseClient>((ref) => Supabase.instance.client);
+final Provider<SupabaseClient> supabaseClientProvider = Provider<SupabaseClient>(
+  (ref) => Supabase.instance.client,
+);

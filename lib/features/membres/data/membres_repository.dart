@@ -204,8 +204,10 @@ class SupabaseMembresRepository implements MembresRepository {
   }) => _ecrire(membershipId, <String, dynamic>{'status': statut.valeurSql});
 
   @override
-  Future<void> renommer({required String membershipId, String? nomAffiche}) =>
-      _ecrire(membershipId, <String, dynamic>{'display_name': nomAffiche});
+  Future<void> renommer({
+    required String membershipId,
+    String? nomAffiche,
+  }) => _ecrire(membershipId, <String, dynamic>{'display_name': nomAffiche});
 
   /// L'unique écriture sur `memberships`, avec sa relecture.
   ///
@@ -216,10 +218,7 @@ class SupabaseMembresRepository implements MembresRepository {
   /// `disabled_at` n'est pas écrit ici : le déclencheur le tient à jour
   /// (migration `0010`), pour que la date de sortie soit juste quel que soit
   /// l'auteur de l'écriture.
-  Future<void> _ecrire(
-    String membershipId,
-    Map<String, dynamic> valeurs,
-  ) async {
+  Future<void> _ecrire(String membershipId, Map<String, dynamic> valeurs) async {
     try {
       final lignes = await _client
           .from('memberships')
