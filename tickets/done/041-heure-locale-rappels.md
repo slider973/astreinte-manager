@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 015
 - **Branche** : `feat/041-heure-locale-rappels`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/40
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
