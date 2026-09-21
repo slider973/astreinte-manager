@@ -457,8 +457,8 @@ c'est la signature qui fait office de portier.
 
 `<jeton>` est `profiles.ics_token` (migration `0029`) : 24 octets tirés au sort, rendus en 48
 caractères hexadécimaux. Le suffixe `.ics` est optionnel pour le serveur mais recommandé dans le
-lien qu'on distribue — plusieurs clients, Outlook en tête, décident du type de contenu d'après
-l'URL avant de lire l'en-tête.
+lien qu'on distribue — plusieurs clients, Outlook en tête, décident du type de contenu d'après l'URL
+avant de lire l'en-tête.
 
 Réponse `200` : `text/calendar; charset=utf-8`, `Cache-Control: no-store`,
 `Content-Disposition: inline; filename="astreintes.ics"`.
@@ -485,9 +485,9 @@ END:VCALENDAR
 **Cette adresse voyage** — elle finit collée dans Google Agenda, donc recopiée sur des serveurs qui
 ne sont pas les nôtres. Ce qui la rend sûre n'est pas ici mais en base :
 
-- `ics_feed_events` ne rend que les astreintes **acceptées** de son porteur, sur un planning
-  publié ou validé, dans les casernes où il est **encore actif**. Aucune jointure ne mène à une
-  autre personne : ni le nom d'un équipier, ni une adresse, ni rien d'une autre caserne.
+- `ics_feed_events` ne rend que les astreintes **acceptées** de son porteur, sur un planning publié
+  ou validé, dans les casernes où il est **encore actif**. Aucune jointure ne mène à une autre
+  personne : ni le nom d'un équipier, ni une adresse, ni rien d'une autre caserne.
 - Un jeton **régénéré** (`rotate_ics_token`) ne désigne plus personne à la transaction suivante :
   l'ancienne adresse répond `404`, sans délai ni liste de révocation.
 - Une appartenance **désactivée** vide le flux des astreintes de cette caserne. Le flux continue de
@@ -511,12 +511,12 @@ gestes n'a pas deux lignes dans son agenda.
 
 Erreurs — en **texte brut**, parce que personne ne les lira : l'appelant est un robot.
 
-| Statut | Corps                                    | Quand                                              |
-| ------ | ---------------------------------------- | -------------------------------------------------- |
-| 404    | `Lien d'abonnement invalide.`            | pas de jeton dans l'URL, ou forme invalide          |
-| 404    | `Lien d'abonnement invalide ou révoqué.` | jeton inconnu **ou** régénéré — indistinguables     |
-| 405    | `Méthode non autorisée.`                 | autre chose qu'un `GET` ou un `HEAD`                |
-| 500    | `Erreur serveur.`                        | la base n'a pas répondu                             |
+| Statut | Corps                                    | Quand                                           |
+| ------ | ---------------------------------------- | ----------------------------------------------- |
+| 404    | `Lien d'abonnement invalide.`            | pas de jeton dans l'URL, ou forme invalide      |
+| 404    | `Lien d'abonnement invalide ou révoqué.` | jeton inconnu **ou** régénéré — indistinguables |
+| 405    | `Méthode non autorisée.`                 | autre chose qu'un `GET` ou un `HEAD`            |
+| 500    | `Erreur serveur.`                        | la base n'a pas répondu                         |
 
 ---
 
