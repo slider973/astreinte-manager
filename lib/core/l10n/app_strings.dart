@@ -187,6 +187,37 @@ abstract final class AppStrings {
       'Caserne suspendue : tu peux consulter, pas modifier.';
 
   // -------------------------------------------------------------------
+  // Caserne suspendue et fin d'essai — ticket 030
+  // -------------------------------------------------------------------
+
+  /// La seconde ligne de la bannière, pour un **membre**.
+  ///
+  /// « Rien n'a été supprimé » est obligatoire : c'est une promesse du produit
+  /// (`docs/PRD.md § 6.6` et § 7.6) et la seule phrase qui compte pour
+  /// quelqu'un qui découvre l'écran inerte un mardi soir.
+  static const String lectureSeuleMembreDetail =
+      'Rien n\'a été supprimé. Contacte ton chef de centre.';
+
+  /// La même, pour un **administrateur** : lui a une sortie.
+  static const String lectureSeuleAdminDetail =
+      'Rien n\'a été supprimé. Reprends l\'abonnement pour rouvrir la saisie.';
+
+  /// La bannière nomme la date de bascule quand la base la connaît.
+  static String lectureSeuleDepuis(String date) =>
+      'Caserne suspendue depuis le $date : tu peux consulter, pas modifier.';
+
+  static const String lectureSeuleAction = 'Abonnement';
+
+  static String essaiJusquAu(String date, int jours) =>
+      'Essai jusqu\'au $date — il reste ${jours == 1 ? '1 jour' : '$jours jours'}.';
+
+  static const String essaiTermine =
+      'Ta période d\'essai est terminée. La caserne passera en lecture seule.';
+
+  static const String essaiDetailAdmin =
+      'Abonne-toi pour continuer à saisir et à publier.';
+
+  // -------------------------------------------------------------------
   // États vides et erreurs
   // -------------------------------------------------------------------
 
@@ -339,6 +370,11 @@ abstract final class AppStrings {
   static const String membresSectionActifs = 'Membres de la caserne';
   static const String membresSectionInvitations = 'Invitations en attente';
   static const String membresInviter = 'Inviter des pompiers';
+
+  /// Ticket 030 : pourquoi « Inviter » et les actions de membre sont inertes.
+  static const String membresSuspendue =
+      'Abonnement suspendu : la caserne est en lecture seule, les invitations '
+      'ne partent plus.';
   static const String membresRafraichir = 'Relire la liste';
   static const String membresVideTitre = 'Aucun membre';
   static const String membresVideTexte =
@@ -862,6 +898,8 @@ abstract final class AppStrings {
   static const String parametresEchecGenerique =
       'Les paramètres n\'ont pas été enregistrés. Vérifie ta connexion, puis '
       'réessaie.';
+  static const String parametresSuspendue =
+      'Abonnement suspendu : les réglages ne peuvent pas être enregistrés.';
 
   // -------------------------------------------------------------------
   // Mon mois — saisie des disponibilités (ticket 011)
@@ -1941,6 +1979,11 @@ abstract final class AppStrings {
   static String suiviRelanceLe(String depuis) => 'relancé $depuis';
 
   static const String suiviRelancer = 'Relancer maintenant';
+
+  /// Ticket 030 : pourquoi les gestes du suivi sont inertes.
+  static const String suiviSuspendue =
+      'Abonnement suspendu : la caserne est en lecture seule, le planning ne '
+      'bouge plus.';
   static const String suiviPrevenir = 'Prévenir maintenant';
 
   /// La bannière qui reste tant que l'envoi manqué n'est pas rattrapé.

@@ -16,6 +16,7 @@ class LigneInvitation extends StatelessWidget {
     required this.invitation,
     required this.onRenvoyer,
     required this.onAnnuler,
+    this.lectureSeule = false,
     required this.maintenant,
     super.key,
     this.occupee = false,
@@ -24,6 +25,10 @@ class LigneInvitation extends StatelessWidget {
   final Invitation invitation;
   final VoidCallback onRenvoyer;
   final VoidCallback onAnnuler;
+
+  /// Caserne suspendue : les deux boutons restent, inertes, et leur libellé
+  /// annoncé dit la raison (ticket 030).
+  final bool lectureSeule;
 
   /// L'instant de référence, injecté : une date « expirée » doit se tester.
   final DateTime maintenant;
@@ -86,18 +91,18 @@ class LigneInvitation extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               _ActionInvitation(
                 icone: Icons.refresh,
-                libelle: AppStrings.invitationRenvoyerSemantique(
-                  invitation.email,
-                ),
-                onPressed: occupee ? null : onRenvoyer,
+                libelle: lectureSeule
+                    ? AppStrings.membresSuspendue
+                    : AppStrings.invitationRenvoyerSemantique(invitation.email),
+                onPressed: occupee || lectureSeule ? null : onRenvoyer,
               ),
               const SizedBox(width: AppSpacing.entreCibles),
               _ActionInvitation(
                 icone: Icons.delete_outline,
-                libelle: AppStrings.invitationAnnulerSemantique(
-                  invitation.email,
-                ),
-                onPressed: occupee ? null : onAnnuler,
+                libelle: lectureSeule
+                    ? AppStrings.membresSuspendue
+                    : AppStrings.invitationAnnulerSemantique(invitation.email),
+                onPressed: occupee || lectureSeule ? null : onAnnuler,
               ),
             ],
           ),

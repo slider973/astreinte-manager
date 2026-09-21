@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_breakpoints.dart';
@@ -208,6 +210,8 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
 
     final donnees = etat.value;
     final enErreur = etat.hasError;
+    final fait = faitCaserneEcran(context, ref);
+    final lectureSeule = ref.watch(lectureSeuleCaserneProvider);
 
     return AppScaffold(
       titre: AppStrings.membresTitre,
@@ -243,15 +247,25 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
               libelleAction: AppStrings.actionReessayer,
               onAction: _relire,
             )
-          : null,
+          : fait?.banniere,
       filActions: admin
           ? PrimaryButton(
               libelle: AppStrings.membresInviter,
               icone: Icons.person_add_alt,
-              onPressed: () => context.goNamed(AppRoutes.inviterName),
+              // Grisé, pas retiré : « pourquoi je ne peux plus inviter ? »
+              // mérite une réponse sur place (`DESIGN.md § Buttons`).
+              onPressed: lectureSeule
+                  ? null
+                  : () => context.goNamed(AppRoutes.inviterName),
+              raisonDesactivation: AppStrings.membresSuspendue,
             )
           : null,
-      child: _corps(admin: admin, etat: etat, donnees: donnees),
+      child: _corps(
+        admin: admin,
+        etat: etat,
+        donnees: donnees,
+        lectureSeule: lectureSeule,
+      ),
     );
   }
 
@@ -259,6 +273,7 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
     required bool admin,
     required AsyncValue<EtatMembres> etat,
     required EtatMembres? donnees,
+    required bool lectureSeule,
   }) {
     if (!admin) {
       return const EmptyState(
@@ -288,6 +303,7 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
     return _ListeMembres(
       donnees: donnees,
       occupee: _occupee,
+      lectureSeule: lectureSeule,
       recherche: _recherche,
       requete: _requete,
       onChercher: _chercher,
@@ -312,6 +328,7 @@ class _ListeMembres extends StatelessWidget {
   const _ListeMembres({
     required this.donnees,
     required this.occupee,
+    required this.lectureSeule,
     required this.recherche,
     required this.requete,
     required this.onChercher,
@@ -323,6 +340,7 @@ class _ListeMembres extends StatelessWidget {
 
   final EtatMembres donnees;
   final String? occupee;
+  final bool lectureSeule;
   final TextEditingController recherche;
   final String requete;
   final ValueChanged<String> onChercher;
@@ -412,6 +430,7 @@ class _ListeMembres extends StatelessWidget {
                     LigneMembre(
                       membre: membre,
                       occupee: occupee == membre.id,
+                      lectureSeule: lectureSeule,
                       onActions: () => onActionsMembre(membre),
                     ),
                     const AppDivider(),
@@ -461,6 +480,7 @@ class _ListeMembres extends StatelessWidget {
                       invitation: invitation,
                       maintenant: maintenant,
                       occupee: occupee == invitation.id,
+                      lectureSeule: lectureSeule,
                       onRenvoyer: () => onRenvoyer(invitation),
                       onAnnuler: () => onAnnuler(invitation),
                     ),

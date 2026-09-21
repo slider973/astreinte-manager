@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_breakpoints.dart';
@@ -189,7 +191,7 @@ class _ParametresScreenState extends ConsumerState<ParametresScreen> {
       // Le refus du serveur reste à l'écran tant que la saisie n'a pas bougé :
       // un `SnackBar` disparaît, et la raison du refus doit rester lisible.
       banniere: echec == null
-          ? null
+          ? faitCaserneEcran(context, ref)?.banniere
           : AppBanner(
               variante: AppBannerVariante.erreur,
               texte: echec,
@@ -202,10 +204,17 @@ class _ParametresScreenState extends ConsumerState<ParametresScreen> {
               libelle: AppStrings.parametresEnregistrer,
               icone: Icons.check,
               chargement: etat.enregistrement,
-              onPressed: etat.modifie ? () => unawaited(_enregistrer()) : null,
-              raisonDesactivation: etat.modifie
+              // Le document se remplit encore — on ne fige pas seize champs
+              // sous les doigts de quelqu'un qui prépare la reprise — mais il
+              // ne s'enregistre pas, et le bouton le dit avant l'essai.
+              onPressed: ref.watch(lectureSeuleCaserneProvider) || !etat.modifie
                   ? null
-                  : AppStrings.parametresAucuneModification,
+                  : () => unawaited(_enregistrer()),
+              raisonDesactivation: ref.watch(lectureSeuleCaserneProvider)
+                  ? AppStrings.parametresSuspendue
+                  : (etat.modifie
+                        ? null
+                        : AppStrings.parametresAucuneModification),
             ),
       child: _corps(admin: admin, asynchrone: asynchrone, etat: etat),
     );

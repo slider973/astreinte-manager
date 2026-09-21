@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/reseau/connectivite.dart';
@@ -559,10 +561,15 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
         etat.suivi.planning != null &&
         ref.watch(alerteEnvoiProvider) == etat.suivi.planning!.id;
 
+    final fait = faitCaserneEcran(context, ref);
+    final lectureSeule =
+        etat.lectureSeule || ref.watch(lectureSeuleCaserneProvider);
+
     final variantes = <AppBannerVariante>[
       if (etat.messageErreur != null || envoiManque) AppBannerVariante.erreur,
       if (horsLigne) AppBannerVariante.horsLigne,
-      if (etat.lectureSeule) AppBannerVariante.lectureSeule,
+      if (lectureSeule) AppBannerVariante.lectureSeule,
+      if (fait != null && !lectureSeule) fait.variante,
       if (valide != null && etat.suivi.etat == PlanningEtat.valide)
         AppBannerVariante.information,
     ];
@@ -592,17 +599,24 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
         variante: AppBannerVariante.horsLigne,
         texte: AppStrings.horsLigneDetail,
       ),
-      AppBannerVariante.lectureSeule => const AppBanner(
-        variante: AppBannerVariante.lectureSeule,
-        texte: AppStrings.lectureSeuleDetail,
-      ),
-      // L'aboutissement du mois : il se dit en toutes lettres et il reste.
-      AppBannerVariante.information => AppBanner(
-        variante: AppBannerVariante.information,
-        texte: AppStrings.suiviValideLe(formaterDateLongue(valide!)),
-      ),
-      AppBannerVariante.verrouille ||
-      AppBannerVariante.attention => null,
+      AppBannerVariante.lectureSeule =>
+        fait?.variante == AppBannerVariante.lectureSeule
+            ? fait!.banniere
+            : const AppBanner(
+                variante: AppBannerVariante.lectureSeule,
+                texte: AppStrings.lectureSeuleDetail,
+              ),
+      // L'aboutissement du mois : il se dit en toutes lettres et il reste. Un
+      // essai qui se termine ne le chasse pas — le mois validé est le fait de
+      // l'écran, l'échéance de facturation n'en est pas un.
+      AppBannerVariante.information => valide != null
+          ? AppBanner(
+              variante: AppBannerVariante.information,
+              texte: AppStrings.suiviValideLe(formaterDateLongue(valide)),
+            )
+          : fait?.banniere,
+      AppBannerVariante.attention => fait?.banniere,
+      AppBannerVariante.verrouille => null,
     };
   }
 }

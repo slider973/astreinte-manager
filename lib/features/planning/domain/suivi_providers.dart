@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
@@ -169,6 +170,10 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
       periode: periode,
       suivi: suivi,
       canalBranche: _canalBranche,
+      // Su **avant** le premier geste depuis le ticket 030 : « Relancer » et
+      // « Réattribuer » naissent grisés avec leur raison, au lieu de le devenir
+      // après un refus.
+      lectureSeule: ref.watch(lectureSeuleCaserneProvider),
     );
 
     if (_enAttente.isEmpty) return etat;

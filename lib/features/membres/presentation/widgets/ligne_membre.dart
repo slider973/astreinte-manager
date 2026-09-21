@@ -17,6 +17,7 @@ class LigneMembre extends StatelessWidget {
     required this.membre,
     super.key,
     this.onActions,
+    this.lectureSeule = false,
     this.occupee = false,
   });
 
@@ -24,6 +25,11 @@ class LigneMembre extends StatelessWidget {
 
   /// Ouvre la feuille d'actions. `null` : la ligne est en lecture seule.
   final VoidCallback? onActions;
+
+  /// La caserne est suspendue : le bouton reste visible et inerte, et
+  /// **l'info-bulle dit pourquoi** (ticket 030). Un `⋮` qui ne répond pas est
+  /// la version muette du refus qu'on cherche justement à expliquer.
+  final bool lectureSeule;
 
   /// Une écriture est en cours sur ce membre : le bouton n'est plus
   /// actionnable, mais il reste là et garde sa place.
@@ -96,9 +102,11 @@ class LigneMembre extends StatelessWidget {
           if (onActions != null) ...<Widget>[
             const SizedBox(width: AppSpacing.entreCibles),
             IconButton(
-              onPressed: occupee ? null : onActions,
+              onPressed: occupee || lectureSeule ? null : onActions,
               icon: const Icon(Icons.more_vert),
-              tooltip: AppStrings.membreActions(membre.libelle),
+              tooltip: lectureSeule
+                  ? AppStrings.membresSuspendue
+                  : AppStrings.membreActions(membre.libelle),
             ),
           ],
         ],

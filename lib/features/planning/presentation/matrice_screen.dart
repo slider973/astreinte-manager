@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/preferences/reperes_locaux.dart';
@@ -778,13 +780,23 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     // Une seule bannière à la fois : l'erreur de la matrice passe devant celle
     // du planning, parce que c'est elle qui décide de ce qui est lisible.
     final messageErreur = etat.messageErreur ?? planning?.messageErreur;
-    final lectureSeule = etat.lectureSeule || (planning?.lectureSeule ?? false);
+    // Trois sources pour un même fait, et c'est l'ordre du ticket 030 :
+    // `etatCaserneProvider` le sait **avant** le premier geste, les deux autres
+    // le déduisent d'un refus déjà essuyé.
+    final fait = faitCaserneEcran(context, ref);
+    final lectureSeule =
+        etat.lectureSeule ||
+        (planning?.lectureSeule ?? false) ||
+        ref.watch(lectureSeuleCaserneProvider);
     final variantes = <AppBannerVariante>[
       if (messageErreur != null) AppBannerVariante.erreur,
       if (horsLigne) AppBannerVariante.horsLigne,
       if (lectureSeule) AppBannerVariante.lectureSeule,
       if (!etat.periode.ouverte) AppBannerVariante.verrouille,
       if (etat.modeArme) AppBannerVariante.attention,
+      // Le fait d'abonnement (essai qui se termine) n'arbitre qu'ici, après le
+      // mode armé : l'état de l'écran passe devant une échéance de facturation.
+      if (fait != null && !lectureSeule) fait.variante,
       if (etat.matrice.vierge) AppBannerVariante.information,
     ];
 
@@ -802,10 +814,13 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
         variante: AppBannerVariante.horsLigne,
         texte: AppStrings.horsLigneDetail,
       ),
-      AppBannerVariante.lectureSeule => const AppBanner(
-        variante: AppBannerVariante.lectureSeule,
-        texte: AppStrings.lectureSeuleDetail,
-      ),
+      AppBannerVariante.lectureSeule =>
+        fait?.variante == AppBannerVariante.lectureSeule
+            ? fait!.banniere
+            : const AppBanner(
+                variante: AppBannerVariante.lectureSeule,
+                texte: AppStrings.lectureSeuleDetail,
+              ),
       // **La matrice reste vivante sur un mois verrouillé** : le PRD § 6.3
       // donne explicitement à l'admin le droit d'y saisir, et la bannière le
       // dit en toutes lettres.
@@ -820,16 +835,21 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       // **Non fermable tant que le mode est armé**, et sans action : elle
       // décrit un état persistant, et l'interrupteur qui le lève est juste
       // au-dessus d'elle. `Échap` le lève aussi.
-      AppBannerVariante.attention => const AppBanner(
-        variante: AppBannerVariante.attention,
-        texte: AppStrings.matriceModeSaisieActif,
-      ),
-      AppBannerVariante.information => AppBanner(
-        variante: AppBannerVariante.information,
-        texte: AppStrings.matriceMoisViergeTexte(
-          AppStrings.moisLongs[etat.periode.mois - 1],
-        ),
-      ),
+      AppBannerVariante.attention => etat.modeArme
+          ? const AppBanner(
+              variante: AppBannerVariante.attention,
+              texte: AppStrings.matriceModeSaisieActif,
+            )
+          : fait?.banniere,
+      AppBannerVariante.information =>
+        fait?.variante == AppBannerVariante.information && !etat.matrice.vierge
+            ? fait!.banniere
+            : AppBanner(
+                variante: AppBannerVariante.information,
+                texte: AppStrings.matriceMoisViergeTexte(
+                  AppStrings.moisLongs[etat.periode.mois - 1],
+                ),
+              ),
     };
   }
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/preferences/reperes_locaux.dart';
@@ -461,6 +462,7 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     if (etat == null) return null;
 
     final refus = etat.refusServeur;
+    final fait = faitCaserneEcran(context, ref);
     final variantes = <AppBannerVariante>[
       if (refus != null || etat.echecPersistant || etat.filePerimee)
         AppBannerVariante.erreur,
@@ -468,6 +470,10 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
       if (etat.lectureSeule && refus == null) AppBannerVariante.lectureSeule,
       if (!etat.periode.ouverte) AppBannerVariante.verrouille,
       if (_bientotFermee(etat.periode)) AppBannerVariante.attention,
+      // Le fait d'abonnement arrive **après** la fermeture du mois : ce que le
+      // pompier vient faire ici, c'est saisir, et la date limite prime sur une
+      // échéance de facturation qui ne le concerne pas.
+      if (fait != null && !etat.lectureSeule) fait.variante,
     ];
 
     final gagnante = AppBannerVariante.prioritaire(variantes);
@@ -504,10 +510,13 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
         variante: AppBannerVariante.horsLigne,
         texte: AppStrings.horsLigneDetail,
       ),
-      AppBannerVariante.lectureSeule => const AppBanner(
-        variante: AppBannerVariante.lectureSeule,
-        texte: AppStrings.lectureSeuleDetail,
-      ),
+      AppBannerVariante.lectureSeule =>
+        fait?.variante == AppBannerVariante.lectureSeule
+            ? fait!.banniere
+            : const AppBanner(
+                variante: AppBannerVariante.lectureSeule,
+                texte: AppStrings.lectureSeuleDetail,
+              ),
       AppBannerVariante.verrouille => AppBanner(
         variante: AppBannerVariante.verrouille,
         texte: AppStrings.periodeVerrouilleeDetail(
@@ -516,14 +525,16 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
           ),
         ),
       ),
-      AppBannerVariante.attention => AppBanner(
-        variante: AppBannerVariante.attention,
-        texte: AppStrings.periodeBientotFermee(
-          etat.periode.joursAvantLimite(DateTime.now()) ?? 0,
-          AppStrings.moisLongs[etat.periode.mois - 1],
-        ),
-      ),
-      AppBannerVariante.information => null,
+      AppBannerVariante.attention => _bientotFermee(etat.periode)
+          ? AppBanner(
+              variante: AppBannerVariante.attention,
+              texte: AppStrings.periodeBientotFermee(
+                etat.periode.joursAvantLimite(DateTime.now()) ?? 0,
+                AppStrings.moisLongs[etat.periode.mois - 1],
+              ),
+            )
+          : fait?.banniere,
+      AppBannerVariante.information => fait?.banniere,
     };
   }
 

@@ -20,6 +20,8 @@ enum TypeNotification {
   planningValide('schedule_validated', Icons.event_available_outlined),
   toutAccepte('schedule_all_accepted', Icons.event_available_outlined),
   retardataires('late_responders', Icons.group_outlined),
+  finEssai('subscription_trial_ending', Icons.hourglass_top),
+  caserneSuspendue('subscription_suspended', Icons.visibility_outlined),
 
   /// Un type que cette version de l'application ne connaît pas.
   inconnu('', Icons.notifications_outlined);
