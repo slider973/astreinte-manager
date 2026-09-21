@@ -168,6 +168,12 @@ class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
             icon: const Icon(Icons.tune),
             tooltip: AppStrings.parametresDepuisMembres,
           ),
+        if (admin)
+          IconButton(
+            onPressed: () => context.goNamed(AppRoutes.abonnementName),
+            icon: const Icon(Icons.card_membership_outlined),
+            tooltip: AppStrings.abonnementDepuisAdmin,
+          ),
         IconButton(
           onPressed: _relire,
           icon: const Icon(Icons.refresh),

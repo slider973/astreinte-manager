@@ -339,8 +339,11 @@ end $$;
 reset role;
 
 -- Une caserne suspendue est en lecture seule, y compris pour son admin.
+-- `on conflict` : depuis la migration 0023, toute caserne naît avec sa ligne
+-- d'abonnement en essai — il s'agit donc de la changer, pas de la créer.
 insert into subscriptions (station_id, status) values
-  ('33333333-0000-4000-8000-000000000001', 'suspended');
+  ('33333333-0000-4000-8000-000000000001', 'suspended')
+on conflict (station_id) do update set status = excluded.status;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"33333333-0000-4000-8000-000000000100","role":"authenticated"}';

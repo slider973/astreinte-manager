@@ -441,6 +441,24 @@ verify_jwt = true
 enabled = true
 verify_jwt = false
 
+# Edge Functions du ticket 029. `create-checkout` est appelée par l'administrateur
+# connecté : `verify_jwt = true`, et le rôle est revérifié en base — `station_id`
+# désigne la caserne visée, il ne prouve aucun droit.
+[functions.create-checkout]
+enabled = true
+verify_jwt = true
+
+# `stripe-webhook` est **publique par nature** : Stripe appelle sans jeton, donc
+# `verify_jwt = false`. Ce qui authentifie l'appelant est la **signature** de
+# l'événement (`Stripe-Signature`, HMAC-SHA256 du corps brut avec
+# `STRIPE_WEBHOOK_SECRET`) : sans elle, ou fausse, ou hors de la fenêtre de cinq
+# minutes, la fonction répond 400 sans même analyser le corps. Tant que le secret
+# n'est pas posé, **tout est refusé** en 503 — jamais accepté sans vérification.
+# Voir supabase/functions/README.md et docs/STRIPE.md.
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+
 # Désactivé en local : Logflare et Vector échouent leur bilan de santé sous Rancher Desktop
 # et ne servent qu'aux journaux dans Studio. Aucun effet sur le projet hébergé.
 [analytics]

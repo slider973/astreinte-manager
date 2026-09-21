@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/abonnement/domain/abonnement_providers.dart';
+import '../../features/abonnement/presentation/abonnement_screen.dart';
 import '../../features/accueil/presentation/accueil_screen.dart';
 import '../../features/auth/presentation/aucune_caserne_screen.dart';
 import '../../features/auth/presentation/code_screen.dart';
@@ -114,6 +116,21 @@ abstract final class AppRoutes {
   /// barre d'application, sans empiler.
   static const String parametres = '/admin/parametres';
   static const String parametresName = 'parametresCaserne';
+
+  /// L'abonnement de la caserne (ticket 029). Écran de la destination
+  /// « Admin », au même niveau que « Membres », « Paramètres » et
+  /// « Périodes » : **aucune destination de navigation ne s'ajoute**
+  /// (`DESIGN.md § Navigation` en fixe cinq, un admin les a toutes).
+  ///
+  /// C'est aussi l'adresse de retour du prestataire de paiement, qui y ajoute
+  /// `?paiement=ok` ou `?paiement=annule` ([parametrePaiement]). Le paramètre
+  /// déclenche une **relecture**, jamais un changement d'état : c'est le
+  /// webhook qui écrit, et il peut arriver après le navigateur.
+  static const String abonnement = '/admin/abonnement';
+  static const String abonnementName = 'abonnementCaserne';
+  static const String parametrePaiement = 'paiement';
+  static const String paiementReussi = 'ok';
+  static const String paiementAnnule = 'annule';
 
   /// Les mois de saisie de la caserne (ticket 014). Troisième écran de la
   /// destination « Admin », au même niveau que « Membres » et « Paramètres » :
@@ -311,6 +328,15 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PeriodesScreen(),
       ),
       GoRoute(
+        path: AppRoutes.abonnement,
+        name: AppRoutes.abonnementName,
+        builder: (context, state) => AbonnementScreen(
+          retour: retourPaiement(
+            state.uri.queryParameters[AppRoutes.parametrePaiement],
+          ),
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.invitation,
         name: AppRoutes.invitationName,
         builder: (context, state) => InvitationScreen(
@@ -404,6 +430,16 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(routeur.dispose);
   return routeur;
 });
+
+/// Le retour du prestataire de paiement, lu dans `?paiement=`.
+///
+/// Toute autre valeur vaut « pas de retour » : le paramètre vient du dehors et
+/// n'a aucune autorité. Il ne fait que demander une relecture.
+RetourPaiement? retourPaiement(String? valeur) => switch (valeur) {
+  AppRoutes.paiementReussi => RetourPaiement.reussi,
+  AppRoutes.paiementAnnule => RetourPaiement.annule,
+  _ => null,
+};
 
 /// Pont entre Riverpod et `go_router` : un [Listenable] qui se déclenche à
 /// chaque changement de l'état d'authentification.
