@@ -486,12 +486,22 @@ abstract final class AppStrings {
 
   /// Le résumé d'un envoi d'invitations, commun aux deux comptes rendus.
   ///
-  /// **Le verbe suit les faits.** « envoyées » n'apparaît que si [parties]
-  /// couvre tout ce qui a été créé ; dès qu'un courriel manque à l'appel, la
-  /// phrase dit « créées ». Sans cette règle, l'écran affichait « 1 invitation
-  /// envoyée, 0 échec. » au-dessus de « le courriel n'est pas parti » : deux
-  /// phrases qui se contredisent, l'une sous l'autre (ticket 048, à l'import
-  /// puis à l'invitation).
+  /// **Le verbe suit les faits.** « envoyées » n'apparaît qu'à deux
+  /// conditions : que [parties] couvre tout ce qui a été retenu, et qu'il y
+  /// ait quelque chose à couvrir. La seconde n'est pas un détail — sans elle,
+  /// un lot entièrement refusé s'annonçait « 0 invitation envoyée, 5
+  /// échecs. », un envoi affirmé sur zéro envoi. Dès qu'un courriel manque à
+  /// l'appel, la phrase ne parle plus que de ce qui existe, et l'écran
+  /// affichait auparavant « 1 invitation envoyée, 0 échec. » au-dessus de
+  /// « le courriel n'est pas parti » : deux phrases qui se contredisent,
+  /// l'une sous l'autre (ticket 048, à l'import puis à l'invitation).
+  ///
+  /// **Le nom suit les faits aussi.** « créée » ne vaut que pour une ligne
+  /// qui n'existait pas. Une adresse déjà invitée revient en [relancees] : la
+  /// compter comme une création annonçait « 1 invitation créée » pour une
+  /// invitation vieille de trois jours (ticket 048, second tour). Quand tous
+  /// les courriels sont partis, la distinction ne sert plus à rien — chacun a
+  /// reçu le sien —, et le résumé compte tout ensemble.
   ///
   /// Les deux écrans partagent la phrase parce qu'ils partagent la règle. Ce
   /// qu'ils ne partagent pas, c'est ce qui vient **dessous** : à l'import,
@@ -499,25 +509,67 @@ abstract final class AppStrings {
   /// rien d'autre n'en parlera ; à l'invitation, vingt lignes au plus, et
   /// chacune porte déjà son sort — le résumé compte, la ligne dit laquelle.
   ///
-  /// Toujours les deux nombres, même à zéro.
+  /// Toujours le nombre d'échecs, même à zéro.
   static String invitationsResume({
     required int creees,
+    required int relancees,
     required int parties,
     required int echecs,
   }) {
+    final retenues = creees + relancees;
     final partieEchecs = echecs <= 1 ? '$echecs échec' : '$echecs échecs';
-    if (parties >= creees) {
-      return creees <= 1
-          ? '$creees invitation envoyée, $partieEchecs.'
-          : '$creees invitations envoyées, $partieEchecs.';
+    if (retenues > 0 && parties >= retenues) {
+      return retenues <= 1
+          ? '$retenues invitation envoyée, $partieEchecs.'
+          : '$retenues invitations envoyées, $partieEchecs.';
     }
-    return creees <= 1
-        ? '$creees invitation créée, $partieEchecs.'
-        : '$creees invitations créées, $partieEchecs.';
+    // Un courriel au moins est resté à quai : la phrase ne dit plus que ce
+    // qui est certain — les lignes nouvelles, et celles qui étaient déjà là.
+    // Le compte des créations reste affiché quand il n'y a rien à relancer,
+    // fût-il nul : « 0 invitation créée, 5 échecs. » est la seule phrase
+    // vraie d'un lot entièrement refusé.
+    final morceaux = <String>[
+      if (creees > 0 || relancees == 0)
+        creees <= 1 ? '$creees invitation créée' : '$creees invitations créées',
+      // Le nom ne se répète pas quand les créations viennent de le poser :
+      // « 1 invitation créée, 1 déjà en attente » plutôt que deux fois le
+      // même mot dans la même phrase.
+      if (relancees > 0)
+        if (creees > 0)
+          '$relancees déjà en attente'
+        else if (relancees <= 1)
+          '$relancees invitation déjà en attente'
+        else
+          '$relancees invitations déjà en attente',
+    ];
+    return '${morceaux.join(', ')}, $partieEchecs.';
   }
 
+  // --- Le sort d'une adresse, sur sa ligne du compte rendu -----------
+  //
+  // Quatre libellés pour trois statuts, parce que deux d'entre eux affirment
+  // qu'on a prévenu quelqu'un et que le serveur les rend même quand aucun
+  // courriel n'est sorti. [ResultatInvitation.libelle] choisit ; ici, on
+  // n'écrit que des phrases vraies.
+  //
+  // Aucun ne contient le mot « envoyée » — pas même « Relancée », qui a
+  // remplacé « Renvoyée » pour cette raison. Le garde-fou des tests
+  // (`test/support/promesse_envoi.dart`) refuse ce mot partout dès qu'un
+  // courriel est resté à quai : avec « Renvoyée » il fallait une exception,
+  // et l'exception laissait justement passer le libellé qui mentait.
+
+  /// Le courriel est parti vers une adresse qui n'avait pas d'invitation.
   static const String resultatInvitee = 'Invitée';
-  static const String resultatRenvoyee = 'Renvoyée';
+
+  /// Le courriel est reparti vers une adresse qui en avait déjà une.
+  static const String resultatRelancee = 'Relancée';
+
+  /// L'invitation existe désormais, mais personne n'a été prévenu.
+  static const String resultatCreee = 'Créée';
+
+  /// L'invitation existait déjà, et personne n'a été prévenu de nouveau.
+  static const String resultatDejaEnAttente = 'Déjà en attente';
+
   static const String resultatEchec = 'Échec';
 
   /// Ce qui s'ajoute quand l'invitation existe mais que le courriel n'est
@@ -774,11 +826,15 @@ abstract final class AppStrings {
   /// Elles ne sont jamais énumérées : le geste utile est le renvoi, et il se
   /// pose dans la liste des invitations en attente, où chaque ligne le porte
   /// (ticket 048).
+  ///
+  /// [retenues] est tout ce que le serveur a accepté, créations **et**
+  /// relances : c'est l'ensemble que [invitationsResume] vient d'annoncer, et
+  /// le seul auquel [nonPartis] puisse se comparer.
   static String importCourrielsNonPartis({
     required int nonPartis,
-    required int creees,
+    required int retenues,
   }) {
-    if (nonPartis >= creees) {
+    if (nonPartis >= retenues) {
       return nonPartis <= 1
           ? 'Son courriel n\'est pas parti. Renvoie cette invitation depuis '
                 'la liste des invitations en attente.'

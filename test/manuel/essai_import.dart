@@ -168,8 +168,8 @@ Future<void> _essai() async {
     final rapport = RapportInvitations.depuisJson(corps);
     envoyees += rapport.resultats.length;
     print(
-      '  créées ${rapport.creees}, courriels partis '
-      '${rapport.courrielsPartis}, échecs ${rapport.echecs} '
+      '  créées ${rapport.creees}, déjà en attente ${rapport.relancees}, '
+      'courriels partis ${rapport.courrielsPartis}, échecs ${rapport.echecs} '
       '(cumul $envoyees/${apercu.nombreAInviter})',
     );
     final coupe = rapport.resultats.where(

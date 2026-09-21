@@ -52,7 +52,7 @@ void main() {
             ),
             ResultatInvitation(
               email: 'ancien@exemple.fr',
-              statut: StatutResultatInvitation.renvoyee,
+              statut: StatutResultatInvitation.relancee,
             ),
             ResultatInvitation(
               email: 'deja@exemple.fr',
@@ -78,23 +78,30 @@ void main() {
       ]);
       expect(
         find.text(
-          AppStrings.invitationsResume(creees: 2, parties: 2, echecs: 1),
+          AppStrings.invitationsResume(
+            creees: 1,
+            relancees: 1,
+            parties: 2,
+            echecs: 1,
+          ),
         ),
         findsOneWidget,
       );
       expect(find.text(AppStrings.resultatInvitee), findsOneWidget);
-      expect(find.text(AppStrings.resultatRenvoyee), findsOneWidget);
+      expect(find.text(AppStrings.resultatRelancee), findsOneWidget);
       expect(find.text(AppStrings.resultatEchec), findsOneWidget);
       expect(find.text(AppStrings.inviteDejaMembre), findsOneWidget);
     });
 
-    // Les quatre situations du compte rendu (ticket 048) : une adresse ou un
-    // lot, tous les courriels partis ou non. Le résumé compte et porte le
-    // verbe — « envoyées » seulement si les envois couvrent les créations —,
-    // la ligne dit laquelle n'a prévenu personne, et aucun des deux ne redit
-    // ce que l'autre a déjà dit. Chaque cas où un courriel manque est gardé
-    // par [aucunEnvoiPromis] : c'est la phrase **en trop** qui ment, et ce
-    // n'est jamais celle qu'on vérifie.
+    // Les cinq situations du compte rendu (ticket 048) : une adresse ou un
+    // lot, tous les courriels partis ou non, et l'adresse déjà invitée que le
+    // serveur rend « relancée ». Le résumé compte et porte le verbe —
+    // « envoyées » seulement si les envois couvrent tout ce qui a été retenu,
+    // « créée » seulement pour une ligne qui n'existait pas —, la ligne dit
+    // laquelle n'a prévenu personne, et aucun des deux ne redit ce que
+    // l'autre a déjà dit. Chaque cas où un courriel manque est gardé par
+    // [aucunEnvoiPromis] : c'est la phrase **en trop** qui ment, et ce n'est
+    // jamais celle qu'on vérifie.
     group('le résumé ne promet que les envois qui ont eu lieu', () {
       testWidgets('une adresse, courriel parti : « envoyée »', (tester) async {
         final depot = FauxMembresRepository(
@@ -115,7 +122,12 @@ void main() {
 
         expect(
           find.text(
-            AppStrings.invitationsResume(creees: 1, parties: 1, echecs: 0),
+            AppStrings.invitationsResume(
+              creees: 1,
+              relancees: 0,
+              parties: 1,
+              echecs: 0,
+            ),
           ),
           findsOneWidget,
         );
@@ -146,7 +158,12 @@ void main() {
         // au-dessus de « le courriel n'est pas parti ».
         expect(
           find.text(
-            AppStrings.invitationsResume(creees: 1, parties: 0, echecs: 0),
+            AppStrings.invitationsResume(
+              creees: 1,
+              relancees: 0,
+              parties: 0,
+              echecs: 0,
+            ),
           ),
           findsOneWidget,
         );
@@ -184,7 +201,12 @@ void main() {
 
         expect(
           find.text(
-            AppStrings.invitationsResume(creees: 2, parties: 2, echecs: 0),
+            AppStrings.invitationsResume(
+              creees: 2,
+              relancees: 0,
+              parties: 2,
+              echecs: 0,
+            ),
           ),
           findsOneWidget,
         );
@@ -224,7 +246,12 @@ void main() {
 
         expect(
           find.text(
-            AppStrings.invitationsResume(creees: 3, parties: 1, echecs: 0),
+            AppStrings.invitationsResume(
+              creees: 3,
+              relancees: 0,
+              parties: 1,
+              echecs: 0,
+            ),
           ),
           findsOneWidget,
         );
@@ -236,6 +263,61 @@ void main() {
           findsNWidgets(2),
         );
         aucunEnvoiPromis(tester);
+      });
+
+      // Le cas de production du 21 septembre 2026, et le défaut du second
+      // tour de revue : réinviter une adresse déjà invitée rend `resent`, que
+      // le courriel sorte ou non. L'écran affichait « 1 invitation créée » —
+      // pour une invitation vieille de trois jours — puis « Renvoyée », juste
+      // au-dessus de « Le courriel n'est pas parti ».
+      testWidgets('une adresse déjà invitée, courriel non parti : ni créée, '
+          'ni renvoyée', (tester) async {
+        final semantique = tester.ensureSemantics();
+        final depot = FauxMembresRepository(
+          rapport: const RapportInvitations(
+            resultats: <ResultatInvitation>[
+              ResultatInvitation(
+                email: 'ancien@exemple.fr',
+                statut: StatutResultatInvitation.relancee,
+                courrielEnvoye: false,
+              ),
+            ],
+          ),
+        );
+        await _ouvrirFormulaire(tester, depot);
+
+        await tester.enterText(find.byType(TextField), 'ancien@exemple.fr');
+        await tester.tap(find.text(AppStrings.inviterEnvoyer));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(
+            AppStrings.invitationsResume(
+              creees: 0,
+              relancees: 1,
+              parties: 0,
+              echecs: 0,
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text(AppStrings.resultatDejaEnAttente), findsOneWidget);
+        expect(find.text(AppStrings.resultatRelancee), findsNothing);
+        expect(find.text(AppStrings.resultatCourrielNonParti), findsOneWidget);
+        // Ce n'est pas un échec : rien à réessayer.
+        expect(find.text(AppStrings.inviterReessayerEchecs), findsNothing);
+
+        // Ce qu'un lecteur d'écran prononce, et non ce qui est dessiné : la
+        // ligne pose `excludeSemantics`, et sa valeur portait encore la
+        // promesse quand le texte ne l'avait plus.
+        expect(
+          tester.getSemantics(find.text('ancien@exemple.fr')).value,
+          '${AppStrings.resultatDejaEnAttente}. '
+          '${AppStrings.resultatCourrielNonParti}',
+        );
+
+        aucunEnvoiPromis(tester);
+        semantique.dispose();
       });
     });
 
@@ -256,7 +338,9 @@ void main() {
       tester,
     ) async {
       final depot = FauxMembresRepository(
-        echecInvitation: const EchecInvitation(ErreurInvitation.caserneSuspendue),
+        echecInvitation: const EchecInvitation(
+          ErreurInvitation.caserneSuspendue,
+        ),
       );
       await _ouvrirFormulaire(tester, depot);
 

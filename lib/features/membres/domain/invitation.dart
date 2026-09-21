@@ -134,18 +134,22 @@ class Invitation {
 /// Le sort d'une adresse dans un envoi de lot (`supabase/functions/README.md`).
 enum StatutResultatInvitation {
   invitee(AppStrings.resultatInvitee),
-  renvoyee(AppStrings.resultatRenvoyee),
+  relancee(AppStrings.resultatRelancee),
   erreur(AppStrings.resultatEchec);
 
   const StatutResultatInvitation(this.libelle);
 
+  /// Le libellé **du statut**, qui suppose le courriel parti. Ce n'est pas
+  /// toujours celui de la ligne : le serveur rend `resent` dès qu'une
+  /// invitation en attente existe pour l'adresse, courriel sorti ou non.
+  /// C'est [ResultatInvitation.libelle] qu'un écran affiche.
   final String libelle;
 
   /// Un statut inconnu est traité comme une erreur : on n'annonce jamais une
   /// réussite sur une valeur qu'on ne comprend pas.
   static StatutResultatInvitation depuisApi(String? valeur) => switch (valeur) {
     'invited' => invitee,
-    'resent' => renvoyee,
+    'resent' => relancee,
     _ => erreur,
   };
 }
@@ -351,6 +355,27 @@ class ResultatInvitation {
 
   bool get enEchec => statut == StatutResultatInvitation.erreur;
 
+  /// Ce que la ligne affiche sous l'adresse : le statut du serveur, corrigé
+  /// par le sort du courriel.
+  ///
+  /// « Invitée » et « Relancée » affirment toutes deux que quelqu'un a été
+  /// prévenu, et le serveur les rend sans rien savoir du courriel — `resent`
+  /// dès qu'une invitation en attente existe pour l'adresse. Le compte rendu
+  /// affichait donc « Renvoyée » — alors le libellé du statut — juste
+  /// au-dessus de « Le courriel n'est pas parti » (ticket 048, second tour).
+  ///
+  /// Quand le courriel est resté à quai, la ligne ne dit plus que ce qui est
+  /// vrai, et distingue les deux faits que [detail] ne distingue pas : une
+  /// invitation de plus, ou une invitation qui était déjà là. L'icône
+  /// `schedule_send_outlined` du compte rendu fait la même distinction, et
+  /// c'est elle que ce libellé rejoint.
+  String get libelle {
+    if (enEchec || courrielEnvoye) return statut.libelle;
+    return statut == StatutResultatInvitation.relancee
+        ? AppStrings.resultatDejaEnAttente
+        : AppStrings.resultatCreee;
+  }
+
   /// La phrase à afficher sous l'adresse, ou `null` si tout s'est bien passé.
   ///
   /// Un refus de débit affiche le message du serveur : lui seul sait de
@@ -386,17 +411,44 @@ class RapportInvitations {
 
   final List<ResultatInvitation> resultats;
 
-  /// Les invitations que le serveur a acceptées, courriel parti ou non.
+  /// Les invitations **nouvelles** : des lignes qui n'existaient pas avant
+  /// cet envoi, courriel parti ou non.
   ///
-  /// **Ce n'est pas un compte d'envois**, et le nom le dit maintenant : une
+  /// **Ce n'est ni un compte d'envois, ni un compte d'acceptations.** Une
   /// invitation peut exister en base sans que le moindre courriel soit sorti
-  /// (`email_sent` faux). Compter les deux ensemble a fait afficher « 3
-  /// invitations envoyées » au-dessus de « aucun courriel n'est parti »
-  /// (ticket 048). Pour les envois, voir [courrielsPartis].
-  int get creees =>
+  /// (`email_sent` faux) : compter les deux ensemble a fait afficher « 3
+  /// invitations envoyées » au-dessus de « aucun courriel n'est parti ». Et
+  /// une adresse déjà invitée revient en `resent` : la compter ici annonçait
+  /// « 1 invitation créée » pour une invitation vieille de trois jours
+  /// (ticket 048, puis second tour). Voir [relancees], [retenues] et
+  /// [courrielsPartis].
+  int get creees => resultats
+      .where(
+        (ResultatInvitation r) => r.statut == StatutResultatInvitation.invitee,
+      )
+      .length;
+
+  /// Les adresses qui avaient déjà une invitation en attente.
+  ///
+  /// Le serveur rend `resent` sans rien créer : il réutilise la ligne,
+  /// repousse l'échéance et conserve le jeton. Rien de neuf n'existe, et le
+  /// courriel n'est pas pour autant parti — c'est [courrielsPartis] qui le
+  /// sait.
+  int get relancees => resultats
+      .where(
+        (ResultatInvitation r) => r.statut == StatutResultatInvitation.relancee,
+      )
+      .length;
+
+  /// Tout ce que le serveur a accepté : [creees] et [relancees] ensemble.
+  ///
+  /// L'ensemble auquel [courrielsPartis] et [courrielsNonPartis] se
+  /// comparent. Toujours dit « retenues », jamais « créées » : la moitié de
+  /// ces lignes peut être plus vieille que l'envoi.
+  int get retenues =>
       resultats.where((ResultatInvitation r) => !r.enEchec).length;
 
-  /// Les invitations créées **dont le courriel est réellement sorti**.
+  /// Les invitations retenues **dont le courriel est réellement sorti**.
   ///
   /// Le seul compte qui autorise le verbe « envoyée », à l'écran comme dans
   /// le compteur d'avancement.
@@ -414,7 +466,7 @@ class RapportInvitations {
       .where((ResultatInvitation r) => r.enEchec)
       .toList(growable: false);
 
-  /// Les invitations créées dont le courriel n'est jamais parti.
+  /// Les invitations retenues dont le courriel n'est jamais parti.
   ///
   /// Ce n'est pas un échec d'invitation — la ligne existe, le renvoi la
   /// relance —, et c'est un **nombre** plutôt qu'une liste : quand aucun

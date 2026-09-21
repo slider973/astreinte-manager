@@ -35,13 +35,95 @@ void main() {
         ],
       });
 
-      expect(rapport.creees, 2);
+      // Une seule ligne est neuve : l'autre adresse avait déjà son
+      // invitation. Les compter ensemble annonçait « 2 invitations créées »
+      // pour une création (ticket 048, second tour).
+      expect(rapport.creees, 1);
+      expect(rapport.relancees, 1);
+      expect(rapport.retenues, 2);
       expect(rapport.courrielsPartis, 2);
       expect(rapport.echecs, 1);
       expect(rapport.toutEstPasse, isFalse);
       expect(rapport.adressesEnEchec, <String>['deja@exemple.fr']);
-      expect(rapport.resultats[1].statut, StatutResultatInvitation.renvoyee);
+      expect(rapport.resultats[1].statut, StatutResultatInvitation.relancee);
+      // Les deux courriels sont partis : les libellés peuvent l'affirmer.
+      expect(rapport.resultats[0].libelle, AppStrings.resultatInvitee);
+      expect(rapport.resultats[1].libelle, AppStrings.resultatRelancee);
       expect(rapport.resultats[2].detail, AppStrings.inviteDejaMembre);
+    });
+
+    // Le cas de production du 21 septembre 2026 : réinviter une adresse déjà
+    // invitée rend `resent`, que le courriel soit sorti ou non.
+    test('une relance dont le courriel n\'est pas parti n\'affirme ni envoi '
+        'ni création', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'results': <dynamic>[
+          {
+            'email': 'ancien@exemple.fr',
+            'status': 'resent',
+            'email_sent': false,
+          },
+        ],
+      });
+
+      final resultat = rapport.resultats.single;
+      expect(resultat.statut, StatutResultatInvitation.relancee);
+      // Le libellé du statut promettrait l'envoi ; celui de la ligne, non.
+      expect(resultat.statut.libelle, AppStrings.resultatRelancee);
+      expect(resultat.libelle, AppStrings.resultatDejaEnAttente);
+      expect(resultat.detail, AppStrings.resultatCourrielNonParti);
+
+      // Rien n'a été créé : le résumé ne peut pas dire le contraire.
+      expect(rapport.creees, 0);
+      expect(rapport.relancees, 1);
+      expect(rapport.retenues, 1);
+      expect(rapport.courrielsNonPartis, 1);
+      expect(
+        AppStrings.invitationsResume(
+          creees: rapport.creees,
+          relancees: rapport.relancees,
+          parties: rapport.courrielsPartis,
+          echecs: rapport.echecs,
+        ),
+        '1 invitation déjà en attente, 0 échec.',
+      );
+    });
+
+    test('le résumé ne dit que ce que les comptes soutiennent', () {
+      // Le défaut du second tour : « 0 invitation envoyée, 5 échecs. » —
+      // la branche « envoyée » gagnait dès que les deux comptes valaient zéro.
+      expect(
+        AppStrings.invitationsResume(
+          creees: 0,
+          relancees: 0,
+          parties: 0,
+          echecs: 5,
+        ),
+        '0 invitation créée, 5 échecs.',
+      );
+
+      // Tous les courriels sortis : le verbe est permis, et la distinction
+      // création / relance ne sert plus à personne — chacun a reçu le sien.
+      expect(
+        AppStrings.invitationsResume(
+          creees: 1,
+          relancees: 1,
+          parties: 2,
+          echecs: 1,
+        ),
+        '2 invitations envoyées, 1 échec.',
+      );
+
+      // Un courriel manque : deux faits, deux morceaux, et pas un mot de plus.
+      expect(
+        AppStrings.invitationsResume(
+          creees: 1,
+          relancees: 1,
+          parties: 0,
+          echecs: 0,
+        ),
+        '1 invitation créée, 1 déjà en attente, 0 échec.',
+      );
     });
 
     test('un courriel non parti n\'est pas un échec, mais se dit', () {
@@ -67,6 +149,8 @@ void main() {
       expect(rapport.creees, 1);
       expect(rapport.courrielsPartis, 0);
       expect(rapport.courrielsNonPartis, 1);
+      // Et la ligne ne se dit pas « Invitée » : personne ne l'est.
+      expect(rapport.resultats.single.libelle, AppStrings.resultatCreee);
     });
 
     test('un statut inconnu est traité comme une erreur', () {

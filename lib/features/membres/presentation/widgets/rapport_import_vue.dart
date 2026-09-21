@@ -28,8 +28,9 @@ import '../../domain/invitation.dart';
 ///   invitations en attente, pas ici.
 ///
 /// **Les deux phrases se composent, elles ne se contredisent pas.** Le résumé
-/// compte les invitations créées, et n'emploie « envoyées » que si tous les
-/// courriels sont réellement sortis ; sinon il dit « créées », et la phrase du
+/// compte ce que le serveur a retenu, et n'emploie « envoyées » que si tous
+/// les courriels sont réellement sortis ; sinon il ne nomme que ce qui existe
+/// — les lignes créées, celles qui étaient déjà en attente —, et la phrase du
 /// dessous dit combien n'ont prévenu personne. C'est
 /// [AppStrings.invitationsResume] qui tient cette règle — la même phrase sert
 /// au compte rendu d'invitation, qui portait le même verbe menteur
@@ -52,7 +53,10 @@ class RapportImportVue extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final refus = rapport.refus;
-    final creees = rapport.creees;
+    // Créations et relances ensemble : c'est à cet ensemble que le compte des
+    // courriels restés à quai se compare, et l'import peut relancer une
+    // adresse qu'un autre administrateur venait d'inviter.
+    final retenues = rapport.retenues;
     final nonPartis = rapport.courrielsNonPartis;
 
     return Column(
@@ -62,7 +66,8 @@ class RapportImportVue extends StatelessWidget {
           liveRegion: true,
           child: Text(
             AppStrings.invitationsResume(
-              creees: creees,
+              creees: rapport.creees,
+              relancees: rapport.relancees,
               parties: rapport.courrielsPartis,
               echecs: rapport.echecs,
             ),
@@ -74,7 +79,7 @@ class RapportImportVue extends StatelessWidget {
           Text(
             AppStrings.importCourrielsNonPartis(
               nonPartis: nonPartis,
-              creees: creees,
+              retenues: retenues,
             ),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,

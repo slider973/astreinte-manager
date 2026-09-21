@@ -381,7 +381,14 @@ void main() {
       // Soixante lignes identiques sous un résumé qui dit déjà « 0 échec »
       // n'ajoutent rien et enterrent ce qui compterait.
       expect(
-        find.text(AppStrings.invitationsResume(creees: 60, parties: 60, echecs: 0)),
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 60,
+            relancees: 0,
+            parties: 60,
+            echecs: 0,
+          ),
+        ),
         findsOneWidget,
       );
       expect(find.text(AppStrings.importEchecsTitre), findsNothing);
@@ -465,7 +472,14 @@ void main() {
       await importerTrois(tester, 3);
 
       expect(
-        find.text(AppStrings.invitationsResume(creees: 3, parties: 3, echecs: 0)),
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 3,
+            relancees: 0,
+            parties: 3,
+            echecs: 0,
+          ),
+        ),
         findsOneWidget,
       );
       // Un fournisseur de courriel est configuré, tout est sorti : pas une
@@ -482,12 +496,19 @@ void main() {
         // Sans fournisseur de courriel configuré, c'est tout l'import qui est
         // dans ce cas : une phrase et un nombre, pas soixante lignes.
         expect(
-          find.text(AppStrings.invitationsResume(creees: 3, parties: 0, echecs: 0)),
+          find.text(
+            AppStrings.invitationsResume(
+              creees: 3,
+              relancees: 0,
+              parties: 0,
+              echecs: 0,
+            ),
+          ),
           findsOneWidget,
         );
         expect(
           find.text(
-            AppStrings.importCourrielsNonPartis(nonPartis: 3, creees: 3),
+            AppStrings.importCourrielsNonPartis(nonPartis: 3, retenues: 3),
           ),
           findsOneWidget,
         );
@@ -507,13 +528,22 @@ void main() {
       await importerTrois(tester, 1);
 
       expect(
-        find.text(AppStrings.invitationsResume(creees: 3, parties: 1, echecs: 0)),
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 3,
+            relancees: 0,
+            parties: 1,
+            echecs: 0,
+          ),
+        ),
         findsOneWidget,
       );
       // Deux sur les trois du résumé, et non « 2 invitations sont créées »,
       // qui ferait douter de la troisième.
       expect(
-        find.text(AppStrings.importCourrielsNonPartis(nonPartis: 2, creees: 3)),
+        find.text(
+          AppStrings.importCourrielsNonPartis(nonPartis: 2, retenues: 3),
+        ),
         findsOneWidget,
       );
       expect(find.text(AppStrings.importEchecsTitre), findsNothing);
@@ -557,7 +587,14 @@ void main() {
       expect(find.text('marie@exemple.fr'), findsNothing);
       expect(find.text('anne@exemple.fr'), findsNothing);
       expect(
-        find.text(AppStrings.invitationsResume(creees: 1, parties: 1, echecs: 0)),
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 1,
+            relancees: 0,
+            parties: 1,
+            echecs: 0,
+          ),
+        ),
         findsOneWidget,
       );
     });
@@ -626,7 +663,14 @@ void main() {
       // écrans ne se contredisent plus.
       await tester.pumpAndSettle();
       expect(
-        find.text(AppStrings.invitationsResume(creees: 35, parties: 35, echecs: 5)),
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 35,
+            relancees: 0,
+            parties: 35,
+            echecs: 5,
+          ),
+        ),
         findsOneWidget,
       );
     });
@@ -777,7 +821,12 @@ void main() {
         // réessaierait des adresses déjà invitées.
         expect(
           find.text(
-            AppStrings.invitationsResume(creees: 20, parties: 20, echecs: 0),
+            AppStrings.invitationsResume(
+              creees: 20,
+              relancees: 0,
+              parties: 20,
+              echecs: 0,
+            ),
           ),
           findsOneWidget,
         );

@@ -220,7 +220,7 @@ void main() {
           resultats: <ResultatInvitation>[
             ResultatInvitation(
               email: 'recrue@exemple.fr',
-              statut: StatutResultatInvitation.renvoyee,
+              statut: StatutResultatInvitation.relancee,
               courrielEnvoye: false,
             ),
           ],
