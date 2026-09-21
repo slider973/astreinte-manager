@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 021
 - **Branche** : `feat/027-mes-astreintes`
-- **Statut** : en cours depuis 2026-09-21
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
 - Liste chronologique des attributions `accepted` à venir, puis passées (repliées).

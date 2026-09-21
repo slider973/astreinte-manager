@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 027 | [Écran Mes astreintes](in-progress/027-mes-astreintes.md) | P0 | 021 |  |
 
 ## À faire
 
@@ -57,4 +56,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 024 | [Push web via Firebase Cloud Messaging (PWA)](done/024-fcm-setup.md) | P0 | 001 005 | https://github.com/slider973/astreinte-manager/pull/14 |
 | 025 | [Edge Function send-notification](done/025-edge-send-notification.md) | P0 | 002 024 | https://github.com/slider973/astreinte-manager/pull/15 |
 | 026 | [Centre de notifications in-app](done/026-centre-notifications.md) | P1 | 025 | https://github.com/slider973/astreinte-manager/pull/16 |
+| 027 | [Écran Mes astreintes](done/027-mes-astreintes.md) | P0 | 021 |  |
 
