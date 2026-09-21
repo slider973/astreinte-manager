@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 019, 025
 - **Branche** : `feat/022-relances-auto`
+- **Statut** : en cours depuis 2026-09-21
 
 ## À faire
 - Migration 0009 (partie 2) : crons `assignment_reminders` et `late_responders_report` selon `docs/WORKFLOWS.md` section 6.
