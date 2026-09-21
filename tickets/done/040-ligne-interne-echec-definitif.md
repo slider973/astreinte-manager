@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 025, 026
 - **Branche** : `feat/040-ligne-interne-echec-definitif`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/26
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
