@@ -71,6 +71,16 @@ l'envoi : la liste peut le dire. Distinguer, sur la ligne, une invitation dont l
 d'une invitation dont personne n'a jamais été prévenu, et proposer le geste utile — renvoyer, ou
 copier le lien.
 
+### L'écran d'invitation porte la même contradiction que le compte rendu d'import (P2)
+Relevé en corrigeant le compte rendu d'import, au premier tour de revue. L'écran du ticket 006
+affiche « 1 invitation envoyée, 0 échec. » en résumé, puis, sous la ligne de l'adresse,
+« Invitation créée, mais le courriel n'est pas parti. » Les deux phrases se contredisent, dans
+l'écran que l'administrateur utilise pour inviter une personne à la fois.
+
+C'est le même défaut, sur le même chemin, avec la même cause : un compte d'invitations créées
+présenté comme un compte d'envois. Le compte rendu d'import ne peut plus le produire, celui-ci si.
+Appliquer la même règle : le verbe qui promet l'envoi est conditionné au compte des envois réels.
+
 ### Trois broutilles (P3)
 - `ImporterController._phraseDeLecture` passe `maxOctetsFichier` comme taille réelle à
   `AppStrings.importTropGros` : le message affiche la limite deux fois.
@@ -91,4 +101,5 @@ copier le lien.
 - Une réponse d'erreur du serveur n'est plus annoncée comme une panne de connexion.
 - Une invitation dont le courriel n'est pas parti se distingue, dans la liste, d'une invitation
   partie et sans réponse.
+- Aucun compte rendu, ni à l'import ni à l'invitation, n'annonce un envoi que rien ne soutient.
 - `flutter analyze` sans avertissement, `flutter test` verts, `flutter build web` qui passe.
