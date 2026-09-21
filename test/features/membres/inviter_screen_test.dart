@@ -130,7 +130,7 @@ void main() {
       tester,
     ) async {
       final depot = FauxMembresRepository(
-        echecInvitation: ErreurInvitation.caserneSuspendue,
+        echecInvitation: const EchecInvitation(ErreurInvitation.caserneSuspendue),
       );
       await _ouvrirFormulaire(tester, depot);
 
@@ -140,6 +140,73 @@ void main() {
 
       expect(find.text(AppStrings.inviteCaserneSuspendue), findsOneWidget);
       expect(find.text(AppStrings.inviterResultatsTitre), findsNothing);
+    });
+
+    // Ticket 038 : le plafond horaire. La phrase porte le délai avant de
+    // pouvoir réessayer — elle vient du serveur et s'affiche telle quelle,
+    // sinon l'écran annoncerait une panne à la place d'une limite.
+    testWidgets('un refus de débit affiche la phrase du serveur', (
+      tester,
+    ) async {
+      const phrase =
+          'Limite d\'invitations atteinte (60 par heure pour cette caserne). '
+          'Réessaie dans 13 minutes.';
+      final depot = FauxMembresRepository(
+        echecInvitation: const EchecInvitation(
+          ErreurInvitation.debitAtteint,
+          messageServeur: phrase,
+          plafond: PlafondInvitations(
+            portee: PorteePlafond.caserne,
+            plafond: 60,
+            delaiAvantNouvelEssai: Duration(seconds: 730),
+          ),
+        ),
+      );
+      await _ouvrirFormulaire(tester, depot);
+
+      await tester.enterText(find.byType(TextField), 'recrue@exemple.fr');
+      await tester.tap(find.text(AppStrings.inviterEnvoyer));
+      await tester.pumpAndSettle();
+
+      expect(find.text(phrase), findsOneWidget);
+      expect(find.text(AppStrings.erreurTexteGenerique), findsNothing);
+    });
+
+    testWidgets('un lot à moitié refusé nomme la limite sous l\'adresse', (
+      tester,
+    ) async {
+      const phrase =
+          'Limite d\'invitations atteinte (60 par heure pour cette caserne). '
+          'Réessaie dans 2 minutes.';
+      final depot = FauxMembresRepository(
+        rapport: const RapportInvitations(
+          resultats: <ResultatInvitation>[
+            ResultatInvitation(
+              email: 'bon@exemple.fr',
+              statut: StatutResultatInvitation.invitee,
+            ),
+            ResultatInvitation(
+              email: 'trop@exemple.fr',
+              statut: StatutResultatInvitation.erreur,
+              motif: MotifEchecInvitation.debitAtteint,
+              messageServeur: phrase,
+            ),
+          ],
+        ),
+      );
+      await _ouvrirFormulaire(tester, depot);
+
+      await tester.enterText(
+        find.byType(TextField),
+        'bon@exemple.fr, trop@exemple.fr',
+      );
+      await tester.tap(find.text(AppStrings.inviterEnvoyer));
+      await tester.pumpAndSettle();
+
+      expect(find.text(phrase), findsOneWidget);
+      expect(find.text(AppStrings.inviteErreurServeur), findsNothing);
+      // Le lot garde sa liste : les adresses passées ne se réessaient pas.
+      expect(find.text(AppStrings.inviterReessayerEchecs), findsOneWidget);
     });
 
     testWidgets('les adresses en échec se réessaient seules', (tester) async {

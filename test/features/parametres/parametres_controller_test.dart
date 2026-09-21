@@ -248,5 +248,44 @@ void main() {
         );
       },
     );
+
+    // Ticket 038 : la caserne règle son plafond horaire d'invitations dans
+    // `settings`, l'écran ne le montre pas. Un enregistrement qui ne
+    // réécrirait que ses propres champs le ferait disparaître sans bruit, et
+    // la caserne retomberait sur le défaut de la base.
+    test('un enregistrement ne perd aucune clé que l\'écran ignore', () async {
+      final lu = ParametresCaserne.depuisJson(<String, dynamic>{
+        'id': stationTest,
+        'name': parametresSeed.nom,
+        'timezone': parametresSeed.fuseau,
+        'settings': <String, dynamic>{
+          ...parametresSeed.settingsJson,
+          'invitation_hourly_limit': 120,
+          'reglage_dune_version_plus_recente': const <String, dynamic>{'x': 1},
+        },
+      });
+      final depot = FauxParametresRepository(parametres: lu);
+      final (conteneur, etat) = await _ouvrir(depot);
+      final controleur = conteneur.read(parametresControllerProvider.notifier);
+
+      controleur.modifier(etat!.brouillon.copyWith(effectifJour: 3));
+      final resultat = await controleur.enregistrer();
+
+      expect(resultat.reussi, isTrue);
+      final envoye = depot.ecritures.single.settingsJson;
+      expect(envoye['required_day'], 3, reason: 'la modification part');
+      expect(envoye['invitation_hourly_limit'], 120);
+      expect(envoye['reglage_dune_version_plus_recente'], <String, dynamic>{
+        'x': 1,
+      });
+
+      // Et l'aller-retour suivant les garde aussi : la relecture de la ligne
+      // écrite ne doit pas les avoir dissoutes en route.
+      final apres = conteneur.read(parametresControllerProvider).value!;
+      expect(
+        apres.enregistres.settingsJson['invitation_hourly_limit'],
+        120,
+      );
+    });
   });
 }

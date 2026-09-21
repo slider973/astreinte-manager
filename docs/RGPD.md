@@ -124,6 +124,7 @@ table, et il se relit à chaque migration qui ajoute une table.
 | `push_tokens` | 365 jours sans usage | tâche `prune_retention` (migration `0030`) |
 | `notification_outbox` | 30 jours après traitement ; jamais une demande non partie | tâche `prune_retention` |
 | `invitations` | 30 jours après expiration ; 3 ans après acceptation | tâche `prune_retention` |
+| `invitation_rate_events` | **7 jours** — la table ne porte aucune adresse, seulement qui a invité et quand | tâche `prune_retention` (migration `0032`) |
 | `audit_log` | **3 ans** | tâche `prune_retention` |
 | `stripe_events` | 90 jours pour `processed` et `skipped` ; sans limite pour `failed` | tâche `prune_retention` |
 

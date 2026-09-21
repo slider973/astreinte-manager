@@ -119,6 +119,173 @@ void main() {
     });
   });
 
+  // Le plafond horaire d'invitations : corps de réponse de
+  // `supabase/functions/README.md § Le plafond de débit`.
+  group('Refus de débit (ticket 038)', () {
+    const faits = <String, dynamic>{
+      'scope': 'station',
+      'limit': 60,
+      'used': 60,
+      'remaining': 0,
+      'window_minutes': 60,
+      'retry_at': '2026-09-21T15:12:00+00:00',
+      'retry_after_seconds': 730,
+    };
+    const phraseServeur =
+        'Limite d\'invitations atteinte (60 par heure pour cette caserne). '
+        'Réessaie dans 13 minutes.';
+
+    test('n\'est pas un incident serveur', () {
+      expect(
+        MotifEchecInvitation.depuisCode('rate_limited'),
+        MotifEchecInvitation.debitAtteint,
+      );
+      expect(
+        ErreurInvitation.depuisCode('rate_limited'),
+        ErreurInvitation.debitAtteint,
+      );
+      expect(
+        MotifEchecInvitation.debitAtteint.message,
+        isNot(AppStrings.inviteErreurServeur),
+      );
+    });
+
+    test('une adresse refusée affiche la phrase du serveur, délai compris', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'results': <dynamic>[
+          {
+            'email': 'recrue@exemple.fr',
+            'status': 'error',
+            'code': 'rate_limited',
+            'message': phraseServeur,
+            'rate_limit': faits,
+          },
+        ],
+      });
+
+      final resultat = rapport.resultats.single;
+      expect(resultat.enEchec, isTrue);
+      expect(resultat.detail, phraseServeur);
+      expect(resultat.detail, contains('13 minutes'));
+    });
+
+    test('les faits sont lus à côté de la phrase', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'results': <dynamic>[
+          {
+            'email': 'recrue@exemple.fr',
+            'status': 'error',
+            'code': 'rate_limited',
+            'message': phraseServeur,
+            'rate_limit': faits,
+          },
+        ],
+      });
+
+      final plafond = rapport.resultats.single.plafond!;
+      expect(plafond.portee, PorteePlafond.caserne);
+      expect(plafond.plafond, 60);
+      expect(plafond.utilisees, 60);
+      expect(plafond.restantes, 0);
+      expect(plafond.fenetreMinutes, 60);
+      expect(plafond.delaiAvantNouvelEssai, const Duration(seconds: 730));
+      expect(
+        plafond.reessayerLe,
+        DateTime.parse('2026-09-21T15:12:00+00:00').toLocal(),
+      );
+    });
+
+    test('sans phrase du serveur, les faits disent encore le délai', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'results': <dynamic>[
+          {
+            'email': 'recrue@exemple.fr',
+            'status': 'error',
+            'code': 'rate_limited',
+            'rate_limit': faits,
+          },
+        ],
+      });
+
+      expect(rapport.resultats.single.detail, contains('13 minutes'));
+    });
+
+    test('sans phrase ni faits, le refus reste un refus, pas une panne', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'results': <dynamic>[
+          {
+            'email': 'recrue@exemple.fr',
+            'status': 'error',
+            'code': 'rate_limited',
+          },
+        ],
+      });
+
+      expect(rapport.resultats.single.detail, AppStrings.inviteDebitAtteint);
+    });
+
+    test('un autre motif garde la phrase de l\'écran', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'results': <dynamic>[
+          {
+            'email': 'deja@exemple.fr',
+            'status': 'error',
+            'code': 'already_member',
+            'message': 'Cette personne est déjà membre actif de la caserne.',
+          },
+        ],
+      });
+
+      expect(rapport.resultats.single.detail, AppStrings.inviteDejaMembre);
+    });
+
+    test('le refus global 429 porte la même phrase', () {
+      final echec = EchecInvitation.depuisCorps(<String, dynamic>{
+        'code': 'rate_limited',
+        'message': phraseServeur,
+        ...faits,
+      });
+
+      expect(echec.erreur, ErreurInvitation.debitAtteint);
+      expect(echec.message, phraseServeur);
+      expect(echec.plafond?.plafond, 60);
+      expect(echec.plafond?.portee, PorteePlafond.caserne);
+    });
+
+    test('un refus global sans phrase compose le délai depuis les faits', () {
+      final echec = EchecInvitation.depuisCorps(<String, dynamic>{
+        'code': 'rate_limited',
+        ...faits,
+      });
+
+      expect(echec.message, contains('13 minutes'));
+      expect(echec.message, isNot(AppStrings.erreurTexteGenerique));
+    });
+
+    test('le super-administrateur est compté par acteur', () {
+      final echec = EchecInvitation.depuisCorps(<String, dynamic>{
+        'code': 'rate_limited',
+        'scope': 'actor',
+        'limit': 200,
+        'retry_after_seconds': 45,
+      });
+
+      expect(echec.plafond?.portee, PorteePlafond.acteur);
+      // Arrondi à la minute supérieure : annoncer moins ferait réessayer
+      // pour rien.
+      expect(echec.message, contains('une minute'));
+    });
+
+    test('un autre refus global garde la phrase de l\'écran', () {
+      final echec = EchecInvitation.depuisCorps(<String, dynamic>{
+        'code': 'station_suspended',
+        'message': 'Abonnement suspendu.',
+      });
+
+      expect(echec.message, AppStrings.inviteCaserneSuspendue);
+    });
+  });
+
   group('Invitation', () {
     test('lit une ligne de invitations sans jamais attendre le jeton', () {
       final invitation = Invitation.depuisJson(const <String, dynamic>{

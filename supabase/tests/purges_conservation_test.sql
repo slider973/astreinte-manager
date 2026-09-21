@@ -368,12 +368,13 @@ select tests.check(
   'le jeton d''hier et celui de 364 jours restent');
 
 -- ---------------------------------------------------------------------------
--- 7. La tâche prune_retention — les cinq purges d'un coup
+-- 7. La tâche prune_retention — les six purges d'un coup
 -- ---------------------------------------------------------------------------
 \echo '== 7. cron_prune_retention'
 
 delete from audit_log;
 delete from invitations;
+delete from invitation_rate_events;
 delete from notification_outbox;
 delete from push_tokens;
 delete from stripe_events;
@@ -388,6 +389,14 @@ insert into invitations (station_id, email, invited_by, expires_at, accepted_at,
   ('aaaaaaaa-0000-4000-8000-000000000001', 'perdue@caserne-a.test',
    'aaaaaaaa-0000-4000-8000-000000000100',
    tests.t0() - interval '200 days', null, tests.t0() - interval '214 days');
+
+-- Le compteur d'invitations (migration 0032) : une semaine de conservation, la
+-- plus courte de la tâche — la fenêtre du plafond ne fait qu'une heure.
+insert into invitation_rate_events (station_id, actor_id, created_at) values
+  ('aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000100',
+   tests.t0() - interval '8 days'),
+  ('aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000100',
+   tests.t0() - interval '6 days');
 
 insert into notification_outbox
   (station_id, type, recipients, payload, status, created_at, processed_at) values
@@ -411,6 +420,7 @@ select tests.check(
   cron_prune_retention(tests.t0()) = jsonb_build_object(
     'audit_log', 1,
     'invitations', 1,
+    'invitation_rate_events', 1,
     'notification_outbox', 1,
     'push_tokens', 1,
     'stripe_events', 2),
@@ -419,6 +429,7 @@ select tests.check(
 select tests.check(
   (select count(*) from audit_log) = 1
   and (select count(*) from invitations) = 0
+  and (select count(*) from invitation_rate_events) = 1
   and (select count(*) from notification_outbox) = 1
   and (select count(*) from push_tokens) = 0
   and (select count(*) from stripe_events) = 0,
@@ -426,8 +437,8 @@ select tests.check(
 
 select tests.check(
   cron_prune_retention(tests.t0()) = jsonb_build_object(
-    'audit_log', 0, 'invitations', 0, 'notification_outbox', 0,
-    'push_tokens', 0, 'stripe_events', 0),
+    'audit_log', 0, 'invitations', 0, 'invitation_rate_events', 0,
+    'notification_outbox', 0, 'push_tokens', 0, 'stripe_events', 0),
   'rejouée sur le même instant, elle ne supprime plus rien');
 
 -- Appelée sans argument — la forme exacte de la commande de l'ordonnanceur —
@@ -435,8 +446,8 @@ select tests.check(
 -- les seules lignes restantes sont celles d'hier.
 select tests.check(
   cron_prune_retention() = jsonb_build_object(
-    'audit_log', 0, 'invitations', 0, 'notification_outbox', 0,
-    'push_tokens', 0, 'stripe_events', 0),
+    'audit_log', 0, 'invitations', 0, 'invitation_rate_events', 0,
+    'notification_outbox', 0, 'push_tokens', 0, 'stripe_events', 0),
   'appelée sans argument, sur now(), elle ne supprime rien de récent');
 
 select tests.check(
@@ -468,7 +479,7 @@ select tests.check(
   (select schedule from cron.job where jobname = 'prune_retention') = '20 4 * * 0',
   'hebdomadaire, dimanche 04:20 (docs/SCHEMA.md § 8)');
 
--- Sept fonctions, aucune appelable depuis l'application. Une purge appelable par
+-- Huit fonctions, aucune appelable depuis l'application. Une purge appelable par
 -- un client serait un « delete » sans politique RLS : la fonction est
 -- `security definer`, elle s'exécute avec les droits de son propriétaire.
 select tests.check(
@@ -479,22 +490,24 @@ from (values
   ('public.cron_prune_retention(timestamptz)'),
   ('public.prune_audit_log(timestamptz, integer)'),
   ('public.prune_invitations(timestamptz, integer, integer)'),
+  ('public.prune_invitation_rate_events(timestamptz, integer)'),
   ('public.prune_notification_outbox(timestamptz, integer)'),
   ('public.prune_push_tokens(timestamptz, integer)'),
   ('public.prune_stripe_events(timestamptz, integer)')
 ) as f(signature)
 cross join (values ('anon'), ('authenticated')) as r(role);
 
--- Les sept sont bien `security definer` avec un `search_path` figé : sans cela,
+-- Les huit sont bien `security definer` avec un `search_path` figé : sans cela,
 -- un objet posé dans un schéma temporaire pourrait détourner un `delete`.
 select tests.check(
-  count(*) = 7,
-  'les sept sont security definer avec search_path figé sur public, pg_temp')
+  count(*) = 8,
+  'les huit sont security definer avec search_path figé sur public, pg_temp')
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
   and p.proname in ('cron_prune_notifications', 'cron_prune_retention',
                     'prune_audit_log', 'prune_invitations',
+                    'prune_invitation_rate_events',
                     'prune_notification_outbox', 'prune_push_tokens',
                     'prune_stripe_events')
   and p.prosecdef

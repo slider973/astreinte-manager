@@ -135,7 +135,26 @@ class ParametresCaserne {
     required this.relanceEmailHeures,
     required this.rapportRetardHeures,
     this.surcharges = const <SurchargeEffectif>[],
+    this.autresReglages = const <String, dynamic>{},
   });
+
+  /// Les clés de `settings` que cette classe sait lire et réécrire.
+  ///
+  /// Tout ce qui n'est pas là-dedans part dans [autresReglages] et revient
+  /// intact : la liste des réglages de la base (migrations `0011`, `0032`,
+  /// et les suivantes) n'a aucune raison de s'arrêter à ce que cet écran
+  /// affiche aujourd'hui.
+  static const Set<String> clesConnues = <String>{
+    'day_start',
+    'day_end',
+    'required_day',
+    'required_night',
+    'availability_deadline_day',
+    'response_reminder_hours',
+    'response_email_hours',
+    'late_report_hours',
+    'required_overrides',
+  };
 
   /// Les valeurs du `default` de la colonne `settings` (migration `0001`).
   static const ParametresCaserne defauts = ParametresCaserne(
@@ -184,6 +203,10 @@ class ParametresCaserne {
         defauts.rapportRetardHeures,
       ),
       surcharges: _surcharges(reglages['required_overrides']),
+      autresReglages: Map<String, dynamic>.unmodifiable(<String, dynamic>{
+        for (final MapEntry<String, dynamic> entree in reglages.entries)
+          if (!clesConnues.contains(entree.key)) entree.key: entree.value,
+      }),
     );
   }
 
@@ -210,6 +233,15 @@ class ParametresCaserne {
   /// l'écran, pas un hasard de la sérialisation JSON.
   final List<SurchargeEffectif> surcharges;
 
+  /// Le reste du document `settings`, tel qu'il a été lu.
+  ///
+  /// **Ce que cet écran ne montre pas, il ne le détruit pas.** Une caserne qui
+  /// a réglé `invitation_hourly_limit` (ticket 038) — ou n'importe quel
+  /// réglage posé en SQL, ou par une version plus récente de l'application —
+  /// le reperdrait au premier enregistrement, sans bruit, et retomberait sur
+  /// le défaut. La clé fait donc l'aller-retour, quelle qu'elle soit.
+  final Map<String, dynamic> autresReglages;
+
   List<SurchargeEffectif> get surchargesDatees => surcharges
       .where((SurchargeEffectif s) => s.jourSemaine == null)
       .toList(growable: false);
@@ -226,6 +258,10 @@ class ParametresCaserne {
   /// `required_overrides` est **omis** quand il n'y a aucune surcharge : une
   /// clé vide n'apporte rien, et le défaut de la colonne ne la porte pas.
   Map<String, dynamic> get settingsJson => <String, dynamic>{
+    // Le reste d'abord : les clés connues sont écrites ensuite et gagnent
+    // toujours, une valeur inconnue ne peut donc pas écraser un réglage de
+    // l'écran.
+    ...autresReglages,
     'day_start': debutJour,
     'day_end': finJour,
     'required_day': effectifJour,
@@ -282,6 +318,7 @@ class ParametresCaserne {
     relanceEmailHeures: relanceEmailHeures ?? this.relanceEmailHeures,
     rapportRetardHeures: rapportRetardHeures ?? this.rapportRetardHeures,
     surcharges: surcharges ?? this.surcharges,
+    autresReglages: autresReglages,
   );
 
   @override
@@ -298,7 +335,8 @@ class ParametresCaserne {
       other.relancePushHeures == relancePushHeures &&
       other.relanceEmailHeures == relanceEmailHeures &&
       other.rapportRetardHeures == rapportRetardHeures &&
-      listEquals(other.surcharges, surcharges);
+      listEquals(other.surcharges, surcharges) &&
+      mapEquals(other.autresReglages, autresReglages);
 
   @override
   int get hashCode => Object.hash(
@@ -314,6 +352,10 @@ class ParametresCaserne {
     relanceEmailHeures,
     rapportRetardHeures,
     Object.hashAll(surcharges),
+    // Les clés suffisent : deux documents qui n'ont pas les mêmes valeurs
+    // sous les mêmes clés restent inégaux, et c'est tout ce qu'on demande à
+    // un condensat.
+    Object.hashAll(autresReglages.keys.toList()..sort()),
   );
 
   static String _texte(Object? valeur, String defaut) =>

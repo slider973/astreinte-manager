@@ -81,10 +81,19 @@ Clés, types et bornes — **la liste est une liste blanche, une clé inconnue e
 | `required_overrides` | objet, **optionnel** | voir ci-dessous | exceptions à l'effectif |
 | `availability_deadline_day` | entier | 1–28 (le jour doit exister en février) | jour du mois précédent où la saisie se verrouille |
 | `response_reminder_hours`, `response_email_hours`, `late_report_hours` | entier | 1–336 (deux semaines) | délais de relance, en heures |
+| `invitation_hourly_limit` | entier, **optionnel** | 1–500 | plafond d'invitations par heure (§ 2.18, migration `0032`). Absente, la valeur est **60** |
 
 `required_overrides` : `{"sat": {"day": 2}, "2026-12-31": {"night": 3}}`. Les clés sont soit
 `mon`…`sun`, soit une date ISO **réelle** (le 30 février est refusé) ; les valeurs sont des
 objets non vides dont les seules sous-clés sont `day` et `night`, entiers 0–50.
+
+`invitation_hourly_limit` est **optionnelle, et doit le rester** *(migration `0032`, ticket 038)*.
+La contrainte `stations_settings_valide` est rejouée à chaque écriture d'une ligne `stations` :
+une clé rendue obligatoire après coup ne casserait rien à la migration, mais condamnerait toute
+caserne écrite avant elle à ne plus jamais pouvoir changer un réglage. La règle vaut pour toute
+clé ajoutée plus tard. **Une caserne qui porte la clé doit aussi la voir revenir** : l'écran des
+paramètres recompose le document entier à chaque enregistrement, une clé qu'il ne connaît pas
+est une clé qu'il efface.
 
 Deux garde-fous complètent la table :
 - `stations_name_non_vide` : nom non blanc, 80 caractères au maximum.
@@ -445,6 +454,34 @@ trois jours : `select * from stripe_events where status <> 'processed'` dit ce q
 passé, comme `notification_outbox` pour les notifications.
 
 RLS active, **aucune politique** : ni `anon` ni `authenticated` n'en lisent une ligne.
+
+### 2.18 `invitation_rate_events` — compteur d'invitations *(migration `0032`, ticket 038)*
+
+```sql
+create table invitation_rate_events (
+  id          uuid primary key default gen_random_uuid(),
+  station_id  uuid not null references stations(id) on delete cascade,
+  actor_id    uuid not null references profiles(id) on delete cascade,
+  created_at  timestamptz not null default now()
+);
+create index invitation_rate_events_station_idx on invitation_rate_events (station_id, created_at desc);
+create index invitation_rate_events_actor_idx   on invitation_rate_events (actor_id,   created_at desc);
+```
+
+Une ligne par courriel d'invitation **réellement parti** — création comme renvoi, un renvoi
+envoyant lui aussi un courriel. Écrite par `create_invitation` (§ 3) et par elle seule.
+
+Ce que la table ne porte pas compte autant : **aucune adresse invitée**. `invitations` la garde
+le temps de l'invitation et `audit_log` trois ans ; une troisième copie de la même donnée
+personnelle pour compter jusqu'à soixante ne se justifie pas.
+
+`actor_id` existe parce que le super-administrateur ne se mesure pas par caserne : il invite le
+premier administrateur d'une caserne **qu'il vient de créer** (ticket 031), dont le compteur est
+vierge par construction. Voir `invitation_rate_limit()` au § 3.
+
+Conservation : **7 jours** (`prune_invitation_rate_events`, tâche `prune_retention`). La fenêtre
+du plafond fait une heure ; ce qui reste au-delà ne sert plus à compter, seulement à répondre à
+« qui a envoyé deux cents invitations mardi ».
 
 ### 2.14 `audit_log`
 
@@ -875,7 +912,7 @@ les Edge Functions `invite-member` et `accept-invitation`, jamais par un client.
 
 | Fonction | Signature | Rôle |
 |---|---|---|
-| `create_invitation` | `(p_station uuid, p_email text, p_role membership_role, p_invited_by uuid) returns jsonb` | Vérifie que `p_invited_by` est admin actif de `p_station`, crée ou prolonge la ligne `invitations`, journalise dans `audit_log`. Renvoie le token. |
+| `create_invitation` | `(p_station uuid, p_email text, p_role membership_role, p_invited_by uuid) returns jsonb` | Vérifie que `p_invited_by` est admin actif de `p_station` (ou super-admin, `0025`), **vérifie le plafond horaire** (`0032`), crée ou prolonge la ligne `invitations`, compte l'envoi dans `invitation_rate_events`, journalise dans `audit_log`. Renvoie le token. |
 | `accept_invitation` | `(p_token text, p_user_id uuid, p_email text) returns jsonb` | Vérifie le token, son expiration, qu'il n'est pas déjà accepté et que `p_email` est bien l'adresse invitée ; crée la `memberships` active et marque `accepted_at`, en une transaction. |
 | `mask_email` | `(p_email text) returns text` | Masque la partie locale d'une adresse, pour les messages rendus à un porteur de lien qui n'est pas le destinataire. |
 
@@ -893,6 +930,52 @@ L'exécution est révoquée de `public`, **et nommément de `anon` et `authentic
 deux rôles sur toute fonction créée dans `public`, qu'un simple `revoke from public` ne
 retire pas. Sans ce verrou, un admin lirait le token en RPC PostgREST — celui-là même que
 `0008` a retiré de son `grant` de `select`.
+
+
+#### Le plafond de débit *(migration `0032`, ticket 038)*
+
+`create_invitation` contrôlait **qui** invite, jamais **combien de fois**. Or elle fait naître
+un compte `auth.users` confirmé — les inscriptions libres sont fermées, c'est le seul chemin —
+et déclenche un courriel depuis le domaine d'envoi du produit. L'Edge Function bornait un appel
+à vingt adresses ; rien ne bornait le nombre d'appels. Le jour où le domaine est signalé pour
+abus, ce sont les invitations de **toutes** les casernes qui tombent en spam.
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `station_invitation_hourly_limit` | `(p_station uuid) returns integer` `stable` | Le plafond effectif d'une caserne : `settings.invitation_hourly_limit`, ou **60** quand la clé est absente. Jamais `null`, même pour une caserne inconnue. |
+| `invitation_rate_limit` | `(p_station uuid, p_actor uuid, p_now timestamptz default null) returns jsonb` | La décision : `allowed`, `scope`, `limit`, `used`, `remaining`, `window_minutes`, et pour un refus `retry_at` et `retry_after_seconds`. Réservée à `service_role`. |
+| `prune_invitation_rate_events` | `(p_reference timestamptz default null, p_days integer default 7) returns integer` | Purge du compteur, appelée par la tâche `prune_retention`. |
+
+Trois décisions portent tout le reste :
+
+- **Une fenêtre glissante d'une heure**, pas un seau vidé à l'heure ronde : un compteur remis
+  à zéro à 15:00 se remplit deux fois entre 14:59 et 15:01.
+- **`retry_at` est la vérité, pas « dans une heure »** : c'est le moment où le plus ancien des
+  `limit` derniers envois sort de la fenêtre. Une phrase qui annonce une heure quand la place
+  se libère dans trois minutes fait fermer l'écran pour la journée.
+- **Deux portées.** Un administrateur est compté **par caserne** — c'est la caserne qui règle
+  son plafond, et nommer un second administrateur ne doit pas doubler le budget. Le
+  super-administrateur est compté **par acteur, toutes casernes confondues**, avec un plafond de
+  **200** : le mesurer par caserne ne le mesurerait pas du tout, puisqu'il invite dans des
+  casernes neuves dont le compteur est vierge (ticket 031).
+
+Ce qui ne consomme rien : un refus qui n'envoie aucun courriel (`invalid_email`,
+`already_member`, `not_admin`, `station_suspended`, et le refus de débit lui-même). Le plafond
+protège l'envoi, pas la lecture — sinon il ne se relâcherait jamais.
+
+Un verrou consultatif de transaction (`pg_advisory_xact_lock`) sur la portée comptée rend
+« compter puis écrire » indivisible : un plafond qui se contourne en ouvrant deux onglets n'est
+pas un plafond. Le verrou porte sur la caserne, jamais sur la table : deux casernes n'ont aucune
+raison de s'attendre.
+
+Le dépassement est inscrit dans `audit_log` sous l'action `invitation.rate_limited`, avec le
+plafond, le compte atteint, la date de réessai et l'adresse qui a déclenché le refus — **une
+seule ligne par caserne et par fenêtre**, sinon un lot de vingt refus écrirait vingt fois la
+même phrase au moment précis où le journal doit rester lisible.
+
+Le code rendu est `rate_limited`, accompagné des faits. La phrase française qui dit **quand
+réessayer** est composée dans l'Edge Function (`_shared/invitation_rate_limit.ts`), parce qu'elle
+change à chaque seconde et qu'un dictionnaire de messages statiques ne sait pas la porter.
 
 ### Suppression de compte (migration `0026`, ticket 007)
 
@@ -993,6 +1076,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `push_tokens` | soi-même | soi-même |
 | `notifications` | soi-même | soi-même (`read_at` uniquement, imposé par un grant de colonne : `revoke update on notifications from authenticated` puis `grant update (read_at)`) ; insert par service role |
 | `subscriptions` | admin de la caserne | service role uniquement (webhook Stripe) |
+| `invitation_rate_events` | admin de la caserne *(migration `0032`)* : il subit le refus, il doit pouvoir en voir la cause | personne — `insert`, `update` et `delete` retirés d'`anon` et d'`authenticated`. La seule main qui écrit est `create_invitation`, en `security definer` |
 | `audit_log` | admin de la caserne | service role et triggers |
 | `super_admins` | super-admin | personne (SQL manuel) |
 
@@ -1414,7 +1498,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `publish-schedule` | app admin | Appelle `publish_schedule` (SQL, atomique), puis `send-notification` avec les destinataires **déjà groupés par membre** : sept créneaux font une notification, pas sept (ticket 019, contrat dans `supabase/functions/README.md`) |
 | `reassign-shift` | app admin | Appelle `reassign_shift` (SQL, atomique) : l'ancienne attribution est marquée `replaced` ou reste `declined`, la nouvelle est créée `proposed` et horodatée, `replaced_by` relie les deux, et **une seule** notification part — au nouveau membre, plus l'ancien si sa garde était acceptée (ticket 020, contrat dans `supabase/functions/README.md`). L'annulation, elle, est une RPC (`cancel_assignment`) et non une Edge Function |
 | `auto-propose` | app admin | **Applique** un remplissage automatique du brouillon, il ne le compose pas : le plan — une liste ordonnée de couples (créneau, pompier) — est calculé dans l'application avec le **tri des candidats du ticket 017**, celui que l'administrateur lit dans le panneau d'un créneau, pour que le récapitulatif qu'il valide soit exactement ce qui part. `apply_auto_proposal` (SQL, atomique) revérifie chaque ligne — membre actif, disponibilité déclarée, plafonds d'astreintes et de weekends, effectif requis, doublons — et **écarte** celles qui ne passent pas avec leur motif au lieu de tout refuser. Aucune notification : un brouillon ne sort pas du bureau (ticket 018, contrat dans `supabase/functions/README.md`) |
-| `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`) |
+| `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`). **Plafonnée en débit** (ticket 038) : `create_invitation` compte les envois par caserne et par heure et refuse avec le code `rate_limited` ; la fonction compose la phrase française qui dit **quand réessayer**, court-circuite les adresses restantes du lot — le budget est épuisé pour toutes — et rend `429` quand aucune adresse n'est passée |
 | `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006) |
 | `stripe-webhook` | Stripe | **Vérifie la signature de l'événement** (HMAC-SHA256 du corps brut, lu sous un plafond d'un mégaoctet, fenêtre de cinq minutes), puis applique les cinq événements de l'abonnement par `subscription_sync`. Un événement non signé, mal signé ou hors de la fenêtre est refusé en 4xx ; un événement **déjà traité** est reconnu par `stripe_events` et n'est pas réappliqué ; sans secret configuré, **tout** est refusé en 503 (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `create-checkout` | app admin | Trois actions pour l'écran « Abonnement » : `state` (statut, tarifs, configuration — **répond même sans compte Stripe**), `checkout` (crée le client si besoin, ouvre la session, rend l'adresse) et `portal` (portail de gestion). Rôle d'administrateur revérifié en base (ticket 029, contrat dans `supabase/functions/README.md`) |
@@ -1581,6 +1665,12 @@ Ordre proposé :
     planning archivé (`shifts` et `assignments`, insert et update), `ics_feed_events` élargie
     aux plannings archivés)
 
+32. `0032_limite_debit_invitations.sql` (ticket 038 : table `invitation_rate_events` et sa
+    politique de lecture, clé `invitation_hourly_limit` ajoutée à la liste blanche de
+    `station_settings_valid`, `station_invitation_hourly_limit`, `invitation_rate_limit`,
+    branche `rate_limited` de `create_invitation`, `prune_invitation_rate_events` ajoutée à
+    `cron_prune_retention`)
+
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
 poussée sur `main` ne se renumérote pas.
@@ -1614,8 +1704,9 @@ et `0022` par `supabase/tests/notifications_test.sql`, les rappels de saisie de 
 `supabase/tests/reattribution_test.sql` et les relances automatiques de `0021` par
 `supabase/tests/assignment_reminders_test.sql`, la suppression de compte de `0026` par
 `supabase/tests/suppression_compte_test.sql`, l'export RGPD de `0027` par
-`supabase/tests/export_rgpd_test.sql` et la proposition automatique de `0028` par
-`supabase/tests/proposition_automatique_test.sql`, joués par le même script. La logique pure
+`supabase/tests/export_rgpd_test.sql`, la proposition automatique de `0028` par
+`supabase/tests/proposition_automatique_test.sql` et le plafond de débit des invitations de
+`0032` par `supabase/tests/limite_debit_invitations_test.sql`, joués par le même script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge

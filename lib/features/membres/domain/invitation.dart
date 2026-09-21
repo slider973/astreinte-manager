@@ -79,11 +79,25 @@ enum MotifEchecInvitation {
   compteImpossible(AppStrings.inviteCompteImpossible),
   caserneSuspendue(AppStrings.inviteCaserneSuspendue),
   nonAdmin(AppStrings.inviteNonAdmin),
+
+  /// Le plafond horaire d'invitations (ticket 038). Sa phrase **ne peut pas
+  /// être une constante** : elle porte le délai avant de pouvoir réessayer,
+  /// qui change à chaque seconde. Elle vient donc du serveur, et
+  /// [MotifEchecInvitation.message] n'est ici qu'un secours.
+  debitAtteint(AppStrings.inviteDebitAtteint, messageDuServeur: true),
+
   erreurServeur(AppStrings.inviteErreurServeur);
 
-  const MotifEchecInvitation(this.message);
+  const MotifEchecInvitation(this.message, {this.messageDuServeur = false});
 
+  /// La phrase de secours. Affichée telle quelle sauf si [messageDuServeur].
   final String message;
+
+  /// Vrai quand la phrase affichable est composée par le serveur : la
+  /// constante d'à côté ne saurait pas dire *quand* réessayer. Les autres
+  /// motifs gardent la phrase de l'application, mieux tournée pour l'écran
+  /// que celle de l'API.
+  final bool messageDuServeur;
 
   static MotifEchecInvitation depuisCode(String? code) => switch (code) {
     'already_member' => dejaMembre,
@@ -92,8 +106,108 @@ enum MotifEchecInvitation {
     'account_failed' => compteImpossible,
     'station_suspended' => caserneSuspendue,
     'not_admin' => nonAdmin,
+    'rate_limited' => debitAtteint,
     _ => erreurServeur,
   };
+}
+
+/// La portée du plafond de débit : la caserne, ou le compte qui invite.
+///
+/// Un super-administrateur est compté par acteur, toutes casernes confondues
+/// (`supabase/functions/README.md § Le plafond de débit`).
+enum PorteePlafond {
+  caserne,
+  acteur;
+
+  static PorteePlafond depuisApi(String? valeur) =>
+      valeur == 'actor' ? acteur : caserne;
+}
+
+/// Les faits d'un refus de débit, à côté de la phrase déjà composée.
+///
+/// Ils ne sont pas là pour reconstruire le message — le serveur l'a fait —
+/// mais pour que l'écran puisse composer autre chose, et pour tenir la
+/// promesse « dis quand réessayer » même si la phrase venait à manquer.
+@immutable
+class PlafondInvitations {
+  const PlafondInvitations({
+    required this.portee,
+    this.plafond,
+    this.utilisees,
+    this.restantes,
+    this.fenetreMinutes,
+    this.reessayerLe,
+    this.delaiAvantNouvelEssai,
+  });
+
+  /// Les faits tels que l'API les rend : sous `rate_limit` pour un résultat
+  /// par adresse, à plat dans `error` pour le refus global.
+  static PlafondInvitations? depuisJson(Object? valeur) {
+    if (valeur is! Map) return null;
+
+    final secondes = _entier(valeur['retry_after_seconds']);
+    final quand = valeur['retry_at'];
+    return PlafondInvitations(
+      portee: PorteePlafond.depuisApi(valeur['scope'] as String?),
+      plafond: _entier(valeur['limit']),
+      utilisees: _entier(valeur['used']),
+      restantes: _entier(valeur['remaining']),
+      fenetreMinutes: _entier(valeur['window_minutes']),
+      reessayerLe: quand is String ? DateTime.tryParse(quand)?.toLocal() : null,
+      delaiAvantNouvelEssai: secondes == null
+          ? null
+          : Duration(seconds: secondes < 0 ? 0 : secondes),
+    );
+  }
+
+  final PorteePlafond portee;
+  final int? plafond;
+  final int? utilisees;
+  final int? restantes;
+  final int? fenetreMinutes;
+
+  /// Le moment exact où le budget se relâche, déjà en heure locale.
+  final DateTime? reessayerLe;
+
+  final Duration? delaiAvantNouvelEssai;
+
+  /// Ce qu'on affiche si le serveur n'a pas envoyé sa phrase. Arrondi à la
+  /// minute **supérieure** : annoncer moins que le délai réel ferait réessayer
+  /// pour rien.
+  String get messageDeSecours {
+    final delai = delaiAvantNouvelEssai;
+    if (delai == null) return AppStrings.inviteDebitAtteint;
+    return AppStrings.inviteDebitAtteintDans((delai.inSeconds / 60).ceil());
+  }
+
+  static int? _entier(Object? valeur) {
+    if (valeur is int) return valeur;
+    if (valeur is num) return valeur.round();
+    if (valeur is String) return int.tryParse(valeur);
+    return null;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlafondInvitations &&
+      other.portee == portee &&
+      other.plafond == plafond &&
+      other.utilisees == utilisees &&
+      other.restantes == restantes &&
+      other.fenetreMinutes == fenetreMinutes &&
+      other.reessayerLe == reessayerLe &&
+      other.delaiAvantNouvelEssai == delaiAvantNouvelEssai;
+
+  @override
+  int get hashCode => Object.hash(
+    portee,
+    plafond,
+    utilisees,
+    restantes,
+    fenetreMinutes,
+    reessayerLe,
+    delaiAvantNouvelEssai,
+  );
 }
 
 /// Le sort d'une adresse, prêt à afficher.
@@ -103,6 +217,8 @@ class ResultatInvitation {
     required this.email,
     required this.statut,
     this.motif,
+    this.messageServeur,
+    this.plafond,
     this.courrielEnvoye = true,
   });
 
@@ -110,22 +226,40 @@ class ResultatInvitation {
     final statut = StatutResultatInvitation.depuisApi(
       ligne['status'] as String?,
     );
+    final motif = statut == StatutResultatInvitation.erreur
+        ? MotifEchecInvitation.depuisCode(ligne['code'] as String?)
+        : null;
+    final message = ligne['message'];
+
     return ResultatInvitation(
       email: (ligne['email'] as String? ?? '').trim(),
       statut: statut,
-      motif: statut == StatutResultatInvitation.erreur
-          ? MotifEchecInvitation.depuisCode(ligne['code'] as String?)
+      motif: motif,
+      // La phrase du serveur n'est retenue que pour les motifs qui la
+      // réclament : ailleurs, la copie de l'écran est mieux tournée.
+      messageServeur: motif != null && motif.messageDuServeur
+          ? _phrase(message)
           : null,
+      plafond: PlafondInvitations.depuisJson(ligne['rate_limit']),
       // Absent du corps : on ne prétend pas qu'un courriel est parti.
       courrielEnvoye: ligne['email_sent'] as bool? ?? false,
     );
   }
+
+  static String? _phrase(Object? valeur) =>
+      valeur is String && valeur.trim().isNotEmpty ? valeur.trim() : null;
 
   final String email;
   final StatutResultatInvitation statut;
 
   /// Renseigné pour les seules erreurs.
   final MotifEchecInvitation? motif;
+
+  /// La phrase composée par le serveur, quand le motif la réclame.
+  final String? messageServeur;
+
+  /// Les faits du refus de débit, s'il y en a un.
+  final PlafondInvitations? plafond;
 
   /// Faux quand l'invitation existe mais que le courriel n'est pas parti. Ce
   /// n'est pas un échec de l'invitation : c'est un renvoi à proposer.
@@ -134,8 +268,16 @@ class ResultatInvitation {
   bool get enEchec => statut == StatutResultatInvitation.erreur;
 
   /// La phrase à afficher sous l'adresse, ou `null` si tout s'est bien passé.
+  ///
+  /// Un refus de débit affiche le message du serveur : lui seul sait de
+  /// combien de temps il parle. Sans lui, les faits le disent encore ; sans
+  /// eux, la constante reste vraie, en moins précis.
   String? get detail {
-    if (motif != null) return motif!.message;
+    final motif = this.motif;
+    if (motif != null) {
+      if (!motif.messageDuServeur) return motif.message;
+      return messageServeur ?? plafond?.messageDeSecours ?? motif.message;
+    }
     if (!courrielEnvoye) return AppStrings.resultatCourrielNonParti;
     return null;
   }
@@ -180,29 +322,66 @@ enum ErreurInvitation {
   nonAdmin(AppStrings.inviteNonAdmin),
   caserneSuspendue(AppStrings.inviteCaserneSuspendue),
   caserneInconnue(AppStrings.inviteCaserneInconnue),
+
+  /// Le plafond horaire, quand **aucune** adresse du lot n'est passée : le
+  /// serveur rend alors un 429 plutôt qu'une liste. Même règle que pour
+  /// [MotifEchecInvitation.debitAtteint] : la phrase vient du serveur.
+  debitAtteint(AppStrings.inviteDebitAtteint, messageDuServeur: true),
+
   reseau(AppStrings.erreurReseauTexte),
   inconnue(AppStrings.erreurTexteGenerique);
 
-  const ErreurInvitation(this.message);
+  const ErreurInvitation(this.message, {this.messageDuServeur = false});
 
+  /// La phrase de secours. Affichée telle quelle sauf si [messageDuServeur].
   final String message;
+
+  /// Voir [MotifEchecInvitation.messageDuServeur].
+  final bool messageDuServeur;
 
   static ErreurInvitation depuisCode(String? code) => switch (code) {
     'invalid_body' => requeteInvalide,
     'not_admin' || 'unauthenticated' => nonAdmin,
     'station_suspended' => caserneSuspendue,
     'station_not_found' => caserneInconnue,
+    'rate_limited' => debitAtteint,
     _ => inconnue,
   };
 }
 
 /// Erreur nommée, levée par le dépôt et affichée telle quelle.
 class EchecInvitation implements Exception {
-  const EchecInvitation(this.erreur);
+  const EchecInvitation(this.erreur, {this.messageServeur, this.plafond});
+
+  /// Lit `error` : `{"code", "message", …faits du plafond}` — pour un refus
+  /// de débit, les faits sont à plat à côté du code
+  /// (`supabase/functions/README.md § Le plafond de débit`).
+  factory EchecInvitation.depuisCorps(Map<Object?, Object?> erreur) {
+    final code = ErreurInvitation.depuisCode(erreur['code'] as String?);
+    if (!code.messageDuServeur) return EchecInvitation(code);
+
+    final message = erreur['message'];
+    return EchecInvitation(
+      code,
+      messageServeur: message is String && message.trim().isNotEmpty
+          ? message.trim()
+          : null,
+      plafond: PlafondInvitations.depuisJson(erreur),
+    );
+  }
 
   final ErreurInvitation erreur;
 
-  String get message => erreur.message;
+  /// La phrase composée par le serveur, quand le code la réclame.
+  final String? messageServeur;
+
+  /// Les faits du refus de débit, s'il y en a un.
+  final PlafondInvitations? plafond;
+
+  String get message {
+    if (!erreur.messageDuServeur) return erreur.message;
+    return messageServeur ?? plafond?.messageDeSecours ?? erreur.message;
+  }
 
   @override
   String toString() => 'EchecInvitation(${erreur.name})';

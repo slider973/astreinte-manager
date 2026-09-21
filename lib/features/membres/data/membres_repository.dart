@@ -162,7 +162,7 @@ class SupabaseMembresRepository implements MembresRepository {
       }
       return RapportInvitations.depuisJson(corps);
     } on FunctionException catch (echec) {
-      throw EchecInvitation(_traduire(echec));
+      throw _traduire(echec);
     }
   }
 
@@ -254,19 +254,25 @@ class SupabaseMembresRepository implements MembresRepository {
 
   /// `{"error": {"code", "message"}}` — la forme unique des Edge Functions
   /// (`supabase/functions/_shared/http.ts`).
-  static ErreurInvitation _traduire(FunctionException echec) {
+  ///
+  /// Le corps est rendu tel quel au domaine, et non réduit à un code : le
+  /// refus de débit (429) porte une phrase que le serveur seul peut composer,
+  /// puisqu'elle dit dans combien de temps réessayer.
+  static EchecInvitation _traduire(FunctionException echec) {
     // Aucune réponse n'est parvenue : c'est le réseau, pas le serveur.
-    if (echec.status == 0) return ErreurInvitation.reseau;
+    if (echec.status == 0) {
+      return const EchecInvitation(ErreurInvitation.reseau);
+    }
 
     final details = echec.details;
     if (details is Map) {
       final erreur = details['error'];
-      if (erreur is Map) {
-        return ErreurInvitation.depuisCode(erreur['code'] as String?);
-      }
+      if (erreur is Map) return EchecInvitation.depuisCorps(erreur);
     }
-    return echec.status >= 500
-        ? ErreurInvitation.inconnue
-        : ErreurInvitation.requeteInvalide;
+    return EchecInvitation(
+      echec.status >= 500
+          ? ErreurInvitation.inconnue
+          : ErreurInvitation.requeteInvalide,
+    );
   }
 }
