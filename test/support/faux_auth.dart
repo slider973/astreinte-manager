@@ -50,6 +50,7 @@ import 'package:astreinte_sp/features/planning/domain/matrice_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/planning_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/suivi_providers.dart';
 import 'package:astreinte_sp/features/profil/data/profil_repository.dart';
+import 'package:astreinte_sp/features/profil/domain/calendrier_providers.dart';
 import 'package:astreinte_sp/features/profil/domain/export_providers.dart';
 import 'package:astreinte_sp/features/profil/domain/profil_providers.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
@@ -62,6 +63,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'faux_abonnement.dart';
 import 'faux_astreintes.dart';
+import 'faux_calendrier.dart';
 import 'faux_caserne.dart';
 import 'faux_dispos.dart';
 import 'faux_export.dart';
@@ -253,6 +255,8 @@ Future<AppMontee> monterApp(
   ProfilRepository? profils,
   FauxExportRepository? export,
   FauxTelechargement? telechargement,
+  FauxCalendrierRepository? calendrier,
+  FauxPressePapiers? pressePapiers,
   ParametresRepository? parametres,
   AbonnementRepository? abonnement,
   CaserneRepository? caserne,
@@ -328,6 +332,17 @@ Future<AppMontee> monterApp(
         ),
         telechargementProvider.overrideWithValue(
           (telechargement ?? FauxTelechargement()).call,
+        ),
+        // L'abonnement calendrier (ticket 028) est posé sur l'onglet
+        // « Profil », et son bloc **lit dès qu'il se construit** : sans faux,
+        // chaque test de cet onglet toucherait un client Supabase qui n'existe
+        // pas. Le presse-papiers, lui, est un canal de plateforme absent sous
+        // `flutter test`.
+        calendrierRepositoryProvider.overrideWithValue(
+          calendrier ?? FauxCalendrierRepository(),
+        ),
+        pressePapiersProvider.overrideWithValue(
+          (pressePapiers ?? FauxPressePapiers()).call,
         ),
         if (parametres != null)
           parametresRepositoryProvider.overrideWithValue(parametres),

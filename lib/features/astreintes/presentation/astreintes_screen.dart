@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/reseau/connectivite.dart';
+import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
@@ -136,6 +137,10 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
         context,
         astreintes: astreintes,
         heures: heures,
+        // Le nom de la caserne n'est pas affiché par la feuille : il part dans
+        // le fichier calendrier, où l'événement doit dire d'où il vient — un
+        // pompier peut appartenir à deux centres (ticket 028).
+        nomCaserne: ref.read(appartenanceCouranteProvider)?.nomCaserne ?? '',
       ),
     );
   }
@@ -338,8 +343,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
       children: <Widget>[
         BasculeVue(
           vue: vue,
-          onChoisir: (VueAstreintes choisie) =>
-              setState(() => _vue = choisie),
+          onChoisir: (VueAstreintes choisie) => setState(() => _vue = choisie),
           calendrierIndisponible: _calendrierTropGrand
               ? AppStrings.astreintesCalendrierTropGrand
               : null,
@@ -360,9 +364,8 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
                   heures: heures,
                   onOuvrir: (Astreinte astreinte) =>
                       _ouvrir(<Astreinte>[astreinte], heures),
-                  onBasculerPassees: () => ref
-                      .read(passeesOuvertesProvider.notifier)
-                      .basculer(),
+                  onBasculerPassees: () =>
+                      ref.read(passeesOuvertesProvider.notifier).basculer(),
                   onRafraichir: ref
                       .read(astreintesControllerProvider.notifier)
                       .rafraichir,
@@ -399,8 +402,7 @@ class _Liste extends StatelessWidget {
   /// Vrai quand rien n'est à venir. Le repli des passées peut alors être le
   /// seul élément de la liste : l'état vide se pose au-dessus de lui plutôt
   /// que de laisser une ligne seule au milieu de l'écran.
-  bool get _aucuneAVenir =>
-      elements.isEmpty || elements.first is ReplisPassees;
+  bool get _aucuneAVenir => elements.isEmpty || elements.first is ReplisPassees;
 
   @override
   Widget build(BuildContext context) {

@@ -102,6 +102,7 @@ create table profiles (
   phone         text,
   push_enabled  boolean not null default true,
   locale        text not null default 'fr',
+  ics_token     text not null unique default encode(extensions.gen_random_bytes(24), 'hex'),
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
@@ -109,6 +110,22 @@ create table profiles (
 
 Créé par trigger sur `auth.users` à l'inscription. `email` est dupliqué pour les jointures
 sans toucher au schéma `auth`.
+
+**`ics_token` est un porteur de droits** *(migration `0029`, ticket 028)*. C'est le secret de
+l'adresse d'abonnement au calendrier (`ics-feed`), qui finit collée dans Google Agenda : elle
+voyage, donc elle se comporte comme un mot de passe affiché. Trois conséquences en base :
+
+- **Il est hors du `grant` de colonne** d'`anon` et d'`authenticated`, comme `invitations.token`
+  depuis `0008`. La politique `profiles_select_self_or_same_station` ouvre la ligne entière à
+  tous les membres de la caserne — la RLS raisonne par ligne, elle ne sait pas excepter une
+  colonne. `select` et `update` ont donc été **retirés de la table** puis re-donnés colonne par
+  colonne : lecture sur les neuf colonnes ordinaires, écriture sur `first_name`, `last_name`,
+  `phone`, `push_enabled` et `locale`. Un `select=*` par PostgREST répond désormais `42501`.
+- **Il se lit et se régénère par fonction**, jamais par la table : `my_ics_token()` et
+  `rotate_ics_token()` (§ 3), qui ne prennent aucun paramètre et ne répondent que sur
+  `auth.uid()`. Régénérer invalide l'ancien jeton à la transaction suivante.
+- **Il n'entre pas dans l'export RGPD** (`0027`) : la liste blanche de `export_own_data` ne le
+  nomme pas. Un jeton recopié dans un fichier qui voyage par courriel est un jeton compromis.
 
 **`id` n'a pas de contrainte de clé étrangère** depuis la migration `0026` (ticket 007). Elle
 existait — `references auth.users(id) on delete cascade` — et elle rendait la suppression de
@@ -928,6 +945,29 @@ fonction aux clients, l'Edge Function `export-user-data` le tire du JWT, `revoke
 nommé sur `anon` et `authenticated`. Le registre des traitements est dans
 `docs/RGPD.md`.
 
+### Export calendrier (migration `0029`, ticket 028)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `my_ics_token` | `() returns text` `security definer` `stable`, réservée à `authenticated` | Le jeton d'abonnement calendrier de **l'appelant**, et de personne d'autre. Null sans session ou sans profil. |
+| `rotate_ics_token` | `() returns text` `security definer`, réservée à `authenticated` | Tire un nouveau jeton pour l'appelant et **invalide l'ancien sur-le-champ**. Null sans session. |
+| `ics_feed_events` | `(p_token text, p_reference date default current_date) returns jsonb` `security definer` `stable`, **réservée à `service_role`** | Le contenu du flux d'un membre, désigné par son jeton : ses astreintes **acceptées** sur un planning `published` ou `validated`, dans les casernes où son appartenance est `active`, à partir de `p_reference - 90` jours, chacune avec le nom, le fuseau et les heures d'affichage de sa caserne. Rend `{"ok": false, "code": "unknown_token"}` pour un jeton inconnu, vide ou nul. |
+
+**Aucune des deux premières ne prend de paramètre**, et c'est leur règle de sécurité :
+un `p_user_id` ici serait une porte pour lire — ou pour faire tourner — l'abonnement de
+n'importe qui. L'identité vient d'`auth.uid()`, comme pour `station_access` (`0024`).
+
+**`ics_feed_events` ne joint jamais un second `assignments`, ni un `profiles` autre que
+le porteur, ni une `memberships` autre que la sienne** : l'identité d'un équipier n'a
+aucun chemin jusqu'à ce JSON. La frontière est tenue par la forme de la requête, pas par
+un filtre qu'on pourrait oublier d'écrire — même méthode qu'en `0027`. Son paramètre
+étant un porteur de droits, elle est fermée à `anon` comme à `authenticated` : l'Edge
+Function `ics-feed` est le seul chemin.
+
+**`station_writable()` n'y figure pas**, et c'est un choix de produit : `docs/PRD.md § 6.6`
+dit « suspendu : lecture seule pour tous », et un flux calendrier est une lecture. Vider
+le flux d'une caserne suspendue ferait croire à des gardes annulées.
+
 ## 4. Row Level Security
 
 RLS activé sur toutes les tables. Principes :
@@ -1343,7 +1383,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006) |
 | `stripe-webhook` | Stripe | **Vérifie la signature de l'événement** (HMAC-SHA256 du corps brut, lu sous un plafond d'un mégaoctet, fenêtre de cinq minutes), puis applique les cinq événements de l'abonnement par `subscription_sync`. Un événement non signé, mal signé ou hors de la fenêtre est refusé en 4xx ; un événement **déjà traité** est reconnu par `stripe_events` et n'est pas réappliqué ; sans secret configuré, **tout** est refusé en 503 (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `create-checkout` | app admin | Trois actions pour l'écran « Abonnement » : `state` (statut, tarifs, configuration — **répond même sans compte Stripe**), `checkout` (crée le client si besoin, ouvre la session, rend l'adresse) et `portal` (portail de gestion). Rôle d'administrateur revérifié en base (ticket 029, contrat dans `supabase/functions/README.md`) |
-| `ics-feed` | GET public avec token par membre | Génère le flux calendrier des astreintes acceptées |
+| `ics-feed` | GET **public**, jeton par membre dans l'URL (`/ics-feed/<jeton>.ics` ou `?token=`) | Sert le flux calendrier d'un membre en `text/calendar` : ses astreintes **acceptées**, heures tirées des paramètres de sa caserne, à partir de 90 jours en arrière. `verify_jwt = false` — un agenda ne sait pas porter de jeton d'accès, c'est le secret dans l'URL qui authentifie, comme la signature pour `stripe-webhook`. Le contenu est décidé en base par `ics_feed_events` : rien d'un collègue, rien d'une autre caserne, rien d'une appartenance désactivée. Jeton inconnu ou régénéré : `404`, indistinguables. Un membre sans astreinte reçoit un calendrier **vide**, jamais une erreur (ticket 028, contrat dans `supabase/functions/README.md`) |
 | `delete-account` | app | **Aucun corps** : l'identité vient du JWT. Appelle `delete_own_account` (SQL, atomique) puis supprime le compte `auth.users`. Le profil reste, anonymisé en « Membre supprimé », et **les attributions passées avec lui** (ticket 007, contrat dans `supabase/functions/README.md`) |
 | `export-user-data` | app | **Aucun corps** : l'identité vient du JWT, et un `user_id` envoyé quand même est ignoré. Appelle `export_own_data` (SQL, un seul instantané), y ajoute les trois faits du compte d'authentification (`auth.admin.getUserById` — le SQL du projet ne touche pas au schéma `auth`) et rend le tout en JSON. Le fichier est composé par le client : servir un `Content-Disposition` mettrait le jeton d'accès dans l'URL (ticket 034, contrat dans `supabase/functions/README.md`) |
 
@@ -1479,7 +1519,8 @@ Ordre proposé :
 26. `0026_suppression_compte.sql` (ticket 007 : contrainte `profiles.id → auth.users` retirée pour que le profil anonymisé survive à son compte d'authentification, `delete_own_account`, exécution réservée à `service_role`)
 27. `0027_export_rgpd.sql` (ticket 034 : `export_own_data`, exécution réservée à `service_role`)
 28. `0028_proposition_automatique.sql` (ticket 018 : `apply_auto_proposal`, exécution réservée à `service_role`)
-29. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
+29. `0029_export_ics.sql` (ticket 028 : colonne `profiles.ics_token` et son index unique, `select`/`insert`/`update` de `profiles` retirés de la table puis re-donnés colonne par colonne, `my_ics_token`, `rotate_ics_token`, `ics_feed_events` réservée à `service_role`)
+30. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
     `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des

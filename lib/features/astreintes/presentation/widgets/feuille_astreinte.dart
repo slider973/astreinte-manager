@@ -8,6 +8,7 @@ import '../../../../core/widgets/app_divider.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../domain/astreinte.dart';
+import 'bouton_ajout_calendrier.dart';
 
 /// Ouvre le détail d'une journée d'astreinte.
 ///
@@ -21,10 +22,15 @@ Future<void> ouvrirDetailAstreinte(
   BuildContext context, {
   required List<Astreinte> astreintes,
   required HeuresAffichage heures,
+  String nomCaserne = '',
 }) {
   if (astreintes.isEmpty) return Future<void>.value();
 
-  final corps = DetailAstreinte(astreintes: astreintes, heures: heures);
+  final corps = DetailAstreinte(
+    astreintes: astreintes,
+    heures: heures,
+    nomCaserne: nomCaserne,
+  );
 
   if (AppWindowClass.of(context).estLarge) {
     return showDialog<void>(
@@ -57,10 +63,16 @@ class DetailAstreinte extends StatelessWidget {
     required this.astreintes,
     required this.heures,
     super.key,
+    this.nomCaserne = '',
   });
 
   final List<Astreinte> astreintes;
   final HeuresAffichage heures;
+
+  /// Le nom de la caserne, pour l'intitulé et le lieu du fichier calendrier.
+  /// Vide quand la caserne n'a pas pu être lue : l'intitulé se replie alors sur
+  /// « Astreinte nuit » plutôt que de finir par un tiret orphelin.
+  final String nomCaserne;
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +107,11 @@ class DetailAstreinte extends StatelessWidget {
               ),
               for (final astreinte in triees) ...<Widget>[
                 const SizedBox(height: AppSpacing.lg),
-                _BlocCreneau(astreinte: astreinte, heures: heures),
+                _BlocCreneau(
+                  astreinte: astreinte,
+                  heures: heures,
+                  nomCaserne: nomCaserne,
+                ),
                 if (astreinte != triees.last) ...<Widget>[
                   const SizedBox(height: AppSpacing.lg),
                   const AppDivider(),
@@ -117,10 +133,15 @@ class DetailAstreinte extends StatelessWidget {
 }
 
 class _BlocCreneau extends StatelessWidget {
-  const _BlocCreneau({required this.astreinte, required this.heures});
+  const _BlocCreneau({
+    required this.astreinte,
+    required this.heures,
+    required this.nomCaserne,
+  });
 
   final Astreinte astreinte;
   final HeuresAffichage heures;
+  final String nomCaserne;
 
   @override
   Widget build(BuildContext context) {
@@ -143,6 +164,16 @@ class _BlocCreneau extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         _Equipiers(astreinte: astreinte),
+        const SizedBox(height: AppSpacing.lg),
+        // **Un bouton par créneau**, et pas un par feuille : la feuille porte
+        // une journée, et un pompier peut être de jour **et** de nuit le même
+        // jour — un bouton unique ne saurait pas lequel enregistrer
+        // (`design/028-export-ics.md § 6`).
+        BoutonAjoutCalendrier(
+          astreinte: astreinte,
+          heures: heures,
+          nomCaserne: nomCaserne,
+        ),
       ],
     );
   }
@@ -216,9 +247,7 @@ class _Equipiers extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(nom, style: theme.textTheme.bodyLarge),
-                ),
+                Expanded(child: Text(nom, style: theme.textTheme.bodyLarge)),
               ],
             ),
           ),

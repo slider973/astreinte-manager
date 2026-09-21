@@ -556,6 +556,7 @@ export type Database = {
           created_at: string
           email: string
           first_name: string
+          ics_token: string
           id: string
           last_name: string
           locale: string
@@ -567,6 +568,7 @@ export type Database = {
           created_at?: string
           email: string
           first_name?: string
+          ics_token?: string
           id: string
           last_name?: string
           locale?: string
@@ -578,6 +580,7 @@ export type Database = {
           created_at?: string
           email?: string
           first_name?: string
+          ics_token?: string
           id?: string
           last_name?: string
           locale?: string
@@ -1135,11 +1138,16 @@ export type Database = {
       delete_own_account: { Args: { p_user_id: string }; Returns: Json }
       est_jour_ferie: { Args: { p_date: string }; Returns: boolean }
       export_own_data: { Args: { p_user_id: string }; Returns: Json }
+      ics_feed_events: {
+        Args: { p_reference?: string; p_token: string }
+        Returns: Json
+      }
       is_admin: { Args: { p_station: string }; Returns: boolean }
       is_member: { Args: { p_station: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       jours_feries_fr: { Args: { p_annee: number }; Returns: string[] }
       mask_email: { Args: { p_email: string }; Returns: string }
+      my_ics_token: { Args: never; Returns: string }
       notification_outbox_recipients_valides: {
         Args: { p_recipients: Json }
         Returns: boolean
@@ -1221,6 +1229,7 @@ export type Database = {
         Args: { p_schedule: string; p_tout?: boolean }
         Returns: Json
       }
+      rotate_ics_token: { Args: never; Returns: string }
       schedule_complet: { Args: { p_schedule: string }; Returns: boolean }
       schedule_reevaluer: { Args: { p_schedule: string }; Returns: boolean }
       station_access: { Args: { p_station: string }; Returns: Json }

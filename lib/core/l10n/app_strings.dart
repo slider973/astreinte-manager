@@ -3164,4 +3164,144 @@ abstract final class AppStrings {
   /// légale fausse se croit, une mention légale trouée se corrige.
   static const String legalACompleterTitre =
       'À compléter avant mise en service';
+
+  // ===================================================================
+  // Export calendrier (ticket 028)
+  // ===================================================================
+
+  // --- Le bloc du profil ---------------------------------------------
+
+  static const String calendrierTitre = 'Ajouter à mon calendrier';
+
+  /// Ce que l'abonnement fait, et la seule chose qui compte : il se met à jour
+  /// tout seul. Sans cette phrase, le geste ressemble à un export figé.
+  static const String calendrierIntro =
+      'Colle cette adresse dans ton agenda : tes astreintes acceptées y '
+      'apparaîtront, et chaque nouvelle garde s\'y ajoutera toute seule.';
+
+  static const String calendrierAdresseLabel = 'Adresse d\'abonnement';
+
+  static const String calendrierCopier = 'Copier le lien';
+  static const String calendrierCopie = 'Lien copié.';
+
+  /// Le presse-papiers peut refuser — contexte non sécurisé, geste non reconnu.
+  /// L'adresse est à l'écran, sélectionnable : le message dit quoi faire.
+  static const String calendrierCopieImpossible =
+      'Ton navigateur n\'a pas laissé copier. Sélectionne l\'adresse '
+      'ci-dessus et copie-la à la main.';
+
+  /// L'avertissement. Il est court et il est au-dessus du mode d'emploi : un
+  /// lien qui vaut mot de passe se dit avant qu'on le distribue.
+  static const String calendrierAvertissement =
+      'Ce lien vaut mot de passe : il donne accès à tes astreintes. Ne le '
+      'partage pas.';
+
+  // --- Le mode d'emploi, replié --------------------------------------
+
+  static const String calendrierModeEmploi = 'Comment l\'ajouter ?';
+
+  static const String calendrierGoogleTitre = 'Google Agenda';
+  static const String calendrierGoogle =
+      'Sur ordinateur : Autres agendas, le +, « À partir de l\'URL », colle '
+      'l\'adresse, « Ajouter l\'agenda ». L\'agenda apparaît ensuite dans '
+      'l\'application Google Agenda du téléphone.';
+
+  static const String calendrierAppleTitre = 'Apple Calendrier';
+  static const String calendrierApple =
+      'Sur iPhone : Réglages, Applications, Calendrier, Comptes, Ajouter un '
+      'compte, Autre, « Ajouter un abonnement à un calendrier », colle '
+      'l\'adresse.';
+
+  static const String calendrierOutlookTitre = 'Outlook';
+  static const String calendrierOutlook =
+      'Sur outlook.com : Calendrier, « Ajouter un calendrier », « S\'abonner '
+      'à partir du web », colle l\'adresse, donne-lui un nom, « Importer ».';
+
+  /// Le délai de rafraîchissement n'est pas à nous : chaque agenda décide.
+  /// Le dire évite la question « pourquoi ma garde d\'hier n\'est pas là ».
+  static const String calendrierDelai =
+      'Les agendas rechargent l\'adresse quelques fois par jour : une astreinte '
+      'acceptée à l\'instant peut mettre un moment à apparaître.';
+
+  // --- La régénération -----------------------------------------------
+
+  static const String calendrierRegenerer = 'Régénérer le lien';
+  static const String calendrierRegenereTitre = 'Régénérer ton lien ?';
+  static const String calendrierRegenereCorps =
+      'L\'adresse actuelle cessera de fonctionner immédiatement. Les agendas '
+      'où tu l\'as déjà collée ne se mettront plus à jour : il faudra y coller '
+      'la nouvelle.';
+  static const String calendrierRegenereConfirmer = 'Régénérer';
+  static const String calendrierRegenereAnnuler = 'Annuler';
+  static const String calendrierRegenereFait =
+      'Nouveau lien en place. L\'ancien ne répond plus : recolle celui-ci dans '
+      'ton agenda.';
+
+  // --- Les refus ------------------------------------------------------
+
+  static const String calendrierNonAuthentifie =
+      'Ta session a expiré. Reconnecte-toi, puis réessaie.';
+
+  static const String calendrierReseau =
+      'Pas de connexion. Réessaie quand le réseau revient.';
+
+  /// Le bouton de reprise du bloc. **Pas « Réessayer »** : la bannière de
+  /// l'écran de profil en porte déjà un, et deux boutons au même libellé sur un
+  /// même écran ne se distinguent pas à l'oreille. Celui-ci nomme son objet.
+  static const String calendrierRelire = 'Relire mon lien';
+
+  static const String calendrierEchec =
+      'Ton lien d\'abonnement n\'a pas pu être lu. Réessaie dans un instant.';
+
+  // --- Le bouton du détail d'une astreinte ----------------------------
+
+  static const String calendrierAjouterUne = 'Ajouter à mon agenda';
+
+  /// Deux boutons au même libellé se suivent dans la feuille d'une journée à
+  /// deux créneaux : l'annoncé porte la phrase entière.
+  static String calendrierAjouterUneDit(String jourEtDate, String creneau) =>
+      'Ajouter $jourEtDate, ${creneau.toLowerCase()}, à mon agenda';
+
+  static const String calendrierAjoutEnCours = 'Préparation du fichier…';
+
+  static String calendrierAjoutEnregistre(String nomFichier) =>
+      'Fichier enregistré : $nomFichier. Ouvre-le pour l\'ajouter à ton agenda.';
+
+  static const String calendrierAjoutPartage =
+      'Fichier envoyé au partage. Choisis ton application d\'agenda pour '
+      'ajouter l\'astreinte.';
+
+  static const String calendrierAjoutImpossible =
+      'Ton navigateur n\'a pas pu enregistrer le fichier. Réessaie, ou abonne '
+      'ton agenda depuis ton profil.';
+
+  // --- Le contenu du fichier iCalendar --------------------------------
+  // Ces trois-là ne s'affichent pas dans l'application : elles s'affichent dans
+  // l'agenda de la personne. C'est du texte de produit malgré tout, et il vit
+  // ici comme le reste (`design/028-export-ics.md § 4`).
+
+  /// « Astreinte nuit — CIS Saint-Martin ». Sans caserne lisible, l'intitulé ne
+  /// finit pas par un tiret orphelin.
+  static String icsIntitule({required bool nuit, required String caserne}) {
+    final creneau = nuit ? 'nuit' : 'jour';
+    return caserne.isEmpty
+        ? 'Astreinte $creneau'
+        : 'Astreinte $creneau — $caserne';
+  }
+
+  /// Un intitulé se tronque dans une vue mensuelle ; la description survit.
+  /// C'est elle qui doit porter le mot *jour* ou *nuit* et les heures.
+  static String icsDescription({
+    required bool nuit,
+    required String debut,
+    required String fin,
+  }) =>
+      'Créneau de ${nuit ? 'nuit' : 'jour'}, de $debut à $fin. '
+      'Astreinte acceptée.';
+
+  /// `astreinte-2026-11-14-nuit.ics`. La date en ISO et en tête : dans un
+  /// dossier de téléchargements, c'est le seul ordre qui range les fichiers
+  /// dans l'ordre des gardes.
+  static String icsNomFichier({required String jourIso, required bool nuit}) =>
+      'astreinte-$jourIso-${nuit ? 'nuit' : 'jour'}.ics';
 }

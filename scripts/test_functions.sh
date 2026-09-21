@@ -3,7 +3,7 @@
 # notifications (ticket 025), publication d'un planning (ticket 019),
 # réattribution d'un créneau refusé (ticket 020), remplissage automatique d'un
 # brouillon (ticket 018), ligne interne d'un envoi définitivement abandonné
-# (ticket 040) et abonnement par caserne (ticket 029).
+# (ticket 040), abonnement par caserne (ticket 029) et flux calendrier (ticket 028).
 #
 #   supabase start
 #   supabase functions serve          # dans un autre terminal
@@ -97,6 +97,15 @@ appeler() { # appeler <fonction> <jeton|-> <corps json>
   CORPS="$(printf '%s' "$reponse" | sed '$d')"
 }
 
+# Le flux calendrier : un GET **sans aucun en-tête**, comme le ferait Google
+# Agenda. Pas d'`apikey`, pas d'`Authorization` : c'est tout l'objet du ticket.
+ics() { # ics <chemin après /functions/v1/ics-feed>
+  local reponse
+  reponse="$(curl -s -w $'\n%{http_code}' "$API_URL/functions/v1/ics-feed$1")"
+  STATUT="$(printf '%s' "$reponse" | tail -1)"
+  CORPS="$(printf '%s' "$reponse" | sed '$d')"
+}
+
 connexion() { # connexion <email> -> jeton d'accès
   curl -s -X POST "$API_URL/auth/v1/token?grant_type=password" \
     -H "apikey: $ANON_KEY" -H 'content-type: application/json' \
@@ -116,6 +125,11 @@ PERIODE_A="aaaaaaaa-0000-4000-8000-000000000202"
 # Le mois M+1 de la caserne B, celui sur lequel la proposition automatique du
 # ticket 018 travaille : le seed le crée et rien d'autre ne s'en sert.
 PERIODE_B="bbbbbbbb-0000-4000-8000-000000000201"
+
+# Le mois du flux calendrier (section 27), posé et retiré par ce script : les
+# deux périodes du seed servent déjà aux sections 14 à 17 et 26, et une
+# astreinte acceptée qui traînerait dans l'une d'elles fausserait leurs comptes.
+PERIODE_ICS="aaaaaaaa-0000-4000-8000-0000000002ff"
 
 nettoyer() {
   sql "delete from audit_log where action like 'invitation.%';
@@ -154,6 +168,13 @@ nettoyer() {
   # supprime sans écarter quoi que ce soit : c'est justement ce que la migration
   # 0019 autorise, et ses attributions partent avec lui.
   sql "delete from schedules where period_id = '$PERIODE_B';" >/dev/null
+
+  # Le mois du flux calendrier (section 27) : son planning est publié, donc il
+  # demande le même écartement de déclencheur que celui de la section 14.
+  sql "alter table schedules disable trigger schedules_guard_suppression;
+       delete from schedules where period_id = '$PERIODE_ICS';
+       alter table schedules enable trigger schedules_guard_suppression;
+       delete from periods where id = '$PERIODE_ICS';" >/dev/null
 }
 
 nettoyer
@@ -1433,6 +1454,135 @@ verifier "rien n'est parti : proposed_at reste nul" "0" \
           where sh.schedule_id = '$PLANNING_B' and a.proposed_at is not null")"
 verifier "et personne n'a été notifié" "$OUTBOX_AVANT" \
   "$(sql "select count(*) from notification_outbox")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 27. ics-feed : une adresse publique qui ne donne que ses propres astreintes'
+# ---------------------------------------------------------------------------
+# La seule fonction du projet qu'on appelle **sans en-tête** : ses clients sont
+# les serveurs de Google, d'Apple et de Microsoft. Ce que ce bloc éprouve est
+# exactement ce que le ticket 028 promet — un jeton valide, un jeton inconnu, un
+# jeton régénéré, un membre désactivé, et le contenu de l'événement.
+
+# Un mois à part, un planning publié, deux astreintes acceptées pour membre1 :
+# une de jour, une de nuit, sur des dates fixes pour que les heures attendues
+# soient calculables à la main (14 et 15 mars 2027 : l'heure d'été ne commence
+# que le 28, la caserne est donc encore à UTC+1).
+sql "insert into periods (id, station_id, year, month, status, deadline_at)
+     values ('$PERIODE_ICS', '$STATION_A', 2027, 3, 'locked', '2027-02-15 23:59:59+01')
+     on conflict (id) do nothing" >/dev/null
+
+PLANNING_ICS="$(sql "
+  insert into schedules (station_id, period_id, status, created_by, published_at)
+  values ('$STATION_A', '$PERIODE_ICS', 'published',
+          'aaaaaaaa-0000-4000-8000-000000000100', now())
+  returning id")"
+
+sql "with c as (
+       insert into shifts (station_id, schedule_id, date, slot, required_count)
+       values ('$STATION_A', '$PLANNING_ICS', date '2027-03-14', 'day',   1),
+              ('$STATION_A', '$PLANNING_ICS', date '2027-03-15', 'night', 1)
+       returning id
+     )
+     insert into assignments (station_id, shift_id, user_id, status, created_by,
+                              proposed_at, responded_at)
+     select '$STATION_A', c.id, '$MEMBRE1_A', 'accepted',
+            'aaaaaaaa-0000-4000-8000-000000000100', now(), now()
+       from c" >/dev/null
+
+# **Le jeton se demande comme l'écran de profil le demande** : par RPC, avec le
+# jeton d'accès du membre. Il n'est lisible nulle part ailleurs (migration 0029).
+MEMBRE1_JWT="$(connexion membre1@caserne-a.test)"
+JETON_ICS="$(curl -s -X POST "$API_URL/rest/v1/rpc/my_ics_token" \
+  -H "apikey: $ANON_KEY" -H "Authorization: Bearer $MEMBRE1_JWT" \
+  -H 'content-type: application/json' -d '{}' | tr -d '"')"
+verifier "le membre lit son jeton d'abonnement" "48" "${#JETON_ICS}"
+
+# Et il n'est **pas** lisible dans la table, ni par lui, ni par un collègue :
+# c'est le grant de colonne de la migration 0029.
+verifier "la colonne reste hors de portée de PostgREST" "42501" \
+  "$(curl -s "$API_URL/rest/v1/profiles?select=ics_token&limit=1" \
+     -H "apikey: $ANON_KEY" -H "Authorization: Bearer $MEMBRE1_JWT" | jq -r '.code // empty')"
+
+ics "/$JETON_ICS.ics"
+verifier "le flux répond sans le moindre en-tête : 200" "200" "$STATUT"
+verifier "c'est bien un calendrier" "BEGIN:VCALENDAR" \
+  "$(printf '%s' "$CORPS" | head -1 | tr -d '\r')"
+verifier "deux événements, les deux astreintes acceptées" "2" \
+  "$(grep -c 'BEGIN:VEVENT' <<<"$CORPS")"
+
+# Le contenu de l'événement : le § 4 du brief de design, vu depuis le fichier servi.
+verifier "l'intitulé dit le créneau et la caserne" "1" \
+  "$(grep -c 'SUMMARY:Astreinte jour — CIS Saint-Martin' <<<"$CORPS")"
+verifier "la nuit aussi" "1" \
+  "$(grep -c 'SUMMARY:Astreinte nuit — CIS Saint-Martin' <<<"$CORPS")"
+verifier "le lieu est la caserne" "2" "$(grep -c 'LOCATION:CIS Saint-Martin' <<<"$CORPS")"
+# La virgule est échappée en `\,` (RFC 5545) : sans cela, elle couperait la
+# propriété en deux et la description arriverait tronquée dans l'agenda.
+verifier "la description dit jour ou nuit, et les heures" "1" \
+  "$(grep -cF 'DESCRIPTION:Créneau de jour\, de 07:00 à 19:00. Astreinte acceptée.' <<<"$CORPS")"
+verifier "et la nuit dit la sienne" "1" \
+  "$(grep -cF 'DESCRIPTION:Créneau de nuit\, de 19:00 à 07:00. Astreinte acceptée.' <<<"$CORPS")"
+# 07:00 à Paris le 14 mars 2027 = 06:00 UTC ; la nuit du 15 finit le 16 au matin.
+verifier "les heures viennent des paramètres de la caserne" "1" \
+  "$(grep -c 'DTSTART:20270314T060000Z' <<<"$CORPS")"
+verifier "et la nuit déborde sur le lendemain" "1" \
+  "$(grep -c 'DTEND:20270316T060000Z' <<<"$CORPS")"
+
+# **Le point de sécurité** : cette adresse voyage.
+verifier "aucun nom de membre dans le flux" "0" "$(grep -c 'Lefebvre' <<<"$CORPS")"
+verifier "aucune adresse de courriel" "0" "$(grep -c '@caserne' <<<"$CORPS")"
+verifier "rien de la caserne voisine" "0" "$(grep -c 'Val-de-Loue' <<<"$CORPS")"
+
+ics "?token=$JETON_ICS"
+verifier "la forme avec paramètre marche aussi : 200" "200" "$STATUT"
+
+ics "/0000000000000000000000000000000000000000deadbeef.ics"
+verifier "un jeton inconnu : 404" "404" "$STATUT"
+verifier "et rien qui ressemble à un calendrier" "0" "$(grep -c 'VCALENDAR' <<<"$CORPS")"
+
+ics ""
+verifier "sans jeton : 404" "404" "$STATUT"
+
+ics "/trop-court.ics"
+verifier "un jeton mal formé n'atteint même pas la base : 404" "404" "$STATUT"
+
+STATUT="$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+  "$API_URL/functions/v1/ics-feed/$JETON_ICS.ics")"
+verifier "un POST sur une adresse d'abonnement : 405" "405" "$STATUT"
+
+# La régénération, et l'invalidation immédiate qui va avec.
+JETON_NEUF="$(curl -s -X POST "$API_URL/rest/v1/rpc/rotate_ics_token" \
+  -H "apikey: $ANON_KEY" -H "Authorization: Bearer $MEMBRE1_JWT" \
+  -H 'content-type: application/json' -d '{}' | tr -d '"')"
+verifier "la régénération rend un jeton différent" "true" \
+  "$([ "$JETON_NEUF" != "$JETON_ICS" ] && [ "${#JETON_NEUF}" = 48 ] && echo true || echo false)"
+
+ics "/$JETON_ICS.ics"
+verifier "l'ancienne adresse est morte sur-le-champ : 404" "404" "$STATUT"
+ics "/$JETON_NEUF.ics"
+verifier "la nouvelle sert le même calendrier : 200" "200" "$STATUT"
+verifier "avec les deux mêmes événements" "2" "$(grep -c 'BEGIN:VEVENT' <<<"$CORPS")"
+
+# Un membre désactivé : l'abonnement ne casse pas, il se vide.
+sql "update memberships set status = 'disabled'
+      where user_id = '$MEMBRE1_A' and station_id = '$STATION_A'" >/dev/null
+ics "/$JETON_NEUF.ics"
+verifier "membre désactivé : le flux répond quand même 200" "200" "$STATUT"
+verifier "mais il est vide" "0" "$(grep -c 'BEGIN:VEVENT' <<<"$CORPS")"
+verifier "et il reste un calendrier valide" "1" "$(grep -c 'END:VCALENDAR' <<<"$CORPS")"
+sql "update memberships set status = 'active', disabled_at = null
+      where user_id = '$MEMBRE1_A' and station_id = '$STATION_A'" >/dev/null
+
+# Une caserne suspendue, elle, continue : « suspendu » veut dire lecture seule,
+# pas gardes annulées (docs/PRD.md § 6.6).
+sql "update subscriptions set status = 'suspended', suspended_at = now()
+      where station_id = '$STATION_A'" >/dev/null
+ics "/$JETON_NEUF.ics"
+verifier "caserne suspendue : les astreintes restent au flux" "2" \
+  "$(grep -c 'BEGIN:VEVENT' <<<"$CORPS")"
+sql "update subscriptions set status = 'trialing', suspended_at = null
+      where station_id = '$STATION_A'" >/dev/null
 
 # ---------------------------------------------------------------------------
 echo ''
