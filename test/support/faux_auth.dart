@@ -4,6 +4,7 @@ import 'package:astreinte_sp/app.dart';
 import 'package:astreinte_sp/core/env.dart';
 import 'package:astreinte_sp/core/firebase/firebase_bootstrap.dart';
 import 'package:astreinte_sp/core/plateforme/contexte_plateforme.dart';
+import 'package:astreinte_sp/core/plateforme/ouverture_externe.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
@@ -15,6 +16,8 @@ import 'package:astreinte_sp/core/session/membership_repository.dart';
 import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/session/session_utilisateur.dart';
 import 'package:astreinte_sp/core/supabase/supabase_bootstrap.dart';
+import 'package:astreinte_sp/features/abonnement/data/abonnement_repository.dart';
+import 'package:astreinte_sp/features/abonnement/domain/abonnement_providers.dart';
 import 'package:astreinte_sp/features/astreintes/data/astreintes_repository.dart';
 import 'package:astreinte_sp/features/astreintes/data/cache_astreintes.dart';
 import 'package:astreinte_sp/features/astreintes/data/cache_planning_caserne.dart';
@@ -50,6 +53,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'faux_abonnement.dart';
 import 'faux_astreintes.dart';
 import 'faux_dispos.dart';
 import 'faux_invitations.dart';
@@ -238,6 +242,8 @@ Future<AppMontee> monterApp(
   InvitationRepository? invitations,
   ProfilRepository? profils,
   ParametresRepository? parametres,
+  AbonnementRepository? abonnement,
+  FauxOuvertureExterne? ouverture,
   PeriodesRepository? periodes,
   MatriceRepository? matrice,
   PlanningRepository? planning,
@@ -300,6 +306,20 @@ Future<AppMontee> monterApp(
         ),
         if (parametres != null)
           parametresRepositoryProvider.overrideWithValue(parametres),
+        // L'abonnement (ticket 029). Par défaut : aucun compte chez le
+        // prestataire de paiement, exactement l'état du projet tant qu'il n'y
+        // en a pas — et l'application doit tourner ainsi.
+        abonnementRepositoryProvider.overrideWithValue(
+          abonnement ?? FauxAbonnementRepository(),
+        ),
+        ouvertureExterneProvider.overrideWithValue(
+          (ouverture ?? FauxOuvertureExterne()).call,
+        ),
+        // L'écran d'abonnement compte des jours d'essai : sans horloge figée,
+        // « il reste 12 jours » dépendrait du jour où le test tourne.
+        horlogeAbonnementProvider.overrideWithValue(
+          horloge ?? () => maintenantTest,
+        ),
         if (periodes != null)
           periodesRepositoryProvider.overrideWithValue(periodes),
         if (matrice != null)

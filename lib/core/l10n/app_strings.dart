@@ -2531,4 +2531,154 @@ abstract final class AppStrings {
 
   static const String planningCaserneNonActualise =
       'Ce planning n\'a pas pu être actualisé.';
+
+  // -------------------------------------------------------------------
+  // Abonnement de la caserne (ticket 029)
+  // -------------------------------------------------------------------
+
+  static const String abonnementTitre = 'Abonnement';
+  static const String abonnementDepuisAdmin = 'Abonnement de la caserne';
+  static const String abonnementRafraichir = 'Relire l\'abonnement';
+  static const String abonnementReserveAdmin =
+      'Seuls les administrateurs de la caserne voient et gèrent l\'abonnement.';
+
+  // --- Le bloc d'état -----------------------------------------------------
+
+  static const String abonnementSectionEtat = 'État';
+
+  static const String abonnementEtatEssai = 'Période d\'essai';
+  static const String abonnementEtatActif = 'Abonnement actif';
+  static const String abonnementEtatRetard = 'Paiement en retard';
+  static const String abonnementEtatSuspendu = 'Caserne suspendue';
+  static const String abonnementEtatResilie = 'Abonnement résilié';
+
+  /// « Gratuite jusqu'au 20 novembre 2026 — 60 jours. »
+  static String abonnementEssaiJusquau(String date, int jours) =>
+      'Gratuite jusqu\'au $date — ${abonnementJours(jours)}.';
+
+  static String abonnementJours(int n) =>
+      n <= 1 ? '$n jour restant' : '$n jours restants';
+
+  /// L'essai est passé, la tâche de suspension n'a pas encore tourné.
+  static String abonnementEssaiTermine(String date) => 'Terminée le $date.';
+
+  static String abonnementProchainPaiement(String date) =>
+      'Prochain paiement le $date.';
+
+  /// Le seul état rouge de l'écran : il y a une action à faire et une échéance
+  /// réelle. Il nomme la conséquence **et** la sortie.
+  static String abonnementRetardEcheance(String date) =>
+      'Mets ta carte à jour avant le $date, sinon la caserne passera en '
+      'lecture seule.';
+
+  static const String abonnementRetardSansDate =
+      'Mets ta carte à jour pour éviter le passage en lecture seule.';
+
+  /// Suspendu et résilié disent la même chose, parce que c'est la même chose
+  /// pour la caserne : lecture seule, et rien de perdu (`docs/PRD.md § 6.6`).
+  static String abonnementLectureSeuleDepuis(String date) =>
+      'Lecture seule depuis le $date. Rien n\'a été supprimé.';
+
+  static const String abonnementLectureSeule =
+      'Lecture seule. Rien n\'a été supprimé.';
+
+  /// Le badge annoncé en une phrase complète, jamais « trialing ».
+  static String abonnementEtatSemantique(String statut, String detail) =>
+      detail.isEmpty ? statut : '$statut. $detail';
+
+  // --- Le bloc des formules -----------------------------------------------
+
+  static const String abonnementSectionFormules = 'Formules';
+
+  static const String abonnementFormuleMensuelle = 'Mensuel';
+  static const String abonnementFormuleAnnuelle = 'Annuel';
+
+  static const String abonnementPeriodeMensuelle = 'par mois';
+  static const String abonnementPeriodeAnnuelle = 'par an';
+
+  static const String abonnementSouscrire = 'S\'abonner';
+
+  /// « S'abonner à la formule mensuelle » — le libellé annoncé, qui nomme
+  /// laquelle des deux on choisit.
+  static String abonnementSouscrireSemantique(String formule) =>
+      'S\'abonner à la formule ${_enMinuscule(formule)}';
+
+  /// « Deux mois offerts. » — calculée, jamais écrite en dur.
+  static String abonnementEconomie(String montant) => '$montant offerts.';
+
+  /// Un montant en euros, sans centimes quand ils sont nuls : « 12 € »,
+  /// « 12,50 € ». Les chiffres prennent le cut Mono dans l'écran.
+  static String abonnementMontant(int centimes, {String devise = 'eur'}) {
+    final unites = centimes ~/ 100;
+    final reste = centimes % 100;
+    final symbole = _symboleDevise(devise);
+    return reste == 0
+        ? '$unites $symbole'
+        : '$unites,${reste.toString().padLeft(2, '0')} $symbole';
+  }
+
+  static String _symboleDevise(String devise) => switch (devise.toLowerCase()) {
+    'eur' => '€',
+    'chf' => 'CHF',
+    'usd' => '\$',
+    _ => devise.toUpperCase(),
+  };
+
+  // --- Le bloc de gestion --------------------------------------------------
+
+  static const String abonnementSectionGestion = 'Gérer';
+  static const String abonnementGerer = 'Gérer mon abonnement';
+  static const String abonnementGererDetail =
+      'Carte bancaire, factures et résiliation se règlent sur la page '
+      'sécurisée de Stripe.';
+
+  // --- Les états de bord ---------------------------------------------------
+
+  /// Le cas d'aujourd'hui : aucun compte n'est configuré. Bannière
+  /// `information`, jamais `erreur` — rien n'est cassé.
+  static const String abonnementNonConfigureTexte =
+      'L\'abonnement n\'est pas encore ouvert. Ta caserne fonctionne '
+      'normalement pendant l\'essai.';
+
+  static const String abonnementBientotDisponible = 'Bientôt disponible.';
+
+  static const String abonnementDejaAbonne =
+      'Cette caserne est déjà abonnée. Passe par « Gérer mon abonnement ».';
+
+  static const String abonnementSansClient =
+      'Cette caserne n\'a pas encore d\'abonnement à gérer.';
+
+  static const String abonnementEssaiExpireTexte =
+      'Ta période d\'essai est terminée. Abonne-toi pour continuer à publier '
+      'des plannings.';
+
+  // --- Le retour du prestataire -------------------------------------------
+
+  static const String abonnementPaiementEnregistre = 'Paiement enregistré.';
+
+  /// Le webhook n'est pas encore passé : on le dit au lieu de faire tourner un
+  /// sablier.
+  static const String abonnementPaiementEnAttente =
+      'Paiement enregistré. Le statut se met à jour dans un instant.';
+
+  static const String abonnementRedirection =
+      'Ouverture de la page de paiement…';
+
+  static const String abonnementOngletBloque =
+      'Ton navigateur a bloqué l\'ouverture. Autorise les fenêtres pour ce '
+      'site, puis réessaie.';
+
+  // --- Les refus -----------------------------------------------------------
+
+  static const String abonnementRefusDroits =
+      'Il faut être administrateur de cette caserne pour gérer son abonnement.';
+
+  static const String abonnementEchecPrestataire =
+      'Le paiement n\'a pas pu s\'ouvrir. Réessaie dans un instant.';
+
+  static const String abonnementEchecGenerique =
+      'Impossible de lire l\'abonnement.';
+
+  static const String abonnementErreurTexte =
+      'Impossible de charger l\'abonnement de la caserne.';
 }

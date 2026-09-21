@@ -12,15 +12,19 @@ import 'app_divider.dart';
 class EnteteSection extends StatelessWidget {
   const EnteteSection({
     required this.titre,
-    required this.compte,
     super.key,
+    this.compte,
     this.premiere = false,
   });
 
   final String titre;
 
   /// Phrase déjà composée (« 9 membres actifs »).
-  final String compte;
+  ///
+  /// Facultative : une section dont le contenu n'est pas une liste n'a rien à
+  /// compter, et une ligne vide sous le titre serait un trou (écran
+  /// « Abonnement », ticket 029).
+  final String? compte;
 
   /// La première section d'un écran n'a pas besoin du grand écart du dessus :
   /// le titre de l'écran vient juste de le donner.
@@ -38,13 +42,15 @@ class EnteteSection extends StatelessWidget {
           header: true,
           child: Text(titre, style: theme.textTheme.titleLarge),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          compte,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        if (compte != null) ...<Widget>[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            compte!,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: AppSpacing.sm),
         const AppDivider(),
       ],
