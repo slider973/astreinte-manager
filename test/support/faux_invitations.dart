@@ -96,6 +96,11 @@ class FauxMembresRepository implements MembresRepository {
       <({String membershipId, String? nomAffiche})>[];
   final List<List<String>> envois = <List<String>>[];
   final List<RoleMembre> rolesEnvoyes = <RoleMembre>[];
+
+  /// La caserne visée par chaque envoi. L'écran de l'éditeur (ticket 031)
+  /// invite dans une caserne dont il n'est pas membre : le test doit pouvoir
+  /// vérifier laquelle.
+  final List<String> casernesInvitees = <String>[];
   final List<String> annulations = <String>[];
 
   @override
@@ -119,6 +124,7 @@ class FauxMembresRepository implements MembresRepository {
   }) async {
     envois.add(emails);
     rolesEnvoyes.add(role);
+    casernesInvitees.add(stationId);
 
     final echec = echecInvitation;
     if (echec != null) throw EchecInvitation(echec);

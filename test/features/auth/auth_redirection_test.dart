@@ -214,4 +214,130 @@ void main() {
       );
     });
   });
+
+  group('La garde de /superadmin (ticket 031)', () {
+    test('un administrateur de caserne y est renvoyé à l\'accueil', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.connecte,
+          chemin: AppRoutes.superAdmin,
+          estAdmin: true,
+          estSuperAdmin: false,
+        ),
+        AppRoutes.accueil,
+      );
+    });
+
+    test('un simple membre aussi', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.connecte,
+          chemin: AppRoutes.superAdmin,
+          estSuperAdmin: false,
+        ),
+        AppRoutes.accueil,
+      );
+    });
+
+    test('l\'éditeur y entre', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.connecte,
+          chemin: AppRoutes.superAdmin,
+          estSuperAdmin: true,
+        ),
+        isNull,
+      );
+    });
+
+    // Le cas nominal : la personne qui édite le produit n'est membre d'aucune
+    // caserne. Sans cette branche, elle atterrirait sur « Aucune caserne », un
+    // écran qui ne propose que la déconnexion.
+    test('l\'éditeur sans caserne y entre quand même', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.sansCaserne,
+          chemin: AppRoutes.superAdmin,
+          estSuperAdmin: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('un compte sans caserne qui n\'est pas l\'éditeur reste dehors', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.sansCaserne,
+          chemin: AppRoutes.superAdmin,
+          estSuperAdmin: false,
+        ),
+        AppRoutes.aucuneCaserne,
+      );
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.sansCaserne,
+          chemin: AppRoutes.accueil,
+          estSuperAdmin: false,
+        ),
+        AppRoutes.aucuneCaserne,
+      );
+    });
+
+    // `chargement` n'est **pas** une attente de l'éditeur : une session en
+    // cours de restauration passe par l'écran d'attente comme pour n'importe
+    // quelle adresse. Sans ça, `destinationInitiale` ne mémorise jamais l'URL
+    // tapée à froid — et c'est ce chemin-là qui avait bouclé dans Chrome.
+    test('en chargement, /superadmin passe par l\'écran d\'attente', () {
+      for (final droit in <bool?>[null, true, false]) {
+        expect(
+          redirectionAuth(
+            etat: EtatAuth.chargement,
+            chemin: AppRoutes.superAdmin,
+            estSuperAdmin: droit,
+          ),
+          AppRoutes.demarrage,
+          reason: 'droit = $droit',
+        );
+      }
+    });
+
+    test('déconnecté, /superadmin mène à la connexion comme le reste', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.deconnecte,
+          chemin: AppRoutes.superAdmin,
+          estSuperAdmin: true,
+        ),
+        AppRoutes.connexion,
+      );
+    });
+
+    // `null` veut dire « pas encore su » : la garde attend plutôt que de
+    // rediriger sur une supposition, sinon une URL tapée à froid est perdue.
+    test('tant que le droit est inconnu, la garde ne tranche pas', () {
+      expect(
+        redirectionAuth(etat: EtatAuth.connecte, chemin: AppRoutes.superAdmin),
+        isNull,
+      );
+    });
+
+    test('l\'écran de l\'éditeur n\'est pas sous la garde des admins', () {
+      // `/superadmin` ne commence pas par `/admin` : les deux gardes portent
+      // sur deux droits différents, et il ne faut pas qu'un administrateur de
+      // caserne hérite de l'une par l'autre.
+      expect(AppRoutes.superAdmin.startsWith(AppRoutes.prefixeAdmin), isFalse);
+    });
+
+    test('un chemin qui commence par « superadmin » sans en être n\'est pas '
+        'concerné', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.connecte,
+          chemin: '/superadministration',
+          estSuperAdmin: false,
+        ),
+        isNull,
+      );
+    });
+  });
 }

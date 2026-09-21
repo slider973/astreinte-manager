@@ -301,7 +301,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
     console.error("lecture membership", erreurMembership.message);
     return errorResponse(500, "internal_error", "Erreur serveur.");
   }
-  if (!membership || membership.status !== "active" || membership.role !== "admin") {
+
+  const estAdmin = membership?.status === "active" && membership.role === "admin";
+
+  // L'éditeur du produit nomme le premier administrateur d'une caserne qu'il
+  // vient de créer (ticket 031) : elle n'a alors aucun membre, donc aucun admin.
+  // Le contrôle qui fait autorité reste celui de `create_invitation` ; ceci n'est
+  // que le raccourci de présentation, et il doit connaître le même droit.
+  let estSuperAdmin = false;
+  if (!estAdmin) {
+    const { data: superAdmin, error: erreurSuper } = await admin
+      .from("super_admins")
+      .select("user_id")
+      .eq("user_id", utilisateur.id)
+      .maybeSingle();
+    if (erreurSuper) {
+      console.error("lecture super_admins", erreurSuper.message);
+      return errorResponse(500, "internal_error", "Erreur serveur.");
+    }
+    estSuperAdmin = superAdmin !== null;
+  }
+
+  if (!estAdmin && !estSuperAdmin) {
     return errorResponse(403, "not_admin", message("not_admin"));
   }
 

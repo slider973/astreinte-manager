@@ -819,6 +819,29 @@ n'avance `current_period_end` qu'après un paiement réussi, alors qu'`updated_a
 tentative de carte. Compter les quatorze jours sur `updated_at` repousserait indéfiniment la
 suspension d'une caserne dont la carte est relancée tous les trois jours.
 
+### Fonctions de l'éditeur du produit (migration `0025`, ticket 031)
+
+Aucune vue n'agrège les casernes et les politiques cloisonnent par caserne : l'écran
+`/superadmin` passe donc par quatre fonctions `security definer`, ouvertes à `authenticated`
+et gardées à l'intérieur par `is_super_admin()`.
+
+| Fonction | Rôle |
+|---|---|
+| `super_admin_stations()` | La liste. Nom, slug, fuseau, création, membres actifs, administrateurs actifs, invitations en attente, les quatre faits d'abonnement, et le dernier planning publié (trié sur le **mois couvert**, pas sur la date de publication). **Ni `settings`, ni identifiants de paiement, ni le moindre nom de personne.** Zéro ligne à qui n'est pas super-admin — une liste vide, pas une exception |
+| `super_admin_create_station(p_name, p_timezone)` | Crée une caserne. Slug dérivé du nom par `station_slug()` avec suffixe en cas de collision — un identifiant d'URL n'a pas à être saisi. Fuseau vérifié contre `pg_timezone_names` : un fuseau faux ne casse rien à l'insertion, il casse les crons trois semaines plus tard. L'essai de 60 jours vient de `subscription_bootstrap` (0023), pas d'ici. Journalise `station.created` |
+| `super_admin_set_station_suspended(p_station, p_suspended, p_reason)` | Suspend ou réactive à la main. Rien n'est supprimé : seul le statut change, et `station_writable()` en tire la lecture seule. **La réactivation d'une caserne sans abonnement souscrit reporte `trial_ends_at` à 30 jours au moins**, sinon `cron_suspend_subscriptions` la reprendrait la nuit suivante. Raison obligatoire (≥ 10 caractères), journalisée en `subscription.suspended` / `subscription.reactivated` |
+| `super_admin_support_schedules(p_station, p_reason)` | **La seule porte vers les données de planning d'une caserne.** Rend, par mois : statut de la période, statut du planning, dates de publication et de validation, nombre de créneaux, décompte des attributions par statut. Aucun nom, aucun `user_id`, aucune disponibilité. Raison obligatoire, et **chaque appel** inscrit `support.schedules_read` dans l'`audit_log` de la caserne |
+
+Pas de « session de support » ouverte pour une heure : **une lecture = une ligne d'audit**.
+Une fenêtre ouverte est une fenêtre qu'on oublie de fermer, et c'est aussi ce qui évite
+d'ajouter `or has_support_access(station_id)` à huit politiques de lecture — huit endroits où
+se tromper, contre un seul.
+
+`create_invitation` (0009) gagne une seule branche : l'invitant peut être **admin actif de la
+caserne ou super-admin**. Une caserne fraîchement créée n'a aucun membre, donc aucun admin, et
+nommer le premier passe par le chemin du ticket 006 — `invite-member` → `create_invitation` —
+et par aucun autre. La ligne d'audit porte alors `by_super_admin: true`.
+
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
 Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
@@ -857,7 +880,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 
 | Table | Lecture | Écriture |
 |---|---|---|
-| `stations` | membre de la caserne ou super-admin | admin de la caserne ou super-admin (update), super-admin (insert), pas de delete |
+| `stations` | membre de la caserne | admin de la caserne (update), pas d'insert, pas de delete — *(migration `0025`, ticket 031 : le super-admin a perdu ses trois branches ; il lisait toute la table, `settings` compris, et pouvait renommer ou reconfigurer une caserne dont il n'est pas membre, sans trace. Il passe désormais par les fonctions du § 3, qui journalisent)* |
 | `profiles` | soi-même ; les profils des membres **actifs** de ses casernes ; et, pour un **admin**, ceux de tous les membres de sa caserne quel que soit leur statut (migration `0010` : sans cette branche, un membre désactivé disparaissait de l'écran « Membres » et ne pouvait plus être réactivé) | soi-même |
 | `memberships` | membre de la caserne, et toujours ses propres lignes (un compte `invited` ou `disabled` doit pouvoir constater son état) | admin de la caserne, sauf son propre rôle. Aucune politique d'update pour un membre sur sa propre ligne : elle ouvrirait une escalade de privilèges |
 | `invitations` | admin de la caserne, **sauf `token`** (retiré du grant de select : c'est un porteur de droits, réservé au service role). Ne jamais faire `select *` sur cette table | admin de la caserne |
@@ -872,6 +895,13 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `subscriptions` | admin de la caserne | service role uniquement (webhook Stripe) |
 | `audit_log` | admin de la caserne | service role et triggers |
 | `super_admins` | super-admin | personne (SQL manuel) |
+
+**Depuis la migration `0025`, `is_super_admin()` n'apparaît plus que dans une seule politique
+du schéma : `super_admins_select_super_admin`.** C'est une propriété vérifiable sur
+`pg_policies`, et `supabase/tests/super_admin_test.sql` la vérifie à chaque PR. Tout ce que
+l'éditeur du produit peut faire passe par les quatre fonctions du § 3, et chacune de celles
+qui écrit — ou qui lit un planning — laisse une ligne dans l'`audit_log` **de la caserne
+concernée**, donc lisible par ses administrateurs.
 
 Exemple de politique pour `availabilities` :
 
@@ -1383,7 +1413,9 @@ Ordre proposé :
 21. `0021_cron_relances.sql` (ticket 022 : `assignment_reminder_targets`, `cron_assignment_reminders`, `cron_late_responders_report`, les deux tâches `pg_cron` des relances)
 22. `0022_notification_echec_definitif.sql` (ticket 040 : `notify_trace_echec`, `cron_dispatch_notifications` trace désormais ses abandons)
 23. `0023_abonnement_stripe.sql` (ticket 029 : `subscription_bootstrap` et son déclencheur, `subscription_sync`, `subscription_set_customer`, `cron_suspend_subscriptions` et la tâche `suspend_subscriptions`)
-24. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
+24. `0024_gating_suspension.sql` (ticket 030 : `station_access`, deux `notification_type`, `cron_subscription_reminders` et la tâche `subscription_reminders`, `cron_suspend_subscriptions` qui prévient les administrateurs)
+25. `0025_super_admin.sql` (ticket 031 : `is_super_admin()` retiré des trois politiques de `stations`, `station_slug`, `super_admin_stations`, `super_admin_create_station`, `super_admin_set_station_suspended`, `super_admin_support_schedules`, branche super-admin de `create_invitation`)
+26. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
     `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des

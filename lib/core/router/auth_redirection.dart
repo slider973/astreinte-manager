@@ -20,11 +20,24 @@ import 'app_router.dart';
 /// même : un membre arrivant sur `/admin/membres` verrait des listes vides et
 /// un formulaire d'invitation qui échoue à l'envoi. Une porte fermée vaut
 /// mieux qu'une porte ouverte sur une pièce vide.
+///
+/// [estSuperAdmin] garde `/superadmin` par la **même** mécanique, avec deux
+/// différences imposées par ce qu'est l'éditeur du produit :
+///
+/// - il n'est membre d'aucune caserne, donc il arrive en
+///   [EtatAuth.sansCaserne], que la règle générale envoie sur « Aucune
+///   caserne ». Son écran, et lui seul, reste joignable depuis cet état ;
+/// - son statut ne vit pas dans la session : il vient d'un appel. `null` veut
+///   dire **pas encore su**, et la garde ne tranche alors pas. Rediriger sur
+///   un statut non résolu perdrait l'URL tapée à froid ; laisser l'écran
+///   s'ouvrir ne montre rien, puisque toutes ses données viennent de fonctions
+///   qui refusent (migration `0025`).
 String? redirectionAuth({
   required EtatAuth etat,
   required String chemin,
   bool outilsDevAutorises = false,
   bool estAdmin = false,
+  bool? estSuperAdmin,
   String? cheminInvitationEnAttente,
 }) {
   // Le catalogue de composants du ticket 004 reste joignable en build de
@@ -39,19 +52,34 @@ String? redirectionAuth({
   if (chemin.startsWith(AppRoutes.prefixeInvitation)) return null;
 
   final surLaConnexion = chemin.startsWith(AppRoutes.connexion);
+  final surLEditeur = _sousSuperAdmin(chemin);
+
+  // Tant que le droit de l'éditeur n'est pas connu, la garde **attend** sur son
+  // écran plutôt que de trancher : rediriger sur une supposition perdrait
+  // l'URL tapée à froid, et l'écran ne peut rien montrer sans droits.
+  // `chargement` n'est pas concerné : une session en cours de restauration
+  // passe par l'écran d'attente comme pour n'importe quelle autre adresse,
+  // sans quoi la destination initiale n'est jamais mémorisée.
+  final editeurEnAttente = surLEditeur && estSuperAdmin == null;
 
   return switch (etat) {
     EtatAuth.chargement =>
       chemin == AppRoutes.demarrage ? null : AppRoutes.demarrage,
     EtatAuth.deconnecte => surLaConnexion ? null : AppRoutes.connexion,
+    // Le cas nominal de l'éditeur : connecté, membre d'aucune caserne. Sans
+    // cette branche il serait renvoyé sur « Aucune caserne », un écran qui ne
+    // propose que la déconnexion.
+    EtatAuth.sansCaserne when surLEditeur && estSuperAdmin != false => null,
     EtatAuth.sansCaserne =>
       cheminInvitationEnAttente ??
           (chemin == AppRoutes.aucuneCaserne ? null : AppRoutes.aucuneCaserne),
+    EtatAuth.connecte when editeurEnAttente => null,
     EtatAuth.connecte =>
       surLaConnexion ||
               chemin == AppRoutes.demarrage ||
               chemin == AppRoutes.aucuneCaserne ||
-              (_sousAdministration(chemin) && !estAdmin)
+              (_sousAdministration(chemin) && !estAdmin) ||
+              (surLEditeur && !estSuperAdmin!)
           ? AppRoutes.accueil
           : null,
   };
@@ -62,3 +90,12 @@ String? redirectionAuth({
 bool _sousAdministration(String chemin) =>
     chemin == AppRoutes.prefixeAdmin ||
     chemin.startsWith('${AppRoutes.prefixeAdmin}/');
+
+/// Vrai pour `/superadmin` et tout ce qui viendrait en dessous.
+///
+/// Ce n'est **pas** un sous-chemin de `/admin` : les deux gardes ne portent pas
+/// sur le même droit, et un administrateur de caserne n'est pas l'éditeur du
+/// produit.
+bool _sousSuperAdmin(String chemin) =>
+    chemin == AppRoutes.superAdmin ||
+    chemin.startsWith('${AppRoutes.superAdmin}/');
