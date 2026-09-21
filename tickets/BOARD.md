@@ -52,7 +52,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 020 | [Réattribution d'un créneau refusé ou modifié](done/020-reattribution.md) | P0 | 019 | https://github.com/slider973/astreinte-manager/pull/22 |
 | 021 | [Écran des propositions pour le membre](done/021-ecran-propositions.md) | P0 | 008 024 | https://github.com/slider973/astreinte-manager/pull/21 |
 | 022 | [Relances automatiques](done/022-relances-auto.md) | P0 | 019 025 | https://github.com/slider973/astreinte-manager/pull/23 |
-| 023 | [Vue du planning de la caserne pour les membres](done/023-planning-caserne.md) | P1 | 019 |  |
+| 023 | [Vue du planning de la caserne pour les membres](done/023-planning-caserne.md) | P1 | 019 | https://github.com/slider973/astreinte-manager/pull/25 |
 | 024 | [Push web via Firebase Cloud Messaging (PWA)](done/024-fcm-setup.md) | P0 | 001 005 | https://github.com/slider973/astreinte-manager/pull/14 |
 | 025 | [Edge Function send-notification](done/025-edge-send-notification.md) | P0 | 002 024 | https://github.com/slider973/astreinte-manager/pull/15 |
 | 026 | [Centre de notifications in-app](done/026-centre-notifications.md) | P1 | 025 | https://github.com/slider973/astreinte-manager/pull/16 |
