@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 044 | [Archiver réellement les plannings des mois passés](in-progress/044-archivage-plannings.md) | P1 | 019 |  |
 
 ## À faire
 
@@ -17,7 +18,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 038 | [Limiter le débit des invitations](backlog/038-limite-debit-invitations.md) | P1 | 006 |  |
 | 041 | [Envoyer les rappels à une heure décente dans chaque fuseau](backlog/041-heure-locale-rappels.md) | P1 | 015 |  |
 | 042 | [Réduire le coût d'une transition de route](backlog/042-transition-de-route.md) | P1 | 016 |  |
-| 044 | [Archiver réellement les plannings des mois passés](backlog/044-archivage-plannings.md) | P1 | 019 |  |
 
 ## Terminés
 
