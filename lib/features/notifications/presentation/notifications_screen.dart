@@ -10,6 +10,7 @@ import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_divider.dart';
+import '../../../core/widgets/barre_actions_basse.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/primary_button.dart';
@@ -144,23 +145,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               libelleAction: AppStrings.actionReessayer,
               onAction: _relire,
             ),
-          Expanded(child: _corps(etat: etat, donnees: donnees)),
+          Expanded(
+            child: _corps(etat: etat, donnees: donnees),
+          ),
 
           // Le bouton n'apparaît que s'il y a quelque chose à marquer. Un
           // bouton désactivé qu'il faudrait expliquer à côté vaut moins qu'un
           // bouton absent (`design/026 § 3`).
           if (nonLues > 0)
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: PrimaryButton(
-                  libelle: AppStrings.centreToutMarquerLu,
-                  icone: Icons.done_all,
-                  variante: PrimaryButtonVariante.secondaire,
-                  chargement: _occupe,
-                  onPressed: () => unawaited(_toutMarquerLu()),
-                ),
+            BarreActionsBasse(
+              child: PrimaryButton(
+                libelle: AppStrings.centreToutMarquerLu,
+                icone: Icons.done_all,
+                variante: PrimaryButtonVariante.secondaire,
+                chargement: _occupe,
+                onPressed: () => unawaited(_toutMarquerLu()),
               ),
             ),
         ],

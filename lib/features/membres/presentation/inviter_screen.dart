@@ -10,6 +10,7 @@ import '../../../core/session/appartenance.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
+import '../../../core/widgets/barre_actions_basse.dart';
 import '../../../core/widgets/champ_texte.dart';
 import '../../../core/widgets/primary_button.dart';
 import 'controllers/inviter_controller.dart';
@@ -87,39 +88,35 @@ class _InviterScreenState extends ConsumerState<InviterScreen> {
               ),
             ),
           ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: EdgeInsets.all(marge),
-              child: rapport == null
-                  ? PrimaryButton(
-                      libelle: AppStrings.inviterEnvoyer,
-                      icone: Icons.send_outlined,
-                      chargement: etat.envoiEnCours,
-                      onPressed: () => unawaited(_envoyer()),
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        if (!rapport.toutEstPasse) ...<Widget>[
-                          PrimaryButton(
-                            libelle: AppStrings.inviterReessayerEchecs,
-                            variante: PrimaryButtonVariante.secondaire,
-                            icone: Icons.refresh,
-                            onPressed: () =>
-                                _reessayerLesEchecs(rapport.adressesEnEchec),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                        ],
+          BarreActionsBasse(
+            child: rapport == null
+                ? PrimaryButton(
+                    libelle: AppStrings.inviterEnvoyer,
+                    icone: Icons.send_outlined,
+                    chargement: etat.envoiEnCours,
+                    onPressed: () => unawaited(_envoyer()),
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      if (!rapport.toutEstPasse) ...<Widget>[
                         PrimaryButton(
-                          libelle: AppStrings.inviterTerminer,
-                          icone: Icons.arrow_back,
-                          onPressed: _terminer,
+                          libelle: AppStrings.inviterReessayerEchecs,
+                          variante: PrimaryButtonVariante.secondaire,
+                          icone: Icons.refresh,
+                          onPressed: () =>
+                              _reessayerLesEchecs(rapport.adressesEnEchec),
                         ),
+                        const SizedBox(height: AppSpacing.sm),
                       ],
-                    ),
-            ),
+                      PrimaryButton(
+                        libelle: AppStrings.inviterTerminer,
+                        icone: Icons.arrow_back,
+                        onPressed: _terminer,
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),

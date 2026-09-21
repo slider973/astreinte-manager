@@ -19,7 +19,8 @@
 //      ou prolongation de la ligne invitations, journal d'audit, le tout atomique ;
 //   2. création du compte auth s'il n'existe pas (les inscriptions libres sont
 //      fermées : un compte ne naît que d'ici, avec la clé de service) ;
-//   3. envoi du courriel et trace dans `notifications`.
+//   3. envoi du courriel, trace sur l'invitation (`email_sent_at` / `email_error`,
+//      migration 0035) et trace dans `notifications`.
 //
 // Le token d'invitation ne sort jamais de cette fonction : il part uniquement dans
 // le lien du courriel, vers l'adresse invitée.
@@ -44,7 +45,8 @@ import {
   type Role,
 } from "../_shared/invitation_people.ts";
 import { type AdminClient, adminClient, caller } from "../_shared/supabase.ts";
-import { sendMail } from "../_shared/mailer.ts";
+import { type MailResult, sendMail } from "../_shared/mailer.ts";
+import { traceEnvoi } from "../_shared/invitation_trace.ts";
 import { invitationUrl, renderInvitationEmail } from "../_shared/invitation_email.ts";
 
 type CreateInvitationResult = {
@@ -141,6 +143,36 @@ async function tracerNotification(
     error: params.error ?? null,
   });
   if (error) console.error("notification invitation non tracée", error.message);
+}
+
+/**
+ * Trace l'envoi **sur l'invitation elle-même** (migration 0035, ticket 048).
+ *
+ * `tracerNotification` ci-dessus écrit la même chose, mais sur une ligne rattachée
+ * au destinataire : l'administrateur n'a aucune raison de pouvoir la lire, et il ne
+ * la lit pas. Sans cette seconde trace, une invitation dont le courriel n'est jamais
+ * parti ressemble, dans « Invitations en attente », à une invitation partie que le
+ * destinataire tarde à accepter.
+ *
+ * Un succès pose la date et efface le motif d'échec précédent. Un échec pose le
+ * motif **sans toucher à la date** : une invitation partie le 12 dont le renvoi du
+ * 21 a échoué garde les deux faits, et ils ne se contredisent pas.
+ *
+ * Best effort, comme la trace de `notifications` : le courriel est déjà parti (ou
+ * déjà perdu) quand on arrive ici, et une trace manquante ne doit pas transformer
+ * une invitation réussie en erreur. Elle retombe alors sur « on ne sait pas », ce
+ * que les deux colonnes nulles veulent précisément dire.
+ */
+async function tracerEnvoiSurInvitation(
+  admin: AdminClient,
+  invitationId: string,
+  envoi: MailResult,
+): Promise<void> {
+  const { error } = await admin
+    .from("invitations")
+    .update(traceEnvoi(envoi))
+    .eq("id", invitationId);
+  if (error) console.error("envoi d'invitation non tracé", error.message);
 }
 
 /**
@@ -252,6 +284,8 @@ async function inviterUneAdresse(
     text: courriel.text,
   });
   if (!envoi.sent) console.error("envoi de l'invitation", envoi.error);
+
+  await tracerEnvoiSurInvitation(admin, invitation.id, envoi);
 
   await tracerNotification(admin, {
     userId: inviteeId,

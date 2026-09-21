@@ -3,6 +3,24 @@ import 'package:flutter/foundation.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/appartenance.dart';
 
+/// Ce que la caserne sait de l'envoi du courriel d'une invitation.
+///
+/// Trois états, lus dans les deux colonnes `email_sent_at` / `email_error`
+/// de la migration `0035` (`docs/SCHEMA.md § 2.4`). Le troisième n'est pas un
+/// quatrième nom pour [nonParti] : une invitation créée avant la migration ne
+/// porte aucune trace, et la déclarer en échec serait inventer un fait.
+enum EnvoiCourriel {
+  /// Un motif d'échec, et aucune date : personne n'a été prévenu.
+  nonParti,
+
+  /// Une date : le courriel est parti, à cette date.
+  parti,
+
+  /// Les deux colonnes vides. **On ne sait pas**, et surtout pas « non
+  /// envoyé ».
+  inconnu,
+}
+
 /// Une invitation en attente (`docs/SCHEMA.md § 2.4`).
 ///
 /// **Le jeton n'est pas là, et c'est voulu** : la colonne `token` est hors du
@@ -18,6 +36,8 @@ class Invitation {
     required this.creeLe,
     this.prenom,
     this.nom,
+    this.courrielEnvoyeLe,
+    this.courrielEnEchec = false,
   });
 
   factory Invitation.depuisJson(Map<String, dynamic> ligne) => Invitation(
@@ -28,10 +48,18 @@ class Invitation {
     creeLe: DateTime.parse(ligne['created_at']! as String).toLocal(),
     prenom: _texte(ligne['first_name']),
     nom: _texte(ligne['last_name']),
+    courrielEnvoyeLe: _date(ligne['email_sent_at']),
+    // Le motif lui-même ne monte pas : « aucun fournisseur de courriel
+    // configuré » se diagnostique dans les journaux, il ne se lit pas dans un
+    // écran d'administration de caserne. Seul le fait qu'il existe compte.
+    courrielEnEchec: _texte(ligne['email_error']) != null,
   );
 
   static String? _texte(Object? valeur) =>
       valeur is String && valeur.trim().isNotEmpty ? valeur.trim() : null;
+
+  static DateTime? _date(Object? valeur) =>
+      valeur is String ? DateTime.tryParse(valeur)?.toLocal() : null;
 
   final String id;
   final String email;
@@ -43,6 +71,26 @@ class Invitation {
   /// invitations créées à la main : le formulaire ne demande que des adresses.
   final String? prenom;
   final String? nom;
+
+  /// L'horodatage du dernier envoi **réussi** du courriel, s'il y en a eu un.
+  final DateTime? courrielEnvoyeLe;
+
+  /// Vrai quand le dernier envoi a échoué. Le motif reste côté base : il est
+  /// technique, et le chef de centre n'en fait rien.
+  final bool courrielEnEchec;
+
+  /// Ce qu'on peut affirmer de l'envoi, et rien de plus.
+  ///
+  /// L'ordre de lecture est celui de `docs/SCHEMA.md § 2.4` : un motif sans
+  /// date dit que personne n'a été prévenu ; une date dit que c'est parti,
+  /// même si un renvoi a échoué depuis ; deux colonnes vides ne disent rien.
+  EnvoiCourriel get envoiCourriel {
+    if (courrielEnEchec && courrielEnvoyeLe == null) {
+      return EnvoiCourriel.nonParti;
+    }
+    if (courrielEnvoyeLe != null) return EnvoiCourriel.parti;
+    return EnvoiCourriel.inconnu;
+  }
 
   /// « Marie Lefèbvre », ou `null` quand l'invitation n'a pas de nom.
   ///
@@ -65,28 +113,43 @@ class Invitation {
       other.expireLe == expireLe &&
       other.creeLe == creeLe &&
       other.prenom == prenom &&
-      other.nom == nom;
+      other.nom == nom &&
+      other.courrielEnvoyeLe == courrielEnvoyeLe &&
+      other.courrielEnEchec == courrielEnEchec;
 
   @override
-  int get hashCode =>
-      Object.hash(id, email, role, expireLe, creeLe, prenom, nom);
+  int get hashCode => Object.hash(
+    id,
+    email,
+    role,
+    expireLe,
+    creeLe,
+    prenom,
+    nom,
+    courrielEnvoyeLe,
+    courrielEnEchec,
+  );
 }
 
 /// Le sort d'une adresse dans un envoi de lot (`supabase/functions/README.md`).
 enum StatutResultatInvitation {
   invitee(AppStrings.resultatInvitee),
-  renvoyee(AppStrings.resultatRenvoyee),
+  relancee(AppStrings.resultatRelancee),
   erreur(AppStrings.resultatEchec);
 
   const StatutResultatInvitation(this.libelle);
 
+  /// Le libellé **du statut**, qui suppose le courriel parti. Ce n'est pas
+  /// toujours celui de la ligne : le serveur rend `resent` dès qu'une
+  /// invitation en attente existe pour l'adresse, courriel sorti ou non.
+  /// C'est [ResultatInvitation.libelle] qu'un écran affiche.
   final String libelle;
 
   /// Un statut inconnu est traité comme une erreur : on n'annonce jamais une
   /// réussite sur une valeur qu'on ne comprend pas.
   static StatutResultatInvitation depuisApi(String? valeur) => switch (valeur) {
     'invited' => invitee,
-    'resent' => renvoyee,
+    'resent' => relancee,
     _ => erreur,
   };
 }
@@ -292,6 +355,27 @@ class ResultatInvitation {
 
   bool get enEchec => statut == StatutResultatInvitation.erreur;
 
+  /// Ce que la ligne affiche sous l'adresse : le statut du serveur, corrigé
+  /// par le sort du courriel.
+  ///
+  /// « Invitée » et « Relancée » affirment toutes deux que quelqu'un a été
+  /// prévenu, et le serveur les rend sans rien savoir du courriel — `resent`
+  /// dès qu'une invitation en attente existe pour l'adresse. Le compte rendu
+  /// affichait donc « Renvoyée » — alors le libellé du statut — juste
+  /// au-dessus de « Le courriel n'est pas parti » (ticket 048, second tour).
+  ///
+  /// Quand le courriel est resté à quai, la ligne ne dit plus que ce qui est
+  /// vrai, et distingue les deux faits que [detail] ne distingue pas : une
+  /// invitation de plus, ou une invitation qui était déjà là. L'icône
+  /// `schedule_send_outlined` du compte rendu fait la même distinction, et
+  /// c'est elle que ce libellé rejoint.
+  String get libelle {
+    if (enEchec || courrielEnvoye) return statut.libelle;
+    return statut == StatutResultatInvitation.relancee
+        ? AppStrings.resultatDejaEnAttente
+        : AppStrings.resultatCreee;
+  }
+
   /// La phrase à afficher sous l'adresse, ou `null` si tout s'est bien passé.
   ///
   /// Un refus de débit affiche le message du serveur : lui seul sait de
@@ -327,10 +411,69 @@ class RapportInvitations {
 
   final List<ResultatInvitation> resultats;
 
-  int get envoyees =>
+  /// Les invitations **nouvelles** : des lignes qui n'existaient pas avant
+  /// cet envoi, courriel parti ou non.
+  ///
+  /// **Ce n'est ni un compte d'envois, ni un compte d'acceptations.** Une
+  /// invitation peut exister en base sans que le moindre courriel soit sorti
+  /// (`email_sent` faux) : compter les deux ensemble a fait afficher « 3
+  /// invitations envoyées » au-dessus de « aucun courriel n'est parti ». Et
+  /// une adresse déjà invitée revient en `resent` : la compter ici annonçait
+  /// « 1 invitation créée » pour une invitation vieille de trois jours
+  /// (ticket 048, puis second tour). Voir [relancees], [retenues] et
+  /// [courrielsPartis].
+  int get creees => resultats
+      .where(
+        (ResultatInvitation r) => r.statut == StatutResultatInvitation.invitee,
+      )
+      .length;
+
+  /// Les adresses qui avaient déjà une invitation en attente.
+  ///
+  /// Le serveur rend `resent` sans rien créer : il réutilise la ligne,
+  /// repousse l'échéance et conserve le jeton. Rien de neuf n'existe, et le
+  /// courriel n'est pas pour autant parti — c'est [courrielsPartis] qui le
+  /// sait.
+  int get relancees => resultats
+      .where(
+        (ResultatInvitation r) => r.statut == StatutResultatInvitation.relancee,
+      )
+      .length;
+
+  /// Tout ce que le serveur a accepté : [creees] et [relancees] ensemble.
+  ///
+  /// L'ensemble auquel [courrielsPartis] et [courrielsNonPartis] se
+  /// comparent. Toujours dit « retenues », jamais « créées » : la moitié de
+  /// ces lignes peut être plus vieille que l'envoi.
+  int get retenues =>
       resultats.where((ResultatInvitation r) => !r.enEchec).length;
 
+  /// Les invitations retenues **dont le courriel est réellement sorti**.
+  ///
+  /// Le seul compte qui autorise le verbe « envoyée », à l'écran comme dans
+  /// le compteur d'avancement.
+  int get courrielsPartis => resultats
+      .where((ResultatInvitation r) => !r.enEchec && r.courrielEnvoye)
+      .length;
+
   int get echecs => resultats.where((ResultatInvitation r) => r.enEchec).length;
+
+  /// Les refus, dans l'ordre où le serveur les a rendus.
+  ///
+  /// Ce sont les seules lignes qu'un compte rendu a besoin de **nommer** :
+  /// une réussite se compte, un refus se lit.
+  List<ResultatInvitation> get refus => resultats
+      .where((ResultatInvitation r) => r.enEchec)
+      .toList(growable: false);
+
+  /// Les invitations retenues dont le courriel n'est jamais parti.
+  ///
+  /// Ce n'est pas un échec d'invitation — la ligne existe, le renvoi la
+  /// relance —, et c'est un **nombre** plutôt qu'une liste : quand aucun
+  /// fournisseur de courriel n'est configuré, tout l'envoi est dans ce cas.
+  int get courrielsNonPartis => resultats
+      .where((ResultatInvitation r) => !r.enEchec && !r.courrielEnvoye)
+      .length;
 
   /// Les adresses en échec, pour proposer de les réessayer seules.
   List<String> get adressesEnEchec => resultats
@@ -353,7 +496,22 @@ enum ErreurInvitation {
   /// [MotifEchecInvitation.debitAtteint] : la phrase vient du serveur.
   debitAtteint(AppStrings.inviteDebitAtteint, messageDuServeur: true),
 
+  /// Une réponse est arrivée, mais elle ne se lit pas : fonction absente,
+  /// passerelle qui refuse, corps vide. **Ce n'est pas le réseau** — quelque
+  /// chose a répondu —, et réessayer dans la minute ne changera rien tant que
+  /// le serveur n'est pas réparé.
+  serveurIndisponible(AppStrings.inviteServeurIndisponible),
+
+  /// Rien n'est revenu, et le navigateur ne se dit pas hors ligne. On ne sait
+  /// donc pas ce qui s'est passé, et surtout pas si la demande est arrivée :
+  /// la phrase ne promet aucune cause.
+  sansReponse(AppStrings.inviteSansReponse),
+
+  /// La seule erreur qui a le droit de parler de connexion : le navigateur
+  /// affirme être hors ligne, et un « non » de sa part est sûr
+  /// (`lib/core/reseau/connectivite.dart`).
   reseau(AppStrings.erreurReseauTexte),
+
   inconnue(AppStrings.erreurTexteGenerique);
 
   const ErreurInvitation(this.message, {this.messageDuServeur = false});

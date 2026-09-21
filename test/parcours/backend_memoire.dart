@@ -546,7 +546,7 @@ class _MembresMemoire implements MembresRepository {
         resultats.add(
           ResultatInvitation(
             email: email,
-            statut: StatutResultatInvitation.renvoyee,
+            statut: StatutResultatInvitation.relancee,
           ),
         );
         continue;

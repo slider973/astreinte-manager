@@ -38,17 +38,24 @@ const MembreCaserne membreJean = MembreCaserne(
 );
 
 /// Une invitation qui court encore.
+///
+/// Sans [courrielEnvoyeLe] ni [courrielEnEchec], elle est dans l'état « on ne
+/// sait pas » : c'est celui des invitations créées avant la migration `0035`.
 Invitation invitationEnAttente({
   String id = 'i-1',
   String email = 'recrue@exemple.fr',
   RoleMembre role = RoleMembre.membre,
   Duration restant = const Duration(days: 10),
+  DateTime? courrielEnvoyeLe,
+  bool courrielEnEchec = false,
 }) => Invitation(
   id: id,
   email: email,
   role: role,
   expireLe: DateTime.now().add(restant),
   creeLe: DateTime.now().subtract(const Duration(days: 4)),
+  courrielEnvoyeLe: courrielEnvoyeLe,
+  courrielEnEchec: courrielEnEchec,
 );
 
 /// Un [MembresRepository] sans réseau, qui compte ce qu'on lui demande.
@@ -111,6 +118,11 @@ class FauxMembresRepository implements MembresRepository {
   /// C'est ainsi qu'un test joue un plafond atteint en cours d'import.
   int? lotQuiEchoue;
 
+  /// Le temps que met un lot à revenir. Sans lui, l'import entier tient dans
+  /// un `pumpAndSettle` et l'avancement n'est jamais observable : c'est ce
+  /// délai qui permet de regarder le compteur entre deux lots.
+  Duration? delaiParLot;
+
   /// Le budget rendu par [budgetInvitations]. `null` fait échouer la lecture,
   /// pour vérifier que l'écran se tait au lieu d'inventer une inquiétude.
   BudgetInvitations? budget = const BudgetInvitations(
@@ -170,6 +182,9 @@ class FauxMembresRepository implements MembresRepository {
     final rang = lotsImportes.length;
     lotsImportes.add(personnes);
     casernesInvitees.add(stationId);
+
+    final delai = delaiParLot;
+    if (delai != null) await Future<void>.delayed(delai);
 
     if (lotQuiEchoue == rang) {
       throw echecInvitation ??

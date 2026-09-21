@@ -78,9 +78,11 @@ Future<void> _essai() async {
   print('--- Lecture');
   print('lisible : ${lecture.lisible}  erreur : ${lecture.erreur}');
   print('lignes  : ${lecture.lignes.length}');
-  print('ligne 1 : ${lecture.lignes.first.prenom} '
-      '${lecture.lignes.first.nom} <${lecture.lignes.first.email}> '
-      '${lecture.lignes.first.role.name}');
+  print(
+    'ligne 1 : ${lecture.lignes.first.prenom} '
+    '${lecture.lignes.first.nom} <${lecture.lignes.first.email}> '
+    '${lecture.lignes.first.role.name}',
+  );
   print('ligne 2 : ${lecture.lignes[1].prenom} ${lecture.lignes[1].nom}');
 
   // Les deux lectures que fait l'écran avant de juger.
@@ -118,13 +120,19 @@ Future<void> _essai() async {
   );
 
   print('\n--- Aperçu');
-  print('à inviter : ${apercu.nombreAInviter}  écartées : ${apercu.nombreEcartees}');
+  print(
+    'à inviter : ${apercu.nombreAInviter}  écartées : ${apercu.nombreEcartees}',
+  );
   print('par motif : ${apercu.ecarteesParMotif}');
-  print('budget    : ${budget.restantes} places sur ${budget.plafond} '
-      '(${budget.envoisRecents.length} envois dans l\'heure)');
+  print(
+    'budget    : ${budget.restantes} places sur ${budget.plafond} '
+    '(${budget.envoisRecents.length} envois dans l\'heure)',
+  );
   print('partira maintenant : ${apercu.partiraMaintenant(budget)}');
-  print('le reste à partir de : '
-      '${budget.ouvertureApresEpuisement(DateTime.now())}');
+  print(
+    'le reste à partir de : '
+    '${budget.ouvertureApresEpuisement(DateTime.now())}',
+  );
   for (final ligne in apercu.lignes.where((l) => !l.partira).take(6)) {
     print('  ligne ${ligne.ligne.numero} — ${ligne.titre} : ${ligne.detail}');
   }
@@ -151,16 +159,22 @@ Future<void> _essai() async {
       print('  refus global : ${erreur['code']}');
       print('  message      : ${erreur['message']}');
       print('  retry_at     : ${erreur['retry_at']}');
-      print('  ARRÊT : ${apercu.nombreAInviter - envoyees} personnes restent à inviter.');
+      print(
+        '  ARRÊT : ${apercu.nombreAInviter - envoyees} personnes restent à inviter.',
+      );
       break;
     }
 
     final rapport = RapportInvitations.depuisJson(corps);
     envoyees += rapport.resultats.length;
-    print('  envoyées ${rapport.envoyees}, échecs ${rapport.echecs} '
-        '(cumul $envoyees/${apercu.nombreAInviter})');
-    final coupe = rapport.resultats
-        .where((r) => r.motif == MotifEchecInvitation.debitAtteint);
+    print(
+      '  créées ${rapport.creees}, déjà en attente ${rapport.relancees}, '
+      'courriels partis ${rapport.courrielsPartis}, échecs ${rapport.echecs} '
+      '(cumul $envoyees/${apercu.nombreAInviter})',
+    );
+    final coupe = rapport.resultats.where(
+      (r) => r.motif == MotifEchecInvitation.debitAtteint,
+    );
     if (coupe.isNotEmpty) {
       print('  plafond atteint dans le lot : ${coupe.first.detail}');
       print('  reprise possible à : ${coupe.first.plafond?.reessayerLe}');

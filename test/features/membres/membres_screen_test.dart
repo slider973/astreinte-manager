@@ -1,4 +1,5 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
+import 'package:astreinte_sp/core/l10n/format_date.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
 import 'package:astreinte_sp/features/membres/domain/membre_caserne.dart';
@@ -151,6 +152,43 @@ void main() {
       expect(find.text(AppStrings.membresInviter), findsNothing);
     });
 
+    // Ticket 048 : une invitation dont le courriel n'est jamais parti
+    // ressemblait à une invitation partie que le destinataire tarde à
+    // accepter. Les trois états de `docs/SCHEMA.md § 2.4` se lisent
+    // maintenant sur la ligne, et « on ne sait pas » n'est pas « non
+    // envoyé ».
+    testWidgets('les trois états de l\'envoi du courriel se distinguent', (
+      tester,
+    ) async {
+      final envoyeLe = DateTime.now().subtract(const Duration(days: 2));
+      final depot = FauxMembresRepository(
+        membresActifs: const <MembreCaserne>[membreJean],
+        invitations: <Invitation>[
+          invitationEnAttente(
+            email: 'muette@exemple.fr',
+            courrielEnEchec: true,
+          ),
+          invitationEnAttente(
+            id: 'i-2',
+            email: 'partie@exemple.fr',
+            courrielEnvoyeLe: envoyeLe,
+          ),
+          invitationEnAttente(id: 'i-3', email: 'ancienne@exemple.fr'),
+        ],
+      );
+      await _ouvrirMembres(tester, depot: depot);
+      await _versInvitations(tester);
+
+      expect(find.text(AppStrings.invitationCourrielNonParti), findsOneWidget);
+      expect(
+        find.text(
+          AppStrings.invitationCourrielEnvoyeLe(formaterDateLongue(envoyeLe)),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(AppStrings.invitationCourrielInconnu), findsOneWidget);
+    });
+
     testWidgets('renvoyer une invitation la relance et le dit', (tester) async {
       final depot = FauxMembresRepository(
         membresActifs: const <MembreCaserne>[membreJean],
@@ -182,7 +220,7 @@ void main() {
           resultats: <ResultatInvitation>[
             ResultatInvitation(
               email: 'recrue@exemple.fr',
-              statut: StatutResultatInvitation.renvoyee,
+              statut: StatutResultatInvitation.relancee,
               courrielEnvoye: false,
             ),
           ],

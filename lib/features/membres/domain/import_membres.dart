@@ -56,6 +56,22 @@ enum VerdictApercu {
   bool get estUneFaute =>
       this == VerdictApercu.adresseInvalide ||
       this == VerdictApercu.adresseAbsente;
+
+  /// Le mot qui nomme l'écart dans le résumé du compte rendu — « déjà
+  /// membre », « en double ».
+  ///
+  /// `null` pour les deux verdicts qui partent : une ligne à inviter n'a pas
+  /// de motif d'écart, et lui en prêter un au hasard ferait dire au compte
+  /// rendu le contraire de ce qui s'est passé. C'est arrivé : la traduction
+  /// vivait dans l'écran et rendait « déjà membre » pour une ligne à inviter.
+  String? get motifEcartee => switch (this) {
+    VerdictApercu.aInviter || VerdictApercu.aInviterSansNom => null,
+    VerdictApercu.dejaMembre => AppStrings.importMotifDejaMembre,
+    VerdictApercu.dejaInvitee => AppStrings.importMotifDejaInvitee,
+    VerdictApercu.doublon => AppStrings.importMotifDoublon,
+    VerdictApercu.adresseInvalide => AppStrings.importMotifAdresseInvalide,
+    VerdictApercu.adresseAbsente => AppStrings.importMotifAdresseAbsente,
+  };
 }
 
 /// Une ligne du fichier, jugée.
@@ -178,6 +194,17 @@ class ApercuImport {
   /// Les lignes qui partiront, dans l'ordre du fichier.
   List<LigneApercu> get aInviter =>
       lignes.where((LigneApercu l) => l.partira).toList(growable: false);
+
+  /// Les lignes qui ne partiront pas, dans l'ordre du fichier.
+  ///
+  /// **L'ordre de lecture de l'aperçu suit celle-ci d'abord**, pas l'ordre du
+  /// tableur : trois fautes en fin d'un fichier de soixante-trois lignes sont
+  /// introuvables autrement, et l'aperçu n'existe que pour qu'aucune ne passe
+  /// inaperçue. À l'intérieur, l'ordre du fichier est conservé, et chaque
+  /// ligne garde son numéro — c'est le repère qui permet de la retrouver dans
+  /// le tableur.
+  List<LigneApercu> get ecartees =>
+      lignes.where((LigneApercu l) => !l.partira).toList(growable: false);
 
   int get nombreAInviter => lignes.where((LigneApercu l) => l.partira).length;
 

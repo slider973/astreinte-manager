@@ -190,6 +190,8 @@ create table invitations (
   invited_by    uuid not null references profiles(id),
   expires_at    timestamptz not null default now() + interval '14 days',
   accepted_at   timestamptz,
+  email_sent_at timestamptz,                       -- migration 0035
+  email_error   text,                              -- migration 0035
   created_at    timestamptz not null default now()
 );
 create unique index invitations_pending_uniq
@@ -212,6 +214,45 @@ quand il importe sa liste depuis un fichier. Deux usages, et un seul interdit.
 Les deux colonnes sont dans le `grant` de select d'`authenticated` ; `token` reste dehors.
 Un renvoi sans nom ne les efface pas : `create_invitation` fait `coalesce(nouveau, ancien)`,
 sinon le bouton « Renvoyer » de l'écran « Membres » ferait disparaître ce qu'un import a posé.
+
+`email_sent_at` et `email_error` *(migration `0035`, ticket 048)* : est-ce que quelqu'un a
+été prévenu, et quand. Sans elles, une invitation dont le courriel n'est jamais parti — aucun
+fournisseur configuré, domaine d'envoi refusé — affiche « En attente » et sa date
+d'expiration, exactement comme une invitation partie que le destinataire tarde à accepter, et
+l'administrateur attend une réponse que personne ne peut lui donner. La trace existe déjà dans
+`notifications` (`sent_at`, `error`), mais cette ligne est rattachée **au destinataire** et un
+administrateur n'a aucune raison de pouvoir la lire : elle vit donc aussi sur l'invitation,
+qu'il lit déjà. Les deux colonnes se lisent ensemble :
+
+| `email_sent_at` | `email_error` | ce que la ligne dit |
+|---|---|---|
+| nul | nul | **on ne sait pas** — rien n'a été tracé |
+| nul | posé | personne n'a été prévenu, et voici pourquoi |
+| posé | nul | le courriel est parti, à cette date |
+| posé | posé | un courriel est parti, le dernier renvoi non |
+
+« On ne sait pas » et « pas envoyé » **ne sont pas la même chose**, et afficher le second à la
+place du premier serait le même mensonge que celui qu'on corrige. D'où la première ligne, et
+d'où le rattrapage joué par la migration : les invitations antérieures ne sont pas déclarées en
+échec d'office, elles reçoivent ce que `notifications` sait déjà d'elles — les lignes
+`invitation` / `email` de la même personne dans la même caserne, postérieures à la création de
+l'invitation — et rien du tout quand elle ne sait rien. Les deux colonnes s'y calculent
+**séparément**, comme l'Edge Function les écrit : la date est celle du dernier envoi **réussi**
+(`max(sent_at)`), le motif est celui de la ligne **la plus récente**, donc nul si cette dernière
+est un succès. Les prendre toutes deux sur la même dernière ligne ferait afficher « courriel non
+parti » à une invitation partie dont seul le renvoi a échoué, soit la quatrième ligne du tableau
+transformée en deuxième.
+
+Écrites par l'Edge Function `invite-member`, en création comme en renvoi, à partir de ce que
+rend `sendMail` : un succès pose la date **et efface le motif précédent**, un échec pose le
+motif **sans toucher à la date**. `create_invitation` n'y touche pas — l'envoi a lieu après sa
+transaction. Elles sont dans le `grant` de select d'`authenticated` (`token` reste dehors) et
+suivent `invitations_select_admin` : administrateur de la caserne, et personne d'autre.
+
+Ce qu'elles ne portent pas : ni horodatage de l'échec — la ligne dit « le courriel n'est pas
+parti », pas « il n'est pas parti à 14 h 03 », et aucun geste ne dépend de cette heure-là —, ni
+fournisseur, ni compteur de tentatives : `notifications` et les journaux de la fonction les
+portent déjà, pour qui diagnostique.
 
 ### 2.5 `periods` — un mois de saisie par caserne
 
@@ -1096,7 +1137,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `stations` | membre de la caserne | admin de la caserne (update), pas d'insert, pas de delete — *(migration `0025`, ticket 031 : le super-admin a perdu ses trois branches ; il lisait toute la table, `settings` compris, et pouvait renommer ou reconfigurer une caserne dont il n'est pas membre, sans trace. Il passe désormais par les fonctions du § 3, qui journalisent)* |
 | `profiles` | soi-même ; les profils des membres **actifs** de ses casernes ; et, pour un **admin**, ceux de tous les membres de sa caserne quel que soit leur statut (migration `0010` : sans cette branche, un membre désactivé disparaissait de l'écran « Membres » et ne pouvait plus être réactivé) | soi-même |
 | `memberships` | membre de la caserne, et toujours ses propres lignes (un compte `invited` ou `disabled` doit pouvoir constater son état) | admin de la caserne, sauf son propre rôle. Aucune politique d'update pour un membre sur sa propre ligne : elle ouvrirait une escalade de privilèges |
-| `invitations` | admin de la caserne, **sauf `token`** (retiré du grant de select : c'est un porteur de droits, réservé au service role). Ne jamais faire `select *` sur cette table — et une colonne ajoutée n'hérite pas du grant, elle se donne explicitement (`0034`) | admin de la caserne |
+| `invitations` | admin de la caserne, **sauf `token`** (retiré du grant de select : c'est un porteur de droits, réservé au service role). Ne jamais faire `select *` sur cette table — et une colonne ajoutée n'hérite pas du grant, elle se donne explicitement (`0034`, puis `0035` pour la trace d'envoi) | admin de la caserne |
 | `periods` | membre | admin |
 | `availabilities` | membre : les siennes ; admin : toutes celles de la caserne | membre : les siennes si période `open` et caserne writable ; admin : toutes |
 | `availability_preferences` | idem availabilities | idem |
@@ -1528,7 +1569,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `publish-schedule` | app admin | Appelle `publish_schedule` (SQL, atomique), puis `send-notification` avec les destinataires **déjà groupés par membre** : sept créneaux font une notification, pas sept (ticket 019, contrat dans `supabase/functions/README.md`) |
 | `reassign-shift` | app admin | Appelle `reassign_shift` (SQL, atomique) : l'ancienne attribution est marquée `replaced` ou reste `declined`, la nouvelle est créée `proposed` et horodatée, `replaced_by` relie les deux, et **une seule** notification part — au nouveau membre, plus l'ancien si sa garde était acceptée (ticket 020, contrat dans `supabase/functions/README.md`). L'annulation, elle, est une RPC (`cancel_assignment`) et non une Edge Function |
 | `auto-propose` | app admin | **Applique** un remplissage automatique du brouillon, il ne le compose pas : le plan — une liste ordonnée de couples (créneau, pompier) — est calculé dans l'application avec le **tri des candidats du ticket 017**, celui que l'administrateur lit dans le panneau d'un créneau, pour que le récapitulatif qu'il valide soit exactement ce qui part. `apply_auto_proposal` (SQL, atomique) revérifie chaque ligne — membre actif, disponibilité déclarée, plafonds d'astreintes et de weekends, effectif requis, doublons — et **écarte** celles qui ne passent pas avec leur motif au lieu de tout refuser. Aucune notification : un brouillon ne sort pas du bureau (ticket 018, contrat dans `supabase/functions/README.md`) |
-| `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`). **Plafonnée en débit** (ticket 038) : `create_invitation` compte les envois par caserne et par heure et refuse avec le code `rate_limited` ; la fonction compose la phrase française qui dit **quand réessayer**, court-circuite les adresses restantes du lot — le budget est épuisé pour toutes — et rend `429` quand aucune adresse n'est passée |
+| `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`). **Plafonnée en débit** (ticket 038) : `create_invitation` compte les envois par caserne et par heure et refuse avec le code `rate_limited` ; la fonction compose la phrase française qui dit **quand réessayer**, court-circuite les adresses restantes du lot — le budget est épuisé pour toutes — et rend `429` quand aucune adresse n'est passée. **Trace l'envoi sur l'invitation** (ticket 048) : `email_sent_at` / `email_error` (§ 2.4), écrites au retour de `sendMail`, en création comme en renvoi |
 | `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006) |
 | `stripe-webhook` | Stripe | **Vérifie la signature de l'événement** (HMAC-SHA256 du corps brut, lu sous un plafond d'un mégaoctet, fenêtre de cinq minutes), puis applique les cinq événements de l'abonnement par `subscription_sync`. Un événement non signé, mal signé ou hors de la fenêtre est refusé en 4xx ; un événement **déjà traité** est reconnu par `stripe_events` et n'est pas réappliqué ; sans secret configuré, **tout** est refusé en 503 (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `create-checkout` | app admin | Trois actions pour l'écran « Abonnement » : `state` (statut, tarifs, configuration — **répond même sans compte Stripe**), `checkout` (crée le client si besoin, ouvre la session, rend l'adresse) et `portal` (portail de gestion). Rôle d'administrateur revérifié en base (ticket 029, contrat dans `supabase/functions/README.md`) |
@@ -1735,6 +1776,11 @@ Ordre proposé :
     leur `grant` de select, `create_invitation` recréée à six paramètres — la signature change,
     donc `drop` puis `create` : deux paramètres à valeur par défaut rendraient l'appel à quatre
     arguments ambigu —, `accept_invitation` amorce le profil vide)
+35. `0035_trace_envoi_invitation.sql` (ticket 048 : colonnes `invitations.email_sent_at` /
+    `email_error` et leur `grant` de select, rattrapage des invitations en attente
+    antérieures à partir de `notifications`. Aucune fonction SQL modifiée : la trace naît de
+    `sendMail`, donc après la transaction de `create_invitation`, et c'est `invite-member`
+    qui l'écrit)
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
@@ -1773,7 +1819,8 @@ et `0022` par `supabase/tests/notifications_test.sql`, les rappels de saisie de 
 `supabase/tests/proposition_automatique_test.sql` et le plafond de débit des invitations de
 `0032` par `supabase/tests/limite_debit_invitations_test.sql`, l'heure locale d'envoi de `0033`
 par `supabase/tests/heure_locale_notifications_test.sql` et le nom porté par l'invitation de `0034`
-par `supabase/tests/import_membres_test.sql`, joués par le même script. La logique pure
+par `supabase/tests/import_membres_test.sql`, la trace d'envoi de `0035` par
+`supabase/tests/trace_envoi_invitation_test.sql`, joués par le même script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge

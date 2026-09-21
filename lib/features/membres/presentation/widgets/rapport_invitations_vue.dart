@@ -10,6 +10,29 @@ import '../../domain/invitation.dart';
 /// Un envoi de lot n'a pas de résultat unique : il en a autant que d'adresses.
 /// L'écran ne dit donc jamais « envoyé » ni « échec » globalement — il nomme
 /// chaque adresse, son statut et, s'il y a lieu, le motif en français.
+///
+/// **Ceci est le compte rendu du formulaire d'invitation, et de lui seul.**
+/// Vingt adresses au plus, tapées à la main, et cette énumération est la
+/// seule trace de ce qui vient d'être demandé : elle vaut le défilement.
+/// L'import a le sien ([RapportImportVue]) : soixante lignes que l'aperçu a
+/// déjà montrées une par une ne se réénumèrent pas, et les gens y ont des
+/// noms.
+///
+/// **Le résumé compte, la ligne dit.** [AppStrings.invitationsResume] —
+/// partagé avec l'import, parce que la règle de vérité est la même — n'emploie
+/// « envoyées » que si tous les courriels sont réellement sortis, et ne parle
+/// que de ce qui existe sinon. Rien ne s'ajoute sous lui pour les courriels
+/// restés à quai : chaque adresse concernée le porte déjà sur sa ligne, et
+/// l'import, qui n'énumère pas, est le seul à avoir besoin d'une phrase de
+/// plus (ticket 048).
+///
+/// **Et la ligne ne dit pas autre chose que le résumé.** Le statut affiché
+/// est [ResultatInvitation.libelle] et non celui du statut brut : le serveur
+/// rend `resent` dès qu'une invitation en attente existe pour l'adresse, sans
+/// rien savoir du courriel, et l'écran affichait « Renvoyée » juste au-dessus
+/// de « Le courriel n'est pas parti » (ticket 048, second tour). Le même
+/// libellé descend dans la sémantique de la ligne : un lecteur d'écran n'a
+/// pas droit à une autre version des faits.
 class RapportInvitationsVue extends StatelessWidget {
   const RapportInvitationsVue({required this.rapport, super.key});
 
@@ -25,8 +48,10 @@ class RapportInvitationsVue extends StatelessWidget {
         Semantics(
           liveRegion: true,
           child: Text(
-            AppStrings.inviterResume(
-              envoyees: rapport.envoyees,
+            AppStrings.invitationsResume(
+              creees: rapport.creees,
+              relancees: rapport.relancees,
+              parties: rapport.courrielsPartis,
               echecs: rapport.echecs,
             ),
             style: theme.textTheme.bodyLarge,
@@ -60,13 +85,14 @@ class _LigneResultat extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final detail = resultat.detail;
+    final libelle = resultat.libelle;
 
     final (IconData icone, Color encre) = switch (resultat.statut) {
       StatutResultatInvitation.erreur => (
         Icons.error_outline,
         theme.colorScheme.error,
       ),
-      StatutResultatInvitation.renvoyee => (
+      StatutResultatInvitation.relancee => (
         Icons.mark_email_read_outlined,
         theme.colorScheme.onSurfaceVariant,
       ),
@@ -77,14 +103,16 @@ class _LigneResultat extends StatelessWidget {
     };
 
     // Le courriel qui n'est pas parti n'est pas un échec d'invitation : la
-    // ligne existe, le renvoi la relance. L'icône le dit sans crier.
+    // ligne existe, le renvoi la relance. L'icône le dit sans crier — et le
+    // libellé dit la même chose qu'elle, sans quoi l'image et le texte
+    // racontent deux histoires.
     final iconeEffective = !resultat.enEchec && !resultat.courrielEnvoye
         ? Icons.schedule_send_outlined
         : icone;
 
     return Semantics(
       label: resultat.email,
-      value: <String>[resultat.statut.libelle, ?detail].join('. '),
+      value: <String>[libelle, ?detail].join('. '),
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
@@ -100,7 +128,7 @@ class _LigneResultat extends StatelessWidget {
                   Text(resultat.email, style: theme.textTheme.bodyLarge),
                   const SizedBox(height: AppSpacing.xxs),
                   Text(
-                    resultat.statut.libelle,
+                    libelle,
                     style: theme.textTheme.labelMedium?.copyWith(color: encre),
                   ),
                   if (detail != null) ...<Widget>[

@@ -1,8 +1,10 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
 import 'package:astreinte_sp/features/membres/domain/membre_caserne.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Les corps de réponse viennent de `supabase/functions/README.md`.
 void main() {
@@ -33,12 +35,95 @@ void main() {
         ],
       });
 
-      expect(rapport.envoyees, 2);
+      // Une seule ligne est neuve : l'autre adresse avait déjà son
+      // invitation. Les compter ensemble annonçait « 2 invitations créées »
+      // pour une création (ticket 048, second tour).
+      expect(rapport.creees, 1);
+      expect(rapport.relancees, 1);
+      expect(rapport.retenues, 2);
+      expect(rapport.courrielsPartis, 2);
       expect(rapport.echecs, 1);
       expect(rapport.toutEstPasse, isFalse);
       expect(rapport.adressesEnEchec, <String>['deja@exemple.fr']);
-      expect(rapport.resultats[1].statut, StatutResultatInvitation.renvoyee);
+      expect(rapport.resultats[1].statut, StatutResultatInvitation.relancee);
+      // Les deux courriels sont partis : les libellés peuvent l'affirmer.
+      expect(rapport.resultats[0].libelle, AppStrings.resultatInvitee);
+      expect(rapport.resultats[1].libelle, AppStrings.resultatRelancee);
       expect(rapport.resultats[2].detail, AppStrings.inviteDejaMembre);
+    });
+
+    // Le cas de production du 21 septembre 2026 : réinviter une adresse déjà
+    // invitée rend `resent`, que le courriel soit sorti ou non.
+    test('une relance dont le courriel n\'est pas parti n\'affirme ni envoi '
+        'ni création', () {
+      final rapport = RapportInvitations.depuisJson(const <String, dynamic>{
+        'results': <dynamic>[
+          {
+            'email': 'ancien@exemple.fr',
+            'status': 'resent',
+            'email_sent': false,
+          },
+        ],
+      });
+
+      final resultat = rapport.resultats.single;
+      expect(resultat.statut, StatutResultatInvitation.relancee);
+      // Le libellé du statut promettrait l'envoi ; celui de la ligne, non.
+      expect(resultat.statut.libelle, AppStrings.resultatRelancee);
+      expect(resultat.libelle, AppStrings.resultatDejaEnAttente);
+      expect(resultat.detail, AppStrings.resultatCourrielNonParti);
+
+      // Rien n'a été créé : le résumé ne peut pas dire le contraire.
+      expect(rapport.creees, 0);
+      expect(rapport.relancees, 1);
+      expect(rapport.retenues, 1);
+      expect(rapport.courrielsNonPartis, 1);
+      expect(
+        AppStrings.invitationsResume(
+          creees: rapport.creees,
+          relancees: rapport.relancees,
+          parties: rapport.courrielsPartis,
+          echecs: rapport.echecs,
+        ),
+        '1 invitation déjà en attente, 0 échec.',
+      );
+    });
+
+    test('le résumé ne dit que ce que les comptes soutiennent', () {
+      // Le défaut du second tour : « 0 invitation envoyée, 5 échecs. » —
+      // la branche « envoyée » gagnait dès que les deux comptes valaient zéro.
+      expect(
+        AppStrings.invitationsResume(
+          creees: 0,
+          relancees: 0,
+          parties: 0,
+          echecs: 5,
+        ),
+        '0 invitation créée, 5 échecs.',
+      );
+
+      // Tous les courriels sortis : le verbe est permis, et la distinction
+      // création / relance ne sert plus à personne — chacun a reçu le sien.
+      expect(
+        AppStrings.invitationsResume(
+          creees: 1,
+          relancees: 1,
+          parties: 2,
+          echecs: 1,
+        ),
+        '2 invitations envoyées, 1 échec.',
+      );
+
+      // Un courriel manque : deux faits, deux morceaux, et pas un mot de plus.
+      expect(
+        AppStrings.invitationsResume(
+          creees: 1,
+          relancees: 1,
+          parties: 0,
+          echecs: 0,
+        ),
+        '1 invitation créée, 1 déjà en attente, 0 échec.',
+      );
     });
 
     test('un courriel non parti n\'est pas un échec, mais se dit', () {
@@ -58,6 +143,14 @@ void main() {
         rapport.resultats.single.detail,
         AppStrings.resultatCourrielNonParti,
       );
+      // L'invitation existe, et personne n'a été prévenu : les deux comptes
+      // divergent, et c'est cette divergence qui interdit le mot « envoyée »
+      // au compte rendu d'import (ticket 048).
+      expect(rapport.creees, 1);
+      expect(rapport.courrielsPartis, 0);
+      expect(rapport.courrielsNonPartis, 1);
+      // Et la ligne ne se dit pas « Invitée » : personne ne l'est.
+      expect(rapport.resultats.single.libelle, AppStrings.resultatCreee);
     });
 
     test('un statut inconnu est traité comme une erreur', () {
@@ -306,6 +399,49 @@ void main() {
         invitation.expiree(DateTime.parse('2026-10-01T00:00:00Z')),
         isFalse,
       );
+      // Sans les colonnes de la migration 0035 : on ne sait pas, et surtout
+      // pas « non envoyé ».
+      expect(invitation.envoiCourriel, EnvoiCourriel.inconnu);
+    });
+
+    // Ticket 048 : `email_sent_at` et `email_error` se lisent ensemble
+    // (`docs/SCHEMA.md § 2.4`).
+    test('la trace de l\'envoi dit trois choses, jamais deux', () {
+      Invitation lire(Object? envoye, Object? motif) =>
+          Invitation.depuisJson(<String, dynamic>{
+            'id': 'i-1',
+            'email': 'recrue@exemple.fr',
+            'role': 'member',
+            'expires_at': '2026-10-04T13:27:19Z',
+            'created_at': '2026-09-20T13:27:19Z',
+            'email_sent_at': envoye,
+            'email_error': motif,
+          });
+
+      // Un motif sans date : personne n'a été prévenu.
+      expect(
+        lire(null, 'no email provider configured').envoiCourriel,
+        EnvoiCourriel.nonParti,
+      );
+
+      // Une date : c'est parti, à cette date.
+      final partie = lire('2026-09-20T13:27:20Z', null);
+      expect(partie.envoiCourriel, EnvoiCourriel.parti);
+      expect(
+        partie.courrielEnvoyeLe,
+        DateTime.parse('2026-09-20T13:27:20Z').toLocal(),
+      );
+
+      // Les deux : un courriel est parti, le dernier renvoi non. La date fait
+      // foi — quelqu'un a bien été prévenu.
+      expect(
+        lire('2026-09-20T13:27:20Z', 'smtp refused').envoiCourriel,
+        EnvoiCourriel.parti,
+      );
+
+      // Les deux nuls, et une chaîne vide qui ne vaut pas un motif.
+      expect(lire(null, null).envoiCourriel, EnvoiCourriel.inconnu);
+      expect(lire(null, '  ').envoiCourriel, EnvoiCourriel.inconnu);
     });
   });
 
@@ -337,6 +473,84 @@ void main() {
         },
       });
       expect(sansNom.libelle, 'nouveau@caserne-a.test');
+    });
+  });
+
+  // Le défaut du 21 septembre 2026 : les Edge Functions n'étaient pas
+  // déployées, et l'écran envoyait vérifier une connexion qui marchait.
+  group('Ce que le serveur répond, et ce que l\'écran en dit', () {
+    test('une réponse illisible n\'est jamais une panne de réseau', () {
+      // Fonction absente : la passerelle répond 404, sans le corps `error`
+      // que composent nos fonctions.
+      final absente = traduireEchecFonction(
+        const FunctionsHttpException(
+          status: 404,
+          details: <String, dynamic>{'message': 'Function not found'},
+        ),
+        enLigne: true,
+      );
+
+      expect(absente.erreur, ErreurInvitation.serveurIndisponible);
+      expect(absente.message, isNot(AppStrings.erreurReseauTexte));
+      expect(absente.message, isNot(contains('connexion, puis réessaie')));
+
+      // Un corps qui n'est même pas une table : même verdict.
+      expect(
+        traduireEchecFonction(
+          const FunctionsHttpException(status: 403, details: 'Forbidden'),
+          enLigne: true,
+        ).erreur,
+        ErreurInvitation.serveurIndisponible,
+      );
+
+      // Un incident interne, lui, peut passer tout seul : on garde « réessaie
+      // dans un instant », qui ne promet toujours pas de cause.
+      expect(
+        traduireEchecFonction(
+          const FunctionsHttpException(status: 502, details: 'Bad gateway'),
+          enLigne: true,
+        ).erreur,
+        ErreurInvitation.inconnue,
+      );
+    });
+
+    test('le corps typé des fonctions garde la main', () {
+      final refus = traduireEchecFonction(
+        const FunctionsHttpException(
+          status: 403,
+          details: <String, dynamic>{
+            'error': <String, dynamic>{
+              'code': 'station_suspended',
+              'message': 'Station suspended',
+            },
+          },
+        ),
+        enLigne: true,
+      );
+
+      expect(refus.erreur, ErreurInvitation.caserneSuspendue);
+    });
+
+    test('sans réponse, on ne parle de connexion que si le navigateur l\'a '
+        'affirmé', () {
+      // Hors ligne : le « non » du navigateur est sûr, la phrase peut nommer
+      // la connexion.
+      expect(
+        traduireEchecFonction(
+          const FunctionsFetchException(details: 'Failed to fetch'),
+          enLigne: false,
+        ).erreur,
+        ErreurInvitation.reseau,
+      );
+
+      // En ligne et pourtant rien : c'est ce que voit le navigateur quand il
+      // bloque la réponse d'une fonction absente. On ne sait pas, on le dit.
+      final muet = traduireEchecFonction(
+        const FunctionsFetchException(details: 'Failed to fetch'),
+        enLigne: true,
+      );
+      expect(muet.erreur, ErreurInvitation.sansReponse);
+      expect(muet.message, isNot(AppStrings.erreurReseauTexte));
     });
   });
 }

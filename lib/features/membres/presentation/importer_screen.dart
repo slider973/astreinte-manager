@@ -7,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/session/email.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_divider.dart';
+import '../../../core/widgets/barre_actions_basse.dart';
 import '../../../core/widgets/entete_section.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../domain/import_membres.dart';
@@ -18,7 +20,7 @@ import '../domain/invitation.dart';
 import 'controllers/importer_controller.dart';
 import 'widgets/bloc_format_fichier.dart';
 import 'widgets/ligne_apercu_import.dart';
-import 'widgets/rapport_invitations_vue.dart';
+import 'widgets/rapport_import_vue.dart';
 
 /// Importer des membres depuis un fichier tableur.
 ///
@@ -46,13 +48,7 @@ class ImporterScreen extends ConsumerWidget {
               EtapeImport.rapport => _Rapport(etat: etat, marge: marge),
             },
           ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: EdgeInsets.all(marge),
-              child: _Actions(etat: etat),
-            ),
-          ),
+          BarreActionsBasse(child: _Actions(etat: etat)),
         ],
       ),
     );
@@ -154,89 +150,131 @@ class _Apercu extends StatelessWidget {
     final theme = Theme.of(context);
     final apercu = etat.apercu!;
     final budget = apercu.budget;
+    final ecartees = apercu.ecartees;
 
+    // **Les écartées d'abord.** L'ordre de lecture suit la priorité de qui
+    // regarde, pas l'ordre du tableur : sur soixante-trois lignes dont trois
+    // fautives en fin de fichier, rien ne menait aux trois. Ce qui ne partira
+    // pas est la seule chose à vérifier ; le reste, le compte du résumé le
+    // dit déjà. L'ordre du fichier est conservé dans chaque section.
+    //
     // Liste virtualisée : cinq cents lignes réglées ne se construisent pas
     // d'un bloc, et c'est le seul endroit de l'écran où la performance décide
-    // d'une structure de widget.
+    // d'une structure de widget. Deux sections, donc deux `SliverList` —
+    // jamais une `Column` de cinq cents enfants.
     return CustomScrollView(
       slivers: <Widget>[
         SliverPadding(
           padding: EdgeInsets.fromLTRB(marge, 0, marge, 0),
           sliver: SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppSpacing.colonneMax,
+            child: _Colonne(
+              enfants: <Widget>[
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  apercu.nomFichier,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      apercu.nomFichier,
+                const SizedBox(height: AppSpacing.xs),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    AppStrings.importApercuResume(
+                      lues: apercu.lignes.length,
+                      aInviter: apercu.nombreAInviter,
+                      ecartees: apercu.nombreEcartees,
+                    ),
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ),
+                if (budget != null && apercu.envoyable) ...<Widget>[
+                  const SizedBox(height: AppSpacing.lg),
+                  _BanniereBudget(apercu: apercu, budget: budget),
+                ],
+                if (etat.envoiEnCours) ...<Widget>[
+                  const SizedBox(height: AppSpacing.lg),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      AppStrings.importAvancement(
+                        faites: etat.parties,
+                        total: apercu.nombreAInviter,
+                      ),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        AppStrings.importApercuResume(
-                          lues: apercu.lignes.length,
-                          aInviter: apercu.nombreAInviter,
-                          ecartees: apercu.nombreEcartees,
-                        ),
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                    ),
-                    if (budget != null && apercu.envoyable) ...<Widget>[
-                      const SizedBox(height: AppSpacing.lg),
-                      _BanniereBudget(apercu: apercu, budget: budget),
-                    ],
-                    if (etat.envoiEnCours) ...<Widget>[
-                      const SizedBox(height: AppSpacing.lg),
-                      Semantics(
-                        liveRegion: true,
-                        child: Text(
-                          AppStrings.importAvancement(
-                            faites: etat.envoyees,
-                            total: apercu.nombreAInviter,
-                          ),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const EnteteSection(titre: AppStrings.importApercuTitre),
-                  ],
-                ),
-              ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(marge, 0, marge, AppSpacing.xl),
-          sliver: SliverList.builder(
-            itemCount: apercu.lignes.length,
-            itemBuilder: (BuildContext context, int index) => Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppSpacing.colonneMax,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    LigneApercuImport(apercu: apercu.lignes[index]),
-                    const AppDivider(),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+
+        // Rien d'écarté : une seule section, et l'aperçu garde exactement la
+        // forme qu'il avait. Pas de titre orphelin pour annoncer un vide.
+        if (ecartees.isEmpty)
+          ..._section(AppStrings.importApercuTitre, apercu.lignes)
+        else ...<Widget>[
+          ..._section(AppStrings.importSectionEcartees, ecartees),
+          ..._section(AppStrings.importSectionAInviter, apercu.aInviter),
+        ],
+
+        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
       ],
+    );
+  }
+
+  /// Un intitulé et ses lignes. Une section sans ligne ne s'ouvre pas.
+  List<Widget> _section(String titre, List<LigneApercu> lignes) {
+    if (lignes.isEmpty) return const <Widget>[];
+
+    return <Widget>[
+      SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: marge),
+        sliver: SliverToBoxAdapter(
+          child: _Colonne(enfants: <Widget>[EnteteSection(titre: titre)]),
+        ),
+      ),
+      SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: marge),
+        sliver: SliverList.builder(
+          itemCount: lignes.length,
+          itemBuilder: (BuildContext context, int index) => _Colonne(
+            enfants: <Widget>[
+              LigneApercuImport(apercu: lignes[index]),
+              const AppDivider(),
+            ],
+          ),
+        ),
+      ),
+    ];
+  }
+}
+
+/// La colonne du corps, bornée à 720 dp et centrée.
+///
+/// Chaque élément de la liste virtualisée la refait pour lui-même : un sliver
+/// ne peut pas hériter d'une colonne posée plus haut, et borner le
+/// `CustomScrollView` entier condamnerait la barre de défilement au milieu de
+/// l'écran sur un poste de bureau.
+class _Colonne extends StatelessWidget {
+  const _Colonne({required this.enfants});
+
+  final List<Widget> enfants;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: enfants,
+        ),
+      ),
     );
   }
 }
@@ -277,7 +315,10 @@ class _BanniereBudget extends StatelessWidget {
   }
 }
 
-/// Temps 3 — le compte rendu, dans le vocabulaire du ticket 006.
+/// Temps 3 — le compte rendu.
+///
+/// Ce qui vient du fichier se dit ici — les lignes écartées, qui n'ont jamais
+/// été tentées —, et ce qui vient du serveur se dit dans [RapportImportVue].
 class _Rapport extends StatelessWidget {
   const _Rapport({required this.etat, required this.marge});
 
@@ -306,7 +347,10 @@ class _Rapport extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],
-              RapportInvitationsVue(rapport: etat.rapport!),
+              RapportImportVue(
+                rapport: etat.rapport!,
+                nomsParAdresse: _nomsParAdresse(etat.apercu),
+              ),
             ],
           ),
         ),
@@ -314,32 +358,38 @@ class _Rapport extends StatelessWidget {
     );
   }
 
+  /// Le nom du fichier, retrouvé par l'adresse.
+  ///
+  /// Le serveur ne rend que des adresses : c'est l'aperçu qui sait qui est
+  /// « pompier1@exemple.fr ». Sans cette table, le compte rendu perdrait le
+  /// nom que l'écran précédent affichait une minute plus tôt.
+  static Map<String, String> _nomsParAdresse(ApercuImport? apercu) =>
+      <String, String>{
+        for (final LigneApercu ligne in apercu?.lignes ?? const <LigneApercu>[])
+          if (ligne.ligne.nomComplet.isNotEmpty)
+            normaliserEmail(ligne.ligne.email): ligne.ligne.nomComplet,
+      };
+
   /// « 2 lignes du fichier n'ont rien reçu : 1 déjà membre, 1 adresse
-  /// invalide. » Elles ne descendent pas dans « Résultat par adresse » : on n'y
-  /// met que ce qui a été tenté.
+  /// invalide. » Elles ne descendent pas dans le détail du compte rendu : on
+  /// n'y met que ce qui a été tenté.
   static String? _phraseDesEcartees(ApercuImport? apercu) {
     if (apercu == null || apercu.nombreEcartees == 0) return null;
 
+    // Le motif est celui du verdict, et un verdict qui part n'en a pas : la
+    // traduction vit sur l'énumération, où l'absence de motif est dite par
+    // `null` plutôt que par une phrase prise au hasard.
     final motifs = <String>[
       for (final MapEntry<VerdictApercu, int> entree
           in apercu.ecarteesParMotif.entries)
-        AppStrings.importEcarteesMotif(entree.value, _motif(entree.key)),
+        if (entree.key.motifEcartee case final String motif)
+          AppStrings.importEcarteesMotif(entree.value, motif),
     ];
     return AppStrings.importEcarteesResume(
       apercu.nombreEcartees,
       motifs.join(', '),
     );
   }
-
-  static String _motif(VerdictApercu verdict) => switch (verdict) {
-    VerdictApercu.dejaMembre => AppStrings.importMotifDejaMembre,
-    VerdictApercu.dejaInvitee => AppStrings.importMotifDejaInvitee,
-    VerdictApercu.doublon => AppStrings.importMotifDoublon,
-    VerdictApercu.adresseInvalide => AppStrings.importMotifAdresseInvalide,
-    VerdictApercu.adresseAbsente => AppStrings.importMotifAdresseAbsente,
-    VerdictApercu.aInviter ||
-    VerdictApercu.aInviterSansNom => AppStrings.importMotifDejaMembre,
-  };
 }
 
 /// Les sorties du bas, différentes à chacun des trois temps.
@@ -368,9 +418,7 @@ class _Actions extends ConsumerWidget {
         ],
         EtapeImport.apercu => <Widget>[
           PrimaryButton(
-            libelle: AppStrings.importEnvoyer(
-              etat.apercu?.nombreAInviter ?? 0,
-            ),
+            libelle: AppStrings.importEnvoyer(etat.apercu?.nombreAInviter ?? 0),
             icone: Icons.send_outlined,
             chargement: etat.envoiEnCours,
             raisonDesactivation: AppStrings.importRienAEnvoyer,
@@ -379,10 +427,16 @@ class _Actions extends ConsumerWidget {
                 : null,
           ),
           const SizedBox(height: AppSpacing.entreCibles),
+          // Inerte pendant l'envoi, et il dit pourquoi. La raison n'est pas
+          // écrite sous le bouton : la ligne d'avancement, juste au-dessus,
+          // porte déjà l'information à l'écran. Elle reste annoncée aux
+          // lecteurs d'écran, qui n'ont pas cette ligne sous les yeux.
           PrimaryButton(
             libelle: AppStrings.importChoisirAutre,
             variante: PrimaryButtonVariante.secondaire,
             icone: Icons.upload_file_outlined,
+            raisonDesactivation: AppStrings.importEnvoiEnCours,
+            raisonVisible: false,
             onPressed: etat.envoiEnCours ? null : controleur.recommencer,
           ),
         ],

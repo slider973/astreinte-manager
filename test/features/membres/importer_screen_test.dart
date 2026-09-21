@@ -2,7 +2,11 @@ import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/l10n/format_date.dart';
 import 'package:astreinte_sp/core/plateforme/selection_fichier.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/theme/app_spacing.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
+import 'package:astreinte_sp/core/widgets/barre_actions_basse.dart';
+import 'package:astreinte_sp/core/widgets/entete_section.dart';
+import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/features/membres/domain/fichier_membres.dart';
 import 'package:astreinte_sp/features/membres/domain/import_membres.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
@@ -17,6 +21,7 @@ import '../../support/faux_auth.dart';
 import '../../support/faux_export.dart';
 import '../../support/faux_fichier.dart';
 import '../../support/faux_invitations.dart';
+import '../../support/promesse_envoi.dart';
 
 const String _cheminImport = '/admin/membres/importer';
 
@@ -30,15 +35,18 @@ const MembreCaserne _membreMarie = MembreCaserne(
   email: 'marie@exemple.fr',
 );
 
-/// Un fichier de soixante pompiers, comme celui du premier jour d'une caserne.
-String fichierDeSoixante() {
+/// Un fichier de [nombre] pompiers, comme celui du premier jour d'une caserne.
+String fichierDe(int nombre) {
   final tampon = StringBuffer('prenom;nom;email;role\r\n');
-  for (var i = 1; i <= 60; i++) {
+  for (var i = 1; i <= nombre; i++) {
     final role = i == 1 ? 'admin' : '';
     tampon.write('Pompier$i;Dupont$i;pompier$i@exemple.fr;$role\r\n');
   }
   return tampon.toString();
 }
+
+/// Soixante lignes : trois lots pleins de vingt.
+String fichierDeSoixante() => fichierDe(60);
 
 typedef Harnais = ({
   FauxMembresRepository depot,
@@ -51,6 +59,7 @@ Future<Harnais> _ouvrirImport(
   FauxMembresRepository? depot,
   FauxSelecteurFichier? selecteur,
   FauxTelechargement? telechargement,
+  Size taille = const Size(390, 844),
 }) async {
   final membres = depot ?? FauxMembresRepository();
   final fichiers = selecteur ?? FauxSelecteurFichier();
@@ -63,6 +72,7 @@ Future<Harnais> _ouvrirImport(
     membres: membres,
     selecteurFichier: fichiers,
     telechargement: remise,
+    taille: taille,
   );
   await ouvrirRoute(tester, _cheminImport);
   return (depot: membres, selecteur: fichiers, telechargement: remise);
@@ -157,10 +167,7 @@ void main() {
 
       await _choisir(tester);
 
-      expect(
-        find.text(AppStrings.importColonneAdresseAbsente),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.importColonneAdresseAbsente), findsOneWidget);
       expect(find.byType(LigneApercuImport), findsNothing);
     });
   });
@@ -273,6 +280,77 @@ void main() {
     });
   });
 
+  group('L\'ordre de lecture de l\'aperçu', () {
+    /// Assez haut pour que les deux sections tiennent sans défilement : on
+    /// compare des ordonnées, pas des gestes.
+    const posteHaut = Size(390, 1400);
+
+    double dy(WidgetTester tester, Finder cible) => tester.getTopLeft(cible).dy;
+
+    testWidgets('les lignes écartées se lisent avant les justes', (
+      tester,
+    ) async {
+      final selecteur = FauxSelecteurFichier()
+        ..posera(
+          'prenom;nom;email;role\n'
+          'Anne;Bernard;anne@exemple.fr;\n'
+          'Paul;Blanc;paul.exemple.fr;\n'
+          'Luc;Martin;luc@exemple.fr;\n'
+          ';;;admin\n'
+          'Zoe;Petit;zoe@exemple.fr;\n',
+        );
+      await _ouvrirImport(tester, selecteur: selecteur, taille: posteHaut);
+
+      await _choisir(tester);
+
+      // Deux intitulés, les écartées d'abord.
+      expect(find.text(AppStrings.importSectionEcartees), findsOneWidget);
+      expect(find.text(AppStrings.importSectionAInviter), findsOneWidget);
+      expect(find.text(AppStrings.importApercuTitre), findsNothing);
+      expect(
+        dy(tester, find.text(AppStrings.importSectionEcartees)),
+        lessThan(dy(tester, find.text(AppStrings.importSectionAInviter))),
+      );
+
+      // Les deux fautives sont au-dessus de la première ligne juste, alors
+      // qu'elles étaient aux lignes 3 et 5 du fichier.
+      final premiereJuste = dy(tester, find.text('Anne Bernard'));
+      expect(dy(tester, find.text('Paul Blanc')), lessThan(premiereJuste));
+      expect(
+        dy(tester, find.text(AppStrings.importLigneNumero(5))),
+        lessThan(premiereJuste),
+      );
+
+      // Remontée, une ligne sans nom garde son numéro de fichier : c'est le
+      // seul repère qui permette de la retrouver dans le tableur.
+      expect(find.text(AppStrings.importLigneNumero(5)), findsOneWidget);
+
+      // Dans chaque section, l'ordre du fichier est conservé.
+      expect(
+        dy(tester, find.text('Paul Blanc')),
+        lessThan(dy(tester, find.text(AppStrings.importLigneNumero(5)))),
+      );
+      expect(premiereJuste, lessThan(dy(tester, find.text('Luc Martin'))));
+      expect(
+        dy(tester, find.text('Luc Martin')),
+        lessThan(dy(tester, find.text('Zoe Petit'))),
+      );
+    });
+
+    testWidgets('sans aucune écartée, l\'aperçu garde sa forme d\'une seule '
+        'section', (tester) async {
+      final selecteur = FauxSelecteurFichier()..posera(fichierDeSoixante());
+      await _ouvrirImport(tester, selecteur: selecteur, taille: posteHaut);
+
+      await _choisir(tester);
+
+      expect(find.byType(EnteteSection), findsOneWidget);
+      expect(find.text(AppStrings.importApercuTitre), findsOneWidget);
+      expect(find.text(AppStrings.importSectionEcartees), findsNothing);
+      expect(find.text(AppStrings.importSectionAInviter), findsNothing);
+    });
+  });
+
   group('Temps 3 — le rapport', () {
     testWidgets('soixante invitations partent en trois lots, avec les noms', (
       tester,
@@ -299,12 +377,177 @@ void main() {
       expect(premier.role, RoleMembre.admin);
       expect(harnais.depot.lotsImportes.first[1].role, RoleMembre.membre);
 
-      // Le vocabulaire du ticket 006, sans un mot de plus.
-      expect(find.text(AppStrings.inviterResultatsTitre), findsOneWidget);
+      // Tout est passé : le compte rendu le dit en un chiffre et s'arrête là.
+      // Soixante lignes identiques sous un résumé qui dit déjà « 0 échec »
+      // n'ajoutent rien et enterrent ce qui compterait.
       expect(
-        find.text(AppStrings.inviterResume(envoyees: 60, echecs: 0)),
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 60,
+            relancees: 0,
+            parties: 60,
+            echecs: 0,
+          ),
+        ),
         findsOneWidget,
       );
+      expect(find.text(AppStrings.importEchecsTitre), findsNothing);
+      expect(find.text(AppStrings.resultatInvitee), findsNothing);
+      expect(find.text('pompier1@exemple.fr'), findsNothing);
+      expect(find.text('Pompier1 Dupont1'), findsNothing);
+    });
+
+    testWidgets('un échec est nommé, ligne par ligne, avec son nom', (
+      tester,
+    ) async {
+      final selecteur = FauxSelecteurFichier()..posera(fichierDe(3));
+      final depot = FauxMembresRepository()
+        ..rapportsParLot = const <RapportInvitations>[
+          RapportInvitations(
+            resultats: <ResultatInvitation>[
+              ResultatInvitation(
+                email: 'pompier1@exemple.fr',
+                statut: StatutResultatInvitation.invitee,
+              ),
+              ResultatInvitation(
+                email: 'pompier2@exemple.fr',
+                statut: StatutResultatInvitation.erreur,
+                motif: MotifEchecInvitation.adresseInvalide,
+              ),
+              ResultatInvitation(
+                email: 'pompier3@exemple.fr',
+                statut: StatutResultatInvitation.invitee,
+              ),
+            ],
+          ),
+        ];
+      await _ouvrirImport(tester, depot: depot, selecteur: selecteur);
+
+      await _choisir(tester);
+      await tester.tap(find.text(AppStrings.importEnvoyer(3)));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.importEchecsTitre), findsOneWidget);
+      // Le nom, comme dans l'aperçu une minute plus tôt : c'est lui qui
+      // permet de reconnaître le pompier et de retrouver sa ligne.
+      expect(find.text('Pompier2 Dupont2'), findsOneWidget);
+      expect(find.text('pompier2@exemple.fr'), findsOneWidget);
+      expect(find.text(AppStrings.inviteAdresseInvalide), findsOneWidget);
+      // Les deux qui sont passées restent des chiffres.
+      expect(find.text('Pompier1 Dupont1'), findsNothing);
+      expect(find.text('Pompier3 Dupont3'), findsNothing);
+    });
+
+    /// Trois lignes acceptées, dont [parties] dont le courriel sort vraiment.
+    ///
+    /// C'est le seul axe qui bouge d'un cas à l'autre : rien n'est refusé, et
+    /// seule la configuration du fournisseur de courriel change — aucun le 21
+    /// septembre en production, tous en local, une partie quand le service
+    /// lâche en cours de route.
+    RapportInvitations troisDontParties(int parties) => RapportInvitations(
+      resultats: <ResultatInvitation>[
+        for (var i = 1; i <= 3; i++)
+          ResultatInvitation(
+            email: 'pompier$i@exemple.fr',
+            statut: StatutResultatInvitation.invitee,
+            courrielEnvoye: i <= parties,
+          ),
+      ],
+    );
+
+    Future<void> importerTrois(WidgetTester tester, int parties) async {
+      final selecteur = FauxSelecteurFichier()..posera(fichierDe(3));
+      final depot = FauxMembresRepository()
+        ..rapportsParLot = <RapportInvitations>[troisDontParties(parties)];
+      await _ouvrirImport(tester, depot: depot, selecteur: selecteur);
+
+      await _choisir(tester);
+      await tester.tap(find.text(AppStrings.importEnvoyer(3)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('tout est parti : le compte rendu tient en une phrase', (
+      tester,
+    ) async {
+      await importerTrois(tester, 3);
+
+      expect(
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 3,
+            relancees: 0,
+            parties: 3,
+            echecs: 0,
+          ),
+        ),
+        findsOneWidget,
+      );
+      // Un fournisseur de courriel est configuré, tout est sorti : pas une
+      // ligne sur des courriels à quai qui n'existent pas.
+      expect(find.textContaining('courriel'), findsNothing);
+      expect(find.text(AppStrings.importEchecsTitre), findsNothing);
+    });
+
+    testWidgets(
+      'rien n\'est parti : les courriels se comptent, pas un par un',
+      (tester) async {
+        await importerTrois(tester, 0);
+
+        // Sans fournisseur de courriel configuré, c'est tout l'import qui est
+        // dans ce cas : une phrase et un nombre, pas soixante lignes.
+        expect(
+          find.text(
+            AppStrings.invitationsResume(
+              creees: 3,
+              relancees: 0,
+              parties: 0,
+              echecs: 0,
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            AppStrings.importCourrielsNonPartis(nonPartis: 3, retenues: 3),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text(AppStrings.resultatCourrielNonParti), findsNothing);
+        expect(find.text(AppStrings.importEchecsTitre), findsNothing);
+
+        // Le défaut de la revue : « 3 invitations envoyées, 0 échec. » posé
+        // juste au-dessus de « leur courriel n'est pas parti ». Aucune phrase
+        // de l'écran ne peut plus le dire.
+        aucunEnvoiPromis(tester);
+      },
+    );
+
+    testWidgets('une partie seulement est partie : le compte le dit', (
+      tester,
+    ) async {
+      await importerTrois(tester, 1);
+
+      expect(
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 3,
+            relancees: 0,
+            parties: 1,
+            echecs: 0,
+          ),
+        ),
+        findsOneWidget,
+      );
+      // Deux sur les trois du résumé, et non « 2 invitations sont créées »,
+      // qui ferait douter de la troisième.
+      expect(
+        find.text(
+          AppStrings.importCourrielsNonPartis(nonPartis: 2, retenues: 3),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(AppStrings.importEchecsTitre), findsNothing);
+      aucunEnvoiPromis(tester);
     });
 
     testWidgets('les lignes écartées sont résumées, pas noyées dans le rapport', (
@@ -339,10 +582,21 @@ void main() {
         ),
         findsOneWidget,
       );
-      // Elles ne descendent pas dans « Résultat par adresse » : on n'y met que
-      // ce qui a été tenté.
+      // Ni les écartées — on ne met dans le détail que ce qui a été tenté —
+      // ni la ligne qui est passée : celle-là est comptée par le résumé.
       expect(find.text('marie@exemple.fr'), findsNothing);
-      expect(find.text('anne@exemple.fr'), findsOneWidget);
+      expect(find.text('anne@exemple.fr'), findsNothing);
+      expect(
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 1,
+            relancees: 0,
+            parties: 1,
+            echecs: 0,
+          ),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('« Revenir aux membres » ramène à la liste', (tester) async {
@@ -357,6 +611,89 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(MembresScreen), findsOneWidget);
+    });
+  });
+
+  group('L\'avancement pendant l\'envoi', () {
+    /// Un premier lot dont cinq adresses sont refusées : elles ont reçu un
+    /// verdict du serveur, mais personne n'a été invité.
+    RapportInvitations premierLotAvecRefus() => RapportInvitations(
+      resultats: <ResultatInvitation>[
+        for (var i = 1; i <= 15; i++)
+          ResultatInvitation(
+            email: 'pompier$i@exemple.fr',
+            statut: StatutResultatInvitation.invitee,
+          ),
+        for (var i = 16; i <= 20; i++)
+          ResultatInvitation(
+            email: 'pompier$i@exemple.fr',
+            statut: StatutResultatInvitation.erreur,
+            motif: MotifEchecInvitation.adresseInvalide,
+          ),
+      ],
+    );
+
+    testWidgets('le compteur ne compte que les invitations parties', (
+      tester,
+    ) async {
+      final depot = FauxMembresRepository()
+        ..delaiParLot = const Duration(milliseconds: 40)
+        ..rapportsParLot = <RapportInvitations>[premierLotAvecRefus()];
+      final selecteur = FauxSelecteurFichier()..posera(fichierDe(40));
+      await _ouvrirImport(tester, depot: depot, selecteur: selecteur);
+
+      await _choisir(tester);
+      await tester.tap(find.text(AppStrings.importEnvoyer(40)));
+      await tester.pump();
+
+      // Entre les deux lots : vingt verdicts rendus, quinze invitations
+      // parties. C'est quinze qui s'affiche.
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump();
+      expect(
+        find.text(AppStrings.importAvancement(faites: 15, total: 40)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(AppStrings.importAvancement(faites: 20, total: 40)),
+        findsNothing,
+      );
+
+      // Et le compte rendu dit le même nombre que le compteur : les deux
+      // écrans ne se contredisent plus.
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 35,
+            relancees: 0,
+            parties: 35,
+            echecs: 5,
+          ),
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('Quand le serveur ne répond pas comme prévu', () {
+    testWidgets('une lecture qui échoue n\'accuse pas la connexion', (
+      tester,
+    ) async {
+      final selecteur = FauxSelecteurFichier()
+        ..posera('email\nanne@exemple.fr\n');
+      await _ouvrirImport(
+        tester,
+        depot: FauxMembresRepository(erreurLecture: true),
+        selecteur: selecteur,
+      );
+
+      await _choisir(tester);
+
+      // Le navigateur ne se dit pas hors ligne : rien n'autorise à envoyer
+      // vérifier un wifi qui marche (ticket 048).
+      expect(find.text(AppStrings.erreurReseauTexte), findsNothing);
+      expect(find.text(AppStrings.erreurTexteGenerique), findsOneWidget);
     });
   });
 
@@ -483,7 +820,14 @@ void main() {
         // Le rapport garde ce qui est passé — sinon l'administrateur
         // réessaierait des adresses déjà invitées.
         expect(
-          find.text(AppStrings.inviterResume(envoyees: 20, echecs: 0)),
+          find.text(
+            AppStrings.invitationsResume(
+              creees: 20,
+              relancees: 0,
+              parties: 20,
+              echecs: 0,
+            ),
+          ),
           findsOneWidget,
         );
 
@@ -495,9 +839,7 @@ void main() {
         // Un fait, pas une panne : la bannière est `attention`, jamais rouge
         // (`design/047-import-membres.md § 3`).
         expect(
-          tester
-              .widget<AppBanner>(find.byType(AppBanner).first)
-              .variante,
+          tester.widget<AppBanner>(find.byType(AppBanner).first).variante,
           AppBannerVariante.attention,
         );
         expect(
@@ -566,6 +908,40 @@ void main() {
       );
       expect(find.text(AppStrings.inviterResultatsTitre), findsNothing);
       expect(find.byType(LigneApercuImport), findsOneWidget);
+    });
+  });
+
+  group('La barre d\'actions', () {
+    /// Le chef de centre importe depuis un ordinateur : c'est la largeur où
+    /// une barre non bornée se voyait le plus (ticket 048).
+    const posteAdmin = Size(1280, 900);
+
+    void verifierLargeur(WidgetTester tester, String libelle) {
+      expect(
+        tester.getSize(find.widgetWithText(PrimaryButton, libelle)).width,
+        AppSpacing.colonneMax,
+        reason: '« $libelle » déborde de la colonne du corps.',
+      );
+    }
+
+    testWidgets('sur poste admin, elle tient dans la colonne aux trois temps', (
+      tester,
+    ) async {
+      final selecteur = FauxSelecteurFichier()
+        ..posera('prenom;nom;email\nAnne;Bernard;anne@exemple.fr\n');
+      await _ouvrirImport(tester, selecteur: selecteur, taille: posteAdmin);
+
+      expect(find.byType(BarreActionsBasse), findsOneWidget);
+      verifierLargeur(tester, AppStrings.importChoisir);
+      verifierLargeur(tester, AppStrings.importExemple);
+
+      await _choisir(tester);
+      verifierLargeur(tester, AppStrings.importEnvoyer(1));
+      verifierLargeur(tester, AppStrings.importChoisirAutre);
+
+      await tester.tap(find.text(AppStrings.importEnvoyer(1)));
+      await tester.pumpAndSettle();
+      verifierLargeur(tester, AppStrings.inviterTerminer);
     });
   });
 

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/reseau/connectivite.dart';
 import '../../../core/session/appartenance.dart';
 import '../domain/import_membres.dart';
 import '../domain/invitation.dart';
@@ -111,9 +112,13 @@ class EchecAdministration implements Exception {
 /// fonctions SQL `create_invitation` et `accept_invitation` sont réservées au
 /// rôle `service_role` (migration `0009`) et refusent un appel client.
 class SupabaseMembresRepository implements MembresRepository {
-  SupabaseMembresRepository(this._client);
+  SupabaseMembresRepository(this._client, this._connectivite);
 
   final SupabaseClient _client;
+
+  /// Sert au seul arbitrage de [traduireEchecFonction] : parler de connexion
+  /// uniquement quand le navigateur l'affirme.
+  final Connectivite _connectivite;
 
   /// Colonnes de `memberships` (§ 2.3) jointes aux colonnes affichables de
   /// `profiles` (§ 2.2).
@@ -124,8 +129,13 @@ class SupabaseMembresRepository implements MembresRepository {
   /// **Jamais `select *`** : `invitations.token` est hors du grant de select
   /// du rôle `authenticated`, et une étoile ferait échouer la requête entière
   /// (`docs/SCHEMA.md § 4`, migration `0008`).
+  /// **Énumérées, jamais `select *`** : `token` est un porteur de droits et
+  /// reste hors du grant de select d'`authenticated` (migration `0008`). Une
+  /// colonne ajoutée n'entre donc pas toute seule ici — `email_sent_at` et
+  /// `email_error` viennent de la migration `0035` (ticket 048).
   static const String _colonnesInvitations =
-      'id, email, role, first_name, last_name, expires_at, created_at';
+      'id, email, role, first_name, last_name, expires_at, created_at, '
+      'email_sent_at, email_error';
 
   @override
   Future<List<MembreCaserne>> membres(String stationId) async {
@@ -193,7 +203,7 @@ class SupabaseMembresRepository implements MembresRepository {
       }
       return RapportInvitations.depuisJson(corps);
     } on FunctionException catch (echec) {
-      throw _traduire(echec);
+      throw traduireEchecFonction(echec, enLigne: _connectivite.enLigne);
     }
   }
 
@@ -328,27 +338,56 @@ class SupabaseMembresRepository implements MembresRepository {
         : ErreurAdministration.inconnue;
   }
 
-  /// `{"error": {"code", "message"}}` — la forme unique des Edge Functions
-  /// (`supabase/functions/_shared/http.ts`).
-  ///
-  /// Le corps est rendu tel quel au domaine, et non réduit à un code : le
-  /// refus de débit (429) porte une phrase que le serveur seul peut composer,
-  /// puisqu'elle dit dans combien de temps réessayer.
-  static EchecInvitation _traduire(FunctionException echec) {
-    // Aucune réponse n'est parvenue : c'est le réseau, pas le serveur.
-    if (echec.status == 0) {
-      return const EchecInvitation(ErreurInvitation.reseau);
-    }
+}
 
-    final details = echec.details;
-    if (details is Map) {
-      final erreur = details['error'];
-      if (erreur is Map) return EchecInvitation.depuisCorps(erreur);
-    }
+/// Traduit un échec d'`invite-member` en refus affichable.
+///
+/// `{"error": {"code", "message"}}` — la forme unique des Edge Functions
+/// (`supabase/functions/_shared/http.ts`). Le corps est rendu tel quel au
+/// domaine, et non réduit à un code : le refus de débit (429) porte une phrase
+/// que le serveur seul peut composer, puisqu'elle dit dans combien de temps
+/// réessayer.
+///
+/// **Un serveur qui répond n'est pas un réseau coupé.** Tout ce qui ne se
+/// lisait pas tombait auparavant sur « vérifie ta connexion » : le
+/// 21 septembre 2026, les fonctions n'étaient pas déployées, et un chef de
+/// centre a cherché une panne de wifi qui n'existait pas. D'où trois sorties
+/// distinctes :
+///
+/// - une réponse est arrivée sans se laisser lire — fonction absente,
+///   passerelle qui refuse — : ce n'est pas la liaison, et il n'y a rien à
+///   réessayer tout de suite ;
+/// - rien n'est revenu **et** le navigateur se dit hors ligne : là seulement
+///   on parle de connexion, parce qu'un « non » du navigateur est sûr
+///   (`lib/core/reseau/connectivite.dart`) ;
+/// - rien n'est revenu et le navigateur se croit en ligne : on ne sait pas, et
+///   on le dit sans envoyer chercher au mauvais endroit.
+///
+/// Fonction plutôt que méthode privée : c'est la règle la plus coûteuse du
+/// fichier quand elle se trompe, et elle se teste sans client Supabase.
+EchecInvitation traduireEchecFonction(
+  FunctionException echec, {
+  required bool enLigne,
+}) {
+  if (echec.status == 0) {
     return EchecInvitation(
-      echec.status >= 500
-          ? ErreurInvitation.inconnue
-          : ErreurInvitation.requeteInvalide,
+      enLigne ? ErreurInvitation.sansReponse : ErreurInvitation.reseau,
     );
   }
+
+  final details = echec.details;
+  if (details is Map) {
+    final erreur = details['error'];
+    if (erreur is Map) return EchecInvitation.depuisCorps(erreur);
+  }
+
+  // Le serveur a parlé sans qu'on le comprenne. Un incident interne (5xx) peut
+  // passer tout seul et mérite « réessaie dans un instant » ; le reste — un
+  // 404 en tête — demande une réparation, et promettre un nouvel essai serait
+  // promettre un geste qui ne répare rien.
+  return EchecInvitation(
+    echec.status >= 500
+        ? ErreurInvitation.inconnue
+        : ErreurInvitation.serveurIndisponible,
+  );
 }

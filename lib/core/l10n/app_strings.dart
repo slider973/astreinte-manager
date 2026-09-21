@@ -434,6 +434,26 @@ abstract final class AppStrings {
   static String invitationRenvoyerSemantique(String email) =>
       'Renvoyer l\'invitation à $email';
 
+  // --- L'envoi du courriel d'invitation (ticket 048) -----------------
+  //
+  // Trois états, et **jamais deux**. « Le courriel n'est pas parti » et « on
+  // ne sait pas s'il est parti » ne se disent pas de la même façon : la
+  // seconde phrase est celle des invitations créées avant la migration
+  // `0035`, et leur coller la première serait exactement le mensonge que ce
+  // ticket corrige (`docs/SCHEMA.md § 2.4`).
+  //
+  // Elles sont courtes parce qu'en production, aucun fournisseur de courriel
+  // n'est configuré : toute la liste porte la première, et une phrase de
+  // trois lignes répétée soixante fois rendrait l'écran illisible. Le motif
+  // technique de l'échec (`email_error`) ne s'affiche nulle part : il sert au
+  // diagnostic, pas au chef de centre.
+
+  static const String invitationCourrielNonParti = 'Courriel non parti';
+  static const String invitationCourrielInconnu = 'Envoi du courriel inconnu';
+
+  static String invitationCourrielEnvoyeLe(String date) =>
+      'Courriel envoyé le $date';
+
   // --- Formulaire d'invitation ---------------------------------------
 
   static const String inviterTitre = 'Inviter des pompiers';
@@ -464,22 +484,106 @@ abstract final class AppStrings {
   static String inviterAdresseInvalide(String email) =>
       'Adresse incomplète : $email.';
 
-  /// Résumé annoncé après un envoi : toujours les deux nombres, même à zéro.
-  static String inviterResume({required int envoyees, required int echecs}) {
-    final partieEnvoyees = envoyees <= 1
-        ? '$envoyees invitation envoyée'
-        : '$envoyees invitations envoyées';
+  /// Le résumé d'un envoi d'invitations, commun aux deux comptes rendus.
+  ///
+  /// **Le verbe suit les faits.** « envoyées » n'apparaît qu'à deux
+  /// conditions : que [parties] couvre tout ce qui a été retenu, et qu'il y
+  /// ait quelque chose à couvrir. La seconde n'est pas un détail — sans elle,
+  /// un lot entièrement refusé s'annonçait « 0 invitation envoyée, 5
+  /// échecs. », un envoi affirmé sur zéro envoi. Dès qu'un courriel manque à
+  /// l'appel, la phrase ne parle plus que de ce qui existe, et l'écran
+  /// affichait auparavant « 1 invitation envoyée, 0 échec. » au-dessus de
+  /// « le courriel n'est pas parti » : deux phrases qui se contredisent,
+  /// l'une sous l'autre (ticket 048, à l'import puis à l'invitation).
+  ///
+  /// **Le nom suit les faits aussi.** « créée » ne vaut que pour une ligne
+  /// qui n'existait pas. Une adresse déjà invitée revient en [relancees] : la
+  /// compter comme une création annonçait « 1 invitation créée » pour une
+  /// invitation vieille de trois jours (ticket 048, second tour). Quand tous
+  /// les courriels sont partis, la distinction ne sert plus à rien — chacun a
+  /// reçu le sien —, et le résumé compte tout ensemble.
+  ///
+  /// Les deux écrans partagent la phrase parce qu'ils partagent la règle. Ce
+  /// qu'ils ne partagent pas, c'est ce qui vient **dessous** : à l'import,
+  /// [importCourrielsNonPartis] compte les invitations restées à quai, car
+  /// rien d'autre n'en parlera ; à l'invitation, vingt lignes au plus, et
+  /// chacune porte déjà son sort — le résumé compte, la ligne dit laquelle.
+  ///
+  /// Toujours le nombre d'échecs, même à zéro.
+  static String invitationsResume({
+    required int creees,
+    required int relancees,
+    required int parties,
+    required int echecs,
+  }) {
+    final retenues = creees + relancees;
     final partieEchecs = echecs <= 1 ? '$echecs échec' : '$echecs échecs';
-    return '$partieEnvoyees, $partieEchecs.';
+    if (retenues > 0 && parties >= retenues) {
+      return retenues <= 1
+          ? '$retenues invitation envoyée, $partieEchecs.'
+          : '$retenues invitations envoyées, $partieEchecs.';
+    }
+    // Un courriel au moins est resté à quai : la phrase ne dit plus que ce
+    // qui est certain — les lignes nouvelles, et celles qui étaient déjà là.
+    // Le compte des créations reste affiché quand il n'y a rien à relancer,
+    // fût-il nul : « 0 invitation créée, 5 échecs. » est la seule phrase
+    // vraie d'un lot entièrement refusé.
+    final morceaux = <String>[
+      if (creees > 0 || relancees == 0)
+        creees <= 1 ? '$creees invitation créée' : '$creees invitations créées',
+      // Le nom ne se répète pas quand les créations viennent de le poser :
+      // « 1 invitation créée, 1 déjà en attente » plutôt que deux fois le
+      // même mot dans la même phrase.
+      if (relancees > 0)
+        if (creees > 0)
+          '$relancees déjà en attente'
+        else if (relancees <= 1)
+          '$relancees invitation déjà en attente'
+        else
+          '$relancees invitations déjà en attente',
+    ];
+    return '${morceaux.join(', ')}, $partieEchecs.';
   }
 
+  // --- Le sort d'une adresse, sur sa ligne du compte rendu -----------
+  //
+  // Quatre libellés pour trois statuts, parce que deux d'entre eux affirment
+  // qu'on a prévenu quelqu'un et que le serveur les rend même quand aucun
+  // courriel n'est sorti. [ResultatInvitation.libelle] choisit ; ici, on
+  // n'écrit que des phrases vraies.
+  //
+  // Aucun ne contient le mot « envoyée » — pas même « Relancée », qui a
+  // remplacé « Renvoyée » pour cette raison. Le garde-fou des tests
+  // (`test/support/promesse_envoi.dart`) refuse ce mot partout dès qu'un
+  // courriel est resté à quai : avec « Renvoyée » il fallait une exception,
+  // et l'exception laissait justement passer le libellé qui mentait.
+
+  /// Le courriel est parti vers une adresse qui n'avait pas d'invitation.
   static const String resultatInvitee = 'Invitée';
-  static const String resultatRenvoyee = 'Renvoyée';
+
+  /// Le courriel est reparti vers une adresse qui en avait déjà une.
+  static const String resultatRelancee = 'Relancée';
+
+  /// L'invitation existe désormais, mais personne n'a été prévenu.
+  static const String resultatCreee = 'Créée';
+
+  /// L'invitation existait déjà, et personne n'a été prévenu de nouveau.
+  static const String resultatDejaEnAttente = 'Déjà en attente';
+
   static const String resultatEchec = 'Échec';
 
+  /// Ce qui s'ajoute quand l'invitation existe mais que le courriel n'est
+  /// jamais sorti : sous l'adresse, au compte rendu ; en réponse au bouton
+  /// « Renvoyer », dans la liste des invitations en attente.
+  ///
+  /// Elle ne redit plus « Invitation créée » : au compte rendu, le résumé
+  /// vient de la compter et le statut la nomme juste au-dessus ; dans la
+  /// liste, l'invitation était déjà là. Remplacer la contradiction du ticket
+  /// 048 par une redite aurait été la corriger à moitié. Ne reste que le fait
+  /// qui manque, et le geste qui le rattrape.
   static const String resultatCourrielNonParti =
-      'Invitation créée, mais le courriel n\'est pas parti. Renvoie-la, ou '
-      'transmets le lien toi-même.';
+      'Le courriel n\'est pas parti. Renvoie-la, ou transmets le lien '
+      'toi-même.';
 
   // --- Motifs d'échec, adresse par adresse ---------------------------
 
@@ -524,6 +628,28 @@ abstract final class AppStrings {
       'sont bloquées.';
   static const String inviteCaserneInconnue =
       'Cette caserne est introuvable. Reconnecte-toi, puis réessaie.';
+
+  // Les deux phrases qui suivent existent parce que « Impossible de joindre
+  // le serveur. Vérifie ta connexion » a été affiché le 21 septembre 2026
+  // pendant que le réseau allait très bien : les Edge Functions n'étaient pas
+  // déployées. On ne nomme donc une cause que lorsqu'on la connaît, et on ne
+  // propose pas un geste qui ne répare rien.
+
+  /// Le serveur a répondu, mais l'application ne sait pas lire sa réponse :
+  /// fonction absente, passerelle qui refuse, corps vide. Une réponse est
+  /// arrivée — la connexion n'est donc pas en cause, et le dire évite de
+  /// chercher une panne là où il n'y en a pas.
+  static const String inviteServeurIndisponible =
+      'Les invitations sont indisponibles : le serveur a refusé la demande '
+      'sans dire pourquoi. Ce n\'est pas ta connexion, et rien n\'est parti. '
+      'Réessaie plus tard.';
+
+  /// Rien n'est revenu, et le navigateur ne se dit pas hors ligne : on ne sait
+  /// pas si la demande est arrivée jusqu'au serveur. Aucune cause n'est donc
+  /// promise, et la sortie proposée est la seule qui apprenne quelque chose.
+  static const String inviteSansReponse =
+      'Le serveur n\'a pas répondu. On ne sait pas si l\'envoi est parti : '
+      'vérifie les invitations en attente avant de relancer.';
 
   // -------------------------------------------------------------------
   // Import de membres depuis un fichier (ticket 047)
@@ -585,9 +711,7 @@ abstract final class AppStrings {
     required int ecartees,
   }) {
     final debut = lues <= 1 ? '$lues ligne lue' : '$lues lignes lues';
-    final envoi = aInviter <= 1
-        ? '$aInviter à inviter'
-        : '$aInviter à inviter';
+    final envoi = aInviter <= 1 ? '$aInviter à inviter' : '$aInviter à inviter';
     if (ecartees == 0) return '$debut : $envoi.';
     final reste = ecartees <= 1 ? '1 écartée' : '$ecartees écartées';
     return '$debut : $envoi, $reste.';
@@ -595,16 +719,42 @@ abstract final class AppStrings {
 
   static const String importApercuTitre = 'Ligne par ligne';
 
-  static String importEnvoyer(int nombre) => nombre <= 1
-      ? 'Envoyer l\'invitation'
-      : 'Envoyer les $nombre invitations';
+  /// Les deux intitulés de l'aperçu quand le fichier a des fautes : ce qui ne
+  /// partira pas se lit en premier. Le vocabulaire est celui du résumé juste
+  /// au-dessus — « 60 à inviter, 3 écartées » — pour qu'un compte annoncé et
+  /// une section portent le même mot. Sans aucune ligne écartée, ni l'un ni
+  /// l'autre n'apparaît : l'aperçu reste « Ligne par ligne ».
+  static const String importSectionEcartees = 'Lignes écartées';
+  static const String importSectionAInviter = 'Lignes à inviter';
+
+  static String importEnvoyer(int nombre) =>
+      nombre <= 1 ? 'Envoyer l\'invitation' : 'Envoyer les $nombre invitations';
 
   static const String importRienAEnvoyer =
       'Aucune ligne de ce fichier ne peut être invitée. Corrige-le, puis '
       'redépose-le.';
 
+  /// Pourquoi « Choisir un autre fichier » est inerte pendant l'envoi. La
+  /// ligne d'avancement le dit déjà à l'écran : cette phrase est celle que le
+  /// lecteur d'écran annonce, et non un doublon visuel.
+  static const String importEnvoiEnCours =
+      'Envoi en cours : attends la fin pour déposer un autre fichier.';
+
+  /// « 15 invitations sur 40 envoyées… » — **envoyées, donc parties**.
+  ///
+  /// [faites] ne compte que les invitations dont le courriel est réellement
+  /// sorti. Deux comptes voisins sont écartés, pour la même raison : les
+  /// adresses refusées, qui reçoivent un verdict sans que personne ne soit
+  /// invité, et les invitations créées dont le courriel n'est pas parti, qui
+  /// existent en base sans que personne ne soit prévenu. L'un comme l'autre
+  /// ferait passer pour invitée une personne qui ne recevra jamais rien, et
+  /// contredirait le compte rendu affiché l'instant d'après. Les échecs ne
+  /// sont pas annoncés ici : pendant l'envoi, on n'en peut rien faire ; le
+  /// compte rendu, lui, les nomme.
   static String importAvancement({required int faites, required int total}) =>
-      '$faites invitations sur $total envoyées…';
+      faites <= 1
+      ? '$faites invitation sur $total envoyée…'
+      : '$faites invitations sur $total envoyées…';
 
   /// Le numéro d'une ligne dépourvue d'adresse : c'est le seul repère qui
   /// permette de la retrouver dans le tableur.
@@ -614,8 +764,7 @@ abstract final class AppStrings {
       'Sans nom : le pompier le saisira lui-même.';
   static const String importDejaInvitee =
       'Invitation déjà en attente. Ignorée.';
-  static String importDoublon(int premiere) =>
-      'Déjà présente ligne $premiere.';
+  static String importDoublon(int premiere) => 'Déjà présente ligne $premiere.';
   static const String importAdresseAbsente =
       'Pas d\'adresse e-mail sur cette ligne.';
 
@@ -640,8 +789,7 @@ abstract final class AppStrings {
 
   // --- Le rapport ------------------------------------------------------
 
-  static String importEcarteesResume(int nombre, String motifs) =>
-      nombre <= 1
+  static String importEcarteesResume(int nombre, String motifs) => nombre <= 1
       ? '1 ligne du fichier n\'a rien reçu : $motifs.'
       : '$nombre lignes du fichier n\'ont rien reçu : $motifs.';
 
@@ -653,6 +801,52 @@ abstract final class AppStrings {
   static const String importMotifDoublon = 'en double';
   static const String importMotifAdresseInvalide = 'adresse invalide';
   static const String importMotifAdresseAbsente = 'sans adresse';
+
+  /// Le titre de la seule liste que le compte rendu déroule.
+  ///
+  /// Ce qui est passé ne descend pas ici : [invitationsResume] l'a déjà
+  /// compté, et soixante coches identiques enterrent les trois lignes qui
+  /// demandent quelque chose — la règle que l'aperçu applique à sa marque.
+  static const String importEchecsTitre = 'À reprendre';
+
+  // Le résumé de l'import n'est pas ici : c'est [invitationsResume], la
+  // phrase commune aux deux comptes rendus. La règle qui interdit « envoyées »
+  // tant qu'un courriel n'est pas sorti est la même des deux côtés, et une
+  // règle de vérité ne se recopie pas (ticket 048).
+
+  /// Les invitations qui existent, mais dont personne n'a été prévenu.
+  ///
+  /// Deux tournures, parce que ce sont deux faits différents. Quand c'est
+  /// tout l'import — le cas de production, aucun fournisseur de courriel
+  /// configuré —, la phrase parle de l'ensemble que [invitationsResume] vient
+  /// d'annoncer. Quand une partie seulement est restée à quai, elle compte
+  /// sur ce même ensemble : dire « 2 invitations sont créées » sous un résumé
+  /// qui en annonce 3 ferait douter de la troisième.
+  ///
+  /// Elles ne sont jamais énumérées : le geste utile est le renvoi, et il se
+  /// pose dans la liste des invitations en attente, où chaque ligne le porte
+  /// (ticket 048).
+  ///
+  /// [retenues] est tout ce que le serveur a accepté, créations **et**
+  /// relances : c'est l'ensemble que [invitationsResume] vient d'annoncer, et
+  /// le seul auquel [nonPartis] puisse se comparer.
+  static String importCourrielsNonPartis({
+    required int nonPartis,
+    required int retenues,
+  }) {
+    if (nonPartis >= retenues) {
+      return nonPartis <= 1
+          ? 'Son courriel n\'est pas parti. Renvoie cette invitation depuis '
+                'la liste des invitations en attente.'
+          : 'Aucun courriel n\'est parti. Renvoie ces invitations depuis la '
+                'liste des invitations en attente.';
+    }
+    return nonPartis <= 1
+        ? '1 de ces invitations n\'a pas reçu son courriel. Renvoie-la depuis '
+              'la liste des invitations en attente.'
+        : '$nonPartis de ces invitations n\'ont pas reçu leur courriel. '
+              'Renvoie-les depuis la liste des invitations en attente.';
+  }
 
   static String importReprendreApres(String heure) =>
       'Reprends l\'import après $heure avec le même fichier : les personnes '

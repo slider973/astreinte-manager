@@ -166,7 +166,16 @@ Aucun secret dans le dépôt : `supabase/functions/.env*` est ignoré par git (`
 
 Le troisième cas n'annule pas l'invitation : la ligne existe, le renvoi la relance. Un courriel qui
 ne part pas est un incident d'envoi, pas une raison de perdre une invitation. L'échec est visible
-dans la réponse (`email_sent`) et tracé dans `notifications.error`.
+dans la réponse (`email_sent`), tracé dans `notifications.error` — et, depuis le ticket 048, sur
+l'invitation elle-même (`invitations.email_sent_at` / `email_error`, migration `0035`).
+
+Cette troisième trace n'est pas une redondance. `notifications` est rattachée **au destinataire** :
+un administrateur n'a aucune raison de la lire, et il ne la lit pas. Sans la trace sur l'invitation,
+l'information « personne n'a été prévenu » disparaissait avec le compte rendu de l'écran, et «
+Invitations en attente » affichait ensuite la même chose pour une invitation partie sans réponse et
+pour une invitation dont le courriel n'était jamais parti. La règle d'écriture vit dans
+`_shared/invitation_trace.ts` (`traceEnvoi`), avec ses tests : un succès pose la date et efface le
+motif précédent, un échec pose le motif sans toucher à la date.
 
 Le gabarit vit dans `_shared/invitation_email.ts` et non dans `supabase/templates/`, qui est réservé
 aux gabarits rendus par GoTrue (`magic_link.html`). Le courriel d'invitation est rendu ici, parce

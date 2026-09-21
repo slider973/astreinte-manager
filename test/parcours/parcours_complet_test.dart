@@ -155,7 +155,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(AppStrings.inviterResume(envoyees: 1, echecs: 0)),
+        find.text(
+          AppStrings.invitationsResume(
+            creees: 1,
+            relancees: 0,
+            parties: 1,
+            echecs: 0,
+          ),
+        ),
         findsOneWidget,
       );
 
@@ -270,10 +277,7 @@ void main() {
 
       // Deux attributions, **un seul pompier** : c'est le nombre de téléphones
       // qui sonnent, et c'est ce que l'écran annonce.
-      expect(
-        find.text(AppStrings.publiePourMois(_nomMois, 1)),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.publiePourMois(_nomMois, 1)), findsOneWidget);
       expect(backend.etatPlanning, PlanningEtat.publie);
       expect(
         backend.attributions.every(
