@@ -55,6 +55,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 026 | [Centre de notifications in-app](done/026-centre-notifications.md) | P1 | 025 | https://github.com/slider973/astreinte-manager/pull/16 |
 | 027 | [Écran Mes astreintes](done/027-mes-astreintes.md) | P0 | 021 | https://github.com/slider973/astreinte-manager/pull/24 |
 | 029 | [Abonnement Stripe par caserne](done/029-stripe-abonnement.md) | P0 | 008 010 | https://github.com/slider973/astreinte-manager/pull/27 |
-| 030 | [Mode suspendu et bannières](done/030-gating-suspension.md) | P1 | 029 |  |
+| 030 | [Mode suspendu et bannières](done/030-gating-suspension.md) | P1 | 029 | https://github.com/slider973/astreinte-manager/pull/28 |
 | 040 | [Rendre visible une notification définitivement perdue](done/040-ligne-interne-echec-definitif.md) | P0 | 025 026 | https://github.com/slider973/astreinte-manager/pull/26 |
 
