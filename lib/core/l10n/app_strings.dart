@@ -627,9 +627,7 @@ abstract final class AppStrings {
     required int ecartees,
   }) {
     final debut = lues <= 1 ? '$lues ligne lue' : '$lues lignes lues';
-    final envoi = aInviter <= 1
-        ? '$aInviter à inviter'
-        : '$aInviter à inviter';
+    final envoi = aInviter <= 1 ? '$aInviter à inviter' : '$aInviter à inviter';
     if (ecartees == 0) return '$debut : $envoi.';
     final reste = ecartees <= 1 ? '1 écartée' : '$ecartees écartées';
     return '$debut : $envoi, $reste.';
@@ -645,9 +643,8 @@ abstract final class AppStrings {
   static const String importSectionEcartees = 'Lignes écartées';
   static const String importSectionAInviter = 'Lignes à inviter';
 
-  static String importEnvoyer(int nombre) => nombre <= 1
-      ? 'Envoyer l\'invitation'
-      : 'Envoyer les $nombre invitations';
+  static String importEnvoyer(int nombre) =>
+      nombre <= 1 ? 'Envoyer l\'invitation' : 'Envoyer les $nombre invitations';
 
   static const String importRienAEnvoyer =
       'Aucune ligne de ce fichier ne peut être invitée. Corrige-le, puis '
@@ -661,11 +658,15 @@ abstract final class AppStrings {
 
   /// « 15 invitations sur 40 envoyées… » — **envoyées, donc parties**.
   ///
-  /// [faites] ne compte que les adresses acceptées par le serveur. Y ajouter
-  /// les refus ferait dire à ce compteur le contraire du compte rendu affiché
-  /// l'instant d'après, et ferait passer pour invitée une personne qui ne
-  /// recevra jamais rien. Les échecs ne sont pas annoncés ici : pendant
-  /// l'envoi, on n'en peut rien faire ; le compte rendu, lui, les nomme.
+  /// [faites] ne compte que les invitations dont le courriel est réellement
+  /// sorti. Deux comptes voisins sont écartés, pour la même raison : les
+  /// adresses refusées, qui reçoivent un verdict sans que personne ne soit
+  /// invité, et les invitations créées dont le courriel n'est pas parti, qui
+  /// existent en base sans que personne ne soit prévenu. L'un comme l'autre
+  /// ferait passer pour invitée une personne qui ne recevra jamais rien, et
+  /// contredirait le compte rendu affiché l'instant d'après. Les échecs ne
+  /// sont pas annoncés ici : pendant l'envoi, on n'en peut rien faire ; le
+  /// compte rendu, lui, les nomme.
   static String importAvancement({required int faites, required int total}) =>
       faites <= 1
       ? '$faites invitation sur $total envoyée…'
@@ -679,8 +680,7 @@ abstract final class AppStrings {
       'Sans nom : le pompier le saisira lui-même.';
   static const String importDejaInvitee =
       'Invitation déjà en attente. Ignorée.';
-  static String importDoublon(int premiere) =>
-      'Déjà présente ligne $premiere.';
+  static String importDoublon(int premiere) => 'Déjà présente ligne $premiere.';
   static const String importAdresseAbsente =
       'Pas d\'adresse e-mail sur cette ligne.';
 
@@ -705,8 +705,7 @@ abstract final class AppStrings {
 
   // --- Le rapport ------------------------------------------------------
 
-  static String importEcarteesResume(int nombre, String motifs) =>
-      nombre <= 1
+  static String importEcarteesResume(int nombre, String motifs) => nombre <= 1
       ? '1 ligne du fichier n\'a rien reçu : $motifs.'
       : '$nombre lignes du fichier n\'ont rien reçu : $motifs.';
 
@@ -721,22 +720,70 @@ abstract final class AppStrings {
 
   /// Le titre de la seule liste que le compte rendu déroule.
   ///
-  /// Ce qui est passé ne descend pas ici : [inviterResume] l'a déjà compté,
+  /// Ce qui est passé ne descend pas ici : [importResume] l'a déjà compté,
   /// et soixante coches identiques enterrent les trois lignes qui demandent
   /// quelque chose — c'est la règle que l'aperçu applique déjà à sa marque.
   static const String importEchecsTitre = 'À reprendre';
 
+  /// Le résumé d'un import, en une phrase qui ne promet que ce qui est vrai.
+  ///
+  /// **Ce n'est pas [inviterResume], et c'est tout le sujet.** Là-bas, un
+  /// seul verbe, « envoyées », pour un nombre qui compte en réalité les
+  /// invitations *créées*. Ici, la création et l'envoi du courriel sont deux
+  /// faits séparés — sans fournisseur de courriel configuré, tout est créé et
+  /// rien ne part — et [importCourrielsNonPartis] le dit juste en dessous.
+  /// Garder « envoyées » afficherait deux phrases qui se contredisent, l'une
+  /// sous l'autre : « 3 invitations envoyées » puis « aucun courriel n'est
+  /// parti ».
+  ///
+  /// Le verbe suit donc les faits : « envoyées » quand [parties] couvre tout
+  /// ce qui a été créé — le compte rendu reste alors bref, rien ne s'ajoute
+  /// dessous —, « créées » dès qu'un courriel manque à l'appel.
+  static String importResume({
+    required int creees,
+    required int parties,
+    required int echecs,
+  }) {
+    final partieEchecs = echecs <= 1 ? '$echecs échec' : '$echecs échecs';
+    if (parties >= creees) {
+      return creees <= 1
+          ? '$creees invitation envoyée, $partieEchecs.'
+          : '$creees invitations envoyées, $partieEchecs.';
+    }
+    return creees <= 1
+        ? '$creees invitation créée, $partieEchecs.'
+        : '$creees invitations créées, $partieEchecs.';
+  }
+
   /// Les invitations qui existent, mais dont personne n'a été prévenu.
   ///
-  /// Elles ne sont pas énumérées : en production aucun fournisseur de
-  /// courriel n'est configuré, et c'est alors **tout** l'import qui est dans
-  /// ce cas. Le geste utile est le renvoi, et il se pose dans la liste des
-  /// invitations en attente, où chaque ligne le porte (ticket 048).
-  static String importCourrielsNonPartis(int nombre) => nombre <= 1
-      ? '1 invitation est créée, mais son courriel n\'est pas parti. '
-            'Renvoie-la depuis la liste des invitations en attente.'
-      : '$nombre invitations sont créées, mais leur courriel n\'est pas '
-            'parti. Renvoie-les depuis la liste des invitations en attente.';
+  /// Deux tournures, parce que ce sont deux faits différents. Quand c'est
+  /// tout l'import — le cas de production, aucun fournisseur de courriel
+  /// configuré —, la phrase parle de l'ensemble que [importResume] vient
+  /// d'annoncer. Quand une partie seulement est restée à quai, elle compte
+  /// sur ce même ensemble : dire « 2 invitations sont créées » sous un résumé
+  /// qui en annonce 3 ferait douter de la troisième.
+  ///
+  /// Elles ne sont jamais énumérées : le geste utile est le renvoi, et il se
+  /// pose dans la liste des invitations en attente, où chaque ligne le porte
+  /// (ticket 048).
+  static String importCourrielsNonPartis({
+    required int nonPartis,
+    required int creees,
+  }) {
+    if (nonPartis >= creees) {
+      return nonPartis <= 1
+          ? 'Son courriel n\'est pas parti. Renvoie cette invitation depuis '
+                'la liste des invitations en attente.'
+          : 'Aucun courriel n\'est parti. Renvoie ces invitations depuis la '
+                'liste des invitations en attente.';
+    }
+    return nonPartis <= 1
+        ? '1 de ces invitations n\'a pas reçu son courriel. Renvoie-la depuis '
+              'la liste des invitations en attente.'
+        : '$nonPartis de ces invitations n\'ont pas reçu leur courriel. '
+              'Renvoie-les depuis la liste des invitations en attente.';
+  }
 
   static String importReprendreApres(String heure) =>
       'Reprends l\'import après $heure avec le même fichier : les personnes '

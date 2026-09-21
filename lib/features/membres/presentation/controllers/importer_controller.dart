@@ -27,7 +27,7 @@ class EtatImport {
     this.erreurLecture,
     this.apercu,
     this.envoiEnCours = false,
-    this.envoyees = 0,
+    this.parties = 0,
     this.rapport,
     this.erreurRequete,
     this.reprendreApres,
@@ -45,13 +45,17 @@ class EtatImport {
 
   final bool envoiEnCours;
 
-  /// Combien d'invitations sont **parties**, pour l'avancement.
+  /// Combien de courriels d'invitation sont **réellement partis**, pour
+  /// l'avancement.
   ///
-  /// Le compte des verdicts rendus par le serveur n'est pas celui-là : une
-  /// adresse refusée reçoit un verdict sans que personne ne soit invité. Les
-  /// mêler faisait annoncer « 60 invitations sur 60 envoyées » pendant
-  /// l'envoi, puis « 57 envoyées, 3 échecs » à l'écran suivant.
-  final int envoyees;
+  /// Ni le compte des verdicts rendus par le serveur — une adresse refusée
+  /// reçoit un verdict sans que personne ne soit invité —, ni celui des
+  /// invitations créées : sans fournisseur de courriel, elles existent toutes
+  /// sans que personne n'ait été prévenu. Le premier faisait annoncer
+  /// « 60 invitations sur 60 envoyées » pendant l'envoi, puis « 57 envoyées,
+  /// 3 échecs » à l'écran suivant ; le second promettait un envoi qui n'avait
+  /// pas eu lieu (ticket 048).
+  final int parties;
 
   final RapportInvitations? rapport;
 
@@ -121,7 +125,10 @@ class ImporterController extends Notifier<EtatImport> {
 
     final depot = ref.read(membresRepositoryProvider);
     try {
-      final (List<MembreCaserne> membres, List<Invitation> invitations) = await (
+      final (
+        List<MembreCaserne> membres,
+        List<Invitation> invitations,
+      ) = await (
         depot.membres(stationId),
         depot.invitationsEnAttente(stationId),
       ).wait;
@@ -228,7 +235,7 @@ class ImporterController extends Notifier<EtatImport> {
           etape: EtapeImport.apercu,
           apercu: apercu,
           envoiEnCours: true,
-          envoyees: _parties(resultats),
+          parties: _parties(resultats),
         );
 
         final coupe = rapport.resultats.firstWhere(
@@ -277,17 +284,24 @@ class ImporterController extends Notifier<EtatImport> {
     state = EtatImport(
       etape: EtapeImport.rapport,
       apercu: apercu,
-      envoyees: rapport.envoyees,
+      parties: rapport.courrielsPartis,
       rapport: rapport,
       erreurRequete: echecGlobal,
       reprendreApres: reprendreApres,
     );
   }
 
-  /// Le seul compte qui vaille pour l'avancement : les adresses que le serveur
-  /// a acceptées. Un refus est un verdict, pas un envoi.
-  static int _parties(List<ResultatInvitation> resultats) =>
-      resultats.where((ResultatInvitation r) => !r.enEchec).length;
+  /// Le seul compte qui vaille pour l'avancement : les invitations dont le
+  /// courriel est **réellement sorti**.
+  ///
+  /// Deux comptes plus larges sont écartés pour la même raison. Un refus est
+  /// un verdict, pas un envoi. Et une invitation créée dont le courriel n'est
+  /// pas parti — tout l'import, en production, faute de fournisseur de
+  /// courriel — existe en base sans que personne n'ait été prévenu : l'annoncer
+  /// « envoyée » ferait attendre une réponse que nul ne peut donner.
+  static int _parties(List<ResultatInvitation> resultats) => resultats
+      .where((ResultatInvitation r) => !r.enEchec && r.courrielEnvoye)
+      .length;
 
   /// Revient au choix d'un fichier, tout effacé.
   void recommencer() => state = const EtatImport();
@@ -310,8 +324,8 @@ class ImporterController extends Notifier<EtatImport> {
 /// Auto-disposé : un fichier lu ne survit pas à la fermeture de l'écran. Il
 /// porte des noms et des adresses, et rien ne justifie de les garder en mémoire
 /// une fois l'import fait.
-final NotifierProvider<ImporterController, EtatImport> importerControllerProvider =
-    NotifierProvider<ImporterController, EtatImport>(
-      ImporterController.new,
-      isAutoDispose: true,
-    );
+final NotifierProvider<ImporterController, EtatImport>
+importerControllerProvider = NotifierProvider<ImporterController, EtatImport>(
+  ImporterController.new,
+  isAutoDispose: true,
+);

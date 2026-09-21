@@ -97,6 +97,27 @@ Future<void> _faireDefilerVers(WidgetTester tester, Finder cible) async {
   await tester.pumpAndSettle();
 }
 
+/// Aucune phrase à l'écran n'annonce un envoi.
+///
+/// C'est l'assertion qui manquait à la revue du ticket 048 : vérifier que la
+/// phrase attendue est là ne voit pas celle **en trop**. Le compte rendu
+/// affichait « 3 invitations envoyées, 0 échec. » posé sur « leur courriel
+/// n'est pas parti », et les deux passaient. Ici, dès qu'un courriel est
+/// resté à quai, plus rien à l'écran n'a le droit de dire « envoyée ».
+void _aucunEnvoiPromis(WidgetTester tester) {
+  final phrases = tester
+      .widgetList<Text>(find.byType(Text))
+      .map((Text texte) => texte.data)
+      .whereType<String>();
+  for (final phrase in phrases) {
+    expect(
+      phrase.contains('envoyée'),
+      isFalse,
+      reason: '« $phrase » promet un envoi qui n\'a pas eu lieu.',
+    );
+  }
+}
+
 void main() {
   group('Temps 1 — choisir', () {
     testWidgets('l\'écran dit ce que le fichier doit contenir', (tester) async {
@@ -284,8 +305,7 @@ void main() {
     /// compare des ordonnées, pas des gestes.
     const posteHaut = Size(390, 1400);
 
-    double dy(WidgetTester tester, Finder cible) =>
-        tester.getTopLeft(cible).dy;
+    double dy(WidgetTester tester, Finder cible) => tester.getTopLeft(cible).dy;
 
     testWidgets('les lignes écartées se lisent avant les justes', (
       tester,
@@ -381,7 +401,7 @@ void main() {
       // Soixante lignes identiques sous un résumé qui dit déjà « 0 échec »
       // n'ajoutent rien et enterrent ce qui compterait.
       expect(
-        find.text(AppStrings.inviterResume(envoyees: 60, echecs: 0)),
+        find.text(AppStrings.importResume(creees: 60, parties: 60, echecs: 0)),
         findsOneWidget,
       );
       expect(find.text(AppStrings.importEchecsTitre), findsNothing);
@@ -431,43 +451,96 @@ void main() {
       expect(find.text('Pompier3 Dupont3'), findsNothing);
     });
 
-    testWidgets('les courriels qui ne partent pas se comptent, pas un par un', (
-      tester,
-    ) async {
+    /// Trois lignes acceptées, dont [parties] dont le courriel sort vraiment.
+    ///
+    /// C'est le seul axe qui bouge d'un cas à l'autre : rien n'est refusé, et
+    /// seule la configuration du fournisseur de courriel change — aucun le 21
+    /// septembre en production, tous en local, une partie quand le service
+    /// lâche en cours de route.
+    RapportInvitations troisDontParties(int parties) => RapportInvitations(
+      resultats: <ResultatInvitation>[
+        for (var i = 1; i <= 3; i++)
+          ResultatInvitation(
+            email: 'pompier$i@exemple.fr',
+            statut: StatutResultatInvitation.invitee,
+            courrielEnvoye: i <= parties,
+          ),
+      ],
+    );
+
+    Future<void> importerTrois(WidgetTester tester, int parties) async {
       final selecteur = FauxSelecteurFichier()..posera(fichierDe(3));
       final depot = FauxMembresRepository()
-        ..rapportsParLot = const <RapportInvitations>[
-          RapportInvitations(
-            resultats: <ResultatInvitation>[
-              ResultatInvitation(
-                email: 'pompier1@exemple.fr',
-                statut: StatutResultatInvitation.invitee,
-                courrielEnvoye: false,
-              ),
-              ResultatInvitation(
-                email: 'pompier2@exemple.fr',
-                statut: StatutResultatInvitation.invitee,
-                courrielEnvoye: false,
-              ),
-              ResultatInvitation(
-                email: 'pompier3@exemple.fr',
-                statut: StatutResultatInvitation.invitee,
-                courrielEnvoye: false,
-              ),
-            ],
-          ),
-        ];
+        ..rapportsParLot = <RapportInvitations>[troisDontParties(parties)];
       await _ouvrirImport(tester, depot: depot, selecteur: selecteur);
 
       await _choisir(tester);
       await tester.tap(find.text(AppStrings.importEnvoyer(3)));
       await tester.pumpAndSettle();
+    }
 
-      // Sans fournisseur de courriel configuré, c'est tout l'import qui est
-      // dans ce cas : une phrase et un nombre, pas soixante lignes.
-      expect(find.text(AppStrings.importCourrielsNonPartis(3)), findsOneWidget);
-      expect(find.text(AppStrings.resultatCourrielNonParti), findsNothing);
+    testWidgets('tout est parti : le compte rendu tient en une phrase', (
+      tester,
+    ) async {
+      await importerTrois(tester, 3);
+
+      expect(
+        find.text(AppStrings.importResume(creees: 3, parties: 3, echecs: 0)),
+        findsOneWidget,
+      );
+      // Un fournisseur de courriel est configuré, tout est sorti : pas une
+      // ligne sur des courriels à quai qui n'existent pas.
+      expect(find.textContaining('courriel'), findsNothing);
       expect(find.text(AppStrings.importEchecsTitre), findsNothing);
+    });
+
+    testWidgets(
+      'rien n\'est parti : les courriels se comptent, pas un par un',
+      (tester) async {
+        await importerTrois(tester, 0);
+
+        // Sans fournisseur de courriel configuré, c'est tout l'import qui est
+        // dans ce cas : une phrase et un nombre, pas soixante lignes.
+        expect(
+          find.text(AppStrings.importResume(creees: 3, parties: 0, echecs: 0)),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            AppStrings.importCourrielsNonPartis(nonPartis: 3, creees: 3),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text(AppStrings.resultatCourrielNonParti), findsNothing);
+        expect(find.text(AppStrings.importEchecsTitre), findsNothing);
+
+        // Le défaut de la revue : « 3 invitations envoyées, 0 échec. » posé
+        // juste au-dessus de « leur courriel n'est pas parti ».
+        expect(
+          find.text(AppStrings.inviterResume(envoyees: 3, echecs: 0)),
+          findsNothing,
+        );
+        _aucunEnvoiPromis(tester);
+      },
+    );
+
+    testWidgets('une partie seulement est partie : le compte le dit', (
+      tester,
+    ) async {
+      await importerTrois(tester, 1);
+
+      expect(
+        find.text(AppStrings.importResume(creees: 3, parties: 1, echecs: 0)),
+        findsOneWidget,
+      );
+      // Deux sur les trois du résumé, et non « 2 invitations sont créées »,
+      // qui ferait douter de la troisième.
+      expect(
+        find.text(AppStrings.importCourrielsNonPartis(nonPartis: 2, creees: 3)),
+        findsOneWidget,
+      );
+      expect(find.text(AppStrings.importEchecsTitre), findsNothing);
+      _aucunEnvoiPromis(tester);
     });
 
     testWidgets('les lignes écartées sont résumées, pas noyées dans le rapport', (
@@ -507,7 +580,7 @@ void main() {
       expect(find.text('marie@exemple.fr'), findsNothing);
       expect(find.text('anne@exemple.fr'), findsNothing);
       expect(
-        find.text(AppStrings.inviterResume(envoyees: 1, echecs: 0)),
+        find.text(AppStrings.importResume(creees: 1, parties: 1, echecs: 0)),
         findsOneWidget,
       );
     });
@@ -576,7 +649,7 @@ void main() {
       // écrans ne se contredisent plus.
       await tester.pumpAndSettle();
       expect(
-        find.text(AppStrings.inviterResume(envoyees: 35, echecs: 5)),
+        find.text(AppStrings.importResume(creees: 35, parties: 35, echecs: 5)),
         findsOneWidget,
       );
     });
@@ -726,7 +799,9 @@ void main() {
         // Le rapport garde ce qui est passé — sinon l'administrateur
         // réessaierait des adresses déjà invitées.
         expect(
-          find.text(AppStrings.inviterResume(envoyees: 20, echecs: 0)),
+          find.text(
+            AppStrings.importResume(creees: 20, parties: 20, echecs: 0),
+          ),
           findsOneWidget,
         );
 

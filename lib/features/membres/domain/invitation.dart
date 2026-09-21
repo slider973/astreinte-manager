@@ -386,8 +386,23 @@ class RapportInvitations {
 
   final List<ResultatInvitation> resultats;
 
-  int get envoyees =>
+  /// Les invitations que le serveur a acceptées, courriel parti ou non.
+  ///
+  /// **Ce n'est pas un compte d'envois**, et le nom le dit maintenant : une
+  /// invitation peut exister en base sans que le moindre courriel soit sorti
+  /// (`email_sent` faux). Compter les deux ensemble a fait afficher « 3
+  /// invitations envoyées » au-dessus de « aucun courriel n'est parti »
+  /// (ticket 048). Pour les envois, voir [courrielsPartis].
+  int get creees =>
       resultats.where((ResultatInvitation r) => !r.enEchec).length;
+
+  /// Les invitations créées **dont le courriel est réellement sorti**.
+  ///
+  /// Le seul compte qui autorise le verbe « envoyée », à l'écran comme dans
+  /// le compteur d'avancement.
+  int get courrielsPartis => resultats
+      .where((ResultatInvitation r) => !r.enEchec && r.courrielEnvoye)
+      .length;
 
   int get echecs => resultats.where((ResultatInvitation r) => r.enEchec).length;
 

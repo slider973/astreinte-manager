@@ -198,7 +198,7 @@ class _Apercu extends StatelessWidget {
                     liveRegion: true,
                     child: Text(
                       AppStrings.importAvancement(
-                        faites: etat.envoyees,
+                        faites: etat.parties,
                         total: apercu.nombreAInviter,
                       ),
                       style: theme.textTheme.bodyMedium?.copyWith(

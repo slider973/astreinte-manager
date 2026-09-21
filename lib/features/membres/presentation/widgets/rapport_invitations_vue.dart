@@ -33,7 +33,7 @@ class RapportInvitationsVue extends StatelessWidget {
           liveRegion: true,
           child: Text(
             AppStrings.inviterResume(
-              envoyees: rapport.envoyees,
+              envoyees: rapport.creees,
               echecs: rapport.echecs,
             ),
             style: theme.textTheme.bodyLarge,

@@ -26,6 +26,14 @@ import '../../domain/invitation.dart';
 ///   sans fournisseur de courriel configuré, c'est tout l'import qui est dans
 ///   ce cas, et le geste utile — le renvoi — se pose dans la liste des
 ///   invitations en attente, pas ici.
+///
+/// **Les deux phrases se composent, elles ne se contredisent pas.** Le résumé
+/// compte les invitations créées, et n'emploie « envoyées » que si tous les
+/// courriels sont réellement sortis ; sinon il dit « créées », et la phrase du
+/// dessous dit lesquelles n'ont prévenu personne. C'est
+/// [AppStrings.importResume] qui tient cette règle, et non l'ancien
+/// [AppStrings.inviterResume], dont le verbe promettait un envoi qui n'avait
+/// pas eu lieu (ticket 048).
 class RapportImportVue extends StatelessWidget {
   const RapportImportVue({
     required this.rapport,
@@ -44,6 +52,7 @@ class RapportImportVue extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final refus = rapport.refus;
+    final creees = rapport.creees;
     final nonPartis = rapport.courrielsNonPartis;
 
     return Column(
@@ -52,8 +61,9 @@ class RapportImportVue extends StatelessWidget {
         Semantics(
           liveRegion: true,
           child: Text(
-            AppStrings.inviterResume(
-              envoyees: rapport.envoyees,
+            AppStrings.importResume(
+              creees: creees,
+              parties: rapport.courrielsPartis,
               echecs: rapport.echecs,
             ),
             style: theme.textTheme.bodyLarge,
@@ -62,7 +72,10 @@ class RapportImportVue extends StatelessWidget {
         if (nonPartis > 0) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
           Text(
-            AppStrings.importCourrielsNonPartis(nonPartis),
+            AppStrings.importCourrielsNonPartis(
+              nonPartis: nonPartis,
+              creees: creees,
+            ),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -112,11 +125,7 @@ class _LigneRefus extends StatelessWidget {
 
     return Semantics(
       label: titre,
-      value: <String>[
-        ?sousTitre,
-        AppStrings.resultatEchec,
-        ?detail,
-      ].join('. '),
+      value: <String>[?sousTitre, AppStrings.resultatEchec, ?detail].join('. '),
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),

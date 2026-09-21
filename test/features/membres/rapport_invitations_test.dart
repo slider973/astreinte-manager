@@ -35,7 +35,8 @@ void main() {
         ],
       });
 
-      expect(rapport.envoyees, 2);
+      expect(rapport.creees, 2);
+      expect(rapport.courrielsPartis, 2);
       expect(rapport.echecs, 1);
       expect(rapport.toutEstPasse, isFalse);
       expect(rapport.adressesEnEchec, <String>['deja@exemple.fr']);
@@ -60,6 +61,12 @@ void main() {
         rapport.resultats.single.detail,
         AppStrings.resultatCourrielNonParti,
       );
+      // L'invitation existe, et personne n'a été prévenu : les deux comptes
+      // divergent, et c'est cette divergence qui interdit le mot « envoyée »
+      // au compte rendu d'import (ticket 048).
+      expect(rapport.creees, 1);
+      expect(rapport.courrielsPartis, 0);
+      expect(rapport.courrielsNonPartis, 1);
     });
 
     test('un statut inconnu est traité comme une erreur', () {
