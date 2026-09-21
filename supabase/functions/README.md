@@ -141,7 +141,13 @@ Il est gardé en mémoire le temps de vie de l'instance, mais **relu en cas de n
 le jour où il tourne, une instance déjà chaude refuserait sinon tous les appels venus de la base
 jusqu'à son recyclage, et les notifications s'accumuleraient en file pour une raison invisible.
 
-L'adresse, elle, vise la pile locale par défaut. Sur un projet hébergé, une commande, une fois :
+L'adresse, elle, vise la pile locale par défaut. **Sur un projet hébergé, la mise en ligne la pose**
+(ticket 049) : `supabase/config.toml` la déclare dans `[remotes.production.db.vault]`, et
+`supabase db push` met à jour les secrets Vault déclarés **avant** de jouer les migrations. Elle est
+donc reposée à chaque déploiement, sans effet quand elle est déjà bonne, et
+`scripts/verifier_production.sh` la contrôle ensuite.
+
+Cette commande reste la reprise à la main, si l'adresse est à corriger sans attendre :
 
 ```sql
 select vault.update_secret(
@@ -151,7 +157,9 @@ select vault.update_secret(
 
 Tant que ce n'est pas fait, les notifications déclenchées **depuis la base** restent en file :
 `select * from notification_outbox where status <> 'sent'` les montre, avec `last_error`. Rien n'est
-perdu — c'est tout l'intérêt de la file — mais rien ne part.
+perdu — c'est tout l'intérêt de la file — mais rien ne part. C'est ce qui s'est passé jusqu'au 21
+septembre 2026 : `cron_dispatch_notifications` réussissait toutes les minutes en poussant vers
+l'adresse Docker de la pile locale, et aucune notification ne partait.
 
 Aucun secret dans le dépôt : `supabase/functions/.env*` est ignoré par git (`.gitignore`, règles
 `.env` / `.env.*`).
