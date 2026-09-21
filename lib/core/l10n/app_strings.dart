@@ -192,7 +192,8 @@ abstract final class AppStrings {
 
   /// La première ligne de la bannière, quand la base ne connaît pas la date de
   /// bascule. Reprise mot pour mot de `DESIGN.md § AppBanner`.
-  static const String lectureSeuleBanniere = 'Caserne suspendue : lecture seule.';
+  static const String lectureSeuleBanniere =
+      'Caserne suspendue : lecture seule.';
 
   /// La même, quand la date est connue.
   ///
@@ -2739,4 +2740,182 @@ abstract final class AppStrings {
 
   static const String abonnementErreurTexte =
       'Impossible de charger l\'abonnement de la caserne.';
+
+  // -------------------------------------------------------------------
+  // Interface de l'éditeur du produit (ticket 031)
+  // -------------------------------------------------------------------
+  //
+  // L'écran de l'éditeur, pas celui d'un client : le vouvoiement n'y est pas
+  // plus de mise qu'ailleurs, mais le ton est descriptif — on énonce des faits
+  // d'exploitation, on ne guide personne.
+
+  static const String superAdminTitre = 'Casernes';
+  static const String superAdminSousTitre =
+      'Toutes les casernes du service, leur état et leur abonnement.';
+
+  static const String superAdminRelire = 'Relire la liste';
+
+  /// L'écran s'ouvre le temps que le droit revienne, puis le routeur reprend
+  /// la main. Se tromper d'URL n'est pas une faute : pas de message d'erreur.
+  static const String superAdminReserveTitre = 'Écran réservé';
+  static const String superAdminReserveTexte =
+      'Cet écran est réservé à l\'éditeur de l\'application.';
+
+  static const String superAdminVideTitre = 'Aucune caserne';
+  static const String superAdminVideTexte =
+      'Rien n\'est encore ouvert. Crée une première caserne et nomme son '
+      'administrateur.';
+
+  static const String superAdminErreurTexte =
+      'Impossible de lire la liste des casernes.';
+
+  // --- La ligne d'une caserne ---------------------------------------------
+
+  /// « 9 membres actifs · 1 administrateur ».
+  static String superAdminEffectif(int membres, int admins) =>
+      '${_pluriel(membres, 'membre actif', 'membres actifs')} · '
+      '${_pluriel(admins, 'administrateur', 'administrateurs')}';
+
+  /// Le seul défaut d'une ligne qui appelle une action.
+  static const String superAdminSansAdmin =
+      'Aucun administrateur : personne ne peut gérer cette caserne.';
+
+  static String superAdminInvitationsEnAttente(int n) => n <= 1
+      ? 'Une invitation d\'administrateur est en attente.'
+      : '$n invitations d\'administrateur sont en attente.';
+
+  static String superAdminCreeeLe(String date) => 'Créée le $date.';
+
+  static String superAdminDernierPlanning(String mois) =>
+      'Dernier planning publié : ${_enMinuscule(mois)}.';
+
+  static const String superAdminAucunPlanning = 'Aucun planning publié.';
+
+  // --- Les actions ---------------------------------------------------------
+
+  static const String superAdminCreer = 'Créer une caserne';
+  static const String superAdminInviterAdmin = 'Inviter un administrateur';
+  static const String superAdminSuspendre = 'Suspendre';
+  static const String superAdminReactiver = 'Réactiver';
+  static const String superAdminConsulter = 'Consulter les plannings';
+
+  /// Quatre boutons « Suspendre » ne se distinguent pas à l'oreille.
+  static String superAdminActionSemantique(String action, String caserne) =>
+      '$action ${caserne.isEmpty ? 'cette caserne' : caserne}';
+
+  // --- La création ---------------------------------------------------------
+
+  static const String superAdminCreerTitre = 'Nouvelle caserne';
+  static const String superAdminCreerAide =
+      'L\'adresse d\'URL est dérivée du nom. L\'essai de 60 jours démarre '
+      'tout de suite.';
+  static const String superAdminChampNom = 'Nom de la caserne';
+  static const String superAdminChampNomExemple = 'CIS Saint-Martin';
+  static const String superAdminChampFuseau = 'Fuseau horaire';
+  static const String superAdminCreerValider = 'Créer la caserne';
+
+  static String superAdminCaserneCreee(String nom) => '$nom créée.';
+
+  // --- L'invitation du premier administrateur ------------------------------
+
+  static const String superAdminInviterTitre = 'Premier administrateur';
+  static String superAdminInviterAide(String caserne) =>
+      'L\'invitation part par courriel. La personne deviendra administratrice '
+      'de $caserne dès qu\'elle l\'aura acceptée.';
+  static const String superAdminChampEmail = 'Adresse e-mail';
+  static const String superAdminChampEmailExemple = 'chef@caserne.fr';
+  static const String superAdminInviterValider = 'Envoyer l\'invitation';
+
+  static String superAdminInvitationEnvoyee(String email) =>
+      'Invitation envoyée à $email.';
+
+  static const String superAdminEchecInvitation =
+      'L\'invitation n\'est pas partie. Réessaie dans un instant.';
+
+  // --- La suspension -------------------------------------------------------
+
+  static String superAdminSuspendreTitre(String caserne) =>
+      'Suspendre $caserne ?';
+
+  /// La promesse du produit, et elle est due ici comme au 030.
+  static const String superAdminSuspendreAide =
+      'Rien n\'est supprimé. La caserne passe en lecture seule : ses membres '
+      'consultent, personne ne modifie.';
+
+  static const String superAdminChampRaisonSuspension =
+      'Impayé constaté hors Stripe, demande du trésorier';
+
+  static const String superAdminSuspendreValider = 'Suspendre la caserne';
+
+  /// Réactiver ne détruit rien et se refait d'un geste : l'écran ne demande pas
+  /// de raison. La fonction en exige une — c'est elle qui part dans le journal
+  /// d'audit de la caserne, et « réactivation manuelle » y est exact.
+  static const String superAdminReactivationRaison =
+      'Réactivation manuelle par l\'éditeur de l\'application';
+
+  static String superAdminSuspendue(String nom) =>
+      nom.isEmpty ? 'Caserne suspendue.' : '$nom suspendue.';
+
+  static String superAdminReactivee(String nom) =>
+      nom.isEmpty ? 'Caserne réactivée.' : '$nom réactivée.';
+
+  // --- La consultation de support ------------------------------------------
+
+  static String superAdminSupportTitre(String caserne) =>
+      'Consulter les plannings de $caserne';
+
+  /// Dit avant l'action, jamais après : la caserne verra qu'on l'a regardée.
+  static const String superAdminSupportAide =
+      'Cette consultation est inscrite au journal d\'audit de la caserne. '
+      'Ses administrateurs la verront.';
+
+  static const String superAdminSupportPortee =
+      'Seuls l\'avancement et les dates sont rendus : aucun nom, aucune '
+      'disponibilité.';
+
+  static const String superAdminChampRaison = 'Raison';
+  static const String superAdminChampRaisonExemple =
+      'Ticket support 42 : le planning de mars ne se valide pas';
+  static const String superAdminSupportValider = 'Ouvrir la consultation';
+
+  static const String superAdminSupportVideTitre = 'Aucun planning';
+  static const String superAdminSupportVideTexte =
+      'Cette caserne n\'a construit aucun planning. Il n\'y a rien à '
+      'diagnostiquer de ce côté.';
+
+  /// « 31 créneaux · 28 acceptées, 3 en attente ».
+  static String superAdminSupportCreneaux(int n) =>
+      _pluriel(n, 'créneau', 'créneaux');
+
+  static String superAdminSupportAttributions(int n) =>
+      _pluriel(n, 'attribution', 'attributions');
+
+  static String superAdminSupportPublieLe(String date) => 'Publié le $date.';
+  static String superAdminSupportValideLe(String date) => 'Validé le $date.';
+
+  // --- Les refus -----------------------------------------------------------
+
+  static const String superAdminRefusDroits =
+      'Cette action est réservée à l\'éditeur de l\'application.';
+
+  static const String superAdminRefusNom =
+      'Donne un nom de caserne, de 80 caractères au plus.';
+
+  static const String superAdminRefusFuseau =
+      'Ce fuseau horaire n\'existe pas. Exemple : Europe/Paris.';
+
+  static const String superAdminRefusRaison =
+      'Écris la raison en une phrase : elle part dans le journal d\'audit de '
+      'la caserne.';
+
+  static const String superAdminRefusCaserne =
+      'Cette caserne n\'existe plus. Relis la liste.';
+
+  static const String superAdminEchecGenerique =
+      'L\'action n\'a pas abouti. Réessaie dans un instant.';
+
+  /// « 1 membre actif », « 9 membres actifs » — l'accord fait le pluriel, pas
+  /// un « (s) » entre parenthèses.
+  static String _pluriel(int n, String singulier, String pluriel) =>
+      '$n ${n <= 1 ? singulier : pluriel}';
 }

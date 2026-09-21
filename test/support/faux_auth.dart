@@ -51,6 +51,8 @@ import 'package:astreinte_sp/features/planning/domain/planning_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/suivi_providers.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/propositions_providers.dart';
+import 'package:astreinte_sp/features/superadmin/data/superadmin_repository.dart';
+import 'package:astreinte_sp/features/superadmin/domain/superadmin_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,6 +68,7 @@ import 'faux_planning_caserne.dart';
 import 'faux_propositions.dart';
 import 'faux_push.dart';
 import 'faux_suivi.dart';
+import 'faux_superadmin.dart';
 
 /// Environnement de test : configuration Supabase présente, mais aucun réseau
 /// n'est jamais joint — les dépôts sont faux.
@@ -268,6 +271,7 @@ Future<AppMontee> monterApp(
   FauxMessageriePush? messagerie,
   FauxPushTokensRepository? jetons,
   NotificationsRepository? notifications,
+  SuperAdminRepository? superAdmin,
   JetonLocal? jetonLocal,
   Size taille = const Size(390, 844),
   bool stabiliser = true,
@@ -413,6 +417,13 @@ Future<AppMontee> monterApp(
         // sans faux, chaque test toucherait un client Supabase inexistant.
         notificationsRepositoryProvider.overrideWithValue(
           notifications ?? FauxNotificationsRepository(),
+        ),
+        // L'éditeur du produit (ticket 031). **Par défaut, personne ne l'est** :
+        // `estSuperAdminProvider` est lu par le routeur à chaque redirection,
+        // donc par tous les tests, et la porte doit rester fermée sans qu'un
+        // client Supabase inexistant soit touché.
+        superAdminRepositoryProvider.overrideWithValue(
+          superAdmin ?? FauxSuperAdminRepository(autorise: false),
         ),
       ],
       child: const AstreinteApp(),

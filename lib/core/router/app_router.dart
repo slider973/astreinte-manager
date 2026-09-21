@@ -24,6 +24,8 @@ import '../../features/parametres/presentation/parametres_screen.dart';
 import '../../features/periodes/presentation/periodes_screen.dart';
 import '../../features/planning/presentation/matrice_screen.dart';
 import '../../features/planning/presentation/suivi_screen.dart';
+import '../../features/superadmin/domain/superadmin_providers.dart';
+import '../../features/superadmin/presentation/superadmin_screen.dart';
 import '../env.dart';
 import '../session/email.dart';
 import '../session/etat_auth.dart';
@@ -138,6 +140,16 @@ abstract final class AppRoutes {
   static const String periodes = '/admin/periodes';
   static const String periodesName = 'periodesCaserne';
 
+  /// L'écran de l'éditeur du produit (ticket 031) : la liste des casernes.
+  ///
+  /// **Pas une destination de navigation**, et pas un préfixe d'administration
+  /// de caserne : l'éditeur n'est membre d'aucune caserne, il n'a pas de barre
+  /// de navigation, il a une URL. La garde est dans `redirectionAuth`, comme
+  /// pour `/admin` — mais elle laisse passer un compte **sans caserne**, ce qui
+  /// est le cas nominal de l'éditeur.
+  static const String superAdmin = '/superadmin';
+  static const String superAdminName = 'superAdmin';
+
   /// Le lien reçu par courriel. **Il ne porte que le jeton** : ni l'adresse
   /// invitée, ni le nom de la caserne (`supabase/functions/README.md`).
   static const String invitation = '/invite/:$parametreJeton';
@@ -242,6 +254,9 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         chemin: state.matchedLocation,
         outilsDevAutorises: env.isDev,
         estAdmin: ref.read(appartenanceCouranteProvider)?.estAdmin ?? false,
+        // `null` tant que la réponse n'est pas là : la garde attend plutôt que
+        // de rediriger sur une supposition (`auth_redirection.dart`).
+        estSuperAdmin: ref.read(estSuperAdminProvider).value,
         cheminInvitationEnAttente: jeton == null
             ? null
             : AppRoutes.cheminInvitation(jeton),
@@ -335,6 +350,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             state.uri.queryParameters[AppRoutes.parametrePaiement],
           ),
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.superAdmin,
+        name: AppRoutes.superAdminName,
+        builder: (context, state) => const SuperAdminScreen(),
       ),
       GoRoute(
         path: AppRoutes.invitation,
@@ -442,20 +462,31 @@ RetourPaiement? retourPaiement(String? valeur) => switch (valeur) {
 };
 
 /// Pont entre Riverpod et `go_router` : un [Listenable] qui se déclenche à
-/// chaque changement de l'état d'authentification.
+/// chaque changement de l'état d'authentification, **et** à l'arrivée du droit
+/// de l'éditeur du produit.
+///
+/// Le second abonnement n'est pas décoratif : `estSuperAdminProvider` répond
+/// après coup, et sans personne pour l'écouter la redirection resterait sur la
+/// décision prise avec un statut inconnu.
 class _RafraichissementRouteur extends ChangeNotifier {
   _RafraichissementRouteur(Ref ref) {
     _abonnement = ref.listen<EtatAuth>(
       etatAuthProvider,
       (_, _) => notifyListeners(),
     );
+    _editeur = ref.listen<AsyncValue<bool>>(
+      estSuperAdminProvider,
+      (_, _) => notifyListeners(),
+    );
   }
 
   late final ProviderSubscription<EtatAuth> _abonnement;
+  late final ProviderSubscription<AsyncValue<bool>> _editeur;
 
   @override
   void dispose() {
     _abonnement.close();
+    _editeur.close();
     super.dispose();
   }
 }
