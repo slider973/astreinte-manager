@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 007
 - **Branche** : `feat/034-rgpd-export`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/31
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
