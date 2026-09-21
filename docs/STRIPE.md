@@ -190,18 +190,22 @@ montre par leur nom (jamais leur contenu).
    **`4242 4242 4242 4242`**, date future quelconque, CVC quelconque, code postal quelconque.
 3. Valide. Stripe renvoie sur l'écran « Abonnement ».
 4. La bannière doit dire **« Paiement enregistré. »** et le statut passer à **« Abonnement actif »**
-   avec sa date de prochain paiement.
+   avec sa date de prochain paiement. Le bloc des formules disparaît : il n'y a plus rien à
+   souscrire.
    Si elle dit « Le statut se met à jour dans un instant », c'est que le webhook n'est pas encore
    arrivé : l'écran relit tout seul dix secondes plus tard.
 5. Dans Stripe : **Développeurs → Webhooks → ton point de terminaison** : les événements doivent
    être en **200**. Un **400** signifie que le secret de signature ne correspond pas — reprends § 4
    et § 5.
+6. Reclique **« Renvoyer »** sur un événement déjà passé : il doit répondre **200** sans rien
+   changer au statut de la caserne. C'est le dédoublonnage — un événement n'est appliqué qu'une
+   fois, même réémis dans la minute.
 
 Autres cartes de test utiles (<https://stripe.com/docs/testing>) :
 
 | Carte | Ce qu'elle produit |
 |---|---|
-| `4000 0000 0000 0341` | le paiement de renouvellement échoue → statut « Paiement en retard » |
+| `4000 0000 0000 0341` | le paiement de renouvellement échoue → statut « Paiement en retard ». **L'écran ne propose alors plus « S'abonner »**, seulement « Gérer mon abonnement » : une carte se change dans le portail, ré-souscrire ferait payer deux fois |
 | `4000 0025 0000 3155` | demande une authentification 3-D Secure |
 
 ### c. Le portail de gestion
@@ -242,7 +246,32 @@ supprimé. L'écran « Abonnement » l'annonce plusieurs jours avant, avec la da
 **« Une caserne peut-elle payer par virement ou par chèque ? »** Pas dans l'application. Le contour
 pour un cas particulier : créer l'abonnement à la main dans le tableau de bord Stripe, en rattachant
 le client à la caserne (champ `station_id` dans les **métadonnées** du client **et** de
-l'abonnement). Le webhook fera le reste.
+l'abonnement). Le webhook fera le reste — à condition que la caserne n'ait pas déjà un **autre**
+client rattaché, auquel cas il refusera (voir l'encadré ci-dessous).
+
+**« Puis-je créer un lien de paiement (Payment Link) ? »** **Non.** L'adresse d'un lien de paiement
+est publique, et n'importe qui peut y accoler `?client_reference_id=<identifiant d'une caserne>` :
+c'est exactement le champ par lequel l'application reconnaît la caserne qui souscrit. L'application
+refuse ce cas — un client ne peut pas être rattaché à une caserne qui en porte déjà un autre, ni à
+une caserne alors qu'il appartient déjà à une autre — mais le bon geste reste de **ne pas créer de
+lien de paiement du tout**. Toutes les souscriptions passent par le bouton de l'écran
+« Abonnement », qui ouvre une session nominative.
+
+**« Un paiement n'est jamais arrivé jusqu'à l'application, que regarder ? »** Dans Stripe :
+**Développeurs → Webhooks → ton point de terminaison**, l'onglet des tentatives. Côté application,
+tous les événements reçus laissent une ligne :
+
+```sql
+select id, type, status, attempts, error, received_at
+from stripe_events
+where status <> 'processed'
+order by received_at desc;
+```
+
+`failed` = le traitement a échoué et sera rejoué (Stripe insiste trois jours ; passé ce délai,
+cette ligne est la seule trace). `skipped` = l'événement a été écarté volontairement, et `error`
+dit pourquoi : `station_not_found` (il ne concerne pas ce projet), `customer_mismatch` (le client
+et la caserne nommée ne vont pas ensemble), `invalid_plan`.
 
 **« Stripe voit-il les données de la caserne ? »** Non. Stripe reçoit le nom de la caserne,
 l'adresse e-mail de l'administrateur qui souscrit, et un identifiant technique. Les
@@ -264,6 +293,8 @@ fenêtres pour le site. Il ne reste jamais un bouton qui ne fait rien.
 | La traduction des événements | `stripe-webhook/evenement.ts`, testée par `tests/stripe_evenement_test.ts` |
 | L'ouverture d'un paiement et du portail | `supabase/functions/create-checkout/`, contrat dans `supabase/functions/README.md` |
 | L'écriture en base | `subscription_sync(...)`, migration `0023`, réservée au rôle de service |
+| Le dédoublonnage et la trace des échecs | table `stripe_events`, `docs/SCHEMA.md § 2.17` |
+| Le contrôle de droits du paiement | `supabase/functions/create-checkout/acces.ts`, testé par `tests/stripe_acces_test.ts` |
 | L'essai de 60 jours | Déclencheur `stations_subscription_bootstrap`, migration `0023` |
 | La suspension automatique | `cron_suspend_subscriptions(...)`, tâche `suspend_subscriptions`, `docs/SCHEMA.md § 8` |
 | La lecture seule qui en découle | `station_writable(uuid)`, migration `0007` |

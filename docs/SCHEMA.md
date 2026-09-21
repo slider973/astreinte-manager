@@ -384,6 +384,41 @@ create table subscriptions (
 );
 ```
 
+### 2.17 `stripe_events` — événements de paiement déjà reçus *(migration `0023`, ticket 029)*
+
+```sql
+create table stripe_events (
+  id            text primary key,          -- « evt_… », l'identifiant du prestataire
+  type          text not null,             -- « invoice.paid », …
+  station_id    uuid references stations(id) on delete set null,
+  status        text not null default 'processing',
+  result        jsonb not null default '{}'::jsonb,
+  error         text,
+  attempts      integer not null default 1,
+  received_at   timestamptz not null default now(),
+  processed_at  timestamptz,
+  constraint stripe_events_status_valide
+    check (status in ('processing', 'processed', 'skipped', 'failed'))
+);
+create index on stripe_events (status, received_at desc) where status <> 'processed';
+```
+
+**La signature ne dit pas qu'un événement est neuf**, seulement qu'il vient bien du prestataire.
+Un même événement authentique réémis dans la fenêtre de cinq minutes — rejeu manuel depuis le
+tableau de bord, double livraison, requête captée — repasse la vérification. Sur
+`invoice.payment_failed`, cela ramène en impayé une caserne qui vient de régulariser. La clé
+primaire est donc l'identifiant du prestataire : c'est lui qui porte l'unicité, et c'est
+l'insertion qui tranche, jamais un test suivi d'une écriture.
+
+Les quatre statuts : `processing` (pris en charge), `processed` (appliqué), `skipped` (écarté —
+caserne inconnue, formule inconnue, client incohérent ; le rejouer n'y changerait rien) et
+`failed`. **`failed` est le seul que le dédoublonnage laisse reprendre**, et c'est ce qui permet
+aux rejeux du prestataire d'aboutir. C'est aussi la trace qui survit à leur abandon au bout de
+trois jours : `select * from stripe_events where status <> 'processed'` dit ce qui n'est jamais
+passé, comme `notification_outbox` pour les notifications.
+
+RLS active, **aucune politique** : ni `anon` ni `authenticated` n'en lisent une ligne.
+
 ### 2.14 `audit_log`
 
 ```sql
@@ -731,12 +766,24 @@ tourne avec des droits élevés n'est pas un bouton de client. Le bouton, c'est
 | Fonction | Rôle |
 |---|---|
 | `subscription_bootstrap()` | Déclencheur `after insert` sur `stations` : toute caserne naît en `trialing` avec `trial_ends_at = now() + 60 jours`. **L'essai est géré côté application, sans carte bancaire** (`docs/PRD.md § 6.6`) — aucun essai n'est déclaré chez le prestataire. `on conflict do nothing` : une ligne posée à la main reste telle quelle |
-| `subscription_sync(p_station, p_customer, p_subscription, p_status, p_plan, p_period_end, p_event, p_reference)` | **Le seul chemin d'écriture de `subscriptions`.** Appelée par `stripe-webhook` une fois la signature vérifiée. Retrouve la caserne par `p_station` (le `client_reference_id` de la session) ou par `p_customer` ; verrou de ligne ; les paramètres **nuls ne remplacent rien**, ce qui rend les cinq événements applicables dans n'importe quel ordre ; tient `suspended_at` ; journalise `subscription.<événement>` dans `audit_log`. Une caserne introuvable rend `station_not_found` sans erreur — l'événement ne nous concerne pas |
+| `subscription_sync(p_station, p_customer, p_subscription, p_status, p_plan, p_period_end, p_event, p_event_id, p_reference)` | **Le seul chemin d'écriture de `subscriptions`.** Appelée par `stripe-webhook` une fois la signature vérifiée. Dédoublonnée sur `p_event_id` via `stripe_events` (§ 2.17) : un rejeu rend `duplicate` sans rien réappliquer, un traitement en échec se reprend. Retrouve la caserne par `p_station` (le `client_reference_id` de la session) ou par `p_customer` ; **refuse (`customer_mismatch`) si les deux ne vont pas déjà ensemble** (voir ci-dessous) ; verrou de ligne ; les paramètres **nuls ne remplacent rien**, ce qui rend les cinq événements applicables dans n'importe quel ordre ; tient `suspended_at` ; journalise `subscription.<événement>` dans `audit_log`. Une caserne introuvable rend `station_not_found` sans erreur — l'événement ne nous concerne pas |
+| `stripe_event_close(p_event_id, p_station, p_code)` | Marque un événement `skipped` et rend le refus. Un refus **consomme** l'événement : une caserne inconnue ne le deviendra pas |
+| `stripe_event_fail(p_event_id, p_type, p_error)` | Trace durable d'un traitement en échec, posée par l'Edge Function **hors de la transaction annulée** — celle posée à l'intérieur est partie avec elle |
 | `subscription_set_customer(p_station, p_customer)` | Retient l'identifiant client du prestataire **sans toucher au statut** : au moment où `create-checkout` crée le client, rien n'est encore payé |
 | `cron_suspend_subscriptions(p_reference)` | Corps de la tâche `suspend_subscriptions` (§ 8). Deux populations : essai expiré **sans abonnement souscrit** (la condition sur `stripe_subscription_id` évite de suspendre une caserne qui vient de payer), et `past_due` dont `coalesce(current_period_end, updated_at)` remonte à plus de quatorze jours. Idempotente |
 
 Les trois premières sont réservées au rôle de service ; la quatrième à l'ordonnanceur. Aucune
 n'est appelable par `anon` ni `authenticated`.
+
+**Pourquoi `subscription_sync` vérifie que le client va avec la caserne.** La signature établit que
+l'appel vient du prestataire, **pas** que la caserne nommée est la bonne : `client_reference_id`
+est un champ que l'on peut poser depuis une URL, un lien de paiement public l'accepte en paramètre.
+Sans contrôle, un événement qui nomme la caserne B avec le client de A fait basculer B en `active`
+**et lui recolle le client de A** — après quoi l'administrateur de B ouvre le portail de A : sa
+carte, ses factures, sa résiliation. Deux garde-fous, qui ne font pas double emploi : la caserne
+visée ne doit pas porter **un autre** client, et le client ne doit pas être **déjà pris** par une
+autre caserne. Dans les deux cas, rien n'est écrit et le code `customer_mismatch` est rendu — que
+l'Edge Function traite comme une caserne inconnue.
 
 **Pourquoi `current_period_end` et non `updated_at`** pour dater un impayé : le prestataire
 n'avance `current_period_end` qu'après un paiement réussi, alors qu'`updated_at` bouge à **chaque**
@@ -1175,7 +1222,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `auto-propose` | app admin | Heuristique de remplissage du brouillon |
 | `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`) |
 | `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006) |
-| `stripe-webhook` | Stripe | **Vérifie la signature de l'événement** (HMAC-SHA256 du corps brut, fenêtre de cinq minutes), puis applique les cinq événements de l'abonnement par `subscription_sync`. Un événement non signé, mal signé ou rejoué est refusé en 4xx ; sans secret configuré, **tout** est refusé en 503 (ticket 029, contrat dans `supabase/functions/README.md`) |
+| `stripe-webhook` | Stripe | **Vérifie la signature de l'événement** (HMAC-SHA256 du corps brut, lu sous un plafond d'un mégaoctet, fenêtre de cinq minutes), puis applique les cinq événements de l'abonnement par `subscription_sync`. Un événement non signé, mal signé ou hors de la fenêtre est refusé en 4xx ; un événement **déjà traité** est reconnu par `stripe_events` et n'est pas réappliqué ; sans secret configuré, **tout** est refusé en 503 (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `create-checkout` | app admin | Trois actions pour l'écran « Abonnement » : `state` (statut, tarifs, configuration — **répond même sans compte Stripe**), `checkout` (crée le client si besoin, ouvre la session, rend l'adresse) et `portal` (portail de gestion). Rôle d'administrateur revérifié en base (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `ics-feed` | GET public avec token par membre | Génère le flux calendrier des astreintes acceptées |
 | `export-user-data` | app | Export RGPD en JSON |

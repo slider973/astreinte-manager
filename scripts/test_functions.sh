@@ -123,6 +123,7 @@ nettoyer() {
        delete from push_tokens where token like 'jeton-test-%';
        update profiles set push_enabled = true where push_enabled = false;
        delete from audit_log where action like 'subscription.%';
+       delete from stripe_events;
        -- Les traces laissées par les sections 15 à 17 : sans elles, deux
        -- exécutions de suite comptent les lignes de la précédente.
        delete from audit_log where action like 'assignment.%'
@@ -839,6 +840,12 @@ verifier "code invalid_body" "invalid_body" "$(jq -r '.error.code' <<<"$CORPS")"
 appeler create-checkout "$ADMIN_A" "{\"station_id\":\"$STATION_A\",\"action\":\"resilier\"}"
 verifier "une action inconnue : 400" "400" "$STATUT"
 
+# Un identifiant mal formé est une faute de frappe, pas un incident serveur :
+# il partait dans une requête PostgREST et en revenait en 500.
+appeler create-checkout "$ADMIN_A" '{"station_id":"pas-un-uuid","action":"state"}'
+verifier "un station_id mal formé : 400, pas 500" "400" "$STATUT"
+verifier "code invalid_body" "invalid_body" "$(jq -r '.error.code' <<<"$CORPS")"
+
 code_http="$(curl -s -o /dev/null -w '%{http_code}' -X GET \
   "$API_URL/functions/v1/create-checkout" -H "apikey: $ANON_KEY" \
   -H "Authorization: Bearer $ADMIN_A" || true)"
@@ -947,13 +954,14 @@ verifier "aucune ligne d'audit de paiement" "0" \
 # **Avec un secret posé**, la signature devient la seule porte. Ce bloc n'est
 # joué que si `supabase functions serve --env-file` a fourni le secret : sans
 # lui, la fonction répond 503 et le test ci-dessus le vérifie déjà.
+signer() { # signer <horodatage> <corps>
+  printf '%s.%s' "$1" "$2" \
+    | openssl dgst -sha256 -hmac "${STRIPE_WEBHOOK_SECRET:-}" -hex \
+    | sed 's/^.*= //'
+}
+
 if [ -n "${STRIPE_WEBHOOK_SECRET:-}" ]; then
   echo '    (secret de test présent : vérification de la signature complète)'
-  signer() { # signer <horodatage> <corps>
-    printf '%s.%s' "$1" "$2" \
-      | openssl dgst -sha256 -hmac "$STRIPE_WEBHOOK_SECRET" -hex \
-      | sed 's/^.*= //'
-  }
   T="$(date +%s)"
 
   webhook "t=$T,v1=$(signer "$T" "$EVENEMENT")" "$EVENEMENT"
@@ -995,7 +1003,140 @@ if [ -n "${STRIPE_WEBHOOK_SECRET:-}" ]; then
               stripe_subscription_id = null, plan = null,
               current_period_end = null, suspended_at = null
         where station_id = '$STATION_A';
-       delete from audit_log where action like 'subscription.%';" >/dev/null
+       delete from audit_log where action like 'subscription.%';
+       delete from stripe_events;" >/dev/null
+fi
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 21. stripe-webhook : le corps est lu sous plafond'
+# ---------------------------------------------------------------------------
+# C'est la seule fonction publique du projet, et elle lit le corps **avant**
+# toute authentification — il le faut pour vérifier la signature. Sans plafond,
+# un anonyme qui connaît l'adresse fait allouer autant de mémoire qu'il veut.
+# Le corps passe par un fichier : 1,2 Mo sur la ligne de commande dépasse la
+# taille maximale des arguments du système.
+gros="$(mktemp)"
+{ printf '{"charge":"'; head -c 1200000 /dev/zero | tr '\0' 'a'; printf '"}'; } > "$gros"
+code_http="$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+  "$API_URL/functions/v1/stripe-webhook" -H 'content-type: application/json' \
+  --data-binary "@$gros" || true)"
+verifier "un corps de plus d'un mégaoctet : 413" "413" "$code_http"
+
+# Et il est refusé **avant** toute lecture : rien n'en est analysé, donc rien
+# n'a pu être écrit.
+verifier "rien n'a été reçu en base" "0" "$(sql "select count(*) from stripe_events")"
+rm -f "$gros"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 22. create-checkout : un abonnement en cours ne se souscrit pas deux fois'
+# ---------------------------------------------------------------------------
+# **Le cas qui compte n'est pas la caserne « active »** — elle ne voit pas le
+# bouton. C'est celle dont la carte a expiré : son statut est « past_due », et
+# un garde-fou posé sur le seul statut « active » la laisserait repartir avec un
+# second abonnement, prélevé en parallèle du premier.
+if [ -n "${STRIPE_WEBHOOK_SECRET:-}" ]; then
+  for etat in active past_due trialing suspended; do
+    sql "update subscriptions
+            set status = '$etat', stripe_customer_id = 'cus_test_029',
+                stripe_subscription_id = 'sub_test_029'
+          where station_id = '$STATION_A'" >/dev/null
+
+    appeler create-checkout "$ADMIN_A" \
+      "{\"station_id\": \"$STATION_A\", \"action\": \"checkout\", \"plan\": \"monthly\"}"
+    verifier "« $etat » avec un abonnement vivant : 409" "409" "$STATUT"
+    verifier "  code already_subscribed" "already_subscribed" \
+      "$(jq -r '.error.code' <<<"$CORPS")"
+  done
+
+  # Une résiliation, elle, se reprend : c'est un client qui revient, et rien ne
+  # se dédouble. La session s'ouvre donc réellement — ici avec une clé de test
+  # bidon, donc le refus vient du prestataire (502) et non de nous.
+  sql "update subscriptions set status = 'cancelled'
+        where station_id = '$STATION_A'" >/dev/null
+  appeler create-checkout "$ADMIN_A" \
+    "{\"station_id\": \"$STATION_A\", \"action\": \"checkout\", \"plan\": \"monthly\"}"
+  verifier "une résiliation peut souscrire à nouveau" "true" \
+    "$([ "$STATUT" != "409" ] && echo true || echo false)"
+
+  sql "update subscriptions
+          set status = 'trialing', stripe_customer_id = null,
+              stripe_subscription_id = null, plan = null,
+              current_period_end = null, suspended_at = null
+        where station_id = '$STATION_A'" >/dev/null
+else
+  echo '    (sans secret : la souscription est refusée avant ce contrôle, voir § 19)'
+fi
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 23. stripe-webhook : rejeu et cohérence client/caserne'
+# ---------------------------------------------------------------------------
+if [ -n "${STRIPE_WEBHOOK_SECRET:-}" ]; then
+  sql "delete from stripe_events;
+       delete from audit_log where action like 'subscription.%';
+       update subscriptions set stripe_customer_id = 'cus_test_029'
+        where station_id = '$STATION_A';
+       update subscriptions set stripe_customer_id = 'cus_test_b'
+        where station_id = '$STATION_B'" >/dev/null
+
+  T="$(date +%s)"
+
+  # a. Un événement appliqué une fois.
+  ECHEC="{\"id\":\"evt_rejeu\",\"type\":\"invoice.payment_failed\",\"data\":{\"object\":{\"customer\":\"cus_test_029\",\"subscription\":\"sub_test_029\"}}}"
+  webhook "t=$T,v1=$(signer "$T" "$ECHEC")" "$ECHEC"
+  verifier "un échec de paiement s'applique : 200" "200" "$STATUT"
+  verifier "la caserne passe en retard de paiement" "past_due" \
+    "$(sql "select status from subscriptions where station_id = '$STATION_A'")"
+
+  # La caserne régularise.
+  sql "update subscriptions set status = 'active' where station_id = '$STATION_A'" >/dev/null
+
+  # b. **Le même événement, rejoué dans la fenêtre de tolérance.** La signature
+  # le laisse passer — elle dit qu'il vient de Stripe, pas qu'il est neuf.
+  webhook "t=$T,v1=$(signer "$T" "$ECHEC")" "$ECHEC"
+  verifier "le rejeu répond 200" "200" "$STATUT"
+  verifier "et il est reconnu comme un doublon" "duplicate" \
+    "$(jq -r '.skipped' <<<"$CORPS")"
+  verifier "**la caserne reste à jour**" "active" \
+    "$(sql "select status from subscriptions where station_id = '$STATION_A'")"
+  verifier "une seule ligne d'audit, pas deux" "1" \
+    "$(sql "select count(*) from audit_log
+             where action = 'subscription.invoice.payment_failed'")"
+
+  # c. Un événement qui nomme la caserne B avec le client de A. Signature
+  # valide : `client_reference_id` se pose depuis une URL.
+  VOL="{\"id\":\"evt_vol\",\"type\":\"checkout.session.completed\",\"data\":{\"object\":{\"client_reference_id\":\"$STATION_B\",\"customer\":\"cus_test_029\",\"subscription\":\"sub_vole\",\"payment_status\":\"paid\"}}}"
+  webhook "t=$T,v1=$(signer "$T" "$VOL")" "$VOL"
+  verifier "un client qui n'est pas celui de la caserne nommée : écarté" \
+    "customer_mismatch" "$(jq -r '.skipped' <<<"$CORPS")"
+  verifier "B n'a pas changé de statut" "trialing" \
+    "$(sql "select status from subscriptions where station_id = '$STATION_B'")"
+  verifier "**et B n'a pas récupéré le client de A**" "cus_test_b" \
+    "$(sql "select stripe_customer_id from subscriptions where station_id = '$STATION_B'")"
+
+  # d. Un identifiant de caserne mal formé ne fait pas tomber la fonction.
+  BANCAL="{\"id\":\"evt_bancal\",\"type\":\"invoice.paid\",\"data\":{\"object\":{\"customer\":\"cus_test_029\",\"period_end\":1800000000,\"metadata\":{\"station_id\":\"pas-un-uuid\"}}}}"
+  webhook "t=$T,v1=$(signer "$T" "$BANCAL")" "$BANCAL"
+  verifier "un station_id illisible : traité par le client, pas en 500" "200" "$STATUT"
+  verifier "et la caserne est bien retrouvée" "active" \
+    "$(jq -r '.status' <<<"$CORPS")"
+
+  # e. La trace d'un échec survit aux rejeux abandonnés.
+  sql "select stripe_event_fail('evt_perdu', 'invoice.paid', 'base indisponible')" >/dev/null
+  verifier "un traitement en échec laisse une ligne « failed »" "failed" \
+    "$(sql "select status from stripe_events where id = 'evt_perdu'")"
+
+  # Remise du décor.
+  sql "delete from stripe_events;
+       delete from audit_log where action like 'subscription.%';
+       update subscriptions
+          set status = 'trialing', stripe_customer_id = null,
+              stripe_subscription_id = null, plan = null,
+              current_period_end = null, suspended_at = null" >/dev/null
+else
+  echo '    (sans secret : aucun événement ne franchit la signature, voir § 20)'
 fi
 
 # ---------------------------------------------------------------------------

@@ -26,6 +26,15 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
   service en jeton porteur (les autres Edge Functions), ou l'en-tête `x-notify-secret` qui vaut le
   secret engendré dans Vault par la migration `0014` (pg_net). Tout le reste, y compris un
   administrateur connecté, reçoit un 401 — et `scripts/test_functions.sh § 8` le vérifie.
+- **La caserne nommée par un événement n'est jamais crue sur parole.** La signature établit que
+  l'appel vient du prestataire, pas que `client_reference_id` désigne la bonne caserne — c'est un
+  champ que l'on peut poser depuis une URL. `subscription_sync` (migration `0023`) refuse
+  (`customer_mismatch`) dès que le client et la caserne ne vont pas déjà ensemble, dans les deux
+  sens. Sans ce contrôle, l'administrateur d'une caserne ouvrirait le portail d'une autre.
+- **Un événement déjà traité ne se réapplique pas.** `stripe_events` (`docs/SCHEMA.md § 2.17`) en
+  porte l'identifiant en clé primaire : un rejeu dans la fenêtre de tolérance rend `duplicate` et
+  n'écrit rien. Sans quoi un `invoice.payment_failed` capté puis réémis après une régularisation
+  remettrait en impayé une caserne à jour.
 - **Un événement de paiement non signé n'est jamais lu.** `stripe-webhook` est publique par nature :
   Stripe l'appelle sans jeton, depuis Internet. La **signature** (`Stripe-Signature`, HMAC-SHA256 du
   **corps brut** avec `STRIPE_WEBHOOK_SECRET`, fenêtre de cinq minutes) est donc tout ce qui
@@ -839,14 +848,37 @@ Erreurs, forme `{"error": {"code", "message"}}` :
 | 401    | `unauthenticated`       | Pas de jeton porteur, ou jeton qui n'identifie pas un utilisateur          |
 | 403    | `not_admin`             | L'appelant n'est pas admin **actif** de `station_id`                       |
 | 405    | `method_not_allowed`    | Autre verbe que POST                                                       |
-| 409    | `already_subscribed`    | Déjà abonnée : le changement de formule passe par le portail               |
+| 409    | `already_subscribed`    | Un abonnement **vit déjà** : carte et formule se changent dans le portail  |
 | 409    | `no_customer`           | `portal` sur une caserne qui n'a jamais souscrit                           |
 | 500    | `internal_error`        | Incident serveur                                                           |
 | 502    | `stripe_error`          | Stripe a refusé ou n'a pas répondu. Le détail reste au journal             |
 | 503    | `stripe_not_configured` | Aucun compte Stripe branché. **Ce n'est pas une panne** (`docs/STRIPE.md`) |
 
 **Une caserne inconnue rend `not_admin`, pas 404.** Dire « caserne inconnue » à qui n'y a pas droit
-lui apprendrait qu'elle existe.
+lui apprendrait qu'elle existe. Et un `station_id` **mal formé** rend 400, pas 500 : il partait dans
+une requête PostgREST où il devenait une erreur traduite en incident serveur — un incident annoncé
+pour une faute de frappe.
+
+**Tout le contrôle de droits tient dans `create-checkout/acces.ts`**, une fonction pure testée à
+chaque PR (`tests/stripe_acces_test.ts`). C'est la règle la plus coûteuse à perdre au premier
+refactor — elle décide qui engage une dépense au nom d'une caserne, et qui ouvre le portail où l'on
+résilie —, et une règle qui ne casse aucun test quand on la retire n'est pas une règle. La couche
+HTTP, elle, est vérifiée par `scripts/test_functions.sh`, qui demande une pile locale et ne tourne
+donc pas en CI.
+
+### Le garde-fou du doublon porte sur l'abonnement, pas sur le statut
+
+Le cas qui compte n'est pas la caserne `active` — celle-là ne voit même pas le bouton. C'est la
+caserne **en retard de paiement**, cas le plus banal qui soit : une carte qui expire. Son statut
+n'est pas `active`, donc une règle posée sur le seul statut `active` la laisse passer — et elle
+repart avec un **second** abonnement, prélevé en parallèle du premier, pendant que le premier
+continue ses relances. `subscriptions.stripe_subscription_id` ne peut en désigner qu'un : l'autre
+devient invisible, et personne ne le résilie.
+
+`checkout` est donc refusé dès qu'un abonnement existe **et vit encore** — `active`, `past_due`,
+`trialing` ou `suspended`. Une caserne **résiliée** peut en reprendre un : c'est un client qui
+revient, rien ne se dédouble. Une carte qui a expiré se change dans le **portail**, et c'est là que
+le message envoie.
 
 ---
 
@@ -863,6 +895,16 @@ Content-Type: application/json
 
 `verify_jwt = false`, et il ne peut pas en être autrement : Stripe appelle sans jeton.
 
+### Avant la signature : un plafond
+
+Le corps est lu par `lireCorpsBorne` (`_shared/http.ts`), qui refuse au-delà d'**un mégaoctet** — un
+événement réel dépasse rarement 100 ko. Cette lecture arrive **avant toute authentification**, et il
+ne peut pas en être autrement : il faut le corps pour vérifier la signature. Sans plafond, un
+anonyme qui connaît l'adresse fait allouer autant de mémoire qu'il veut, puis fait calculer
+l'empreinte HMAC de l'ensemble. Deux barrières, parce qu'une seule ne suffit pas : l'en-tête
+`Content-Length` n'est pas obligatoire et peut mentir, donc c'est le compte réel des octets lus qui
+tranche. Un dépassement rend **413 `payload_too_large`**.
+
 ### La signature, et rien d'autre
 
 `HMAC-SHA256(secret, "<t>.<corps brut>")`, en hexadécimal, comparé **à temps constant**, dans une
@@ -870,8 +912,10 @@ fenêtre de **cinq minutes**. Trois pièges, tous traités :
 
 - **Le corps brut.** `JSON.parse` puis `JSON.stringify` change l'ordre des clés et les espaces : la
   signature ne correspondrait plus. Le corps est lu en texte, signé en texte, et analysé **après**.
-- **La fenêtre.** Sans elle, un événement authentique capté une fois se rejoue indéfiniment. Elle
-  est symétrique : un horodatage dans le futur est refusé aussi.
+- **La fenêtre.** Sans elle, un événement authentique capté une fois pourrait être réémis des mois
+  plus tard. Elle est symétrique : un horodatage dans le futur est refusé aussi. Elle ne fait que
+  **borner** le rejeu — à l'intérieur des cinq minutes, c'est le dédoublonnage ci-dessous qui
+  l'empêche, jamais la signature.
 - **Plusieurs `v1`.** Pendant une rotation de secret, Stripe en envoie deux ; il suffit qu'un
   corresponde. Les `v0` sont l'ancien schéma, ignorés.
 
@@ -882,11 +926,35 @@ exactement ce qu'on veut d'un secret mal recopié :
 | ------ | ---------------------------- | ----------------------------------------------------------- |
 | 400    | `missing_signature`          | En-tête absent                                              |
 | 400    | `malformed_signature`        | En-tête illisible, ou sans `v1`                             |
-| 400    | `timestamp_out_of_tolerance` | Hors des cinq minutes : horloge décalée, ou rejeu           |
+| 400    | `timestamp_out_of_tolerance` | Hors des cinq minutes : horloge décalée, ou rejeu tardif    |
 | 400    | `signature_mismatch`         | Signature fausse, ou corps modifié après signature          |
 | 400    | `invalid_body`               | Signé mais illisible — anomalie sérieuse, elle doit se voir |
 | 405    | `method_not_allowed`         | Autre verbe que POST                                        |
+| 413    | `payload_too_large`          | Corps au-delà d'un mégaoctet, refusé avant lecture          |
 | 503    | `stripe_not_configured`      | **Aucun secret posé : rien n'est traité**                   |
+
+### Une fois et une seule
+
+La signature dit que l'événement vient de Stripe, **pas qu'il est neuf**. Un même événement
+authentique réémis dans la fenêtre de tolérance — rejeu manuel depuis le tableau de bord, double
+livraison, requête captée — repasse la vérification. Sur `invoice.payment_failed`, cela remet en
+impayé une caserne qui vient de régulariser.
+
+`subscription_sync` s'appuie donc sur la clé primaire de `stripe_events` (`docs/SCHEMA.md § 2.17`) :
+c'est l'insertion qui tranche, jamais un test suivi d'une écriture, et deux livraisons simultanées
+ne peuvent pas passer toutes les deux. Un rejeu répond **200** avec `"skipped": "duplicate"` — le
+prestataire n'a pas à insister.
+
+La même table porte la **trace d'un échec**. Quand `subscription_sync` lève, sa transaction est
+annulée et la ligne qu'elle avait posée part avec elle ; l'Edge Function en pose alors une seconde
+par `stripe_event_fail`, dans sa propre transaction. Sans elle, un événement valide dont le
+traitement échoue disparaîtrait : le prestataire abandonne ses rejeux au bout de trois jours, et il
+ne resterait qu'une ligne de journal à rétention courte. `status = 'failed'` est **le seul** état
+que le dédoublonnage laisse reprendre, ce qui est précisément ce qui permet aux rejeux d'aboutir.
+
+```sql
+select id, type, status, attempts, error from stripe_events where status <> 'processed';
+```
 
 ### Les cinq événements, et tous les autres
 
@@ -900,8 +968,11 @@ exactement ce qu'on veut d'un secret mal recopié :
 
 Tout autre type est **ignoré avec un 200** : un 4xx ferait rejouer Stripe pendant trois jours un
 événement qu'on ne traitera jamais, puis désactiverait le point de terminaison — et les vrais
-événements cesseraient d'arriver. Même règle pour une caserne introuvable (un autre projet branché
-sur le même compte) :
+événements cesseraient d'arriver. Même règle pour les trois refus métier : une caserne introuvable
+(un autre projet branché sur le même compte), une formule inconnue, et un **client qui ne correspond
+pas à la caserne nommée** (`customer_mismatch`) — la seule protection contre un
+`client_reference_id` posé depuis une URL. Ces trois-là **consomment** l'événement : le rejouer n'y
+changerait rien, et `stripe_events` en garde la trace en `skipped`.
 
 ```jsonc
 { "ok": true, "event_id": "evt_…", "type": "charge.refunded", "skipped": "type_ignore" }
