@@ -484,22 +484,54 @@ abstract final class AppStrings {
   static String inviterAdresseInvalide(String email) =>
       'Adresse incomplète : $email.';
 
-  /// Résumé annoncé après un envoi : toujours les deux nombres, même à zéro.
-  static String inviterResume({required int envoyees, required int echecs}) {
-    final partieEnvoyees = envoyees <= 1
-        ? '$envoyees invitation envoyée'
-        : '$envoyees invitations envoyées';
+  /// Le résumé d'un envoi d'invitations, commun aux deux comptes rendus.
+  ///
+  /// **Le verbe suit les faits.** « envoyées » n'apparaît que si [parties]
+  /// couvre tout ce qui a été créé ; dès qu'un courriel manque à l'appel, la
+  /// phrase dit « créées ». Sans cette règle, l'écran affichait « 1 invitation
+  /// envoyée, 0 échec. » au-dessus de « le courriel n'est pas parti » : deux
+  /// phrases qui se contredisent, l'une sous l'autre (ticket 048, à l'import
+  /// puis à l'invitation).
+  ///
+  /// Les deux écrans partagent la phrase parce qu'ils partagent la règle. Ce
+  /// qu'ils ne partagent pas, c'est ce qui vient **dessous** : à l'import,
+  /// [importCourrielsNonPartis] compte les invitations restées à quai, car
+  /// rien d'autre n'en parlera ; à l'invitation, vingt lignes au plus, et
+  /// chacune porte déjà son sort — le résumé compte, la ligne dit laquelle.
+  ///
+  /// Toujours les deux nombres, même à zéro.
+  static String invitationsResume({
+    required int creees,
+    required int parties,
+    required int echecs,
+  }) {
     final partieEchecs = echecs <= 1 ? '$echecs échec' : '$echecs échecs';
-    return '$partieEnvoyees, $partieEchecs.';
+    if (parties >= creees) {
+      return creees <= 1
+          ? '$creees invitation envoyée, $partieEchecs.'
+          : '$creees invitations envoyées, $partieEchecs.';
+    }
+    return creees <= 1
+        ? '$creees invitation créée, $partieEchecs.'
+        : '$creees invitations créées, $partieEchecs.';
   }
 
   static const String resultatInvitee = 'Invitée';
   static const String resultatRenvoyee = 'Renvoyée';
   static const String resultatEchec = 'Échec';
 
+  /// Ce qui s'ajoute quand l'invitation existe mais que le courriel n'est
+  /// jamais sorti : sous l'adresse, au compte rendu ; en réponse au bouton
+  /// « Renvoyer », dans la liste des invitations en attente.
+  ///
+  /// Elle ne redit plus « Invitation créée » : au compte rendu, le résumé
+  /// vient de la compter et le statut la nomme juste au-dessus ; dans la
+  /// liste, l'invitation était déjà là. Remplacer la contradiction du ticket
+  /// 048 par une redite aurait été la corriger à moitié. Ne reste que le fait
+  /// qui manque, et le geste qui le rattrape.
   static const String resultatCourrielNonParti =
-      'Invitation créée, mais le courriel n\'est pas parti. Renvoie-la, ou '
-      'transmets le lien toi-même.';
+      'Le courriel n\'est pas parti. Renvoie-la, ou transmets le lien '
+      'toi-même.';
 
   // --- Motifs d'échec, adresse par adresse ---------------------------
 
@@ -720,46 +752,21 @@ abstract final class AppStrings {
 
   /// Le titre de la seule liste que le compte rendu déroule.
   ///
-  /// Ce qui est passé ne descend pas ici : [importResume] l'a déjà compté,
-  /// et soixante coches identiques enterrent les trois lignes qui demandent
-  /// quelque chose — c'est la règle que l'aperçu applique déjà à sa marque.
+  /// Ce qui est passé ne descend pas ici : [invitationsResume] l'a déjà
+  /// compté, et soixante coches identiques enterrent les trois lignes qui
+  /// demandent quelque chose — la règle que l'aperçu applique à sa marque.
   static const String importEchecsTitre = 'À reprendre';
 
-  /// Le résumé d'un import, en une phrase qui ne promet que ce qui est vrai.
-  ///
-  /// **Ce n'est pas [inviterResume], et c'est tout le sujet.** Là-bas, un
-  /// seul verbe, « envoyées », pour un nombre qui compte en réalité les
-  /// invitations *créées*. Ici, la création et l'envoi du courriel sont deux
-  /// faits séparés — sans fournisseur de courriel configuré, tout est créé et
-  /// rien ne part — et [importCourrielsNonPartis] le dit juste en dessous.
-  /// Garder « envoyées » afficherait deux phrases qui se contredisent, l'une
-  /// sous l'autre : « 3 invitations envoyées » puis « aucun courriel n'est
-  /// parti ».
-  ///
-  /// Le verbe suit donc les faits : « envoyées » quand [parties] couvre tout
-  /// ce qui a été créé — le compte rendu reste alors bref, rien ne s'ajoute
-  /// dessous —, « créées » dès qu'un courriel manque à l'appel.
-  static String importResume({
-    required int creees,
-    required int parties,
-    required int echecs,
-  }) {
-    final partieEchecs = echecs <= 1 ? '$echecs échec' : '$echecs échecs';
-    if (parties >= creees) {
-      return creees <= 1
-          ? '$creees invitation envoyée, $partieEchecs.'
-          : '$creees invitations envoyées, $partieEchecs.';
-    }
-    return creees <= 1
-        ? '$creees invitation créée, $partieEchecs.'
-        : '$creees invitations créées, $partieEchecs.';
-  }
+  // Le résumé de l'import n'est pas ici : c'est [invitationsResume], la
+  // phrase commune aux deux comptes rendus. La règle qui interdit « envoyées »
+  // tant qu'un courriel n'est pas sorti est la même des deux côtés, et une
+  // règle de vérité ne se recopie pas (ticket 048).
 
   /// Les invitations qui existent, mais dont personne n'a été prévenu.
   ///
   /// Deux tournures, parce que ce sont deux faits différents. Quand c'est
   /// tout l'import — le cas de production, aucun fournisseur de courriel
-  /// configuré —, la phrase parle de l'ensemble que [importResume] vient
+  /// configuré —, la phrase parle de l'ensemble que [invitationsResume] vient
   /// d'annoncer. Quand une partie seulement est restée à quai, elle compte
   /// sur ce même ensemble : dire « 2 invitations sont créées » sous un résumé
   /// qui en annonce 3 ferait douter de la troisième.

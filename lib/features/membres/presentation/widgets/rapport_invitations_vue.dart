@@ -17,6 +17,14 @@ import '../../domain/invitation.dart';
 /// L'import a le sien ([RapportImportVue]) : soixante lignes que l'aperçu a
 /// déjà montrées une par une ne se réénumèrent pas, et les gens y ont des
 /// noms.
+///
+/// **Le résumé compte, la ligne dit.** [AppStrings.invitationsResume] —
+/// partagé avec l'import, parce que la règle de vérité est la même — n'emploie
+/// « envoyées » que si tous les courriels sont réellement sortis, et dit
+/// « créées » sinon. Rien ne s'ajoute sous lui pour les courriels restés à
+/// quai : chaque adresse concernée le porte déjà sur sa ligne, et l'import,
+/// qui n'énumère pas, est le seul à avoir besoin d'une phrase de plus
+/// (ticket 048).
 class RapportInvitationsVue extends StatelessWidget {
   const RapportInvitationsVue({required this.rapport, super.key});
 
@@ -32,8 +40,9 @@ class RapportInvitationsVue extends StatelessWidget {
         Semantics(
           liveRegion: true,
           child: Text(
-            AppStrings.inviterResume(
-              envoyees: rapport.creees,
+            AppStrings.invitationsResume(
+              creees: rapport.creees,
+              parties: rapport.courrielsPartis,
               echecs: rapport.echecs,
             ),
             style: theme.textTheme.bodyLarge,

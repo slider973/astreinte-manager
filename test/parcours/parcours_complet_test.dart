@@ -155,7 +155,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(AppStrings.inviterResume(envoyees: 1, echecs: 0)),
+        find.text(AppStrings.invitationsResume(creees: 1, parties: 1, echecs: 0)),
         findsOneWidget,
       );
 

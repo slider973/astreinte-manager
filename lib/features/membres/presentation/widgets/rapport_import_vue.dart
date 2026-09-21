@@ -30,10 +30,10 @@ import '../../domain/invitation.dart';
 /// **Les deux phrases se composent, elles ne se contredisent pas.** Le résumé
 /// compte les invitations créées, et n'emploie « envoyées » que si tous les
 /// courriels sont réellement sortis ; sinon il dit « créées », et la phrase du
-/// dessous dit lesquelles n'ont prévenu personne. C'est
-/// [AppStrings.importResume] qui tient cette règle, et non l'ancien
-/// [AppStrings.inviterResume], dont le verbe promettait un envoi qui n'avait
-/// pas eu lieu (ticket 048).
+/// dessous dit combien n'ont prévenu personne. C'est
+/// [AppStrings.invitationsResume] qui tient cette règle — la même phrase sert
+/// au compte rendu d'invitation, qui portait le même verbe menteur
+/// (ticket 048).
 class RapportImportVue extends StatelessWidget {
   const RapportImportVue({
     required this.rapport,
@@ -61,7 +61,7 @@ class RapportImportVue extends StatelessWidget {
         Semantics(
           liveRegion: true,
           child: Text(
-            AppStrings.importResume(
+            AppStrings.invitationsResume(
               creees: creees,
               parties: rapport.courrielsPartis,
               echecs: rapport.echecs,

@@ -21,6 +21,7 @@ import '../../support/faux_auth.dart';
 import '../../support/faux_export.dart';
 import '../../support/faux_fichier.dart';
 import '../../support/faux_invitations.dart';
+import '../../support/promesse_envoi.dart';
 
 const String _cheminImport = '/admin/membres/importer';
 
@@ -95,27 +96,6 @@ Future<void> _faireDefilerVers(WidgetTester tester, Finder cible) async {
         .first,
   );
   await tester.pumpAndSettle();
-}
-
-/// Aucune phrase à l'écran n'annonce un envoi.
-///
-/// C'est l'assertion qui manquait à la revue du ticket 048 : vérifier que la
-/// phrase attendue est là ne voit pas celle **en trop**. Le compte rendu
-/// affichait « 3 invitations envoyées, 0 échec. » posé sur « leur courriel
-/// n'est pas parti », et les deux passaient. Ici, dès qu'un courriel est
-/// resté à quai, plus rien à l'écran n'a le droit de dire « envoyée ».
-void _aucunEnvoiPromis(WidgetTester tester) {
-  final phrases = tester
-      .widgetList<Text>(find.byType(Text))
-      .map((Text texte) => texte.data)
-      .whereType<String>();
-  for (final phrase in phrases) {
-    expect(
-      phrase.contains('envoyée'),
-      isFalse,
-      reason: '« $phrase » promet un envoi qui n\'a pas eu lieu.',
-    );
-  }
 }
 
 void main() {
@@ -401,7 +381,7 @@ void main() {
       // Soixante lignes identiques sous un résumé qui dit déjà « 0 échec »
       // n'ajoutent rien et enterrent ce qui compterait.
       expect(
-        find.text(AppStrings.importResume(creees: 60, parties: 60, echecs: 0)),
+        find.text(AppStrings.invitationsResume(creees: 60, parties: 60, echecs: 0)),
         findsOneWidget,
       );
       expect(find.text(AppStrings.importEchecsTitre), findsNothing);
@@ -485,7 +465,7 @@ void main() {
       await importerTrois(tester, 3);
 
       expect(
-        find.text(AppStrings.importResume(creees: 3, parties: 3, echecs: 0)),
+        find.text(AppStrings.invitationsResume(creees: 3, parties: 3, echecs: 0)),
         findsOneWidget,
       );
       // Un fournisseur de courriel est configuré, tout est sorti : pas une
@@ -502,7 +482,7 @@ void main() {
         // Sans fournisseur de courriel configuré, c'est tout l'import qui est
         // dans ce cas : une phrase et un nombre, pas soixante lignes.
         expect(
-          find.text(AppStrings.importResume(creees: 3, parties: 0, echecs: 0)),
+          find.text(AppStrings.invitationsResume(creees: 3, parties: 0, echecs: 0)),
           findsOneWidget,
         );
         expect(
@@ -515,12 +495,9 @@ void main() {
         expect(find.text(AppStrings.importEchecsTitre), findsNothing);
 
         // Le défaut de la revue : « 3 invitations envoyées, 0 échec. » posé
-        // juste au-dessus de « leur courriel n'est pas parti ».
-        expect(
-          find.text(AppStrings.inviterResume(envoyees: 3, echecs: 0)),
-          findsNothing,
-        );
-        _aucunEnvoiPromis(tester);
+        // juste au-dessus de « leur courriel n'est pas parti ». Aucune phrase
+        // de l'écran ne peut plus le dire.
+        aucunEnvoiPromis(tester);
       },
     );
 
@@ -530,7 +507,7 @@ void main() {
       await importerTrois(tester, 1);
 
       expect(
-        find.text(AppStrings.importResume(creees: 3, parties: 1, echecs: 0)),
+        find.text(AppStrings.invitationsResume(creees: 3, parties: 1, echecs: 0)),
         findsOneWidget,
       );
       // Deux sur les trois du résumé, et non « 2 invitations sont créées »,
@@ -540,7 +517,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(AppStrings.importEchecsTitre), findsNothing);
-      _aucunEnvoiPromis(tester);
+      aucunEnvoiPromis(tester);
     });
 
     testWidgets('les lignes écartées sont résumées, pas noyées dans le rapport', (
@@ -580,7 +557,7 @@ void main() {
       expect(find.text('marie@exemple.fr'), findsNothing);
       expect(find.text('anne@exemple.fr'), findsNothing);
       expect(
-        find.text(AppStrings.importResume(creees: 1, parties: 1, echecs: 0)),
+        find.text(AppStrings.invitationsResume(creees: 1, parties: 1, echecs: 0)),
         findsOneWidget,
       );
     });
@@ -649,7 +626,7 @@ void main() {
       // écrans ne se contredisent plus.
       await tester.pumpAndSettle();
       expect(
-        find.text(AppStrings.importResume(creees: 35, parties: 35, echecs: 5)),
+        find.text(AppStrings.invitationsResume(creees: 35, parties: 35, echecs: 5)),
         findsOneWidget,
       );
     });
@@ -800,7 +777,7 @@ void main() {
         // réessaierait des adresses déjà invitées.
         expect(
           find.text(
-            AppStrings.importResume(creees: 20, parties: 20, echecs: 0),
+            AppStrings.invitationsResume(creees: 20, parties: 20, echecs: 0),
           ),
           findsOneWidget,
         );
