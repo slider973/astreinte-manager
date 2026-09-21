@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 029
 - **Branche** : `feat/030-gating-suspension`
-- **Statut** : en cours depuis 2026-09-21
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
 - `station_writable` bloque les écritures (déjà dans RLS, ticket 008) ; l'app affiche un bandeau explicatif et désactive les actions.
