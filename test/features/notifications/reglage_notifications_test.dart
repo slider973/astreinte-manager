@@ -43,7 +43,11 @@ Future<AppMontee> _ouvrirProfil(
   );
   await tester.tap(find.text(AppStrings.navProfil));
   await tester.pumpAndSettle();
-  await defilerJusqua(tester, find.text(AppStrings.notifReglageToujours));
+  // **Vers l'interrupteur, pas vers le titre du bloc.** L'écran de profil s'est
+  // allongé au ticket 034 (export, liens légaux) : amener le titre à l'écran ne
+  // garantit plus que la cible tactile y soit aussi, et un `tap` qui manque sa
+  // cible ne lève pas — il ne fait rien.
+  await defilerJusqua(tester, find.byType(Switch).first);
   return faux;
 }
 

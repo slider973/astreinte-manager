@@ -12,6 +12,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/champ_texte.dart';
 import '../../../core/widgets/ecran_simple.dart';
+import '../../../core/widgets/liens_legaux.dart';
 import '../../../core/widgets/primary_button.dart';
 import 'controllers/connexion_controller.dart';
 
@@ -98,6 +99,12 @@ class _ConnexionScreenState extends ConsumerState<ConnexionScreen> {
           chargement: etat.envoiEnCours,
           onPressed: () => unawaited(_envoyer()),
         ),
+        // **Le seul écran qu'un visiteur non connecté voit** (ticket 034) :
+        // une politique de confidentialité joignable seulement une fois
+        // connecté ne remplit pas son office. Les deux routes `/legal/…`
+        // traversent la garde d'authentification sans condition.
+        const SizedBox(height: AppSpacing.xxl),
+        const LiensLegaux(),
       ],
     );
   }

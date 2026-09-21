@@ -2940,7 +2940,8 @@ abstract final class AppStrings {
   static const String profilEmailRaison =
       'C\'est ton identifiant de connexion. Pour en changer, demande à ton '
       'chef de centre.';
-  static const String profilEnregistrerIdentite = 'Enregistrer mes informations';
+  static const String profilEnregistrerIdentite =
+      'Enregistrer mes informations';
   static const String profilEnregistre = 'Informations enregistrées.';
   static const String profilLectureEchec =
       'Ton profil n\'a pas pu être lu. Vérifie ta connexion, puis réessaie.';
@@ -3024,4 +3025,75 @@ abstract final class AppStrings {
 
   static const String suppressionEchec =
       'La suppression n\'a pas abouti. Réessaie dans un instant.';
+
+  // ===================================================================
+  // Export des données personnelles et pages légales (ticket 034)
+  // ===================================================================
+
+  static const String exportBouton = 'Exporter mes données';
+
+  /// La phrase sous le bouton, toujours visible : elle dit ce que contient le
+  /// fichier avant qu'on le demande, pas après.
+  static const String exportAide =
+      'Un fichier JSON contenant tout ce que l\'application sait de toi : ton '
+      'profil, tes disponibilités, tes astreintes, tes notifications. Les '
+      'autres membres de ta caserne n\'y figurent pas.';
+
+  /// Dans la feuille de suppression : la dernière sortie avant le point de
+  /// non-retour (`design/034-rgpd-export.md § 5.2`).
+  static const String exportAvantSuppressionTitre =
+      'Récupère d\'abord tes données';
+  static const String exportAvantSuppression =
+      'Une fois le compte supprimé, plus personne ne peut te les rendre.';
+
+  static const String exportEnCours = 'Préparation de ton fichier…';
+
+  /// Le fichier est nommé : dans une PWA installée, il n'y a pas de barre de
+  /// téléchargement pour le dire à la place de l'écran.
+  static String exportEnregistre(String nomFichier) =>
+      'Fichier enregistré : $nomFichier';
+
+  static const String exportPartage =
+      'Fichier envoyé au partage. Choisis « Enregistrer dans Fichiers » pour le '
+      'garder sur ton téléphone.';
+
+  // --- Les refus -----------------------------------------------------
+
+  static const String exportProfilIntrouvable =
+      'Ton profil est introuvable. Déconnecte-toi, reconnecte-toi, puis '
+      'réessaie.';
+
+  static const String exportNonAuthentifie =
+      'Ta session a expiré. Reconnecte-toi, puis réessaie.';
+
+  static const String exportReseau =
+      'Pas de connexion. Réessaie quand le réseau revient.';
+
+  /// Le serveur a répondu, c'est l'appareil qui n'a pas su ranger le fichier.
+  /// Le message le dit : réessayer a un sens, se reconnecter n'en a aucun.
+  static const String exportFichierImpossible =
+      'Tes données sont prêtes, mais ton navigateur n\'a pas pu enregistrer le '
+      'fichier. Réessaie, ou ouvre l\'application dans un onglet ordinaire.';
+
+  static const String exportEchec =
+      'L\'export n\'a pas abouti. Réessaie dans un instant.';
+
+  // --- Les deux pages légales ----------------------------------------
+
+  static const String legalConfidentialiteLien = 'Confidentialité';
+  static const String legalMentionsLien = 'Mentions légales';
+
+  /// Le pied de page qui mène aux deux documents, sur le profil comme sur
+  /// l'écran de connexion — c'est le seul écran qu'un visiteur non connecté
+  /// voit, et une politique de confidentialité joignable seulement une fois
+  /// connecté ne remplit pas son office.
+  static const String legalPiedTitre = 'Tes données et la loi';
+
+  static const String legalRetour = 'Retour';
+
+  /// La marque de ce qui reste à décider par le propriétaire du produit. Elle
+  /// est **visible**, jamais remplacée par un texte plausible : une mention
+  /// légale fausse se croit, une mention légale trouée se corrige.
+  static const String legalACompleterTitre =
+      'À compléter avant mise en service';
 }

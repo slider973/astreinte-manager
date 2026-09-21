@@ -7,6 +7,7 @@ import 'package:astreinte_sp/core/env.dart';
 import 'package:astreinte_sp/core/firebase/firebase_bootstrap.dart';
 import 'package:astreinte_sp/core/plateforme/contexte_plateforme.dart';
 import 'package:astreinte_sp/core/plateforme/ouverture_externe.dart';
+import 'package:astreinte_sp/core/plateforme/telechargement.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
@@ -49,6 +50,7 @@ import 'package:astreinte_sp/features/planning/domain/matrice_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/planning_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/suivi_providers.dart';
 import 'package:astreinte_sp/features/profil/data/profil_repository.dart';
+import 'package:astreinte_sp/features/profil/domain/export_providers.dart';
 import 'package:astreinte_sp/features/profil/domain/profil_providers.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/propositions_providers.dart';
@@ -62,6 +64,7 @@ import 'faux_abonnement.dart';
 import 'faux_astreintes.dart';
 import 'faux_caserne.dart';
 import 'faux_dispos.dart';
+import 'faux_export.dart';
 import 'faux_notifications.dart';
 import 'faux_planning.dart';
 import 'faux_planning_caserne.dart';
@@ -248,6 +251,8 @@ Future<AppMontee> monterApp(
   MembresRepository? membres,
   InvitationRepository? invitations,
   ProfilRepository? profils,
+  FauxExportRepository? export,
+  FauxTelechargement? telechargement,
   ParametresRepository? parametres,
   AbonnementRepository? abonnement,
   CaserneRepository? caserne,
@@ -313,6 +318,16 @@ Future<AppMontee> monterApp(
         // qui n'existe pas en test.
         profilRepositoryProvider.overrideWithValue(
           profils ?? FauxProfilRepository(),
+        ),
+        // L'export RGPD (ticket 034) est posé sur l'onglet « Profil » et dans
+        // la feuille de suppression : sans faux, une touche sur le bouton
+        // toucherait un client Supabase qui n'existe pas en test. Et sans faux
+        // téléchargement, elle appellerait le navigateur.
+        exportRepositoryProvider.overrideWithValue(
+          export ?? FauxExportRepository(),
+        ),
+        telechargementProvider.overrideWithValue(
+          (telechargement ?? FauxTelechargement()).call,
         ),
         if (parametres != null)
           parametresRepositoryProvider.overrideWithValue(parametres),

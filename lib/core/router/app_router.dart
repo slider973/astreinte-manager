@@ -12,6 +12,7 @@ import '../../features/demarrage/presentation/configuration_absente_screen.dart'
 import '../../features/demarrage/presentation/demarrage_screen.dart';
 import '../../features/dev/presentation/dev_components_screen.dart';
 import '../../features/invitation/presentation/invitation_screen.dart';
+import '../../features/legal/presentation/document_legal_screen.dart';
 import '../../features/membres/presentation/inviter_screen.dart';
 import '../../features/membres/presentation/membres_screen.dart';
 import '../../features/notifications/domain/destination_push.dart';
@@ -202,6 +203,22 @@ abstract final class AppRoutes {
   /// `/availability/<period>` — la saisie du mois.
   static const String lienSaisie = '/availability/:$parametrePeriode';
   static const String lienSaisieName = 'lienSaisie';
+
+  // --- Les deux pages légales (ticket 034) ---------------------------------
+
+  /// Politique de confidentialité et mentions légales.
+  ///
+  /// **Joignables dans tous les états d'authentification**, comme le lien
+  /// d'invitation : une politique de confidentialité doit se lire sans compte —
+  /// par une mairie, par un candidat à l'invitation, par qui a reçu un
+  /// courriel — et elle doit avoir une URL qu'on colle dans une délibération
+  /// (`design/034-rgpd-export.md § 5.3`). La garde est dans `redirectionAuth`,
+  /// et ce préfixe **est** la règle.
+  static const String prefixeLegal = '/legal';
+  static const String confidentialite = '$prefixeLegal/confidentialite';
+  static const String confidentialiteName = 'confidentialite';
+  static const String mentions = '$prefixeLegal/mentions';
+  static const String mentionsName = 'mentionsLegales';
 
   /// L'app n'a pas reçu son URL Supabase à la compilation.
   static const String configuration = '/configuration';
@@ -426,6 +443,17 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
               ) ??
               AppRoutes.accueil,
         ),
+      GoRoute(
+        path: AppRoutes.confidentialite,
+        name: AppRoutes.confidentialiteName,
+        builder: (context, state) =>
+            const DocumentLegalScreen.confidentialite(),
+      ),
+      GoRoute(
+        path: AppRoutes.mentions,
+        name: AppRoutes.mentionsName,
+        builder: (context, state) => const DocumentLegalScreen.mentions(),
+      ),
       GoRoute(
         path: AppRoutes.demarrage,
         name: AppRoutes.demarrageName,

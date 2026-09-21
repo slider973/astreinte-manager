@@ -328,6 +328,48 @@ void main() {
       expect(AppRoutes.superAdmin.startsWith(AppRoutes.prefixeAdmin), isFalse);
     });
 
+    // **Les deux pages légales s'ouvrent dans tous les états** (ticket 034).
+    // Une politique de confidentialité qui exige un compte pour être lue ne
+    // remplit pas son office : elle doit être joignable par une mairie, par un
+    // candidat à l'invitation, par qui a reçu un courriel.
+    test('les pages légales traversent la garde dans les quatre états', () {
+      for (final chemin in <String>[
+        AppRoutes.confidentialite,
+        AppRoutes.mentions,
+      ]) {
+        for (final etat in EtatAuth.values) {
+          expect(
+            redirectionAuth(
+              etat: etat,
+              chemin: chemin,
+              estSuperAdmin: false,
+            ),
+            isNull,
+            reason: 'depuis $chemin en $etat',
+          );
+        }
+      }
+    });
+
+    test('elles ne sont sous la garde ni des admins ni de l\'éditeur', () {
+      expect(
+        AppRoutes.confidentialite.startsWith(AppRoutes.prefixeAdmin),
+        isFalse,
+      );
+      expect(
+        AppRoutes.confidentialite.startsWith(AppRoutes.superAdmin),
+        isFalse,
+      );
+    });
+
+    test('un chemin qui commence par « legal » sans en être n\'est pas '
+        'concerné', () {
+      expect(
+        redirectionAuth(etat: EtatAuth.deconnecte, chemin: '/legalement'),
+        AppRoutes.connexion,
+      );
+    });
+
     test('un chemin qui commence par « superadmin » sans en être n\'est pas '
         'concerné', () {
       expect(

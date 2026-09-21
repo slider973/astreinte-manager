@@ -7,6 +7,7 @@ import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../domain/suppression_providers.dart';
+import 'bouton_export.dart';
 
 /// Ouvre la feuille de suppression de compte. Rend `true` quand le compte a
 /// bien été supprimé.
@@ -99,9 +100,19 @@ class _Corps extends ConsumerWidget {
                   titre: AppStrings.suppressionCeQuiResteTitre,
                   texte: AppStrings.suppressionCeQuiReste,
                 ),
-                // Le ticket 034 pose ici « Exporter mes données », dernière
-                // sortie avant le point de non-retour. Rien n'est posé
-                // aujourd'hui : un bouton mort est pire qu'un bouton absent.
+                // **La dernière sortie avant le point de non-retour**
+                // (ticket 034). Elle ne ferme pas la feuille, elle ne bloque
+                // pas la suppression et elle n'en est pas une étape : forcer
+                // un téléchargement avant de partir, c'est retenir quelqu'un
+                // qui a décidé (`design/034-rgpd-export.md § 5.2`).
+                const SizedBox(height: AppSpacing.lg),
+                const _Volet(
+                  icone: Icons.download_outlined,
+                  titre: AppStrings.exportAvantSuppressionTitre,
+                  texte: AppStrings.exportAvantSuppression,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                const BoutonExportDonnees(aideVisible: false),
                 const SizedBox(height: AppSpacing.xl),
                 PrimaryButton(
                   libelle: AppStrings.suppressionConfirmer,
