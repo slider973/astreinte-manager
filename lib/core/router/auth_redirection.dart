@@ -51,6 +51,13 @@ String? redirectionAuth({
   // jeton, qui n'existe que dans l'URL reçue par courriel.
   if (chemin.startsWith(AppRoutes.prefixeInvitation)) return null;
 
+  // `/install` s'ouvre dans tous les états, pour la même raison qu'une page
+  // légale : elle s'adresse à quelqu'un qui n'a pas encore de compte — celui
+  // à qui on vient de dicter l'adresse. La renvoyer sur l'écran de connexion
+  // ferait de l'aide à l'installation une récompense de la connexion
+  // (ticket 032).
+  if (chemin == AppRoutes.aideInstallation) return null;
+
   // Les deux pages légales aussi, et pour une raison qui leur est propre : une
   // politique de confidentialité doit être lisible **sans compte** — par une
   // mairie qui instruit un dossier, par quelqu'un qui vient de recevoir une

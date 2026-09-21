@@ -286,6 +286,11 @@ Future<AppMontee> monterApp(
   JetonLocal? jetonLocal,
   Size taille = const Size(390, 844),
   bool stabiliser = true,
+
+  /// L'état du démarrage Supabase. `configurationAbsente` reproduit un
+  /// déploiement dont la base n'est pas encore branchée (ticket 032) : le
+  /// routeur n'ouvre alors que `/configuration` et `/install`.
+  SupabaseDemarrage demarrage = SupabaseDemarrage.pret,
 }) async {
   tester.view.physicalSize = taille * tester.view.devicePixelRatio;
   addTearDown(tester.view.reset);
@@ -310,7 +315,7 @@ Future<AppMontee> monterApp(
     ProviderScope(
       overrides: [
         envProvider.overrideWithValue(envDeTest),
-        supabaseDemarrageProvider.overrideWithValue(SupabaseDemarrage.pret),
+        supabaseDemarrageProvider.overrideWithValue(demarrage),
         authRepositoryProvider.overrideWithValue(auth),
         membershipRepositoryProvider.overrideWithValue(memberships),
         if (membres != null)

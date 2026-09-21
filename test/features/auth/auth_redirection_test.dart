@@ -328,6 +328,34 @@ void main() {
       expect(AppRoutes.superAdmin.startsWith(AppRoutes.prefixeAdmin), isFalse);
     });
 
+    // **`/install` s'ouvre dans tous les états** (ticket 032). C'est l'adresse
+    // qu'un chef de centre dicte au téléphone : celui qui la tape n'a pas de
+    // compte, et n'en a pas besoin pour poser une icône sur son écran.
+    test('/install traverse la garde dans les quatre états', () {
+      for (final etat in EtatAuth.values) {
+        expect(
+          redirectionAuth(
+            etat: etat,
+            chemin: AppRoutes.aideInstallation,
+            estSuperAdmin: false,
+          ),
+          isNull,
+          reason: 'en $etat',
+        );
+      }
+    });
+
+    test('un chemin qui commence par « install » sans en être n\'est pas '
+        'concerné', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.deconnecte,
+          chemin: '/installation',
+        ),
+        AppRoutes.connexion,
+      );
+    });
+
     // **Les deux pages légales s'ouvrent dans tous les états** (ticket 034).
     // Une politique de confidentialité qui exige un compte pour être lue ne
     // remplit pas son office : elle doit être joignable par une mairie, par un

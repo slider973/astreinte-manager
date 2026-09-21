@@ -11,6 +11,7 @@ import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/ecran_simple.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../domain/parcours_accueil.dart';
+import 'etapes_installation.dart';
 
 /// « Ajouter à l'écran d'accueil », une fois et une seule.
 ///
@@ -25,18 +26,6 @@ class InstallationScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final plateforme = ref.watch(contextePlateformeProvider);
     final ios = plateforme.navigateur == NavigateurInstallation.safariIos;
-
-    final etapes = ios
-        ? const <String>[
-            AppStrings.installIosEtape1,
-            AppStrings.installIosEtape2,
-            AppStrings.installIosEtape3,
-          ]
-        : const <String>[
-            AppStrings.installAndroidEtape1,
-            AppStrings.installAndroidEtape2,
-            AppStrings.installAndroidEtape3,
-          ];
 
     Future<void> terminer() async {
       final suite = await ref
@@ -62,18 +51,7 @@ class InstallationScreen extends ConsumerWidget {
           style: Theme.of(context).textTheme.bodyLarge,
         ),
         const SizedBox(height: AppSpacing.auDessusTitre),
-        Semantics(
-          header: true,
-          child: Text(
-            AppStrings.installEtapesTitre,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        for (int index = 0; index < etapes.length; index++) ...<Widget>[
-          _Etape(numero: index + 1, texte: etapes[index]),
-          if (index < etapes.length - 1) const SizedBox(height: AppSpacing.lg),
-        ],
+        EtapesInstallation(etapes: etapesInstallation(plateforme.navigateur)),
         const SizedBox(height: AppSpacing.xxl),
         PrimaryButton(
           libelle: AppStrings.installTermine,
@@ -89,50 +67,6 @@ class InstallationScreen extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Un geste, numéroté. La numérotation porte l'information — l'ordre des
-/// gestes — et non la décoration.
-class _Etape extends StatelessWidget {
-  const _Etape({required this.numero, required this.texte});
-
-  final int numero;
-  final String texte;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Semantics(
-      label: '$numero. $texte',
-      excludeSemantics: true,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHigh,
-              borderRadius: AppRadius.caseRegistreRadius,
-              border: Border.all(color: theme.colorScheme.outlineVariant),
-            ),
-            child: SizedBox.square(
-              dimension: AppTouch.badge,
-              child: Center(
-                child: Text('$numero', style: theme.textTheme.labelLarge),
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xs),
-              child: Text(texte, style: theme.textTheme.bodyLarge),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
