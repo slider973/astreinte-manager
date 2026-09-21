@@ -7,7 +7,7 @@
 # et **rien ne le disait**. Le défaut s'est découvert quand un pompier est resté à
 # la porte. Ce script existe pour que l'écart se voie avant l'usager.
 #
-# Il ne écrit rien : quatre lectures, un compte rendu, un code de sortie.
+# Il n'écrit rien : rien que des lectures, un compte rendu, un code de sortie.
 #   0 — le dépôt et la production disent la même chose ;
 #   1 — au moins un écart, chacun nommé et expliqué ;
 #   2 — le script n'a pas pu conclure (outil ou secret manquant).
@@ -23,8 +23,8 @@
 
 set -uo pipefail
 
-racine="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$racine"
+racine="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 2
+cd "$racine" || exit 2
 
 # ---------------------------------------------------------------------------
 # Compte rendu
@@ -199,16 +199,27 @@ attendu_notify="https://$ref.supabase.co/functions/v1/send-notification"
 reponse_vault="$(curl -sS -X POST "https://api.supabase.com/v1/projects/$ref/database/query" \
   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"query":"select decrypted_secret as url from vault.decrypted_secrets where name = '"'"'notify_function_url'"'"'"}' 2>&1)"
+  -d '{"read_only":true,"query":"select decrypted_secret as url from vault.decrypted_secrets where name = '"'"'notify_function_url'"'"'"}' 2>&1)"
 
-url_notify="$(printf '%s' "$reponse_vault" | jq -r 'if type == "array" then (.[0].url // "") else "" end' 2>/dev/null)"
-
-if [ -z "$url_notify" ]; then
-  ecart "Le secret Vault notify_function_url est introuvable en production. Les notifications déclenchées depuis la base ne partiront pas."
-elif [ "$url_notify" != "$attendu_notify" ]; then
-  ecart "notify_function_url vise $url_notify au lieu de $attendu_notify. La file reste en attente, tentatives comptées, sans erreur visible."
+# Trois issues à distinguer, et la dernière est celle qu'on confondait : la
+# requête a abouti et rend une ligne (le secret existe) ; elle a abouti et rend
+# un tableau vide (le secret manque vraiment) ; elle n'a pas abouti du tout —
+# jeton sans le droit `database.query`, projet en pause, API en panne — et alors
+# le script ne sait rien. Annoncer « secret introuvable » dans ce dernier cas
+# enverrait réparer une base qui va bien.
+if ! printf '%s' "$reponse_vault" | jq -e 'type == "array"' >/dev/null 2>&1; then
+  detail="$(printf '%s' "$reponse_vault" | jq -r '.message // .error // empty' 2>/dev/null)"
+  ecart "notify_function_url : je n'ai pas pu conclure. La requête de lecture sur $ref n'a pas abouti${detail:+ ($detail)} — ce n'est pas la preuve que le secret manque, c'est l'absence de réponse. À reprendre à la main : docs/DEPLOIEMENT.md § 8."
+  url_notify=""
 else
-  ok "notify_function_url vise bien la fonction du projet hébergé."
+  url_notify="$(printf '%s' "$reponse_vault" | jq -r '.[0].url // ""')"
+  if [ -z "$url_notify" ]; then
+    ecart "Le secret Vault notify_function_url est introuvable en production. Les notifications déclenchées depuis la base ne partiront pas."
+  elif [ "$url_notify" != "$attendu_notify" ]; then
+    ecart "notify_function_url vise $url_notify au lieu de $attendu_notify. La file reste en attente, tentatives comptées, sans erreur visible."
+  else
+    ok "notify_function_url vise bien la fonction du projet hébergé."
+  fi
 fi
 
 # La file dit la vérité mieux qu'un réglage : une notification en échec définitif
@@ -216,7 +227,7 @@ fi
 file="$(curl -sS -X POST "https://api.supabase.com/v1/projects/$ref/database/query" \
   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"query":"select status, count(*)::int as n from notification_outbox group by status order by status"}' 2>&1)"
+  -d '{"read_only":true,"query":"select status, count(*)::int as n from notification_outbox group by status order by status"}' 2>&1)"
 if printf '%s' "$file" | jq -e 'type == "array"' >/dev/null 2>&1; then
   resume="$(printf '%s' "$file" | jq -r '[.[] | "\(.status) : \(.n)"] | join(", ")')"
   info "File de notifications — ${resume:-vide}."
@@ -251,9 +262,32 @@ else
   info "Comparé avec la surcouche [remotes.production] de supabase/config.toml."
 fi
 
-divergences="$(printf '%s' "$json_config" | jq -r '
-  [.changes[] | select(.class == "update")
+# **Les propriétés qui ne peuvent pas converger.** Une alarme qui sonne à chaque
+# déploiement ne dit plus rien ; celle-ci doit rester silencieuse tant que la
+# production est bonne. `auth.sms.twilio.enabled` est dans ce cas et, pour
+# l'instant, la seule : l'API hébergée rend toujours un `sms_provider` et le sien
+# vaut « twilio » par défaut, sans compte Twilio, `external_phone_enabled` à faux,
+# donc sans qu'aucun SMS parte — le MVP n'authentifie que par courriel. La
+# déclarer vraie dans [remotes.production] est refusé par le CLI, qui réclame
+# alors des identifiants Twilio qui n'existent pas ; la pousser à faux ne tient
+# pas, l'API la redonne vraie au passage suivant. Le raisonnement complet est
+# dans supabase/config.toml, au-dessus de [remotes.production.db.vault].
+#
+# Cette liste se mérite : y ajouter une entrée, c'est renoncer à surveiller un
+# réglage. Chacune doit venir avec sa raison, écrite, et vérifiée.
+non_convergentes="auth.sms.twilio.enabled"
+
+divergences="$(printf '%s' "$json_config" | jq -r --arg ig "$non_convergentes" '
+  ($ig | split(" ")) as $ignorees
+  | [.changes[] | select(.class == "update")
+   | select([.path | join(".")] - $ignorees | length > 0)
    | "\(.path | join(".")) : dépôt \(.local | tostring) / production \(.remote | tostring)"] | .[]')"
+
+ignorees_vues="$(printf '%s' "$json_config" | jq -r --arg ig "$non_convergentes" '
+  ($ig | split(" ")) as $ignorees
+  | [.changes[] | select(.class == "update") | (.path | join("."))
+     | select([.] - $ignorees | length == 0)] | join(", ")')"
+[ -n "$ignorees_vues" ] && info "Hors comparaison, faute de pouvoir converger : $ignorees_vues. Ni poussé, ni surveillé — la raison est en commentaire dans ce script."
 
 if [ -n "$divergences" ]; then
   while IFS= read -r d; do
@@ -261,13 +295,63 @@ if [ -n "$divergences" ]; then
   done <<<"$divergences"
   info "Rattrapage : SUPABASE_AUTH_SMTP_PASSWORD=… supabase config push --project-ref $ref"
 else
-  ok "Le projet hébergé sert la configuration du dépôt : gabarits, serveur d'envoi, plafonds, redirections."
+  ok "Le projet hébergé sert la configuration du dépôt : sujets des gabarits, serveur d'envoi, plafonds, redirections."
 fi
 
 # Le mot de passe SMTP et les autres identifiants sont masqués par l'API : aucune
 # comparaison n'est possible, et ce script ne peut donc pas dire s'ils sont bons.
 masques="$(printf '%s' "$json_config" | jq -r '[.masked[] | join(".")] | join(", ")')"
 [ -n "$masques" ] && info "Non vérifiable (masqué par l'API) : $masques."
+
+# ---------------------------------------------------------------------------
+# Le **corps** du gabarit de connexion
+#
+# `config diff` ne compare que le *sujet* : `content_path` n'est pas une valeur,
+# c'est un fichier que `config push` téléverse et oublie. Changer le sujet se
+# voyait donc, ajouter une ligne au corps ne se voyait pas — ni en `changes`, ni
+# en `unmanaged`, ni en `masked`. Or le 21 septembre 2026, c'est le corps qui
+# était en anglais, avec un lien là où l'application attend six chiffres : la
+# seule partie que le pompier lit était la seule que rien ne surveillait.
+#
+# La valeur servie se lit par `GET /v1/projects/{ref}/config/auth`, champ
+# `mailer_templates_magic_link_content`.
+#
+# **Ce qui est normalisé avant de comparer**, et rien d'autre : les retours
+# chariot (`\r`) des fins de ligne Windows, les espaces en fin de ligne, et les
+# lignes vides. Ces trois-là dépendent de qui a écrit la valeur — le CLI, le
+# champ de texte du tableau de bord, un copier-coller — et ne changent pas d'un
+# iota le courriel reçu. Tout le reste compte : une ligne ajoutée, un mot changé,
+# une balise déplacée font un écart.
+# ---------------------------------------------------------------------------
+
+normaliser_gabarit() { tr -d '\r' | sed -e 's/[[:space:]]*$//' -e '/^$/d'; }
+
+gabarit_depot_fichier="supabase/templates/magic_link.html"
+if [ ! -f "$gabarit_depot_fichier" ]; then
+  ecart "$gabarit_depot_fichier est absent du dépôt alors que supabase/config.toml le déclare : config push échouerait."
+else
+  reponse_auth="$(curl -sS "https://api.supabase.com/v1/projects/$ref/config/auth" \
+    -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" 2>&1)"
+
+  if ! printf '%s' "$reponse_auth" | jq -e 'has("mailer_templates_magic_link_content")' >/dev/null 2>&1; then
+    detail="$(printf '%s' "$reponse_auth" | jq -r '.message // .error // empty' 2>/dev/null)"
+    ecart "Corps du gabarit magic_link : je n'ai pas pu conclure. La lecture de la configuration d'authentification de $ref n'a pas abouti${detail:+ ($detail)} — ce n'est pas la preuve que le gabarit est bon."
+  else
+    gabarit_distant="$(printf '%s' "$reponse_auth" |
+      jq -r '.mailer_templates_magic_link_content // ""' | normaliser_gabarit)"
+    gabarit_depot="$(normaliser_gabarit <"$gabarit_depot_fichier")"
+
+    if [ -z "$gabarit_distant" ]; then
+      ecart "Le projet hébergé n'a aucun corps pour le gabarit magic_link : il sert celui de Supabase, en anglais, avec un lien là où l'application attend six chiffres. Rattrapage : SUPABASE_AUTH_SMTP_PASSWORD=… supabase config push --project-ref $ref"
+    elif [ "$gabarit_distant" != "$gabarit_depot" ]; then
+      lignes="$(diff <(printf '%s\n' "$gabarit_depot") <(printf '%s\n' "$gabarit_distant") |
+        grep -c '^[<>]')"
+      ecart "Le corps servi par le projet hébergé n'est pas celui de $gabarit_depot_fichier : $lignes ligne(s) de différence, espaces et lignes vides mis à part. C'est le texte que le pompier reçoit. Rattrapage : SUPABASE_AUTH_SMTP_PASSWORD=… supabase config push --project-ref $ref"
+    else
+      ok "Le corps du gabarit magic_link est celui de $gabarit_depot_fichier, ligne pour ligne."
+    fi
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 
