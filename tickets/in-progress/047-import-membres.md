@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 006, 009, 038
 - **Branche** : `feat/047-import-membres`
+- **Statut** : en cours depuis 2026-09-21
 
 ## Contexte
 Demandé par le propriétaire au moment de créer sa première caserne réelle. Aujourd'hui, l'admin
