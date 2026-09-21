@@ -89,6 +89,19 @@ ne doit être ajouté sans équivalent web.
 - PR : titre `N — Titre du ticket`, corps généré par le script, terminé par
   `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 
+## Règle des caches locaux
+
+Tout ce qui est écrit sur l'appareil doit disparaître à la déconnexion : un téléphone de caserne
+est prêté, un véhicule est partagé. La règle vit à un seul endroit, la méthode qui oublie les
+caches dans `lib/core/session/deconnexion.dart`, appelée avant la fermeture de session puisque les
+identifiants servant de clés ne sont plus lisibles après. **Tout nouveau cache local doit y être
+branché**, et aucun test ne le rappellera de lui-même.
+
+Un cache ne décide jamais d'un droit. Une appartenance restaurée depuis le stockage revient
+toujours en simple membre : la base reste la seule autorité, le cache ne sert qu'à savoir vers quel
+écran aller. Et un repli sur le cache ne doit couvrir qu'une panne de réseau, jamais un refus de la
+base, sinon une révocation devient invisible.
+
 ## Ce qu'il ne faut pas faire
 
 - Coder une fonctionnalité qui n'est pas dans le ticket en cours.
