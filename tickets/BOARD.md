@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 048 | [Finition de l'écran d'import des membres](in-progress/048-finition-import-membres.md) | P1 | 047 | — |
 
 ## À faire
 

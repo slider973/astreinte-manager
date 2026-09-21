@@ -5,7 +5,7 @@
 - **Dépend de** : 047
 - **Branche** : `feat/048-finition-import-membres`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-21
 
 ## Contexte
 L'audit Impeccable de l'écran livré au ticket 047 a été passé après coup, le 21 septembre 2026,
