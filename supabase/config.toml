@@ -467,6 +467,15 @@ verify_jwt = false
 enabled = true
 verify_jwt = true
 
+# Edge Function du ticket 034. Même verrou que `delete-account`, pour un enjeu
+# symétrique : celle-ci ne détruit rien, elle **livre** le dossier complet d'une
+# personne. L'identité vient du JWT, un corps de requête est ignoré, et la
+# fonction SQL `export_own_data` (migration 0027) est fermée à `anon` comme à
+# `authenticated`. Voir supabase/functions/README.md et docs/RGPD.md.
+[functions.export-user-data]
+enabled = true
+verify_jwt = true
+
 # Désactivé en local : Logflare et Vector échouent leur bilan de santé sous Rancher Desktop
 # et ne servent qu'aux journaux dans Studio. Aucun effet sur le projet hébergé.
 [analytics]

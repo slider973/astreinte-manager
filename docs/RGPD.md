@@ -1,0 +1,206 @@
+# Registre des traitements — Astreinte SP
+
+Document de référence pour le RGPD (règlement UE 2016/679). Il décrit **ce que le logiciel fait
+réellement**, vérifié contre `docs/SCHEMA.md` table par table et contre le code des Edge Functions.
+Il n'anticipe rien : une durée qui n'est pas appliquée par une tâche automatique est signalée comme
+telle.
+
+Ce que le propriétaire doit compléter est marqué `[À COMPLÉTER : …]`. Ces marques sont volontaires :
+une mention inventée se croirait, une mention trouée se corrige. Les deux pages publiques de
+l'application (`/legal/confidentialite`, `/legal/mentions`) portent les mêmes.
+
+- **Version** : 1 — ticket 034, 21 septembre 2026.
+- **Portée** : l'application Astreinte SP (PWA), sa base Supabase, ses Edge Functions et ses
+  sous-traitants listés au § 5.
+
+---
+
+## 1. Qui est responsable de quoi
+
+Le produit sert des **centres de secours** qui y gèrent leurs propres sapeurs-pompiers. La
+répartition qui en découle, à confirmer par écrit dans les conditions d'utilisation :
+
+| Rôle | Qui | Sur quoi |
+|---|---|---|
+| **Responsable de traitement** | la caserne (son SDIS, sa commune ou l'association qui l'exploite) | les données de ses membres : identité, coordonnées, disponibilités, astreintes |
+| **Sous-traitant** (art. 28) | l'éditeur d'Astreinte SP | l'hébergement et le traitement de ces données pour le compte de la caserne |
+| **Responsable de traitement** | l'éditeur d'Astreinte SP | ses propres données de gestion : compte d'accès, facturation de l'abonnement, journaux techniques |
+
+`[À COMPLÉTER : raison sociale, forme juridique, numéro SIREN et adresse du siège de l'éditeur.]`
+
+`[À COMPLÉTER : adresse de contact pour l'exercice des droits — une adresse électronique
+surveillée, pas une boîte de contact générique.]`
+
+`[À COMPLÉTER : désignation ou non d'un délégué à la protection des données. Un DPO est obligatoire
+pour un organisme public ; la plupart des SDIS en ont un, l'éditeur pas nécessairement.]`
+
+`[À COMPLÉTER : un contrat de sous-traitance (art. 28.3) par caserne, ou une annexe unique aux
+conditions d'utilisation. Sans lui, la répartition ci-dessus n'existe que dans ce document.]`
+
+---
+
+## 2. Les traitements
+
+### 2.1 Gérer le compte et l'accès à l'application
+
+| | |
+|---|---|
+| **Finalité** | Permettre à une personne de se connecter, de se faire reconnaître par sa caserne et d'être jointe |
+| **Personnes concernées** | Sapeurs-pompiers volontaires et professionnels, chefs de centre, éditeur du produit |
+| **Données** | Adresse électronique, prénom, nom, téléphone (facultatif), surnom affiché dans la caserne, rôle et statut d'appartenance, langue, date de création, date de dernière connexion |
+| **Tables** | `profiles`, `memberships`, `invitations`, `super_admins`, et `auth.users` (schéma d'authentification Supabase) |
+| **Base légale** | Exécution du contrat qui lie la caserne à ses membres, et intérêt légitime de la caserne à organiser ses gardes (art. 6.1.b et 6.1.f) |
+| **Destinataires** | La personne elle-même ; les membres actifs de sa caserne (prénom, nom, surnom) ; les administrateurs de sa caserne (y compris téléphone et adresse) ; l'éditeur, pour l'exploitation |
+| **Conservation** | Tant que l'appartenance existe. Après suppression de compte : le profil est **anonymisé** (« Membre supprimé », adresse non routable, téléphone effacé) et conservé sans limite, parce que les astreintes passées y pendent (§ 3) |
+| **Mesures** | Connexion par code à usage unique envoyé par courriel — aucun mot de passe stocké. Cloisonnement par caserne en Row Level Security sur chaque table (`docs/SCHEMA.md § 4`). Le jeton d'invitation n'est jamais rendu à un client |
+
+### 2.2 Recueillir les disponibilités et construire les plannings
+
+| | |
+|---|---|
+| **Finalité** | Savoir qui peut tenir une garde, composer le planning mensuel du centre, proposer les astreintes et suivre les réponses |
+| **Personnes concernées** | Les membres actifs d'une caserne |
+| **Données** | Disponibilité ou absence par date et par créneau (jour / nuit) ; quotas souhaités par mois et commentaire libre ; attributions, acceptations, refus et leur motif ; mention « attribué hors disponibilité » |
+| **Tables** | `availabilities`, `availability_preferences`, `periods`, `schedules`, `shifts`, `assignments` |
+| **Base légale** | Exécution du contrat et intérêt légitime de la caserne à assurer la continuité du service (art. 6.1.b et 6.1.f) |
+| **Destinataires** | Le membre pour ses propres lignes ; les administrateurs de sa caserne pour toutes ; les autres membres uniquement quand le planning est **publié ou validé** (`docs/PRD.md § 7` règle 1) |
+| **Conservation** | Les disponibilités et les quotas sont effacés à la suppression du compte. **Les attributions sont conservées sans limite**, sous la mention « Membre supprimé » : elles décrivent une garde tenue, c'est-à-dire un fait de service de la caserne, et non plus une donnée d'identité (`docs/PRD.md § 7` règle 6) |
+| **Point d'attention** | Le commentaire libre de `availability_preferences` est saisi par le membre. Rien n'y empêche une mention de santé ou de famille (« indisponible, traitement médical »), qui serait une donnée sensible au sens de l'art. 9. L'interface n'en demande pas et la page de confidentialité déconseille d'en écrire ; c'est une atténuation, pas une garantie. `[À COMPLÉTER : décision du propriétaire — laisser le champ libre avec l'avertissement, ou le remplacer par des motifs pré-définis]` |
+
+### 2.3 Prévenir, relancer, notifier
+
+| | |
+|---|---|
+| **Finalité** | Faire savoir à un membre qu'une astreinte lui est proposée, qu'une échéance approche, qu'un planning est publié ou qu'une garde a changé |
+| **Personnes concernées** | Les membres actifs d'une caserne, les administrateurs |
+| **Données** | Titre et texte de chaque notification, canal (interne, push, courriel), horodatages d'envoi, de remise et de lecture, motif d'échec ; identifiant d'appareil émis par Firebase, plateforme, libellé lisible (« iPhone · Safari »), date de dernière utilisation |
+| **Tables** | `notifications`, `push_tokens`, `notification_outbox` |
+| **Base légale** | Exécution du contrat (art. 6.1.b). Les notifications **non critiques** — rappels de saisie, rapports — se coupent depuis le profil ; les propositions d'astreinte, elles, partent toujours : sans elles le produit ne rend pas son service |
+| **Destinataires** | Le destinataire seul. Aucun administrateur ne lit les notifications d'un membre |
+| **Conservation** | Aujourd'hui **sans limite**. La tâche `prune_notifications` (suppression des notifications lues de plus de 90 jours) est décrite au `docs/SCHEMA.md § 8` mais **n'est pas encore en service** : elle n'apparaît pas dans `cron.job`. Tout est effacé à la suppression du compte. `[À COMPLÉTER : mettre la tâche en service, ou retenir une autre durée]` |
+| **Mesures** | Un identifiant d'appareil définitivement rejeté par Firebase est supprimé par l'Edge Function d'envoi. La file d'attente `notification_outbox` n'est lisible par aucun client |
+
+### 2.4 Tracer les actes d'administration
+
+| | |
+|---|---|
+| **Finalité** | Rendre vérifiable ce qu'un administrateur fait sur les données d'un membre : saisir une disponibilité à sa place, attribuer une garde hors disponibilité, annuler, réouvrir un mois (`docs/PRD.md § 7` règle 7) |
+| **Personnes concernées** | Les membres visés par l'acte, les administrateurs qui le posent |
+| **Données** | Nature de l'acte, entité visée, date, caserne, et un détail structuré qui peut contenir une date, un créneau, un statut, un rôle ou une adresse invitée |
+| **Tables** | `audit_log` |
+| **Base légale** | Intérêt légitime : sans trace, un désaccord sur « qui a coché cette case » ne se tranche pas (art. 6.1.f) |
+| **Destinataires** | Les administrateurs de la caserne concernée. Le membre lui-même, pour les actes qui le visent, par l'export du § 4 |
+| **Conservation** | Sans limite. La trace survit à la suppression du compte : `actor_id` désigne alors un profil anonyme. `[À COMPLÉTER : durée de conservation du journal d'audit — trois ans est l'ordre de grandeur usuel pour une trace administrative]` |
+
+### 2.5 Facturer l'abonnement de la caserne
+
+| | |
+|---|---|
+| **Finalité** | Encaisser l'abonnement mensuel ou annuel d'une caserne, suspendre l'accès en écriture en cas d'impayé |
+| **Personnes concernées** | Aucune, au sens du règlement : le client est la caserne. L'administrateur qui souscrit laisse toutefois ses coordonnées de facturation **chez le prestataire de paiement**, pas dans cette base |
+| **Données** | Statut de l'abonnement, identifiants client et abonnement du prestataire, formule, dates d'échéance et de suspension |
+| **Tables** | `subscriptions`, `stripe_events` |
+| **Base légale** | Exécution du contrat d'abonnement, et obligation légale de conservation comptable (art. 6.1.b et 6.1.c) |
+| **Destinataires** | Les administrateurs de la caserne, l'éditeur, le prestataire de paiement |
+| **Conservation** | Durée de l'abonnement, puis la durée légale de conservation des pièces comptables. `[À COMPLÉTER : dix ans est la durée applicable en France aux livres et pièces comptables — à confirmer avec le comptable de l'éditeur]` |
+
+---
+
+## 3. Ce qui reste après une suppression de compte
+
+Le produit tient deux promesses qui se contredisent en apparence, et la frontière entre les deux
+est la raison d'être de la migration `0026` :
+
+- **Ce qui part** : disponibilités, préférences de charge et leur commentaire, appareils,
+  notifications reçues, invitations en attente à l'adresse supprimée, appartenance au registre des
+  éditeurs du produit.
+- **Ce qui reste, anonymisé** : le profil, réduit à « Membre supprimé », adresse non routable
+  (`supprime@astreinte.invalid`), téléphone effacé, notifications coupées ; les appartenances,
+  passées en `disabled` et privées de leur surnom ; **et les attributions**, qui décrivent des
+  gardes tenues.
+- **Ce qui ne bouge pas** : les colonnes qui désignent l'auteur d'un acte
+  (`audit_log.actor_id`, `assignments.created_by`, `schedules.created_by`,
+  `invitations.invited_by`, `availabilities.set_by`). Elles pointent désormais vers un profil
+  anonyme — c'est exactement l'effet recherché.
+
+Une caserne qui perdrait son dernier administrateur actif n'aurait plus personne pour publier un
+planning : la suppression est alors **refusée**, avec la sortie (« nomme d'abord quelqu'un »).
+
+---
+
+## 4. Les droits des personnes, et où ils s'exercent
+
+| Droit | Article | Comment il s'exerce |
+|---|---|---|
+| Accès et portabilité | 15 et 20 | « Exporter mes données » dans l'écran Profil. Fichier JSON réutilisable, produit par l'Edge Function `export-user-data`, contenant les douze sections listées ci-dessous |
+| Rectification | 16 | Prénom, nom et téléphone se corrigent dans l'écran Profil. L'adresse de connexion est l'identifiant du compte : sa correction passe par l'administrateur de la caserne |
+| Effacement | 17 | « Supprimer mon compte » dans l'écran Profil, avec la liste de ce qui part et de ce qui reste **avant** le geste. Les astreintes passées sont conservées au titre de l'intérêt légitime de la caserne (art. 17.3.b et 17.3.e) |
+| Opposition et limitation | 18 et 21 | Les notifications non critiques se coupent dans l'écran Profil. Pour le reste, `[À COMPLÉTER : adresse de contact]` |
+| Réclamation | 77 | Auprès de la CNIL, 3 place de Fontenoy, 75007 Paris — [cnil.fr](https://www.cnil.fr) |
+
+**Ce que contient l'export** (`supabase/functions/README.md § export-user-data`) : compte
+d'authentification, profil, casernes, appartenances, disponibilités, préférences de charge,
+attributions, notifications, appareils, invitations reçues, invitations envoyées, actes
+d'administration concernant la personne, actes qu'elle a elle-même posés, et le fait d'être ou non
+éditeur du produit. Un inventaire compte chaque section, y compris vide.
+
+**Ce qu'il ne contient jamais** : le nom, l'adresse ou l'identifiant d'une autre personne. Quand un
+acte implique quelqu'un d'autre, seul le fait est conservé — « cette case a été cochée par un
+administrateur », « cette attribution a été remplacée » — jamais l'identité. L'adresse d'une
+personne invitée est masquée. Le jeton d'un appareil est tronqué : c'est un identifiant
+d'installation émis par Firebase, sans valeur pour la personne et réutilisable par qui le lit.
+
+---
+
+## 5. Sous-traitants et hébergement
+
+| Sous-traitant | Ce qu'il traite | Où | Encadrement |
+|---|---|---|---|
+| **Supabase** | Base de données, authentification, Edge Functions : la totalité des données du § 2 | `[À COMPLÉTER : région du projet hébergé. Le PRD § 8 exige une région européenne — `eu-central-1` ou `eu-west`. À vérifier dans le tableau de bord avant toute mise en service]` | DPA de Supabase, clauses contractuelles types |
+| **Google (Firebase Cloud Messaging)** | Identifiants d'appareil et contenu des notifications push | États-Unis | Clauses contractuelles types. **Transfert hors UE** : c'est le seul du produit, et il porte le titre et le corps de la notification — donc, parfois, une date de garde |
+| **Resend** | Adresse électronique du destinataire et contenu des courriels (invitations, rappels, notifications de secours) | `[À COMPLÉTER : région retenue chez Resend]` | DPA de Resend |
+| **Stripe** | Coordonnées de facturation de la caserne, jamais celles d'un membre | Irlande / États-Unis | DPA de Stripe, clauses contractuelles types |
+| **Hébergeur de la PWA** | Aucune donnée personnelle : fichiers statiques uniquement | `[À COMPLÉTER : Vercel ou Cloudflare Pages, selon le choix du ticket 032]` | — |
+
+`[À COMPLÉTER : la liste des sous-traitants doit être publiée et tenue à jour. Toute addition doit
+être annoncée aux casernes avant d'entrer en service — c'est une obligation du contrat de
+sous-traitance, pas une politesse.]`
+
+---
+
+## 6. Mesures de sécurité
+
+- **Cloisonnement par caserne** en Row Level Security, sur chaque table, vérifié à chaque PR par
+  `supabase/tests/rls_test.sql`. Aucune requête cliente n'échappe à ces politiques.
+- **La clé de service ne quitte jamais le serveur.** Elle ouvre le client administrateur des Edge
+  Functions et n'apparaît dans aucune réponse, aucun journal, aucun message d'erreur.
+- **Aucun mot de passe** : la connexion se fait par code à usage unique envoyé par courriel.
+- **Les fonctions qui portent un `user_id` en paramètre** — `delete_own_account`,
+  `export_own_data`, les fonctions d'invitation — sont fermées aux rôles `anon` et `authenticated`.
+  Seules les Edge Functions les appellent, avec une identité tirée du jeton d'accès.
+- **Le jeton d'invitation** est hors du `grant` de lecture du rôle `authenticated` et ne sort ni
+  dans une réponse, ni dans un export, ni par le canal temps réel.
+- **Aucun secret dans le dépôt.**
+
+`[À COMPLÉTER : procédure de notification de violation (art. 33 et 34) — qui prévient les casernes,
+dans quel délai, par quel canal. 72 heures est le plafond légal pour saisir la CNIL.]`
+
+`[À COMPLÉTER : politique de sauvegarde et de restauration de la base — fréquence, rétention,
+localisation. Une sauvegarde est une copie des données du § 2 et relève du même régime.]`
+
+---
+
+## 7. Analyse d'impact
+
+Une analyse d'impact (AIPD, art. 35) n'est **pas** manifestement requise en l'état : le traitement
+ne porte ni sur des données sensibles au sens de l'art. 9, ni sur une surveillance systématique à
+grande échelle, ni sur une décision automatisée produisant des effets juridiques. Deux réserves,
+qui sont à surveiller et non à écarter :
+
+1. Le commentaire libre des préférences de charge (§ 2.2) peut recueillir une donnée de santé.
+2. La proposition automatique de remplissage du planning (ticket 018, hors périmètre à ce jour)
+   serait un traitement automatisé **assisté** : l'administrateur décide, la machine suggère. Si un
+   jour la suggestion devenait une décision, l'analyse serait à refaire.
+
+`[À COMPLÉTER : position du responsable de traitement. Un SDIS a souvent un cadre interne qui
+impose une AIPD indépendamment de ce raisonnement.]`

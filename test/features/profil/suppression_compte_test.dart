@@ -97,6 +97,21 @@ Future<void> _ouvrirLaFeuille(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Défile **dans la feuille**, pas dans l'écran qui est dessous.
+///
+/// La feuille pousse son propre `Scrollable` au sommet de la pile ; depuis le
+/// ticket 034 elle porte en plus l'export, et « Annuler » tombe sous la ligne
+/// de flottaison sur un écran de test. Un `tap` qui manque sa cible ne lève
+/// pas — il ne fait rien —, d'où ce détour.
+Future<void> _defilerDansLaFeuille(WidgetTester tester, Finder cible) async {
+  await tester.scrollUntilVisible(
+    cible,
+    200,
+    scrollable: find.byType(Scrollable).last,
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('Suppression de compte', () {
     testWidgets('la feuille dit ce qui part, ce qui reste, et que c\'est '
@@ -119,6 +134,10 @@ void main() {
       // Rien n'est parti tant qu'on n'a pas confirmé.
       expect(decor.profils.suppressions, 0);
 
+      await _defilerDansLaFeuille(
+        tester,
+        find.text(AppStrings.suppressionAnnuler),
+      );
       await tester.tap(find.text(AppStrings.suppressionAnnuler));
       await tester.pumpAndSettle();
       expect(find.text(AppStrings.suppressionTitre), findsNothing);
@@ -255,13 +274,33 @@ void main() {
       expect(find.text(AppStrings.suppressionAccesNonFerme), findsOneWidget);
     });
 
-    testWidgets('le ticket 034 n\'a encore rien posé ici', (tester) async {
+    testWidgets('l\'export est proposé avant le point de non-retour', (
+      tester,
+    ) async {
       await _ouvrirProfil(tester);
       await _ouvrirLaFeuille(tester);
 
-      // L'export des données personnelles a sa place réservée, pas de bouton
-      // mort : un contrôle qui ne fait rien est pire qu'un contrôle absent.
-      expect(find.textContaining('Exporter'), findsNothing);
+      // La place que le ticket 007 avait réservée est remplie (ticket 034).
+      expect(find.text(AppStrings.exportAvantSuppressionTitre), findsOneWidget);
+      expect(find.text(AppStrings.exportBouton), findsWidgets);
+
+      // **Au-dessus** du bouton rouge, jamais après : on récupère ses données
+      // avant de partir, et une sortie proposée après le point de non-retour
+      // n'est pas une sortie (`design/034-rgpd-export.md § 5.2`).
+      final feuille = find.byType(BottomSheet);
+      final export = tester.getTopLeft(
+        find.descendant(
+          of: feuille,
+          matching: find.text(AppStrings.exportBouton),
+        ),
+      );
+      final supprimer = tester.getTopLeft(
+        find.descendant(
+          of: feuille,
+          matching: find.text(AppStrings.suppressionConfirmer),
+        ),
+      );
+      expect(export.dy, lessThan(supprimer.dy));
     });
 
     test('la file de saisie s\'efface vraiment du stockage', () async {

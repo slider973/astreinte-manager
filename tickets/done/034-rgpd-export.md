@@ -4,7 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 007
 - **Branche** : `feat/034-rgpd-export`
-- **Statut** : en cours depuis 2026-09-21
+- **PR** : https://github.com/slider973/astreinte-manager/pull/31
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
 - Edge Function `export-user-data` : JSON de tout ce qui concerne l'utilisateur (profil, memberships, disponibilités, attributions, notifications).

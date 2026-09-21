@@ -12,6 +12,8 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
 | `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                  |
 | `create-checkout`   | 029    | État de l'abonnement d'une caserne, ouverture d'une session de paiement, ouverture du portail de gestion — réservé aux administrateurs de la caserne  |
 | `stripe-webhook`    | 029    | Reçoit les événements du prestataire de paiement, **vérifie leur signature**, met à jour `subscriptions`                                              |
+| `delete-account`    | 007    | Le membre supprime son compte : profil anonymisé en « Membre supprimé », appartenances désactivées, attributions passées conservées                   |
+| `export-user-data`  | 034    | Le membre récupère en JSON tout ce que l'application sait de lui, et rien de ce qu'elle sait des autres                                               |
 
 ## Règles qui ne se négocient pas
 
@@ -347,8 +349,92 @@ Erreurs :
 actif (même règle que `memberships_guard_admin`, migration `0010`). L'écran nomme la caserne et dit
 la sortie — « nomme quelqu'un d'abord ».
 
-L'export RGPD préalable (`export-user-data`, ticket 034) n'existe pas encore : cette fonction ne
-l'appelle pas et ne l'attend pas.
+**L'export RGPD (`export-user-data`, ci-dessous) reste une étape séparée, et volontairement
+facultative.** L'écran le propose juste avant le bouton rouge (`design/034-rgpd-export.md § 5.2`),
+mais `delete-account` ne l'appelle pas et ne l'attend pas : forcer un téléchargement avant de
+partir, c'est retenir quelqu'un qui a décidé.
+
+---
+
+## `export-user-data`
+
+Le droit d'accès et de portabilité, en un fichier. Référence : `docs/PRD.md § 8` (RGPD),
+`docs/SCHEMA.md § 7`, migration `0027`, `docs/RGPD.md`, `design/034-rgpd-export.md`, ticket 034.
+
+```
+POST /functions/v1/export-user-data
+apikey: <clé anon>
+Authorization: Bearer <access_token du membre>
+```
+
+**Aucun corps, et un corps envoyé quand même est ignoré.** Même règle que `delete-account`, pour un
+enjeu symétrique : celle-ci ne détruit rien, elle **livre** le dossier complet d'une personne —
+profil, adresse, téléphone, disponibilités, astreintes. Un `user_id` cru sur parole en ferait un
+annuaire. L'identité vient de `caller()`, et `export_own_data` est fermée à `anon` comme à
+`authenticated` (`revoke` nommé, migration `0027`) : la RPC directe répond `42501`.
+
+Réponse `200` :
+
+```jsonc
+{
+  "export": {
+    "produit": "Astreinte SP",
+    "version_format": 1,
+    "genere_le": "2026-09-21T05:45:34.644Z",
+    "personne": "uuid",
+    "a_lire": "…",
+    "inventaire": { "profil": 1, "disponibilites": 72, "attributions": 1, … }
+  },
+  "donnees": {
+    "compte": { … },          // auth.users, ajouté par la fonction
+    "profil": { … },          // les douze sections de export_own_data
+    "casernes": [ … ],
+    "appartenances": [ … ],
+    "disponibilites": [ … ],
+    "preferences_de_charge": [ … ],
+    "attributions": [ … ],
+    "notifications": [ … ],
+    "appareils": [ … ],
+    "invitations_recues": [ … ],
+    "invitations_envoyees": [ … ],
+    "actes_administratifs_me_concernant": [ … ],
+    "mes_actes_administratifs": [ … ],
+    "editeur_du_produit": false
+  }
+}
+```
+
+`inventaire` donne le compte de chaque section, y compris quand elle est vide : une section absente
+et une section vide ne disent pas la même chose, et c'est ce qui permet de vérifier un export sans
+le relire en entier.
+
+**Rien d'une autre personne n'entre dans ce fichier.** C'est la deuxième règle de la fonction SQL,
+et elle vaut un export livré : l'administrateur qui a saisi une disponibilité à ma place est un
+booléen (`saisie_par_un_administrateur`), l'attribution qui a remplacé la mienne est un booléen
+(`remplacee`), l'adresse que j'ai invitée est masquée (`mask_email`), le `data` d'une ligne d'audit
+est filtré par liste blanche, et le jeton d'un appareil est tronqué à ses douze derniers caractères.
+Les tables écartées et la raison de chacune sont en tête de la migration `0027` et dans
+`docs/RGPD.md`.
+
+**La fonction n'ajoute qu'une chose au SQL** : la section `compte` (date de création, dernière
+connexion, confirmation de l'adresse), lue par `auth.admin.getUserById`. Le SQL du projet ne touche
+pas au schéma `auth` — c'est la règle du `docs/SCHEMA.md § 2.2`, où `profiles.email` est dupliqué
+pour cette raison. Si la lecture échoue, `compte` vaut `null` et le reste de l'export part quand
+même : un profil anonymisé survit à son compte d'authentification (migration `0026`).
+
+**Le fichier n'est pas fabriqué ici.** La réponse est du JSON, pas une pièce jointe : c'est le
+client qui compose le nom et déclenche l'enregistrement (`lib/core/plateforme/telechargement.dart`).
+Servir un `Content-Disposition` obligerait le navigateur à visiter l'URL lui-même, donc à porter le
+jeton d'accès **dans l'URL**, donc dans l'historique et dans les journaux de la passerelle.
+
+Erreurs :
+
+| Statut | `code`               | Détails joints à `error` |
+| ------ | -------------------- | ------------------------ |
+| 401    | `unauthenticated`    | —                        |
+| 405    | `method_not_allowed` | —                        |
+| 409    | `profile_missing`    | —                        |
+| 500    | `internal_error`     | —                        |
 
 ---
 
@@ -821,7 +907,9 @@ Erreurs, forme `{"error": {"code", "message"}}` : `method_not_allowed` (405), `u
 | Quoi                                                                            | Où                                                                      | En CI ? |
 | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------- |
 | Fonctions SQL `create_invitation` / `accept_invitation`                         | `supabase/tests/invitations_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
-| Couche HTTP des cinq Edge Functions                                             | `scripts/test_functions.sh`                                             | non     |
+| Couche HTTP des Edge Functions                                                  | `scripts/test_functions.sh`                                             | non     |
+| Export RGPD : sections, cloisonnement, fermeture aux clients (migration `0027`) | `supabase/tests/export_rgpd_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
+| Suppression de compte (migration `0026`)                                        | `supabase/tests/suppression_compte_test.sql`, même script               | oui     |
 | Publication, gardes de transition, validation automatique, relance              | `supabase/tests/publication_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
 | Réattribution, annulation, garde des statuts terminaux                          | `supabase/tests/reattribution_test.sql`, joué par `scripts/test_rls.sh` | oui     |
 | File d'attente, `notify(...)` et trace d'un abandon (migrations `0014`, `0022`) | `supabase/tests/notifications_test.sql`, joué par `scripts/test_rls.sh` | oui     |

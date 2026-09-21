@@ -139,6 +139,7 @@ jobs:
           deno check invite-member/index.ts
           deno check accept-invitation/index.ts
           deno check delete-account/index.ts
+          deno check export-user-data/index.ts
           deno check publish-schedule/index.ts
           deno check reassign-shift/index.ts
           deno check create-checkout/index.ts

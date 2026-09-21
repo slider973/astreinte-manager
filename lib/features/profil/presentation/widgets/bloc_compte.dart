@@ -7,9 +7,11 @@ import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/session/deconnexion.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_divider.dart';
+import '../../../../core/widgets/liens_legaux.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../domain/suppression_providers.dart';
 import 'bloc_regle.dart';
+import 'bouton_export.dart';
 import 'feuille_suppression.dart';
 
 /// Les deux sorties du produit, dans l'ordre : celle dont on revient, puis
@@ -19,8 +21,9 @@ import 'feuille_suppression.dart';
 /// on ne tombe pas sur « Supprimer mon compte » en cherchant son numéro de
 /// téléphone (`design/007-profil.md § 4`).
 ///
-/// Le ticket 034 pose « Exporter mes données » entre le filet et la
-/// suppression : c'est la place prévue, et rien n'y est posé aujourd'hui.
+/// Le ticket 034 a rempli la place prévue : « Exporter mes données » est entre
+/// le filet et la suppression — on récupère avant de partir, jamais après — et
+/// les deux liens légaux ferment le bloc.
 class BlocCompte extends ConsumerWidget {
   const BlocCompte({super.key});
 
@@ -48,12 +51,21 @@ class BlocCompte extends ConsumerWidget {
         const SizedBox(height: AppSpacing.lg),
         const AppDivider(),
         const SizedBox(height: AppSpacing.lg),
+        // L'export d'abord, la suppression ensuite : c'est l'ordre dans lequel
+        // on quitte un produit qui détient des données
+        // (`design/034-rgpd-export.md § 1`).
+        const BoutonExportDonnees(),
+        const SizedBox(height: AppSpacing.xl),
         PrimaryButton(
           libelle: AppStrings.profilSupprimerCompte,
           variante: PrimaryButtonVariante.danger,
           icone: Icons.delete_outline,
           onPressed: () => unawaited(_supprimer(context, ref)),
         ),
+        const SizedBox(height: AppSpacing.lg),
+        const AppDivider(),
+        const SizedBox(height: AppSpacing.sm),
+        const LiensLegaux(),
       ],
     );
   }

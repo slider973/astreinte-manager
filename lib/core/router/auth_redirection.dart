@@ -51,6 +51,13 @@ String? redirectionAuth({
   // jeton, qui n'existe que dans l'URL reçue par courriel.
   if (chemin.startsWith(AppRoutes.prefixeInvitation)) return null;
 
+  // Les deux pages légales aussi, et pour une raison qui leur est propre : une
+  // politique de confidentialité doit être lisible **sans compte** — par une
+  // mairie qui instruit un dossier, par quelqu'un qui vient de recevoir une
+  // invitation et veut savoir à quoi il s'engage. Une page qui ne s'ouvre
+  // qu'une fois connecté ne remplit pas son office (ticket 034).
+  if (_sousLegal(chemin)) return null;
+
   final surLaConnexion = chemin.startsWith(AppRoutes.connexion);
   final surLEditeur = _sousSuperAdmin(chemin);
 
@@ -90,6 +97,11 @@ String? redirectionAuth({
 bool _sousAdministration(String chemin) =>
     chemin == AppRoutes.prefixeAdmin ||
     chemin.startsWith('${AppRoutes.prefixeAdmin}/');
+
+/// Vrai pour `/legal` et les deux documents qui sont en dessous.
+bool _sousLegal(String chemin) =>
+    chemin == AppRoutes.prefixeLegal ||
+    chemin.startsWith('${AppRoutes.prefixeLegal}/');
 
 /// Vrai pour `/superadmin` et tout ce qui viendrait en dessous.
 ///

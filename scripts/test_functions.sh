@@ -1267,6 +1267,81 @@ fi
 
 # ---------------------------------------------------------------------------
 echo ''
+echo '--- 25. export-user-data : tout de moi, rien des autres (ticket 034)'
+# ---------------------------------------------------------------------------
+# Lecture seule : la section travaille sur un membre du seed, sans rien détruire.
+# Elle pose seulement un appareil (préfixe `jeton-test-`, balayé par `nettoyer`)
+# et une invitation, pour que les sections correspondantes ne soient pas vides.
+sql "insert into push_tokens (user_id, token, platform, device_label)
+     values ('$MEMBRE1_A', 'jeton-test-export-0123456789ABCDEF', 'web', 'iPhone · Safari')
+     on conflict (token) do nothing;
+     insert into invitations (station_id, email, role, invited_by, token)
+     values ('$STATION_B', 'membre1@caserne-a.test', 'member',
+             'bbbbbbbb-0000-4000-8000-000000000100', 'jeton-test-export-invitation')
+     on conflict do nothing;" >/dev/null
+
+# a. Le portier : la clé anon est un JWT valide, elle ne dit pas *qui*.
+appeler export-user-data - '{}'
+verifier "sans jeton : 401" "401" "$STATUT"
+verifier "et le code le dit" "unauthenticated" "$(jq -r '.error.code' <<<"$CORPS")"
+
+JETON_MEMBRE1="$(connexion membre1@caserne-a.test)"
+
+# b. Une lecture n'est pas un GET ici : le jeton voyage en en-tête, jamais en URL.
+STATUT_GET="$(curl -s -o /dev/null -w '%{http_code}' -X GET \
+  "$API_URL/functions/v1/export-user-data" \
+  -H "apikey: $ANON_KEY" -H "Authorization: Bearer $JETON_MEMBRE1")"
+verifier "GET refusé : 405" "405" "$STATUT_GET"
+
+# c. **Le cœur du ticket** : un `user_id` glissé dans le corps est ignoré.
+appeler export-user-data "$JETON_MEMBRE1" "{\"user_id\":\"$MEMBRE2_A\"}"
+verifier "l'export aboutit : 200" "200" "$STATUT"
+verifier "l'export est celui de l'appelant, pas celui du corps" "$MEMBRE1_A" \
+  "$(jq -r '.export.personne' <<<"$CORPS")"
+verifier "et son profil le confirme" "membre1@caserne-a.test" \
+  "$(jq -r '.donnees.profil.email' <<<"$CORPS")"
+
+# d. Toutes les sections attendues, y compris vides.
+for section in compte profil casernes appartenances disponibilites \
+               preferences_de_charge attributions notifications appareils \
+               invitations_recues invitations_envoyees \
+               actes_administratifs_me_concernant mes_actes_administratifs \
+               editeur_du_produit; do
+  verifier "la section « $section » est présente" "true" \
+    "$(jq --arg s "$section" 'has("donnees") and (.donnees | has($s))' <<<"$CORPS")"
+done
+verifier "l'inventaire accompagne les données" "true" \
+  "$(jq '.export.inventaire | has("disponibilites")' <<<"$CORPS")"
+verifier "les données du compte d'authentification sont là" "membre1@caserne-a.test" \
+  "$(jq -r '.donnees.compte.adresse_de_connexion' <<<"$CORPS")"
+
+# e. **Le second critère du ticket** : rien d'une autre personne. Le fichier
+#    entier est fouillé, en texte — nom, prénom, adresse, identifiant.
+for interdit in Thomas Moreau 'membre2@caserne-a.test' "$MEMBRE2_A" \
+                Dupont 'admin@caserne-a.test' \
+                'aaaaaaaa-0000-4000-8000-000000000100'; do
+  verifier "« $interdit » n'apparaît pas dans l'export" "0" \
+    "$(grep -c -- "$interdit" <<<"$CORPS" || true)"
+done
+verifier "aucun jeton d'invitation dans l'export" "0" \
+  "$(grep -c -- 'jeton-test-export-invitation' <<<"$CORPS" || true)"
+verifier "le jeton de l'appareil est tronqué à ses douze derniers" "456789ABCDEF" \
+  "$(jq -r '[.donnees.appareils[] | select(.appareil == "iPhone · Safari")][0].jeton_fin' \
+     <<<"$CORPS")"
+
+# f. La fonction SQL, elle, reste fermée : l'Edge Function est le seul chemin.
+STATUT_RPC="$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+  "$API_URL/rest/v1/rpc/export_own_data" \
+  -H "apikey: $ANON_KEY" -H "Authorization: Bearer $JETON_MEMBRE1" \
+  -H 'content-type: application/json' \
+  -d "{\"p_user_id\":\"$MEMBRE2_A\"}")"
+verifier "la RPC directe est refusée à authenticated : 403" "403" "$STATUT_RPC"
+
+sql "delete from invitations where token = 'jeton-test-export-invitation';
+     delete from push_tokens where token like 'jeton-test-export-%';" >/dev/null
+
+# ---------------------------------------------------------------------------
+echo ''
 if [ "$echecs" -eq 0 ]; then
   echo "=== Edge Functions : $total tests, tous verts ==="
   exit 0

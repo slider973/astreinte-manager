@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 034 | [RGPD : export et suppression des données](in-progress/034-rgpd-export.md) | P1 | 007 |  |
 
 ## À faire
 
@@ -22,6 +21,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 038 | [Limiter le débit des invitations](backlog/038-limite-debit-invitations.md) | P1 | 006 |  |
 | 041 | [Envoyer les rappels à une heure décente dans chaque fuseau](backlog/041-heure-locale-rappels.md) | P1 | 015 |  |
 | 042 | [Réduire le coût d'une transition de route](backlog/042-transition-de-route.md) | P1 | 016 |  |
+| 043 | [Purger réellement les anciennes notifications](backlog/043-purge-notifications.md) | P0 | 034 |  |
 
 ## Terminés
 
@@ -56,5 +56,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 029 | [Abonnement Stripe par caserne](done/029-stripe-abonnement.md) | P0 | 008 010 | https://github.com/slider973/astreinte-manager/pull/27 |
 | 030 | [Mode suspendu et bannières](done/030-gating-suspension.md) | P1 | 029 | https://github.com/slider973/astreinte-manager/pull/28 |
 | 031 | [Interface super-admin](done/031-super-admin.md) | P1 | 008 029 | https://github.com/slider973/astreinte-manager/pull/29 |
+| 034 | [RGPD : export et suppression des données](done/034-rgpd-export.md) | P1 | 007 | https://github.com/slider973/astreinte-manager/pull/31 |
 | 040 | [Rendre visible une notification définitivement perdue](done/040-ligne-interne-echec-definitif.md) | P0 | 025 026 | https://github.com/slider973/astreinte-manager/pull/26 |
 
