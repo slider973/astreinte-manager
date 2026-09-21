@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 004, 032
 - **Branche** : `feat/037-canvaskit-autoheberge`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/38
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
