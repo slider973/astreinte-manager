@@ -5,6 +5,7 @@ import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_spacing.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
 import 'package:astreinte_sp/core/widgets/barre_actions_basse.dart';
+import 'package:astreinte_sp/core/widgets/entete_section.dart';
 import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/features/membres/domain/fichier_membres.dart';
 import 'package:astreinte_sp/features/membres/domain/import_membres.dart';
@@ -272,6 +273,78 @@ void main() {
 
       expect(find.text(AppStrings.importFormatTitre), findsOneWidget);
       expect(find.byType(LigneApercuImport), findsNothing);
+    });
+  });
+
+  group('L\'ordre de lecture de l\'aperçu', () {
+    /// Assez haut pour que les deux sections tiennent sans défilement : on
+    /// compare des ordonnées, pas des gestes.
+    const posteHaut = Size(390, 1400);
+
+    double dy(WidgetTester tester, Finder cible) =>
+        tester.getTopLeft(cible).dy;
+
+    testWidgets('les lignes écartées se lisent avant les justes', (
+      tester,
+    ) async {
+      final selecteur = FauxSelecteurFichier()
+        ..posera(
+          'prenom;nom;email;role\n'
+          'Anne;Bernard;anne@exemple.fr;\n'
+          'Paul;Blanc;paul.exemple.fr;\n'
+          'Luc;Martin;luc@exemple.fr;\n'
+          ';;;admin\n'
+          'Zoe;Petit;zoe@exemple.fr;\n',
+        );
+      await _ouvrirImport(tester, selecteur: selecteur, taille: posteHaut);
+
+      await _choisir(tester);
+
+      // Deux intitulés, les écartées d'abord.
+      expect(find.text(AppStrings.importSectionEcartees), findsOneWidget);
+      expect(find.text(AppStrings.importSectionAInviter), findsOneWidget);
+      expect(find.text(AppStrings.importApercuTitre), findsNothing);
+      expect(
+        dy(tester, find.text(AppStrings.importSectionEcartees)),
+        lessThan(dy(tester, find.text(AppStrings.importSectionAInviter))),
+      );
+
+      // Les deux fautives sont au-dessus de la première ligne juste, alors
+      // qu'elles étaient aux lignes 3 et 5 du fichier.
+      final premiereJuste = dy(tester, find.text('Anne Bernard'));
+      expect(dy(tester, find.text('Paul Blanc')), lessThan(premiereJuste));
+      expect(
+        dy(tester, find.text(AppStrings.importLigneNumero(5))),
+        lessThan(premiereJuste),
+      );
+
+      // Remontée, une ligne sans nom garde son numéro de fichier : c'est le
+      // seul repère qui permette de la retrouver dans le tableur.
+      expect(find.text(AppStrings.importLigneNumero(5)), findsOneWidget);
+
+      // Dans chaque section, l'ordre du fichier est conservé.
+      expect(
+        dy(tester, find.text('Paul Blanc')),
+        lessThan(dy(tester, find.text(AppStrings.importLigneNumero(5)))),
+      );
+      expect(premiereJuste, lessThan(dy(tester, find.text('Luc Martin'))));
+      expect(
+        dy(tester, find.text('Luc Martin')),
+        lessThan(dy(tester, find.text('Zoe Petit'))),
+      );
+    });
+
+    testWidgets('sans aucune écartée, l\'aperçu garde sa forme d\'une seule '
+        'section', (tester) async {
+      final selecteur = FauxSelecteurFichier()..posera(fichierDeSoixante());
+      await _ouvrirImport(tester, selecteur: selecteur, taille: posteHaut);
+
+      await _choisir(tester);
+
+      expect(find.byType(EnteteSection), findsOneWidget);
+      expect(find.text(AppStrings.importApercuTitre), findsOneWidget);
+      expect(find.text(AppStrings.importSectionEcartees), findsNothing);
+      expect(find.text(AppStrings.importSectionAInviter), findsNothing);
     });
   });
 

@@ -149,89 +149,131 @@ class _Apercu extends StatelessWidget {
     final theme = Theme.of(context);
     final apercu = etat.apercu!;
     final budget = apercu.budget;
+    final ecartees = apercu.ecartees;
 
+    // **Les écartées d'abord.** L'ordre de lecture suit la priorité de qui
+    // regarde, pas l'ordre du tableur : sur soixante-trois lignes dont trois
+    // fautives en fin de fichier, rien ne menait aux trois. Ce qui ne partira
+    // pas est la seule chose à vérifier ; le reste, le compte du résumé le
+    // dit déjà. L'ordre du fichier est conservé dans chaque section.
+    //
     // Liste virtualisée : cinq cents lignes réglées ne se construisent pas
     // d'un bloc, et c'est le seul endroit de l'écran où la performance décide
-    // d'une structure de widget.
+    // d'une structure de widget. Deux sections, donc deux `SliverList` —
+    // jamais une `Column` de cinq cents enfants.
     return CustomScrollView(
       slivers: <Widget>[
         SliverPadding(
           padding: EdgeInsets.fromLTRB(marge, 0, marge, 0),
           sliver: SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppSpacing.colonneMax,
+            child: _Colonne(
+              enfants: <Widget>[
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  apercu.nomFichier,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      apercu.nomFichier,
+                const SizedBox(height: AppSpacing.xs),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    AppStrings.importApercuResume(
+                      lues: apercu.lignes.length,
+                      aInviter: apercu.nombreAInviter,
+                      ecartees: apercu.nombreEcartees,
+                    ),
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ),
+                if (budget != null && apercu.envoyable) ...<Widget>[
+                  const SizedBox(height: AppSpacing.lg),
+                  _BanniereBudget(apercu: apercu, budget: budget),
+                ],
+                if (etat.envoiEnCours) ...<Widget>[
+                  const SizedBox(height: AppSpacing.lg),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      AppStrings.importAvancement(
+                        faites: etat.envoyees,
+                        total: apercu.nombreAInviter,
+                      ),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        AppStrings.importApercuResume(
-                          lues: apercu.lignes.length,
-                          aInviter: apercu.nombreAInviter,
-                          ecartees: apercu.nombreEcartees,
-                        ),
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                    ),
-                    if (budget != null && apercu.envoyable) ...<Widget>[
-                      const SizedBox(height: AppSpacing.lg),
-                      _BanniereBudget(apercu: apercu, budget: budget),
-                    ],
-                    if (etat.envoiEnCours) ...<Widget>[
-                      const SizedBox(height: AppSpacing.lg),
-                      Semantics(
-                        liveRegion: true,
-                        child: Text(
-                          AppStrings.importAvancement(
-                            faites: etat.envoyees,
-                            total: apercu.nombreAInviter,
-                          ),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const EnteteSection(titre: AppStrings.importApercuTitre),
-                  ],
-                ),
-              ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(marge, 0, marge, AppSpacing.xl),
-          sliver: SliverList.builder(
-            itemCount: apercu.lignes.length,
-            itemBuilder: (BuildContext context, int index) => Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppSpacing.colonneMax,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    LigneApercuImport(apercu: apercu.lignes[index]),
-                    const AppDivider(),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+
+        // Rien d'écarté : une seule section, et l'aperçu garde exactement la
+        // forme qu'il avait. Pas de titre orphelin pour annoncer un vide.
+        if (ecartees.isEmpty)
+          ..._section(AppStrings.importApercuTitre, apercu.lignes)
+        else ...<Widget>[
+          ..._section(AppStrings.importSectionEcartees, ecartees),
+          ..._section(AppStrings.importSectionAInviter, apercu.aInviter),
+        ],
+
+        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
       ],
+    );
+  }
+
+  /// Un intitulé et ses lignes. Une section sans ligne ne s'ouvre pas.
+  List<Widget> _section(String titre, List<LigneApercu> lignes) {
+    if (lignes.isEmpty) return const <Widget>[];
+
+    return <Widget>[
+      SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: marge),
+        sliver: SliverToBoxAdapter(
+          child: _Colonne(enfants: <Widget>[EnteteSection(titre: titre)]),
+        ),
+      ),
+      SliverPadding(
+        padding: EdgeInsets.symmetric(horizontal: marge),
+        sliver: SliverList.builder(
+          itemCount: lignes.length,
+          itemBuilder: (BuildContext context, int index) => _Colonne(
+            enfants: <Widget>[
+              LigneApercuImport(apercu: lignes[index]),
+              const AppDivider(),
+            ],
+          ),
+        ),
+      ),
+    ];
+  }
+}
+
+/// La colonne du corps, bornée à 720 dp et centrée.
+///
+/// Chaque élément de la liste virtualisée la refait pour lui-même : un sliver
+/// ne peut pas hériter d'une colonne posée plus haut, et borner le
+/// `CustomScrollView` entier condamnerait la barre de défilement au milieu de
+/// l'écran sur un poste de bureau.
+class _Colonne extends StatelessWidget {
+  const _Colonne({required this.enfants});
+
+  final List<Widget> enfants;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: enfants,
+        ),
+      ),
     );
   }
 }

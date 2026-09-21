@@ -179,6 +179,17 @@ class ApercuImport {
   List<LigneApercu> get aInviter =>
       lignes.where((LigneApercu l) => l.partira).toList(growable: false);
 
+  /// Les lignes qui ne partiront pas, dans l'ordre du fichier.
+  ///
+  /// **L'ordre de lecture de l'aperçu suit celle-ci d'abord**, pas l'ordre du
+  /// tableur : trois fautes en fin d'un fichier de soixante-trois lignes sont
+  /// introuvables autrement, et l'aperçu n'existe que pour qu'aucune ne passe
+  /// inaperçue. À l'intérieur, l'ordre du fichier est conservé, et chaque
+  /// ligne garde son numéro — c'est le repère qui permet de la retrouver dans
+  /// le tableur.
+  List<LigneApercu> get ecartees =>
+      lignes.where((LigneApercu l) => !l.partira).toList(growable: false);
+
   int get nombreAInviter => lignes.where((LigneApercu l) => l.partira).length;
 
   int get nombreEcartees => lignes.length - nombreAInviter;

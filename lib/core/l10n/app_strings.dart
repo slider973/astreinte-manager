@@ -595,6 +595,14 @@ abstract final class AppStrings {
 
   static const String importApercuTitre = 'Ligne par ligne';
 
+  /// Les deux intitulés de l'aperçu quand le fichier a des fautes : ce qui ne
+  /// partira pas se lit en premier. Le vocabulaire est celui du résumé juste
+  /// au-dessus — « 60 à inviter, 3 écartées » — pour qu'un compte annoncé et
+  /// une section portent le même mot. Sans aucune ligne écartée, ni l'un ni
+  /// l'autre n'apparaît : l'aperçu reste « Ligne par ligne ».
+  static const String importSectionEcartees = 'Lignes écartées';
+  static const String importSectionAInviter = 'Lignes à inviter';
+
   static String importEnvoyer(int nombre) => nombre <= 1
       ? 'Envoyer l\'invitation'
       : 'Envoyer les $nombre invitations';
