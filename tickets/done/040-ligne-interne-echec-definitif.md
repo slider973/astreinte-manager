@@ -4,7 +4,8 @@
 - **Priorité** : P0
 - **Dépend de** : 025, 026
 - **Branche** : `feat/040-ligne-interne-echec-definitif`
-- **Statut** : en cours depuis 2026-09-21
+- **PR** : https://github.com/slider973/astreinte-manager/pull/26
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
 Relevé en revue du ticket 025, puis tranché au ticket 026. Une demande d'envoi qui échoue cinq fois

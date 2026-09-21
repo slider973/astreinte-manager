@@ -21,6 +21,20 @@
 //
 // Rien ne lève : chaque destinataire a son sort, et un destinataire en échec
 // n'empêche pas les autres d'être servis.
+//
+// Un quatrième cas, le mode « trace » (ticket 040)
+// ------------------------------------------------
+// Quand la charge utile porte `delivery_failure` (posée par `notify_trace_echec`,
+// migration `0022`), la demande n'est pas un envoi : c'est le constat d'un envoi
+// **abandonné** après cinq tentatives. On n'envoie alors rien — ni push, ni
+// courriel — et on écrit la seule ligne `inapp`, `delivered = false` et `error`
+// renseignée, pour que le membre voie dans son centre de notifications ce qu'il
+// a failli ne jamais apprendre.
+//
+// Le titre et le corps restent ceux de `construireContenu` : « Astreinte proposée
+// le 12 octobre, nuit », pas « une notification a échoué ». C'est la raison même
+// du détour par ici — le français des notifications ne s'écrit pas deux fois, et
+// surtout pas une fois en TypeScript et une fois en SQL.
 
 import {
   type Canal,
@@ -29,7 +43,9 @@ import {
   construireContenu,
   type Contenu,
   type Destinataire,
+  type EchecLivraison,
   etiquette,
+  lireEchecLivraison,
   regrouper,
   type TypeNotification,
   TYPES_CRITIQUES,
@@ -149,6 +165,8 @@ export type ResultatEnvoi = {
   recipients: number;
   delivered: number;
   failed: number;
+  /** Vrai en mode « trace » : rien n'a été envoyé, seule la ligne interne est écrite. */
+  delivery_failure?: boolean;
   results: ResultatDestinataire[];
 };
 
@@ -174,7 +192,13 @@ export async function traiterEnvoi(
   const ids = [...new Set(destinataires.map((d) => d.user_id))];
   const caserne = await deps.lireCaserne(demande.station_id);
   const profils = new Map((await deps.lireProfils(ids)).map((p) => [p.id, p]));
-  const canaux = demande.channels ?? CANAUX_PAR_DEFAUT[demande.type];
+
+  // Mode « trace » : les canaux ne sont pas discutés, c'est `inapp` et rien
+  // d'autre. La base le demande déjà (`channels = {inapp}`), on le réaffirme ici
+  // parce que la règle appartient à l'enchaînement, pas à l'appelant : relancer
+  // un push sur un canal qui vient d'échouer cinq fois n'a aucun sens.
+  const echec = lireEchecLivraison(demande.payload);
+  const canaux: Canal[] = echec ? ["inapp"] : demande.channels ?? CANAUX_PAR_DEFAUT[demande.type];
 
   // Les jetons ne sont lus que si le push est au programme : un rappel J-1 par
   // courriel n'a aucune raison de parcourir `push_tokens`.
@@ -188,6 +212,7 @@ export async function traiterEnvoi(
         profil: profils.get(destinataire.user_id) ?? null,
         jetons: jetons.get(destinataire.user_id) ?? [],
         canaux,
+        echec,
       }),
     );
   }
@@ -199,6 +224,7 @@ export async function traiterEnvoi(
     recipients: resultats.length,
     delivered,
     failed: resultats.length - delivered,
+    delivery_failure: echec ? true : undefined,
     results: resultats,
   };
 }
@@ -212,9 +238,10 @@ async function servirUnDestinataire(
     profil: Profil | null;
     jetons: Jeton[];
     canaux: Canal[];
+    echec: EchecLivraison | null;
   },
 ): Promise<ResultatDestinataire> {
-  const { caserne, profil, jetons, canaux } = contexte;
+  const { caserne, profil, jetons, canaux, echec } = contexte;
 
   // Sans profil, il n'y a personne à notifier : `notifications.user_id` référence
   // `profiles`, l'insertion échouerait de toute façon. On le dit franchement
@@ -246,6 +273,10 @@ async function servirUnDestinataire(
   };
 
   // 1. La ligne interne, avant tout envoi.
+  //
+  // En mode « trace », c'est la seule chose qui sera écrite, et elle est écrite
+  // **en échec** : `sent_at` nul parce que rien n'est parti, `error` renseignée
+  // parce que c'est ce que l'écran regarde pour afficher sa mention (ticket 026).
   let notificationId: string | null = null;
   if (canaux.includes("inapp")) {
     notificationId = await deps.ecrireNotification({
@@ -256,9 +287,9 @@ async function servirUnDestinataire(
       title: contenu.titre,
       body: contenu.corps,
       data: donnees,
-      sent_at: maintenant,
-      delivered: true,
-      error: null,
+      sent_at: echec ? null : maintenant,
+      delivered: echec ? false : true,
+      error: echec?.motif ?? null,
     });
     // Écrite, ou pas. `ecrireNotification` rend `null` quand l'insertion a
     // échoué, et poser `inapp: true` sans regarder ferait compter le destinataire

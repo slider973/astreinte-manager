@@ -488,3 +488,110 @@ Deno.test("la charge utile commune est fusionnée sous celle de chaque membre", 
     "/schedule/2026-10",
   );
 });
+
+// ---------------------------------------------------------------------------
+// Le mode « trace » d'un envoi abandonné (ticket 040)
+// ---------------------------------------------------------------------------
+
+Deno.test("une demande abandonnée n'écrit que la ligne interne, avec sa mention d'échec", async () => {
+  // La demande de trace posée par `notify_trace_echec` (migration 0022) : même
+  // type, mêmes destinataires, même charge utile, plus la marque. On lui donne
+  // ici un appareil et des canaux généreux pour vérifier que rien ne part
+  // malgré tout — c'est l'enchaînement qui décide, pas l'appelant.
+  const { deps, journal } = faussesDeps({
+    jetons: { [MEMBRE]: [{ token: "VIVANT", platform: "web" }] },
+  });
+
+  const resultat = await traiterEnvoi(
+    deps,
+    demande({
+      channels: ["push", "email", "inapp"],
+      payload: {
+        delivery_failure: {
+          outbox_id: "cccccccc-0000-4000-8000-000000000004",
+          attempts: 5,
+          error: "abandon après 5 tentatives sans réponse",
+        },
+      },
+    }),
+  );
+
+  // Une seule ligne, sur le seul canal qui reste utile.
+  assertEquals(journal.notifications.length, 1);
+  assertEquals(journal.notifications[0].channel, "inapp");
+  assertEquals(journal.pushEnvoyes.length, 0);
+  assertEquals(journal.courriels.length, 0);
+
+  // Elle est écrite en échec : c'est `error` non nulle que l'écran regarde pour
+  // afficher « L'envoi a échoué, tu ne l'as peut-être pas reçue » (ticket 026).
+  assertEquals(journal.notifications[0].delivered, false);
+  assertEquals(journal.notifications[0].sent_at, null);
+  assertStringIncludes(String(journal.notifications[0].error), "abandon après 5 tentatives");
+
+  // Et surtout : le membre lit ce qu'il a failli ne jamais apprendre, dans les
+  // mots habituels. Le français ne s'écrit pas une seconde fois en SQL.
+  assertEquals(journal.notifications[0].title, "Astreinte proposée le 12 octobre, nuit");
+  assertStringIncludes(journal.notifications[0].body, "12 octobre");
+  assertEquals(
+    (journal.notifications[0].data as Record<string, unknown>).route,
+    "/proposals",
+  );
+
+  // La demande de trace, elle, a abouti : la file la clôt et ne la rejoue pas.
+  assertEquals(resultat.ok, true);
+  assertEquals(resultat.delivery_failure, true);
+  assertEquals(resultat.delivered, 1);
+});
+
+Deno.test("la trace d'un envoi groupé garde une ligne par membre, avec ses créneaux", async () => {
+  const { deps, journal } = faussesDeps({
+    profils: [profil(MEMBRE), profil(AUTRE)],
+    jetons: {},
+  });
+
+  await traiterEnvoi(
+    deps,
+    demande({
+      type: "schedule_validated",
+      payload: {
+        period: "2026-10",
+        delivery_failure: { error: "abandon après 5 tentatives sans réponse" },
+      },
+      recipients: [
+        { user_id: MEMBRE, payload: { shifts: [{ date: "2026-10-03", slot: "day" }] } },
+        { user_id: AUTRE, payload: { shifts: [{ date: "2026-10-09", slot: "night" }] } },
+      ],
+    }),
+  );
+
+  assertEquals(journal.notifications.length, 2);
+  for (const ligne of journal.notifications) {
+    assertEquals(ligne.channel, "inapp");
+    assertEquals(ligne.delivered, false);
+    assert(ligne.error !== null);
+    assertEquals(ligne.title, "Planning d'octobre validé");
+  }
+  assertStringIncludes(journal.notifications[0].body, "3 octobre");
+  assertStringIncludes(journal.notifications[1].body, "9 octobre");
+});
+
+Deno.test("une marque d'échec vide ou mal formée ne laisse jamais « error » vide", async () => {
+  // `notifications.error` est le seul signal de l'écran : une marque présente
+  // mais sans motif doit quand même renseigner la colonne, sinon la ligne
+  // ressemble à un envoi réussi et la mention disparaît.
+  const { deps, journal } = faussesDeps({ jetons: {} });
+
+  await traiterEnvoi(deps, demande({ payload: { delivery_failure: {} } }));
+
+  assertEquals(journal.notifications.length, 1);
+  assertEquals(journal.notifications[0].error, "delivery_failure");
+
+  // Une valeur qui n'est pas un objet n'est pas une marque : envoi ordinaire.
+  const ordinaire = faussesDeps({ jetons: {} });
+  await traiterEnvoi(
+    ordinaire.deps,
+    demande({ channels: ["inapp"], payload: { delivery_failure: "oui" } }),
+  );
+  assertEquals(ordinaire.journal.notifications[0].error, null);
+  assertEquals(ordinaire.journal.notifications[0].delivered, true);
+});
