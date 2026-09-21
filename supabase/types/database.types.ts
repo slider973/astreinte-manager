@@ -1120,6 +1120,10 @@ export type Database = {
         Returns: number
       }
       cron_lock_periods: { Args: { p_reference?: string }; Returns: number }
+      cron_subscription_reminders: {
+        Args: { p_reference?: string }
+        Returns: number
+      }
       cron_suspend_subscriptions: {
         Args: { p_reference?: string }
         Returns: number
@@ -1213,6 +1217,7 @@ export type Database = {
       }
       schedule_complet: { Args: { p_schedule: string }; Returns: boolean }
       schedule_reevaluer: { Args: { p_schedule: string }; Returns: boolean }
+      station_access: { Args: { p_station: string }; Returns: Json }
       station_required_count: {
         Args: {
           p_date: string
@@ -1285,6 +1290,8 @@ export type Database = {
         | "schedule_validated"
         | "schedule_all_accepted"
         | "late_responders"
+        | "subscription_trial_ending"
+        | "subscription_suspended"
       period_status: "open" | "locked"
       push_platform: "ios" | "android" | "web"
       schedule_status: "draft" | "published" | "validated" | "archived"
@@ -1444,6 +1451,8 @@ export const Constants = {
         "schedule_validated",
         "schedule_all_accepted",
         "late_responders",
+        "subscription_trial_ending",
+        "subscription_suspended",
       ],
       period_status: ["open", "locked"],
       push_platform: ["ios", "android", "web"],
