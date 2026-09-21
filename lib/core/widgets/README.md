@@ -20,6 +20,7 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `hachures.dart` | `Hachures`, `HachuresPainter` | Primitive de dessin, pas un composant : le motif à 45° partagé par `SlotChip` et `AppBanner`. |
 | `champ_texte.dart` | `ChampTexte` | Champ rempli M3 : libellé au-dessus, erreur annoncée sous le champ, une ou plusieurs lignes. |
 | `ecran_simple.dart` | `EcranSimple` | L'ossature des écrans sans navigation : connexion, invitation, accueil d'un nouveau membre. |
+| `barre_actions_basse.dart` | `BarreActionsBasse` | Le pied de la colonne : les actions du bas s'y bornent à la même largeur que le corps, derrière un filet de niveau 1. |
 
 ## Ce qu'aucun de ces widgets ne fait
 

@@ -11,6 +11,7 @@ import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_divider.dart';
+import '../../../core/widgets/barre_actions_basse.dart';
 import '../../../core/widgets/entete_section.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../domain/import_membres.dart';
@@ -46,13 +47,7 @@ class ImporterScreen extends ConsumerWidget {
               EtapeImport.rapport => _Rapport(etat: etat, marge: marge),
             },
           ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: EdgeInsets.all(marge),
-              child: _Actions(etat: etat),
-            ),
-          ),
+          BarreActionsBasse(child: _Actions(etat: etat)),
         ],
       ),
     );
@@ -368,9 +363,7 @@ class _Actions extends ConsumerWidget {
         ],
         EtapeImport.apercu => <Widget>[
           PrimaryButton(
-            libelle: AppStrings.importEnvoyer(
-              etat.apercu?.nombreAInviter ?? 0,
-            ),
+            libelle: AppStrings.importEnvoyer(etat.apercu?.nombreAInviter ?? 0),
             icone: Icons.send_outlined,
             chargement: etat.envoiEnCours,
             raisonDesactivation: AppStrings.importRienAEnvoyer,

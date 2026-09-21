@@ -2,7 +2,10 @@ import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/l10n/format_date.dart';
 import 'package:astreinte_sp/core/plateforme/selection_fichier.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/theme/app_spacing.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
+import 'package:astreinte_sp/core/widgets/barre_actions_basse.dart';
+import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/features/membres/domain/fichier_membres.dart';
 import 'package:astreinte_sp/features/membres/domain/import_membres.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
@@ -51,6 +54,7 @@ Future<Harnais> _ouvrirImport(
   FauxMembresRepository? depot,
   FauxSelecteurFichier? selecteur,
   FauxTelechargement? telechargement,
+  Size taille = const Size(390, 844),
 }) async {
   final membres = depot ?? FauxMembresRepository();
   final fichiers = selecteur ?? FauxSelecteurFichier();
@@ -63,6 +67,7 @@ Future<Harnais> _ouvrirImport(
     membres: membres,
     selecteurFichier: fichiers,
     telechargement: remise,
+    taille: taille,
   );
   await ouvrirRoute(tester, _cheminImport);
   return (depot: membres, selecteur: fichiers, telechargement: remise);
@@ -157,10 +162,7 @@ void main() {
 
       await _choisir(tester);
 
-      expect(
-        find.text(AppStrings.importColonneAdresseAbsente),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.importColonneAdresseAbsente), findsOneWidget);
       expect(find.byType(LigneApercuImport), findsNothing);
     });
   });
@@ -495,9 +497,7 @@ void main() {
         // Un fait, pas une panne : la bannière est `attention`, jamais rouge
         // (`design/047-import-membres.md § 3`).
         expect(
-          tester
-              .widget<AppBanner>(find.byType(AppBanner).first)
-              .variante,
+          tester.widget<AppBanner>(find.byType(AppBanner).first).variante,
           AppBannerVariante.attention,
         );
         expect(
@@ -566,6 +566,40 @@ void main() {
       );
       expect(find.text(AppStrings.inviterResultatsTitre), findsNothing);
       expect(find.byType(LigneApercuImport), findsOneWidget);
+    });
+  });
+
+  group('La barre d\'actions', () {
+    /// Le chef de centre importe depuis un ordinateur : c'est la largeur où
+    /// une barre non bornée se voyait le plus (ticket 048).
+    const posteAdmin = Size(1280, 900);
+
+    void verifierLargeur(WidgetTester tester, String libelle) {
+      expect(
+        tester.getSize(find.widgetWithText(PrimaryButton, libelle)).width,
+        AppSpacing.colonneMax,
+        reason: '« $libelle » déborde de la colonne du corps.',
+      );
+    }
+
+    testWidgets('sur poste admin, elle tient dans la colonne aux trois temps', (
+      tester,
+    ) async {
+      final selecteur = FauxSelecteurFichier()
+        ..posera('prenom;nom;email\nAnne;Bernard;anne@exemple.fr\n');
+      await _ouvrirImport(tester, selecteur: selecteur, taille: posteAdmin);
+
+      expect(find.byType(BarreActionsBasse), findsOneWidget);
+      verifierLargeur(tester, AppStrings.importChoisir);
+      verifierLargeur(tester, AppStrings.importExemple);
+
+      await _choisir(tester);
+      verifierLargeur(tester, AppStrings.importEnvoyer(1));
+      verifierLargeur(tester, AppStrings.importChoisirAutre);
+
+      await tester.tap(find.text(AppStrings.importEnvoyer(1)));
+      await tester.pumpAndSettle();
+      verifierLargeur(tester, AppStrings.inviterTerminer);
     });
   });
 
