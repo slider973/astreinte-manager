@@ -18,9 +18,15 @@ const String _cheminMembres = '/admin/membres';
 /// trois lignes de texte par membre : sur un téléphone, les invitations sont
 /// sous le pli. C'est la liste virtualisée qui l'exige, pas le test — un
 /// widget qui n'est pas construit n'est pas trouvable.
-Future<void> _versInvitations(WidgetTester tester) async {
+Future<void> _versInvitations(WidgetTester tester) =>
+    _faireDefilerVers(tester, find.byType(LigneInvitation));
+
+/// Descend jusqu'à [cible]. La section des invitations est sous la ligne de
+/// flottaison d'un téléphone : le fil d'actions porte deux boutons depuis le
+/// ticket 047 (inviter, importer), et la liste est virtualisée.
+Future<void> _faireDefilerVers(WidgetTester tester, Finder cible) async {
   await tester.scrollUntilVisible(
-    find.byType(LigneInvitation),
+    cible,
     200,
     scrollable: find
         .descendant(
@@ -122,6 +128,10 @@ void main() {
         ),
       );
 
+      await _faireDefilerVers(
+        tester,
+        find.text(AppStrings.membresInvitationsVide),
+      );
       expect(find.text(AppStrings.membresInvitationsVide), findsOneWidget);
       expect(find.byType(LigneInvitation), findsNothing);
     });
@@ -217,6 +227,7 @@ void main() {
         invitations: <Invitation>[invitationEnAttente()],
       );
       await _ouvrirMembres(tester, depot: depot);
+      await _versInvitations(tester);
       expect(find.text('recrue@exemple.fr'), findsOneWidget);
       final lecturesInitiales = depot.lectures;
 

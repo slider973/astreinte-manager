@@ -3,18 +3,18 @@
 Deno / TypeScript, une fonction par dossier, la liste de référence est la section 7 de
 [`docs/SCHEMA.md`](../../docs/SCHEMA.md). Le code partagé est dans `_shared/`.
 
-| Fonction            | Ticket | Rôle                                                                                                                                                                             |
-| ------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation, **plafond horaire** (038) |
-| `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                                              |
-| `publish-schedule`  | 019    | Publie un planning : statut, `proposed_at` de chaque attribution, puis **une** notification par membre                                                                           |
-| `reassign-shift`    | 020    | Réattribue un créneau d'un planning publié : nouvelle attribution proposée, ancienne remplacée, **une** notification au nouveau membre                                           |
-| `auto-propose`      | 018    | Applique un remplissage automatique du brouillon : le plan vient de l'application (tri du ticket 017), la base revérifie chaque ligne et écarte celles qui ne passent pas        |
-| `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                                             |
-| `create-checkout`   | 029    | État de l'abonnement d'une caserne, ouverture d'une session de paiement, ouverture du portail de gestion — réservé aux administrateurs de la caserne                             |
-| `stripe-webhook`    | 029    | Reçoit les événements du prestataire de paiement, **vérifie leur signature**, met à jour `subscriptions`                                                                         |
-| `delete-account`    | 007    | Le membre supprime son compte : profil anonymisé en « Membre supprimé », appartenances désactivées, attributions passées conservées                                              |
-| `export-user-data`  | 034    | Le membre récupère en JSON tout ce que l'application sait de lui, et rien de ce qu'elle sait des autres                                                                          |
+| Fonction            | Ticket | Rôle                                                                                                                                                                                                                  |
+| ------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation, **plafond horaire** (038), **noms et rôle par personne** (047) |
+| `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                                                                                   |
+| `publish-schedule`  | 019    | Publie un planning : statut, `proposed_at` de chaque attribution, puis **une** notification par membre                                                                                                                |
+| `reassign-shift`    | 020    | Réattribue un créneau d'un planning publié : nouvelle attribution proposée, ancienne remplacée, **une** notification au nouveau membre                                                                                |
+| `auto-propose`      | 018    | Applique un remplissage automatique du brouillon : le plan vient de l'application (tri du ticket 017), la base revérifie chaque ligne et écarte celles qui ne passent pas                                             |
+| `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                                                                                  |
+| `create-checkout`   | 029    | État de l'abonnement d'une caserne, ouverture d'une session de paiement, ouverture du portail de gestion — réservé aux administrateurs de la caserne                                                                  |
+| `stripe-webhook`    | 029    | Reçoit les événements du prestataire de paiement, **vérifie leur signature**, met à jour `subscriptions`                                                                                                              |
+| `delete-account`    | 007    | Le membre supprime son compte : profil anonymisé en « Membre supprimé », appartenances désactivées, attributions passées conservées                                                                                   |
+| `export-user-data`  | 034    | Le membre récupère en JSON tout ce que l'application sait de lui, et rien de ce qu'elle sait des autres                                                                                                               |
 
 ## Règles qui ne se négocient pas
 
@@ -184,14 +184,34 @@ Authorization: Bearer <access_token de l'admin>
 Content-Type: application/json
 ```
 
-Corps — une adresse ou une liste, jusqu'à 20, un seul rôle pour le lot :
+Corps — trois formes, jusqu'à 20 adresses :
 
 ```jsonc
 { "station_id": "uuid", "email": "recrue@exemple.fr" }
 { "station_id": "uuid", "emails": ["a@x.fr", "b@x.fr"], "role": "admin" }
+{ "station_id": "uuid", "people": [
+    { "email": "marie@x.fr", "first_name": "Marie", "last_name": "Lefèbvre", "role": "admin" },
+    { "email": "thomas@x.fr", "first_name": "Thomas", "last_name": "Nguyen" }
+] }
 ```
 
-`role` vaut `member` par défaut. Les adresses sont normalisées (espaces, casse) et dédoublonnées.
+`role` vaut `member` par défaut. Les adresses sont normalisées (espaces, casse) et dédoublonnées ;
+un doublon garde la **première** occurrence, donc le premier nom.
+
+La troisième forme est celle de l'**import de fichier** (ticket 047). Elle porte deux choses que les
+deux autres n'ont pas :
+
+- **le nom**, écrit dans `invitations.first_name` / `last_name` (migration `0034`) et recopié dans
+  le profil par `accept_invitation` **uniquement s'il est vide**. Le nom saisi par l'administrateur
+  est une proposition ; celui que la personne saisit sur elle-même fait foi, et
+  `memberships.display_name` reste le levier de l'administrateur sur sa propre caserne
+  (`design/047-import-membres.md § 7`). Un renvoi sans nom n'efface pas celui d'un import ;
+- **un rôle par personne**, `people[].role`, avec le rôle du lot en repli. Un fichier a une colonne
+  « rôle » : obliger à importer deux fois pour deux rôles serait une limite de l'API, pas du métier.
+
+La lecture du corps vit dans `_shared/invitation_people.ts` et a ses propres tests
+(`tests/invitation_people_test.ts`) : c'est elle qui décide _qui_ est invité et _sous quel nom_, à
+partir d'un fichier que personne n'a relu.
 
 Réponse `200` — sémantique de lot : chaque adresse a son sort.
 
@@ -256,7 +276,10 @@ et les faits :
 
 Deux comportements de lot à connaître côté client :
 
-- **Vingt adresses comptent pour vingt.** Le compteur est par adresse, pas par appel.
+- **Vingt adresses comptent pour vingt.** Le compteur est par adresse, pas par appel. Un import de
+  soixante personnes est donc trois appels et soixante unités de budget : l'écran d'import
+  (ticket 047) l'annonce **avant** de commencer, en comptant lui-même `invitation_rate_events`,
+  ouverte en lecture aux administrateurs de la caserne.
 - Dès qu'une adresse est refusée pour cette raison, **les suivantes ne sont pas tentées** : le
   budget est épuisé pour toute la caserne, et vingt allers-retours pour s'entendre dire vingt fois
   la même chose ne servent personne. Elles portent le même code et le même message.

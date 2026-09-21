@@ -16,6 +16,8 @@ class Invitation {
     required this.role,
     required this.expireLe,
     required this.creeLe,
+    this.prenom,
+    this.nom,
   });
 
   factory Invitation.depuisJson(Map<String, dynamic> ligne) => Invitation(
@@ -24,13 +26,33 @@ class Invitation {
     role: RoleMembre.depuisSql(ligne['role'] as String?),
     expireLe: DateTime.parse(ligne['expires_at']! as String).toLocal(),
     creeLe: DateTime.parse(ligne['created_at']! as String).toLocal(),
+    prenom: _texte(ligne['first_name']),
+    nom: _texte(ligne['last_name']),
   );
+
+  static String? _texte(Object? valeur) =>
+      valeur is String && valeur.trim().isNotEmpty ? valeur.trim() : null;
 
   final String id;
   final String email;
   final RoleMembre role;
   final DateTime expireLe;
   final DateTime creeLe;
+
+  /// Le nom saisi par l'administrateur à l'import (ticket 047). Absent des
+  /// invitations créées à la main : le formulaire ne demande que des adresses.
+  final String? prenom;
+  final String? nom;
+
+  /// « Marie Lefèbvre », ou `null` quand l'invitation n'a pas de nom.
+  ///
+  /// Sert de titre à la ligne d'invitation en attente. Sans lui, un chef de
+  /// centre qui vient d'importer sa caserne passerait deux semaines devant une
+  /// liste d'adresses.
+  String? get nomComplet {
+    final morceaux = <String>[?prenom, ?nom];
+    return morceaux.isEmpty ? null : morceaux.join(' ');
+  }
 
   bool expiree(DateTime maintenant) => expireLe.isBefore(maintenant);
 
@@ -41,10 +63,13 @@ class Invitation {
       other.email == email &&
       other.role == role &&
       other.expireLe == expireLe &&
-      other.creeLe == creeLe;
+      other.creeLe == creeLe &&
+      other.prenom == prenom &&
+      other.nom == nom;
 
   @override
-  int get hashCode => Object.hash(id, email, role, expireLe, creeLe);
+  int get hashCode =>
+      Object.hash(id, email, role, expireLe, creeLe, prenom, nom);
 }
 
 /// Le sort d'une adresse dans un envoi de lot (`supabase/functions/README.md`).

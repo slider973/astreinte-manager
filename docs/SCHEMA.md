@@ -184,6 +184,8 @@ create table invitations (
   station_id    uuid not null references stations(id) on delete cascade,
   email         text not null,
   role          membership_role not null default 'member',
+  first_name    text,                              -- migration 0034
+  last_name     text,                              -- migration 0034
   token         text not null unique default encode(gen_random_bytes(24), 'hex'),
   invited_by    uuid not null references profiles(id),
   expires_at    timestamptz not null default now() + interval '14 days',
@@ -193,6 +195,23 @@ create table invitations (
 create unique index invitations_pending_uniq
   on invitations (station_id, lower(email)) where accepted_at is null;
 ```
+
+`first_name` et `last_name` *(migration `0034`, ticket 047)* : le nom saisi par l'administrateur
+quand il importe sa liste depuis un fichier. Deux usages, et un seul interdit.
+
+- L'écran « Membres » l'affiche en titre de l'invitation en attente. Sans lui, un chef de centre
+  qui vient de monter sa caserne passe deux semaines devant une liste d'adresses.
+- `accept_invitation` le recopie dans `profiles` **à la seule condition que la case y soit vide**.
+  C'est la décision du ticket : l'administrateur propose, la personne dispose. Un compte qui
+  existait déjà — un pompier venu d'une autre caserne, un ancien membre réactivé — ne voit jamais
+  son profil réécrit par l'administrateur d'une caserne.
+- Il n'écrit **jamais** `memberships.display_name`. Le surnom de caserne appartient à
+  l'administrateur (ticket 009), il prime déjà dans les plannings, et il se décide — il ne se
+  déduit pas d'un tableur.
+
+Les deux colonnes sont dans le `grant` de select d'`authenticated` ; `token` reste dehors.
+Un renvoi sans nom ne les efface pas : `create_invitation` fait `coalesce(nouveau, ancien)`,
+sinon le bouton « Renvoyer » de l'écran « Membres » ferait disparaître ce qu'un import a posé.
 
 ### 2.5 `periods` — un mois de saisie par caserne
 
@@ -923,8 +942,8 @@ les Edge Functions `invite-member` et `accept-invitation`, jamais par un client.
 
 | Fonction | Signature | Rôle |
 |---|---|---|
-| `create_invitation` | `(p_station uuid, p_email text, p_role membership_role, p_invited_by uuid) returns jsonb` | Vérifie que `p_invited_by` est admin actif de `p_station` (ou super-admin, `0025`), **vérifie le plafond horaire** (`0032`), crée ou prolonge la ligne `invitations`, compte l'envoi dans `invitation_rate_events`, journalise dans `audit_log`. Renvoie le token. |
-| `accept_invitation` | `(p_token text, p_user_id uuid, p_email text) returns jsonb` | Vérifie le token, son expiration, qu'il n'est pas déjà accepté et que `p_email` est bien l'adresse invitée ; crée la `memberships` active et marque `accepted_at`, en une transaction. |
+| `create_invitation` | `(p_station uuid, p_email text, p_role membership_role, p_invited_by uuid, p_first_name text default null, p_last_name text default null) returns jsonb` | Vérifie que `p_invited_by` est admin actif de `p_station` (ou super-admin, `0025`), **vérifie le plafond horaire** (`0032`), crée ou prolonge la ligne `invitations` **avec les deux noms** (`0034`), compte l'envoi dans `invitation_rate_events`, journalise dans `audit_log` — sans y recopier les noms. Renvoie le token. |
+| `accept_invitation` | `(p_token text, p_user_id uuid, p_email text) returns jsonb` | Vérifie le token, son expiration, qu'il n'est pas déjà accepté et que `p_email` est bien l'adresse invitée ; crée la `memberships` active, **amorce prénom et nom du profil s'ils sont vides** (`0034`) et marque `accepted_at`, en une transaction. |
 | `mask_email` | `(p_email text) returns text` | Masque la partie locale d'une adresse, pour les messages rendus à un porteur de lien qui n'est pas le destinataire. |
 
 Ni exception ni `raise` pour les refus métier : les deux fonctions renvoient
@@ -1077,7 +1096,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `stations` | membre de la caserne | admin de la caserne (update), pas d'insert, pas de delete — *(migration `0025`, ticket 031 : le super-admin a perdu ses trois branches ; il lisait toute la table, `settings` compris, et pouvait renommer ou reconfigurer une caserne dont il n'est pas membre, sans trace. Il passe désormais par les fonctions du § 3, qui journalisent)* |
 | `profiles` | soi-même ; les profils des membres **actifs** de ses casernes ; et, pour un **admin**, ceux de tous les membres de sa caserne quel que soit leur statut (migration `0010` : sans cette branche, un membre désactivé disparaissait de l'écran « Membres » et ne pouvait plus être réactivé) | soi-même |
 | `memberships` | membre de la caserne, et toujours ses propres lignes (un compte `invited` ou `disabled` doit pouvoir constater son état) | admin de la caserne, sauf son propre rôle. Aucune politique d'update pour un membre sur sa propre ligne : elle ouvrirait une escalade de privilèges |
-| `invitations` | admin de la caserne, **sauf `token`** (retiré du grant de select : c'est un porteur de droits, réservé au service role). Ne jamais faire `select *` sur cette table | admin de la caserne |
+| `invitations` | admin de la caserne, **sauf `token`** (retiré du grant de select : c'est un porteur de droits, réservé au service role). Ne jamais faire `select *` sur cette table — et une colonne ajoutée n'hérite pas du grant, elle se donne explicitement (`0034`) | admin de la caserne |
 | `periods` | membre | admin |
 | `availabilities` | membre : les siennes ; admin : toutes celles de la caserne | membre : les siennes si période `open` et caserne writable ; admin : toutes |
 | `availability_preferences` | idem availabilities | idem |
@@ -1712,6 +1731,10 @@ Ordre proposé :
     `station_notification_window`, les trois tâches qui écrivent aux membres passées sous cette
     fenêtre — `cron_availability_reminders`, `cron_assignment_reminders`,
     `cron_late_responders_report` —, tâche `availability_reminders` replanifiée à l'heure)
+34. `0034_import_membres.sql` (ticket 047 : colonnes `invitations.first_name` / `last_name` et
+    leur `grant` de select, `create_invitation` recréée à six paramètres — la signature change,
+    donc `drop` puis `create` : deux paramètres à valeur par défaut rendraient l'appel à quatre
+    arguments ambigu —, `accept_invitation` amorce le profil vide)
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
@@ -1748,8 +1771,9 @@ et `0022` par `supabase/tests/notifications_test.sql`, les rappels de saisie de 
 `supabase/tests/suppression_compte_test.sql`, l'export RGPD de `0027` par
 `supabase/tests/export_rgpd_test.sql`, la proposition automatique de `0028` par
 `supabase/tests/proposition_automatique_test.sql` et le plafond de débit des invitations de
-`0032` par `supabase/tests/limite_debit_invitations_test.sql` et l'heure locale d'envoi de `0033`
-par `supabase/tests/heure_locale_notifications_test.sql`, joués par le même script. La logique pure
+`0032` par `supabase/tests/limite_debit_invitations_test.sql`, l'heure locale d'envoi de `0033`
+par `supabase/tests/heure_locale_notifications_test.sql` et le nom porté par l'invitation de `0034`
+par `supabase/tests/import_membres_test.sql`, joués par le même script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge

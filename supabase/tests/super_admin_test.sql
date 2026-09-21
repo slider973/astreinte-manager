@@ -380,7 +380,7 @@ end $$;
 -- Et le token ne devient pas lisible en RPC pour autant.
 select tests_sa.check(
   not has_function_privilege('authenticated',
-    'create_invitation(uuid, text, membership_role, uuid)', 'execute'),
+    'create_invitation(uuid, text, membership_role, uuid, text, text)', 'execute'),
   'create_invitation reste fermée au rôle authenticated');
 
 rollback to savepoint s5;

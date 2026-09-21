@@ -249,15 +249,34 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
             )
           : fait?.banniere,
       filActions: admin
-          ? PrimaryButton(
-              libelle: AppStrings.membresInviter,
-              icone: Icons.person_add_alt,
-              // Grisé, pas retiré : « pourquoi je ne peux plus inviter ? »
-              // mérite une réponse sur place (`DESIGN.md § Buttons`).
-              onPressed: lectureSeule
-                  ? null
-                  : () => context.goNamed(AppRoutes.inviterName),
-              raisonDesactivation: AppStrings.membresSuspendue,
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                PrimaryButton(
+                  libelle: AppStrings.membresInviter,
+                  icone: Icons.person_add_alt,
+                  // Grisé, pas retiré : « pourquoi je ne peux plus inviter ? »
+                  // mérite une réponse sur place (`DESIGN.md § Buttons`).
+                  onPressed: lectureSeule
+                      ? null
+                      : () => context.goNamed(AppRoutes.inviterName),
+                  raisonDesactivation: AppStrings.membresSuspendue,
+                ),
+                const SizedBox(height: AppSpacing.entreCibles),
+                // Secondaire : l'invitation à la main est le geste ordinaire,
+                // l'import celui du premier jour (ticket 047).
+                PrimaryButton(
+                  libelle: AppStrings.membresImporter,
+                  variante: PrimaryButtonVariante.secondaire,
+                  icone: Icons.upload_file_outlined,
+                  onPressed: lectureSeule
+                      ? null
+                      : () => context.goNamed(AppRoutes.importerName),
+                  raisonDesactivation: AppStrings.membresSuspendue,
+                  raisonVisible: false,
+                ),
+              ],
             )
           : null,
       child: _corps(

@@ -5,6 +5,14 @@
 // En-têtes : Authorization: Bearer <access_token de l'admin>, apikey: <clé anon>
 // Corps    : { "station_id": uuid, "email": string }
 //         ou { "station_id": uuid, "emails": string[], "role": "member" | "admin" }
+//         ou { "station_id": uuid, "people": [{ email, first_name?, last_name?, role? }] }
+//
+// La troisième forme est celle de l'import de fichier (ticket 047) : elle porte le
+// nom que l'administrateur a saisi pour chaque personne, et un rôle par personne
+// plutôt qu'un rôle par lot — un fichier a une colonne « rôle », et obliger à
+// importer deux fois pour deux rôles serait une limite de l'API, pas du métier.
+// Les deux premières formes restent valides : l'écran d'invitation à la main et le
+// renvoi d'une invitation ne connaissent que des adresses.
 //
 // Enchaînement, pour une adresse :
 //   1. create_invitation (SQL, service_role) — contrôle du droit d'inviter, création
@@ -29,13 +37,15 @@ import {
   lireDetailDebit,
   messageDebitDepasse,
 } from "../_shared/invitation_rate_limit.ts";
+import {
+  lirePersonnes,
+  MAX_ADRESSES,
+  type Personne,
+  type Role,
+} from "../_shared/invitation_people.ts";
 import { type AdminClient, adminClient, caller } from "../_shared/supabase.ts";
 import { sendMail } from "../_shared/mailer.ts";
 import { invitationUrl, renderInvitationEmail } from "../_shared/invitation_email.ts";
-
-const MAX_ADRESSES = 20;
-
-type Role = "member" | "admin";
 
 type CreateInvitationResult = {
   ok: boolean;
@@ -57,6 +67,8 @@ type CreateInvitationResult = {
     station_id: string;
     email: string;
     role: Role;
+    first_name: string | null;
+    last_name: string | null;
     expires_at: string;
     created_at: string;
   };
@@ -98,25 +110,6 @@ const MESSAGES: Record<string, string> = {
 
 function message(code: string): string {
   return MESSAGES[code] ?? "L'invitation a échoué.";
-}
-
-/** Normalise, déduplique et borne la liste d'adresses du corps de la requête. */
-function lireAdresses(body: Record<string, unknown>): string[] | null {
-  const brut: unknown[] = Array.isArray(body.emails)
-    ? body.emails
-    : typeof body.email === "string"
-    ? [body.email]
-    : [];
-  if (brut.length === 0) return null;
-
-  const vues = new Set<string>();
-  for (const valeur of brut) {
-    if (typeof valeur !== "string") return null;
-    const normalisee = valeur.trim().toLowerCase();
-    if (normalisee !== "") vues.add(normalisee);
-  }
-  if (vues.size === 0 || vues.size > MAX_ADRESSES) return null;
-  return [...vues];
 }
 
 /**
@@ -169,15 +162,19 @@ function refusDebit(email: string, detail: DetailDebit): ResultatAdresse {
 async function inviterUneAdresse(
   admin: AdminClient,
   stationId: string,
-  email: string,
-  role: Role,
+  personne: Personne,
   invitedBy: string,
 ): Promise<ResultatAdresse> {
+  const email = personne.email;
   const { data, error } = await admin.rpc("create_invitation", {
     p_station: stationId,
     p_email: email,
-    p_role: role,
+    p_role: personne.role,
     p_invited_by: invitedBy,
+    // La migration 0034 les normalise et les borne à son tour : ce qui arrive ici
+    // vient d'un fichier que personne n'a relu, pas d'un formulaire.
+    p_first_name: personne.firstName,
+    p_last_name: personne.lastName,
   });
 
   if (error) {
@@ -312,12 +309,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errorResponse(400, "invalid_body", "Le rôle doit être « member » ou « admin ».");
   }
 
-  const adresses = lireAdresses(body);
-  if (!adresses) {
+  const personnes = lirePersonnes(body, role);
+  if (!personnes) {
     return errorResponse(
       400,
       "invalid_body",
-      `Donne une adresse (email) ou une liste d'adresses (emails), ${MAX_ADRESSES} au plus.`,
+      `Donne une adresse (email), une liste d'adresses (emails) ou une liste de ` +
+        `personnes (people), ${MAX_ADRESSES} au plus.`,
     );
   }
 
@@ -374,17 +372,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const resultats: ResultatAdresse[] = [];
   let debitEpuise: DetailDebit | null = null;
-  for (const adresse of adresses) {
+  for (const personne of personnes) {
     if (debitEpuise !== null) {
-      resultats.push(refusDebit(adresse, debitEpuise));
+      resultats.push(refusDebit(personne.email, debitEpuise));
       continue;
     }
 
     const resultat = await inviterUneAdresse(
       admin,
       stationId,
-      adresse,
-      role,
+      personne,
       utilisateur.id,
     );
     resultats.push(resultat);
