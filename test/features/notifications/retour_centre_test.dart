@@ -1,9 +1,14 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/theme/app_spacing.dart';
+import 'package:astreinte_sp/core/widgets/barre_actions_basse.dart';
 import 'package:astreinte_sp/core/widgets/bouton_retour.dart';
+import 'package:astreinte_sp/core/widgets/day_cell.dart';
+import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
 import 'package:astreinte_sp/features/astreintes/presentation/astreintes_screen.dart';
+import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
 import 'package:astreinte_sp/features/legal/presentation/document_legal_screen.dart';
 import 'package:astreinte_sp/features/notifications/domain/notification_interne.dart';
@@ -16,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
+import '../../support/faux_dispos.dart';
 import '../../support/faux_notifications.dart';
 
 /// Un écran haut : les quatre onglets tiennent sans défiler.
@@ -37,11 +43,13 @@ const Map<int, Type> _onglets = <int, Type>{
 Future<void> _monterMembre(
   WidgetTester tester, {
   FauxNotificationsRepository? depot,
+  FauxDisposRepository? dispos,
 }) => monterApp(
   tester,
   session: sessionMembre,
   appartenances: const <Appartenance>[appartenanceMembre],
   notifications: depot ?? FauxNotificationsRepository(),
+  dispos: dispos,
   taille: _telephoneLong,
 );
 
@@ -87,7 +95,12 @@ void main() {
 
           expect(find.byType(NotificationsScreen), findsNothing);
           expect(find.byType(onglet.value), findsOneWidget);
-          expect(emplacementCourant(tester), startsWith(AppRoutes.accueil));
+          // **L'adresse est redevenue celle de l'écran d'origine**, onglet
+          // compris : c'est elle que le rechargement rejouerait.
+          expect(
+            emplacementCourant(tester),
+            '${AppRoutes.accueil}?${AppRoutes.parametreOnglet}=${onglet.key}',
+          );
           // Le même `State`, pas un nouveau : rien n'a été resérialisé.
           expect(
             identical(
@@ -98,13 +111,52 @@ void main() {
             reason: 'la coquille a été reconstruite : l\'onglet est perdu',
           );
           expect(
-            tester.widget<NavigationBar>(find.byType(NavigationBar))
+            tester
+                .widget<NavigationBar>(find.byType(NavigationBar))
                 .selectedIndex,
             onglet.key,
           );
         },
       );
     }
+
+    // **La preuve 2 du brief** : « Mon mois » sur novembre, cloche, retour —
+    // novembre, pas octobre. Le mois ne vit que dans `?mois=`, et c'est ce qui
+    // se perdait quand la flèche faisait un `go` vers « / ».
+    testWidgets('le mois affiché survit à l\'aller-retour', (tester) async {
+      await _monterMembre(
+        tester,
+        dispos: FauxDisposRepository(
+          periodes: <PeriodeSaisie>[
+            periodeOuverte(annee: 2026, mois: 10),
+            periodeOuverte(annee: 2026, mois: 11),
+          ],
+        ),
+      );
+      const depart =
+          '${AppRoutes.accueil}?${AppRoutes.parametreOnglet}=0'
+          '&${AppRoutes.parametreMois}=2026-11';
+      await ouvrirRoute(tester, depart);
+      expect(
+        tester.widgetList<DayCell>(find.byType(DayCell)).first.nomJour,
+        'dim.',
+        reason: 'le 1er novembre 2026 est un dimanche',
+      );
+
+      await tester.tap(find.byType(BoutonNotifications));
+      await tester.pumpAndSettle();
+      expect(find.byType(NotificationsScreen), findsOneWidget);
+
+      await tester.tap(_fleche);
+      await tester.pumpAndSettle();
+
+      expect(emplacementCourant(tester), depart);
+      expect(
+        tester.widgetList<DayCell>(find.byType(DayCell)).first.nomJour,
+        'dim.',
+        reason: 'le mois est retombé sur octobre',
+      );
+    });
 
     testWidgets('l\'adresse dit « /notifications » pendant l\'affichage', (
       tester,
@@ -358,6 +410,102 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(emplacementCourant(tester), AppRoutes.accueil);
+    });
+  });
+
+  // La zone sûre basse du centre : la barre d'accueil de l'iPhone en PWA
+  // installée mange les 34 derniers points de l'écran, et rien d'autre que ce
+  // qui est au bas de la liste ne les réserve.
+  group('La zone sûre basse', () {
+    /// La hauteur de la barre d'accueil d'un iPhone récent, en points.
+    const double barreAccueil = 34;
+
+    /// La réserve posée sous la dernière ligne de la liste.
+    EdgeInsets reserveListe(WidgetTester tester) =>
+        tester
+                .widget<SliverPadding>(
+                  find.ancestor(
+                    of: find.byType(SliverList),
+                    matching: find.byType(SliverPadding),
+                  ),
+                )
+                .padding
+            as EdgeInsets;
+
+    Future<void> ouvrirCentre(
+      WidgetTester tester, {
+      required bool toutLu,
+    }) async {
+      // Deux propriétés, deux lecteurs : `viewPadding` nourrit
+      // `MediaQuery.viewPaddingOf`, que lit la liste, et `padding` nourrit
+      // `SafeArea`, dont se sert `BarreActionsBasse`. Les fixer toutes les
+      // deux, c'est l'iPhone en PWA installée, clavier fermé.
+      final reserve = FakeViewPadding(
+        bottom: barreAccueil * tester.view.devicePixelRatio,
+      );
+      tester.view
+        ..viewPadding = reserve
+        ..padding = reserve;
+      await _monterMembre(
+        tester,
+        depot: FauxNotificationsRepository(
+          notifications: <NotificationInterne>[
+            // Assez de lignes pour que la liste déborde de l'écran : sans
+            // défilement possible, la vérification à l'écran ne prouverait
+            // rien.
+            for (var index = 0; index < 40; index++)
+              notification(
+                id: 'n-$index',
+                lueLe: toutLu ? DateTime(2026, 9, 20, 10) : null,
+              ),
+          ],
+        ),
+      );
+      await ouvrirRoute(tester, AppRoutes.notifications);
+    }
+
+    testWidgets('tout lu : la dernière ligne garde les 34 points', (
+      tester,
+    ) async {
+      await ouvrirCentre(tester, toutLu: true);
+
+      // Rien sous la liste : c'est elle qui porte la zone sûre.
+      expect(find.byType(BarreActionsBasse), findsNothing);
+      expect(reserveListe(tester).bottom, AppSpacing.xl + barreAccueil);
+
+      // Et à l'écran, une fois la liste défilée jusqu'au bout : la dernière
+      // ligne s'arrête au-dessus de la barre d'accueil.
+      final defilement = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      defilement.jumpTo(defilement.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        defilement.maxScrollExtent,
+        greaterThan(0),
+        reason: 'la liste tient dans l\'écran : le bas n\'est pas éprouvé',
+      );
+      expect(
+        _telephoneLong.height -
+            tester.getBottomLeft(find.byType(LigneNotification).last).dy,
+        greaterThanOrEqualTo(barreAccueil),
+      );
+    });
+
+    testWidgets('des non-lus : c\'est la barre d\'actions qui la porte', (
+      tester,
+    ) async {
+      await ouvrirCentre(tester, toutLu: false);
+
+      // La réserve ne compte qu'une fois : doubler la zone sûre creuserait un
+      // trou entre la liste et la barre.
+      expect(reserveListe(tester).bottom, AppSpacing.xl);
+      expect(find.byType(BarreActionsBasse), findsOneWidget);
+      expect(
+        _telephoneLong.height -
+            tester.getBottomLeft(find.byType(PrimaryButton)).dy,
+        greaterThanOrEqualTo(barreAccueil),
+      );
     });
   });
 }
