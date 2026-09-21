@@ -10,6 +10,7 @@ import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../notifications/presentation/widgets/reglage_notifications.dart';
 import '../domain/profil.dart';
 import '../domain/profil_providers.dart';
+import 'widgets/bloc_calendrier.dart';
 import 'widgets/bloc_caserne.dart';
 import 'widgets/bloc_compte.dart';
 import 'widgets/bloc_identite.dart';
@@ -125,6 +126,11 @@ class _Contenu extends StatelessWidget {
                 // Déménagé tel quel depuis l'onglet d'accueil, où le ticket 024
                 // l'avait posé en attendant cet écran.
                 const ReglageNotifications(),
+                const SizedBox(height: AppSpacing.auDessusTitre),
+                // Juste après les notifications : les deux répondent à la même
+                // famille de question — comment cette application entre dans ma
+                // journée (`design/028-export-ics.md § 5`).
+                const BlocCalendrier(),
                 const SizedBox(height: AppSpacing.auDessusTitre),
                 _BlocLangue(langue: profil?.langue ?? Langue.francais),
                 const SizedBox(height: AppSpacing.auDessusTitre),
