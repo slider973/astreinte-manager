@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 006
 - **Branche** : `feat/038-limite-debit-invitations`
-- **Statut** : en cours depuis 2026-09-21
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
 Relevé en revue du ticket 006 : la fonction d'invitation accepte vingt adresses par appel et un
