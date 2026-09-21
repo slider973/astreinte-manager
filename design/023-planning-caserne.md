@@ -103,7 +103,7 @@ l'ordre**, ce qu'un calendrier est. Il n'est pas tenu par une grille à sept col
 | Planning | Journées affichées | Pourquoi |
 |---|---|---|
 | **validé** | **toutes** celles du mois qui portent au moins un créneau requis | La base rend tout. Un jour sans personne est un trou réel du planning, et c'est une information qu'un pompier a le droit de lire. |
-| **publié** | **seulement celles où ce pompier est attribué** | La base ne rend que ses attributions. Afficher les 29 autres journées avec « Personne n'est d'astreinte » serait un **mensonge de mise en page** : ces journées ont sûrement quelqu'un, on n'a simplement pas le droit de savoir qui. |
+| **publié** | **seulement les créneaux où ce pompier est attribué**, et donc les journées qui en portent | La base ne rend que ses attributions. Afficher les autres avec « Personne n'est d'astreinte » serait un **mensonge de mise en page** : quelqu'un y est sûrement, on n'a simplement pas le droit de savoir qui. Le tri se fait **au créneau**, pas à la journée : un samedi où il est de nuit ne doit pas montrer son créneau de jour comme vide (vu dans Chrome, § 10). |
 
 C'est la seule différence de forme entre les deux états, et elle est portée par le bloc suivant.
 
@@ -256,8 +256,23 @@ information.
 
 ## 10. Vérifié dans Chrome
 
-Renseigné après implémentation — voir le § 11 du brief 027 pour le précédent.
+Stack Supabase locale, caserne A. Décor construit pour la vérification : **octobre 2026 validé**
+(trois journées pourvues, `required_count` à 0 ailleurs — la caserne ne demande personne) et
+**novembre 2026 publié** (Marie L. acceptée sur le 7 au soir et le 14 en journée, Thomas M.,
+Camille G., Lucas B. et Émilie R. encore en attente de réponse). Connecté en `membre1@caserne-a`,
+c'est-à-dire Marie L.
 
 | Ce qui a été vu | Ce qui a changé |
 |---|---|
-| (à remplir) | |
+| **Sur le planning publié de novembre, un créneau affiché « Personne n'est d'astreinte »**. Le samedi 7, Marie est de nuit ; son créneau de jour, que la RLS ne lui rend pas, s'affichait vide. C'est **exactement la phrase que ce ticket existe pour ne pas écrire** : quelqu'un y est sûrement, on n'a pas le droit de savoir qui. | `assemblerJournees` trie désormais **au créneau**, plus à la journée : sur un planning seulement publié, seuls les créneaux du lecteur sont montés. Le § 3 le dit maintenant. Deux tests le tiennent, un de domaine et un d'écran. |
+| **Démarrage à froid sans réseau : « Aucune caserne »** — un écran qui ne propose que la déconnexion, pour quelqu'un de parfaitement rattaché. Le repli du ticket 027 sur la caserne gardée n'avait jamais lieu. Cause : `appartenancesProvider` observe `sessionProvider`, il est d'abord calculé **sans session** — liste vide — puis recalculé quand la session est restaurée ; Riverpod garde la valeur précédente pendant ce recalcul, et `etatAuthProvider` décidait dessus. Sans réseau, la requête ne répondant jamais, la liste vide restait à l'écran pour toujours. | Une garde dans `etatAuthProvider` : **une liste vide encore en chargement ne décide rien**. La condition porte sur la liste vide et non sur le chargement seul, sinon un rafraîchissement de jeton renverrait à l'écran de démarrage toutes les heures. C'est un défaut du ticket 027, découvert ici parce que c'est ici que le critère « sans réseau » se vérifie. |
+| **Un échec de lecture sans rien en cache s'affichait « Aucun planning publié »** — une caserne parfaitement organisée passait pour une caserne sans planning. Même cause : `AsyncValue` garde l'état vide du premier calcul à côté de l'erreur. | La condition de l'écran porte sur le **contenu** (`mois.isEmpty`) et non sur `hasValue`. Deux tests, en ligne et hors ligne. |
+| Le reste tenait du premier coup : sélecteur de portée, titre qui suit la portée, registre des journées, marque « Toi », bloc d'attente ocre, flèches de mois désactivées avec leur raison en info-bulle, bandeau de fraîcheur, lecture complète depuis le cache avec l'API arrêtée, navigation d'un mois à l'autre hors ligne, et la disposition sur 1280 dp. | — |
+
+**Ce que la vérification a aussi appris sur le décor.** Sur un planning **validé**, « Personne n'est
+d'astreinte » ne peut presque jamais apparaître : `schedule_reevaluer` ramène à `published` tout
+planning dont un créneau demandé perd son effectif — c'est ce qui s'est produit en montant
+`required_count` à 2 sur octobre. La phrase est donc un filet de sécurité, pas une lecture
+courante, et c'est bien `required_count` qui porte le travail utile : sans lui, un mois validé où
+la caserne ne demande personne afficherait soixante-deux lignes de « Personne », ce qui serait le
+même mensonge de mise en page à l'envers.
