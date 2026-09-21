@@ -44,3 +44,10 @@ silencieusement au décodage, et l'application retombe sur un **Roboto télécha
 Le levier correct est la compression de transport : TTF + brotli donne 83 Ko, soit 11 Ko de plus
 que le WOFF2, sans rien casser. Exigence d'hébergement : servir ce répertoire avec
 `Content-Encoding: br`.
+
+**Fait au ticket 032**, et mesuré à 82 Ko. `scripts/build_web.sh` compresse les cinq fichiers sur
+place après `flutter build web`, et `vercel.json` pose l'en-tête sur
+`/assets/assets/fonts/(.*).ttf`. Les deux vont ensemble : servir ces fichiers **sans** l'en-tête
+donne des polices illisibles et un repli silencieux sur Roboto — exactement la panne décrite
+ci-dessus. Le workflow de déploiement le vérifie après chaque mise en ligne et échoue si l'en-tête
+manque (`docs/DEPLOIEMENT.md § 6`).

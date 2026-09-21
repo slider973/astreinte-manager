@@ -30,5 +30,14 @@ Exemple :
 
 ```sh
 flutter run -d chrome --dart-define-from-file=env/dev.json
-flutter build web --release --dart-define-from-file=env/prod.json
+scripts/build_web.sh env/prod.json
 ```
+
+## En production, le fichier n'existe pas
+
+`env/prod.json` n'est jamais commité et n'est **pas** créé à la main sur un serveur : le workflow
+de déploiement le compose à chaque mise en ligne à partir des secrets du dépôt GitHub
+(`.github/workflows/deploy.yml`). Ces valeurs sont lues par `String.fromEnvironment`, donc résolues
+à la **compilation** — une variable posée dans le tableau de bord de l'hébergeur n'atteindrait
+jamais le binaire. La liste des secrets et l'endroit où les poser sont dans
+[docs/DEPLOIEMENT.md](../docs/DEPLOIEMENT.md).

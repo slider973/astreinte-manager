@@ -12,6 +12,7 @@ et de validation du planning.
 | [docs/SCHEMA.md](docs/SCHEMA.md) | Schéma Supabase : tables, enums, RLS, fonctions, vues, cron |
 | [docs/WORKFLOWS.md](docs/WORKFLOWS.md) | Machines à états et séquences (planning, attribution, notifications) |
 | [docs/FIREBASE.md](docs/FIREBASE.md) | Ce que le propriétaire doit créer chez Firebase pour activer les notifications, et comment le vérifier |
+| [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md) | Mise en ligne de la PWA : projet Vercel, secrets GitHub, domaine, vérifications |
 | [tickets/](tickets/README.md) | Tickets de développement, un par PR, regroupés par épopée |
 
 ## Stack
@@ -63,10 +64,23 @@ flutter run -d emulator-5554 --dart-define-from-file=env/dev.json     # émulate
 ### Construire
 
 ```sh
-flutter build web --release --dart-define-from-file=env/prod.json    # sortie dans build/web
+scripts/build_web.sh env/prod.json                                  # la PWA, prête à servir
+flutter build web --release --dart-define-from-file=env/prod.json   # la même, sans la compression des polices
 flutter build ipa           --dart-define-from-file=env/prod.json
 flutter build appbundle     --dart-define-from-file=env/prod.json
 ```
+
+`scripts/build_web.sh` ajoute au build web la compression brotli des polices embarquées (184 Ko →
+83 Ko). Elle n'est lisible qu'avec l'en-tête `Content-Encoding: br` que pose `vercel.json` : servir
+`build/web` avec un serveur statique ordinaire donne des polices illisibles et un repli silencieux
+sur Roboto. Pour regarder le résultat avec les en-têtes réels : `scripts/servir_web.py`, puis
+<http://127.0.0.1:8099>.
+
+### Mettre en ligne
+
+Tout commit fusionné dans `main` part en production après une CI verte
+([.github/workflows/deploy.yml](.github/workflows/deploy.yml)). Les secrets à poser et les
+vérifications à faire sont dans [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md).
 
 ### Architecture
 
