@@ -1,7 +1,8 @@
 # Intégration continue d'Astreinte SP.
 #
-# Trois tâches en parallèle, chacune autosuffisante :
+# Quatre tâches en parallèle, chacune autosuffisante :
 #   - « flutter »        : analyse, tests unitaires et de widgets, build web (le canal principal) ;
+#   - « parcours »       : le parcours complet d'un mois, dans un Chrome sans interface ;
 #   - « base-donnees »   : rejeu complet des migrations, tests RLS et lint du schéma ;
 #   - « edge-functions » : types, lint, format et tests unitaires des fonctions Deno.
 #
@@ -67,6 +68,58 @@ jobs:
       - name: Construire la PWA
         run: flutter build web --dart-define-from-file=env/dev.json
 
+  # Le parcours complet d'un mois (ticket 035) : l'admin invite, la recrue accepte,
+  # saisit son mois, l'admin construit et publie, la recrue refuse, l'admin réattribue,
+  # le second pompier accepte, le planning se valide.
+  #
+  # **Une tâche à part, et volontairement.** Le critère d'acceptation du ticket est
+  # chiffré — « le parcours complet passe en CI en moins de 10 minutes » —, et il se
+  # lit ici, sur une durée à lui. `timeout-minutes` porte ce budget : dépassé, la
+  # tâche échoue au lieu de s'étirer en silence. Mesuré à ~20 s sur un poste de
+  # développement, compilation comprise.
+  #
+  # Le navigateur est celui de l'exécuteur (`google-chrome`, préinstallé sur
+  # `ubuntu-latest`), sans interface. Aucun chromedriver, aucun pilote extérieur :
+  # `--platform chrome` compile le test avec l'application et le fait tourner
+  # **dans** la page. Le paquet `integration_test` ne sert pas ici — Flutter 3.38
+  # répond « Web devices are not supported for integration tests yet » ; le détail
+  # est dans `test/parcours/README.md`.
+  #
+  # Ce que cette tâche ne joint pas : Supabase. Le serveur du parcours est une
+  # caserne en mémoire qui rejoue les règles de la base ; les règles elles-mêmes
+  # sont éprouvées par la tâche « base-donnees », qui joue le même fil en SQL
+  # (`supabase/tests/parcours_complet_test.sql`).
+  parcours:
+    name: Parcours — bout en bout sur Chrome headless
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Restaurer le cache pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-
+
+      - name: Récupérer les dépendances
+        run: flutter pub get
+
+      - name: Jouer le parcours complet
+        run: flutter test --platform chrome test/parcours
+        env:
+          CHROME_EXECUTABLE: /usr/bin/google-chrome
+
   base-donnees:
     name: Base de données — migrations, RLS, lint
     runs-on: ubuntu-latest
@@ -93,7 +146,11 @@ jobs:
       - name: Rejouer les migrations et le seed
         run: supabase db reset
 
-      - name: Tests Row Level Security
+      # `scripts/test_rls.sh` joue **tout** `supabase/tests/*.sql` : les politiques,
+      # les fonctions, les tâches planifiées jouées avec une date de référence, et
+      # depuis le ticket 035 le parcours complet d'un mois de bout en bout. Mesuré à
+      # ~16 s en local, la concurrence comprise.
+      - name: Tests RLS, fonctions, tâches planifiées et parcours complet
         run: scripts/test_rls.sh
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
