@@ -11,6 +11,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_divider.dart';
 import '../../../core/widgets/barre_actions_basse.dart';
+import '../../../core/widgets/bouton_retour.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/primary_button.dart';
@@ -124,6 +125,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        // La sortie est construite par le produit et non laissée au bouton
+        // implicite de Flutter : c'est la seule façon de traiter la pile vide,
+        // qui est justement le cas du lien profond application fermée
+        // (ticket 052).
+        leading: const BoutonRetour(),
+        leadingWidth: BoutonRetour.largeur(context),
         title: const Text(AppStrings.centreTitre),
         actions: <Widget>[
           IconButton(
@@ -146,7 +153,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               onAction: _relire,
             ),
           Expanded(
-            child: _corps(etat: etat, donnees: donnees),
+            child: _corps(
+              etat: etat,
+              donnees: donnees,
+              barreActions: nonLues > 0,
+            ),
           ),
 
           // Le bouton n'apparaît que s'il y a quelque chose à marquer. Un
@@ -170,6 +181,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Widget _corps({
     required AsyncValue<EtatCentre> etat,
     required EtatCentre? donnees,
+    required bool barreActions,
   }) {
     if (donnees == null) {
       return etat.hasError
@@ -192,6 +204,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     return _ListeNotifications(
       donnees: donnees,
+      barreActions: barreActions,
       onOuvrir: (NotificationInterne notification) =>
           unawaited(_ouvrir(notification)),
     );
@@ -200,9 +213,18 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
 /// La liste, virtualisée : deux cents événements peuvent s'y trouver.
 class _ListeNotifications extends StatelessWidget {
-  const _ListeNotifications({required this.donnees, required this.onOuvrir});
+  const _ListeNotifications({
+    required this.donnees,
+    required this.barreActions,
+    required this.onOuvrir,
+  });
 
   final EtatCentre donnees;
+
+  /// La barre « Tout marquer comme lu » est sous la liste : c'est elle qui
+  /// porte alors la zone sûre basse.
+  final bool barreActions;
+
   final ValueChanged<NotificationInterne> onOuvrir;
 
   @override
@@ -210,6 +232,16 @@ class _ListeNotifications extends StatelessWidget {
     final marge = AppWindowClass.of(context).margePage;
     final maintenant = DateTime.now();
     final lignes = donnees.notifications;
+
+    // **La zone sûre basse quand rien ne la porte.** Tout lu, donc pas de
+    // barre d'actions : sans cette réserve, la dernière notification passe
+    // sous la barre d'accueil de l'iPhone en PWA installée
+    // (`PRODUCT.md` — « respecter les zones sûres »). Avec la barre,
+    // `BarreActionsBasse` s'en charge déjà, et doubler la réserve creuserait
+    // un trou.
+    final zoneSure = barreActions
+        ? 0.0
+        : MediaQuery.viewPaddingOf(context).bottom;
 
     return Center(
       child: ConstrainedBox(
@@ -246,7 +278,7 @@ class _ListeNotifications extends StatelessWidget {
               padding: EdgeInsets.only(
                 left: marge - AppSpacing.md,
                 right: marge - AppSpacing.md,
-                bottom: AppSpacing.xl,
+                bottom: AppSpacing.xl + zoneSure,
               ),
               sliver: SliverList.separated(
                 itemCount: lignes.length,
