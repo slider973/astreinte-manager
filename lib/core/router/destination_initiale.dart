@@ -1,3 +1,4 @@
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_router.dart';
@@ -20,7 +21,38 @@ import 'app_router.dart';
 /// l'utilisateur a demandée. Les redirections suivantes sont des conséquences,
 /// pas des intentions.
 class DestinationInitiale {
+  /// [aLaProchaineImage] n'existe que pour les tests, qui remplacent l'image
+  /// par un appel direct ou différé à la main.
+  DestinationInitiale({void Function(VoidCallback)? aLaProchaineImage})
+    : _aLaProchaineImage = aLaProchaineImage ?? _apresLImageCourante;
+
+  /// Ce qui relâche la destination une fois la redirection retombée.
+  ///
+  /// `addPostFrameCallback` seul ne suffit pas : il n'exige pas d'image. Un
+  /// changement d'état qui ne repeint rien — et la restauration de session en
+  /// est un — n'en déclencherait aucune, et la destination resterait gardée
+  /// pour toujours. `ensureVisualUpdate` en demande une.
+  static void _apresLImageCourante(VoidCallback quoi) {
+    final binding = SchedulerBinding.instance
+      ..addPostFrameCallback((_) => quoi());
+    binding.ensureVisualUpdate();
+  }
+
+  final void Function(VoidCallback) _aLaProchaineImage;
+
   String? _gardee;
+
+  /// Vrai quand la passe courante est déjà passée par la destination : elle a
+  /// fait son office, et la rejouer une fois de plus dans la **même** chaîne de
+  /// redirection tournerait en rond.
+  ///
+  /// Le cas n'est pas théorique : les quatre liens publics des notifications
+  /// (`/proposals`, `/schedule/…`) n'ont pas d'écran à eux, ils redirigent vers
+  /// un autre emplacement. Sans ce drapeau, la redirection y ramènerait
+  /// aussitôt, et `go_router` s'arrêterait sur sa limite de redirections.
+  bool _atteinte = false;
+
+  bool _oubliProgramme = false;
 
   /// Les emplacements qui ne sont jamais une destination : ce sont les étapes
   /// qu'on traverse. Y revenir après la connexion serait une boucle.
@@ -44,20 +76,55 @@ class DestinationInitiale {
     return true;
   }
 
-  /// La destination gardée, une fois et une seule, si elle diffère de
-  /// [emplacement] — y être déjà rend la reprise inutile.
+  /// Le routeur repart de l'écran d'attente : la restauration n'est pas
+  /// terminée, quoi qu'une passe précédente ait déjà fait de la destination.
+  ///
+  /// **C'est le correctif du ticket 045.** `go_router` recalcule sa redirection
+  /// à chaque notification de `refreshListenable`, et il la recalcule à partir
+  /// de l'emplacement que le navigateur affiche — pas de celui qu'une passe
+  /// précédente vient de décider, qui n'est rapporté qu'à la fin de l'image.
+  /// Le droit de l'éditeur et l'état d'authentification arrivent souvent dans
+  /// la même image : deux passes partent alors du même `/demarrage` périmé. La
+  /// première menait à la destination, la seconde — mémoire vidée — renvoyait à
+  /// l'accueil, et c'est la seconde qui gagne. Une fois sur trois dans Chrome,
+  /// pour une destination d'administration comme pour une destination de
+  /// membre : le rôle n'y était pour rien.
+  void repartDeLAttente() => _atteinte = false;
+
+  /// La destination gardée, si elle diffère de [emplacement] et qu'on n'y est
+  /// pas déjà passé dans cette chaîne de redirection.
+  ///
+  /// **Elle n'est pas consommée ici.** Regarder la mémoire la condamne
+  /// seulement à être relâchée à l'image suivante : d'ici là, toutes les passes
+  /// de la même image répondent la même chose, et la dernière ne peut plus
+  /// défaire ce que la première a décidé.
   String? reprendre(String emplacement) {
     final gardee = _gardee;
     if (gardee == null) return null;
-    _gardee = null;
-    return gardee == emplacement ? null : gardee;
+    _programmerOubli();
+
+    if (gardee == emplacement) {
+      // Y être déjà rend la reprise inutile — et le dit à la suite de la
+      // chaîne.
+      _atteinte = true;
+      return null;
+    }
+    return _atteinte ? null : gardee;
   }
 
-  void oublier() => _gardee = null;
+  void oublier() {
+    _gardee = null;
+    _atteinte = false;
+    _oubliProgramme = false;
+  }
 
-  /// Une destination gardée est **consommée même si l'appelant ne la rejoue
-  /// pas** : c'est [reprendre] qui vide la mémoire, et une destination que la
-  /// garde de navigation refuse ne doit pas revenir au tour suivant.
+  /// Une destination que la garde de navigation refuse ne revient pas à
+  /// l'image suivante : la relâche est programmée dès qu'on l'a regardée.
+  void _programmerOubli() {
+    if (_oubliProgramme) return;
+    _oubliProgramme = true;
+    _aLaProchaineImage(oublier);
+  }
 
   /// Vrai si l'emplacement porte une intention : **une adresse interne**,
   /// autre chose que l'accueil nu et qu'une étape traversée.

@@ -2,26 +2,52 @@ import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/router/destination_initiale.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Une destination dont la relâche est tenue à la main.
+///
+/// Hors application, il n'y a pas d'image : depuis le ticket 045, c'est elle
+/// qui relâche la destination, et les tests la déclenchent eux-mêmes avec
+/// [relacher].
+DestinationInitiale _destination(List<void Function()> images) =>
+    DestinationInitiale(aLaProchaineImage: images.add);
+
+void _relacher(List<void Function()> images) {
+  for (final image in images) {
+    image();
+  }
+  images.clear();
+}
+
 void main() {
   group('Destination initiale (ticket 039)', () {
     test('une destination demandée survit à la restauration de session', () {
-      final destination = DestinationInitiale();
+      final images = <void Function()>[];
+      final destination = _destination(images);
 
       expect(destination.memoriser('/availability/2026-10'), isTrue);
       expect(destination.reprendre(AppRoutes.accueil), '/availability/2026-10');
     });
 
-    test('elle ne se reprend qu\'une fois', () {
-      final destination = DestinationInitiale()..memoriser('/proposals');
+    // Le contrat a changé au ticket 045 : la destination n'est plus consommée
+    // au premier regard, elle est relâchée à l'image suivante. Toutes les
+    // passes de la **même** image répondent la même chose ; c'est ce qui
+    // empêche une seconde passe partie du même `/demarrage` périmé de défaire
+    // la première.
+    test('elle ne se reprend qu\'une fois, à une image près', () {
+      final images = <void Function()>[];
+      final destination = _destination(images)..memoriser('/proposals');
 
       expect(destination.reprendre(AppRoutes.accueil), '/proposals');
+      expect(destination.reprendre(AppRoutes.accueil), '/proposals');
+
+      _relacher(images);
       expect(destination.reprendre(AppRoutes.accueil), isNull);
     });
 
     test(
       'la première demandée gagne : les suivantes sont des conséquences',
       () {
-        final destination = DestinationInitiale()..memoriser('/proposals');
+        final images = <void Function()>[];
+        final destination = _destination(images)..memoriser('/proposals');
 
         expect(destination.memoriser('/schedule/2026-10'), isFalse);
         expect(destination.reprendre(AppRoutes.accueil), '/proposals');
@@ -29,7 +55,8 @@ void main() {
     );
 
     test('y être déjà rend la reprise inutile', () {
-      final destination = DestinationInitiale()..memoriser('/proposals');
+      final images = <void Function()>[];
+      final destination = _destination(images)..memoriser('/proposals');
 
       expect(destination.reprendre('/proposals'), isNull);
     });

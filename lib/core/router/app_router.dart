@@ -292,6 +292,17 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       // atterrirait sur l'écran que la précédente venait de quitter.
       if (etat == EtatAuth.deconnecte) destinationInitiale.oublier();
 
+      // **Une passe qui repart de l'écran d'attente repart de zéro**
+      // (ticket 045). `go_router` recalcule sa redirection à chaque
+      // notification de [_RafraichissementRouteur], et il la recalcule depuis
+      // l'emplacement du navigateur, qui n'apprend la décision de la passe
+      // précédente qu'à la fin de l'image. Deux passes de la même image
+      // partent donc du même `/demarrage`, et la seconde doit refaire le même
+      // trajet que la première — sans quoi elle le défait.
+      if (state.matchedLocation == AppRoutes.demarrage) {
+        destinationInitiale.repartDeLAttente();
+      }
+
       // La garde, pour un chemin donné. Elle sert deux fois : sur
       // l'emplacement courant, et sur la destination qu'on s'apprête à
       // rejouer — c'est la seconde qui compte, voir plus bas.
@@ -346,6 +357,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         // ordinaire (ticket 031). Le même piège attendait `/admin/membres`
         // ouvert à froid par un simple membre : ce n'est pas un défaut de ce
         // ticket, c'est un défaut qu'il a fait apparaître.
+        //
+        // La destination n'est plus **consommée** par ce regard depuis le
+        // ticket 045 : elle est relâchée à l'image suivante. Une passe refusée
+        // ne la rejoue donc pas davantage, mais une seconde passe de la même
+        // image retrouve la même réponse que la première.
         if (reprise != null && garde(Uri.parse(reprise).path) == null) {
           return reprise;
         }

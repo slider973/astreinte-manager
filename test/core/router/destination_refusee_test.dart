@@ -84,18 +84,26 @@ void main() {
   });
 
   group('DestinationInitiale', () {
-    // La reprise **consomme** la destination, qu'on la rejoue ou non : c'est
-    // ce qui garantit qu'une destination refusée ne revient pas au tour
-    // suivant.
-    test('une destination n\'est reprise qu\'une fois', () {
-      final destination = DestinationInitiale()..memoriser('/admin/membres');
+    // Regarder la reprise **condamne** la destination, qu'on la rejoue ou non :
+    // c'est ce qui garantit qu'une destination refusée ne revient pas au tour
+    // suivant. Depuis le ticket 045 la relâche est différée d'une image, pour
+    // que deux passes de la même image répondent la même chose ; les tests la
+    // déclenchent eux-mêmes.
+    test('une destination n\'est reprise qu\'une fois, à une image près', () {
+      final images = <void Function()>[];
+      final destination = DestinationInitiale(aLaProchaineImage: images.add)
+        ..memoriser('/admin/membres');
 
       expect(destination.reprendre('/'), '/admin/membres');
+      for (final image in images) {
+        image();
+      }
       expect(destination.reprendre('/'), isNull);
     });
 
     test('y être déjà rend la reprise inutile', () {
-      final destination = DestinationInitiale()..memoriser('/admin/membres');
+      final destination = DestinationInitiale(aLaProchaineImage: (_) {})
+        ..memoriser('/admin/membres');
 
       expect(destination.reprendre('/admin/membres'), isNull);
     });
