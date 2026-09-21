@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 008, 010
 - **Branche** : `feat/029-stripe-abonnement`
+- **Statut** : en cours depuis 2026-09-21
 
 ## À faire
 - Produit et prix Stripe (mensuel, annuel), essai 60 jours sans carte géré côté app (`trial_ends_at`).
