@@ -26,14 +26,23 @@ class MoisPlanning {
   /// (`docs/SCHEMA.md § 4`), et c'est elle qui porte l'année et le mois.
   static const String colonnes = 'id, status, periods!inner(year, month)';
 
-  /// Les deux seuls états qui donnent quelque chose à lire à un membre.
+  /// Les trois états qui donnent quelque chose à lire à un membre.
   ///
-  /// **Ce n'est pas une redite de la RLS** : `schedules_select_member_published`
-  /// laisse passer `archived`, mais `shifts_select_member_published` ne rend
-  /// les créneaux que sur `published` ou `validated`. Un mois archivé
-  /// n'afficherait donc rien du tout. Et un administrateur, lui, voit aussi ses
-  /// brouillons — qui n'ont rien à faire ici.
-  static const List<String> etatsLisibles = <String>['published', 'validated'];
+  /// **`archived` en fait partie depuis le ticket 044**, et c'est tout l'objet
+  /// de ce ticket : la tâche `archive_schedules` archive chaque mois écoulé le
+  /// 1er du mois suivant, donc sans `archived` ici le sélecteur perdrait un
+  /// mois de plus tous les mois. `shifts_select_member_published` (migration
+  /// `0031`) rend désormais les créneaux d'un planning archivé, et
+  /// `assignments_select_station_archived` les gardes qui y ont été tenues : un
+  /// mois archivé se lit, il n'est plus vide.
+  ///
+  /// **Ce n'est pas pour autant une redite de la RLS** : un administrateur voit
+  /// aussi ses brouillons, qui n'ont rien à faire dans ce sélecteur.
+  static const List<String> etatsLisibles = <String>[
+    'published',
+    'validated',
+    'archived',
+  ];
 
   /// Construit depuis la réponse PostgREST. Rend `null` sur une ligne sans
   /// période lisible plutôt que de lever : une ligne qu'on ne comprend pas est
@@ -70,10 +79,9 @@ class MoisPlanning {
   String get libelle => AppStrings.moisNomEtAnnee(mois, annee);
 
   /// Vrai quand la caserne entière est lisible. C'est **la** distinction de cet
-  /// écran, et c'est la base qui la porte : `assignments_select_station_validated`
-  /// n'ouvre les attributions des autres que sur un planning `validated`
+  /// écran, et c'est la base qui la porte, jamais ce fichier
   /// (`docs/SCHEMA.md § 4`).
-  bool get complet => etat == PlanningEtat.valide;
+  bool get complet => caserneEntiereLisible(etat);
 
   /// L'ordre du calendrier.
   int comparer(MoisPlanning autre) {
@@ -356,12 +364,14 @@ class PlanningCaserne {
 
 /// Assemble les journées affichables d'un mois.
 ///
-/// **C'est ici qu'est écrite la seule différence de forme entre les deux états
-/// du planning** (`design/023 § 3`) :
+/// **C'est ici qu'est écrite la seule différence de forme entre les états du
+/// planning** (`design/023 § 3`) :
 ///
-/// - planning **validé** — la base rend tout : on affiche toutes les journées
-///   qui portent au moins un créneau demandé. Un créneau sans personne est un
-///   trou réel, et c'est une information ;
+/// - planning **validé** ou **archivé** — la base rend tout : on affiche toutes
+///   les journées qui portent au moins un créneau demandé. Un créneau sans
+///   personne est un trou réel — un trou qui reste à combler sur un mois
+///   validé, un trou qui n'a jamais été comblé sur un mois archivé —, et dans
+///   les deux cas c'est une information ;
 /// - planning **publié** — la base ne rend que les attributions du lecteur :
 ///   **on n'affiche que les créneaux où il est lui-même attribué**, et donc
 ///   que les journées qui en portent au moins un. Écrire « Personne n'est
@@ -377,7 +387,7 @@ List<JourneeCaserne> assemblerJournees({
   required PlanningEtat etat,
   required Map<DateTime, List<CreneauCaserne>> parJour,
 }) {
-  final complet = etat == PlanningEtat.valide;
+  final complet = caserneEntiereLisible(etat);
   final journees = <JourneeCaserne>[];
 
   for (final entree in parJour.entries) {

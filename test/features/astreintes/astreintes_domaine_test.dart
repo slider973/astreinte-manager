@@ -61,6 +61,24 @@ void main() {
       expect(validee.equipiersConnus, isTrue);
     });
 
+    test('sur un mois archivé, les équipiers sont connus eux aussi', () {
+      // L'écran remonte un an d'historique (`design/027 § 8.1`) et tout mois
+      // révolu est archivé le 1er du mois suivant : sans ce cas, une garde
+      // tenue en février afficherait « en attente de la validation »
+      // indéfiniment (ticket 044).
+      final archivee = astreinte(
+        id: 'a-fevrier',
+        jour: DateTime(2026, 2, 14),
+        planningEtat: PlanningEtat.archive,
+        equipiers: const <String>['Thomas B.'],
+      );
+
+      expect(archivee.equipiersConnus, isTrue);
+      expect(caserneEntiereLisible(PlanningEtat.archive), isTrue);
+      expect(caserneEntiereLisible(PlanningEtat.publie), isFalse);
+      expect(caserneEntiereLisible(PlanningEtat.brouillon), isFalse);
+    });
+
     test('la frontière du passé est le jour, pas l\'instant', () {
       // Une astreinte **de nuit** — le créneau par défaut du faux — le jour
       // même ne bascule pas dans les passées à 8 h du matin

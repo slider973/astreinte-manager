@@ -75,7 +75,7 @@ Future<HeuresAffichage> lireHeuresAffichage(
 /// Tout ce que l'écran « Mes astreintes » sait faire.
 abstract interface class AstreintesRepository {
   /// Les astreintes **acceptées** de ce membre, ses équipiers quand le
-  /// planning est validé, et les heures d'affichage de la caserne.
+  /// planning est validé ou archivé, et les heures d'affichage de la caserne.
   ///
   /// [depuis] borne la lecture côté serveur : l'historique n'est jamais
   /// supprimé (`docs/PRD.md § 7.6`), mais il n'a pas à être téléchargé à
@@ -151,10 +151,11 @@ class SupabaseAstreintesRepository implements AstreintesRepository {
   /// Les autres membres acceptés, par identifiant de créneau.
   ///
   /// **La RLS fait le tri** : `assignments_select_station_validated` n'ouvre
-  /// les attributions des autres que sur un planning `validated`. La liste des
-  /// créneaux interrogés est néanmoins réduite aux plannings validés — seconde
-  /// ceinture, sur une donnée qui, montrée trop tôt, ferait croire à un
-  /// planning figé (`design/027 § 8.1`).
+  /// les attributions des autres que sur un planning `validated`, et
+  /// `assignments_select_station_archived` (ticket 044) les gardes tenues d'un
+  /// mois archivé. La liste des créneaux interrogés est néanmoins réduite à ces
+  /// deux états — seconde ceinture, sur une donnée qui, montrée trop tôt,
+  /// ferait croire à un planning figé (`design/027 § 8.1`).
   Future<Map<String, List<String>>> _equipiers({
     required String stationId,
     required String userId,

@@ -99,6 +99,51 @@ void main() {
         <CreneauType>[CreneauType.jour, CreneauType.nuit],
       );
     });
+
+    test(
+      'planning archivé : le tableau du mois écoulé, trous compris',
+      () {
+        // La décision du ticket 044 : un mois archivé se lit comme le tableau
+        // de garde punaisé au mur. `assignments_select_station_archived` rend
+        // les gardes tenues par tout le monde, donc l'écran affiche le mois
+        // entier — et un créneau que personne n'a tenu reste une information,
+        // celle d'un trou qui n'a jamais été comblé.
+        final journees = assemblerJournees(
+          etat: PlanningEtat.archive,
+          parJour: <DateTime, List<CreneauCaserne>>{
+            DateTime(2026, 8, 3): <CreneauCaserne>[
+              creneauCaserne(
+                id: 'c-3-nuit',
+                moi: true,
+                noms: const <String>['Marie L.'],
+              ),
+            ],
+            DateTime(2026, 8, 4): <CreneauCaserne>[
+              // Personne n'a tenu cette garde : la journée s'affiche quand
+              // même. Sur un planning seulement publié, elle serait masquée.
+              creneauCaserne(id: 'c-4-nuit'),
+            ],
+          },
+        );
+
+        expect(
+          journees.map((JourneeCaserne j) => j.date),
+          <DateTime>[DateTime(2026, 8, 3), DateTime(2026, 8, 4)],
+        );
+        expect(journees.last.creneaux.single.personne, isTrue);
+      },
+    );
+
+    test('un mois archivé est un mois complet, comme un mois validé', () {
+      expect(
+        moisPlanning(annee: 2026, mois: 8, etat: PlanningEtat.archive).complet,
+        isTrue,
+      );
+      expect(
+        moisPlanning(annee: 2026, mois: 11, etat: PlanningEtat.publie).complet,
+        isFalse,
+      );
+    });
   });
 
   group('le mois d\'ouverture', () {
@@ -126,6 +171,29 @@ void main() {
       ];
       expect(moisDouverturePlanning(mois, _aujourdhui)?.cle, '2026-09');
     });
+
+    test(
+      'les mois archivés restent atteignables, sans devenir le mois '
+      'd\'ouverture',
+      () {
+        // Le 15 octobre, août et septembre sont archivés depuis le 1er
+        // septembre et le 1er octobre. Ils restent dans la liste — c'est
+        // l'historique du produit (`docs/PRD.md § 7.6`) — mais l'écran
+        // s'ouvre sur le mois courant.
+        final mois = <MoisPlanning>[
+          moisPlanning(annee: 2026, mois: 8, etat: PlanningEtat.archive),
+          moisPlanning(annee: 2026, mois: 9, etat: PlanningEtat.archive),
+          moisPlanning(annee: 2026, mois: 10),
+        ];
+        expect(moisDouverturePlanning(mois, _aujourdhui)?.cle, '2026-10');
+
+        // Et quand il ne reste que du passé, on ouvre sur le plus récent.
+        expect(
+          moisDouverturePlanning(mois.sublist(0, 2), _aujourdhui)?.cle,
+          '2026-09',
+        );
+      },
+    );
 
     test('aucun mois : aucun mois d\'ouverture', () {
       expect(moisDouverturePlanning(const <MoisPlanning>[], _aujourdhui), isNull);
