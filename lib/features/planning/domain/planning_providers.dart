@@ -89,6 +89,7 @@ class EtatPlanning {
     this.canalBranche = false,
     this.creation = false,
     this.publication = false,
+    this.proposition = false,
     this.sync = SyncEtat.repos,
     this.messageErreur,
     this.lectureSeule = false,
@@ -109,6 +110,11 @@ class EtatPlanning {
   /// récapitulatif reste ouvert (`design/019 § 5.2`).
   final bool publication;
 
+  /// Le remplissage automatique est en vol. Distinct de [sync] : la barre
+  /// d'enregistrement s'allume pour toutes les écritures, le bouton
+  /// « Proposer automatiquement » ne doit tourner que pour la sienne.
+  final bool proposition;
+
   final SyncEtat sync;
   final String? messageErreur;
 
@@ -125,6 +131,7 @@ class EtatPlanning {
     bool? canalBranche,
     bool? creation,
     bool? publication,
+    bool? proposition,
     SyncEtat? sync,
     String? messageErreur,
     bool effacerMessage = false,
@@ -137,6 +144,7 @@ class EtatPlanning {
     canalBranche: canalBranche ?? this.canalBranche,
     creation: creation ?? this.creation,
     publication: publication ?? this.publication,
+    proposition: proposition ?? this.proposition,
     sync: sync ?? this.sync,
     messageErreur: effacerMessage ? null : messageErreur ?? this.messageErreur,
     lectureSeule: lectureSeule ?? this.lectureSeule,
@@ -491,6 +499,57 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
     }
   }
 
+  /// Applique un remplissage automatique : `auto-propose`, puis relecture.
+  ///
+  /// **Aucune attribution optimiste.** Poser quarante-huit lignes à l'écran
+  /// avant la réponse du serveur, c'est afficher un mois qui n'existe peut-être
+  /// pas — et devoir en retirer une poignée si la base en a écarté. La
+  /// relecture est la seule façon honnête de savoir ce qui s'est passé, et elle
+  /// coûte une requête sur un geste qui en vaut cinquante.
+  ///
+  /// Rend le compte rendu du serveur, ou l'erreur : c'est l'écran qui choisit
+  /// la surface.
+  Future<({ResultatProposition? fait, ErreurPlanning? erreur})>
+  appliquerProposition(List<Map<String, String>> picks) async {
+    final courant = state.value;
+    final planning = courant?.planning.planning;
+    if (courant == null || planning == null || picks.isEmpty) {
+      return (fait: null, erreur: null);
+    }
+
+    state = AsyncValue<EtatPlanning?>.data(
+      courant.copie(
+        proposition: true,
+        sync: SyncEtat.enregistrement,
+        effacerMessage: true,
+        effacerDistant: true,
+      ),
+    );
+
+    try {
+      final resultat = await ref
+          .read(planningRepositoryProvider)
+          .appliquerProposition(planningId: planning.id, picks: picks);
+
+      await rafraichir();
+      final apres = state.value;
+      if (!ref.mounted || apres == null) return (fait: resultat, erreur: null);
+      state = AsyncValue<EtatPlanning?>.data(
+        apres.copie(proposition: false, sync: SyncEtat.enregistre),
+      );
+      return (fait: resultat, erreur: null);
+    } on EchecPlanning catch (echec) {
+      _echouer(echec, proposition: false);
+      // Le planning a été publié, ou il a changé sous nos yeux : on relit
+      // plutôt que de garder une image fausse.
+      if (echec.erreur == ErreurPlanning.planningPublie ||
+          echec.erreur == ErreurPlanning.moisIntrouvable) {
+        unawaited(rafraichir());
+      }
+      return (fait: null, erreur: echec.erreur);
+    }
+  }
+
   /// Réattribue un créneau d'un planning publié.
   ///
   /// **Le geste le plus lourd de l'écran après la publication** : il fait
@@ -650,7 +709,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
     );
   }
 
-  void _echouer(EchecPlanning echec, {bool? creation}) {
+  void _echouer(EchecPlanning echec, {bool? creation, bool? proposition}) {
     final courant = state.value;
     if (!ref.mounted || courant == null) return;
 
@@ -669,6 +728,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
       courant.copie(
         sync: SyncEtat.echec,
         creation: creation,
+        proposition: proposition,
         messageErreur: suspendue || passagere ? null : echec.message,
         effacerMessage: suspendue || passagere,
         lectureSeule: courant.lectureSeule || suspendue,
@@ -727,6 +787,25 @@ final Provider<List<LigneMatrice>> lignesVisiblesProvider =
       if (lignes.isEmpty) return const <LigneMatrice>[];
       return ref.watch(filtresMatriceProvider).appliquer(lignes);
     });
+
+/// Vrai quand le brouillon porte encore au moins un créneau sous son effectif.
+///
+/// C'est la condition d'existence du bouton « Proposer automatiquement » : sur
+/// un mois complet, il n'aurait rien à faire, et un bouton qui ne fait rien est
+/// un bouton qui ment (`design/018 § 5.1`).
+///
+/// **Mémorisé par Riverpod** : le parcours des soixante-deux créneaux n'est
+/// refait qu'au changement de planning, pas à chaque image.
+final Provider<bool> resteAPourvoirProvider = Provider<bool>((ref) {
+  final etat = ref.watch(planningControllerProvider).value;
+  final planning = etat?.planning;
+  if (planning == null || !planning.modifiable) return false;
+
+  for (final creneau in planning.creneaux) {
+    if (planning.pourvus(creneau.id) < creneau.effectifRequis) return true;
+  }
+  return false;
+});
 
 /// Ce que le panneau du créneau ouvert affiche, ou `null` si rien n'est
 /// ouvert.

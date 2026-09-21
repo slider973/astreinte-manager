@@ -1027,6 +1027,74 @@ class _PlanningMemoire implements PlanningRepository {
     return true;
   }
 
+  /// `apply_auto_proposal` : les limites, et rien d'autre. Le choix des
+  /// pompiers a été fait par l'écran, avec le tri du ticket 017.
+  @override
+  Future<ResultatProposition> appliquerProposition({
+    required String planningId,
+    required List<Map<String, String>> picks,
+  }) async {
+    if (_base.etatPlanning != PlanningEtat.brouillon) {
+      throw const EchecPlanning(ErreurPlanning.planningPublie);
+    }
+
+    var posees = 0;
+    for (final ligne in picks) {
+      final creneauId = ligne['shift_id']!;
+      final userId = ligne['user_id']!;
+
+      final index = _base.creneaux.indexWhere(
+        (CreneauPlanning c) => c.id == creneauId,
+      );
+      if (index < 0) continue;
+      final creneau = _base.creneaux[index];
+
+      final membre = _base.membreParId(userId);
+      if (membre == null || !membre.actif) continue;
+
+      // Ni l'absent ni le non-saisi : la machine ne désigne que ceux qui ont
+      // dit oui.
+      if (!_base._etaitDisponible(userId, creneau)) continue;
+
+      final lignes = _base.attributionsDe(creneauId);
+      if (lignes.any((AttributionMemoire a) => a.userId == userId && a.active)) {
+        continue;
+      }
+      if (lignes.where((AttributionMemoire a) => a.active).length >=
+          creneau.effectifRequis) {
+        continue;
+      }
+
+      _base.attributions.add(
+        AttributionMemoire(
+          id: _base._id('att'),
+          creneauId: creneauId,
+          userId: userId,
+          etaitDisponible: true,
+          auteurId: _adminId,
+        ),
+      );
+      posees++;
+    }
+
+    final decouverts = _base.creneaux
+        .where(
+          (CreneauPlanning c) =>
+              _base
+                  .attributionsDe(c.id)
+                  .where((AttributionMemoire a) => a.active)
+                  .length <
+              c.effectifRequis,
+        )
+        .length;
+
+    return ResultatProposition(
+      posees: posees,
+      ecartees: picks.length - posees,
+      decouverts: decouverts,
+    );
+  }
+
   @override
   Future<ResultatReattribution> reattribuer({
     required String creneauId,

@@ -267,6 +267,23 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
                     taille: StatusBadgeTaille.compacte,
                   ),
                   IndicateurDirect(branche: widget.planning!.canalBranche),
+                  // **Le remplissage automatique vit ici**, à côté de l'état du
+                  // planning, et jamais dans la barre d'actions du bas : celle-là
+                  // porte « Publier », le geste qui sort de l'application, et
+                  // deux gestes de poids différents ne se rangent pas ensemble.
+                  //
+                  // Absent quand il n'y a plus rien à pourvoir : un bouton qui
+                  // ne ferait rien est un bouton qui ment.
+                  if (widget.planning!.resteAPourvoir)
+                    PrimaryButton(
+                      libelle: AppStrings.proposerAction,
+                      variante: PrimaryButtonVariante.secondaire,
+                      icone: Icons.auto_fix_high,
+                      chargement: widget.planning!.proposition,
+                      pleineLargeur: false,
+                      onPressed: widget.planning!.onProposer,
+                      raisonDesactivation: widget.planning!.raisonProposition,
+                    ),
                 ],
                 if (widget.montrerLegende) const LegendeEtats(),
                 SaveIndicator(
@@ -365,6 +382,10 @@ class CommandePlanning {
     required this.creation,
     required this.onCreer,
     this.raisonCreation,
+    this.resteAPourvoir = false,
+    this.proposition = false,
+    this.onProposer,
+    this.raisonProposition,
   });
 
   final bool existe;
@@ -379,4 +400,15 @@ class CommandePlanning {
   /// `null` désactive le bouton — et exige alors [raisonCreation].
   final VoidCallback? onCreer;
   final String? raisonCreation;
+
+  /// Il reste au moins un créneau dont l'effectif n'est pas atteint. Faux, le
+  /// bouton « Proposer automatiquement » disparaît : il n'aurait rien à faire.
+  final bool resteAPourvoir;
+
+  /// Le remplissage est en vol : le bouton garde son libellé et sa largeur.
+  final bool proposition;
+
+  /// `null` désactive le bouton — et exige alors [raisonProposition].
+  final VoidCallback? onProposer;
+  final String? raisonProposition;
 }

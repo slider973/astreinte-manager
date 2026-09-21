@@ -238,6 +238,60 @@ class FauxPlanningRepository implements PlanningRepository {
     return true;
   }
 
+  /// Les plans de remplissage reçus, dans l'ordre. C'est ce que le test lit
+  /// pour vérifier **ce que l'écran a réellement envoyé** : le plan calculé, et
+  /// pas un autre.
+  final List<List<Map<String, String>>> propositions =
+      <List<Map<String, String>>>[];
+
+  /// Ce que la base écarte : les indices du plan qu'elle refusera. Une course
+  /// perdue contre l'adjoint, rejouée sans réseau.
+  Set<int> propositionEcartees = const <int>{};
+
+  @override
+  Future<ResultatProposition> appliquerProposition({
+    required String planningId,
+    required List<Map<String, String>> picks,
+  }) async {
+    propositions.add(picks);
+
+    final echec = erreurEcriture;
+    if (echec != null) throw EchecPlanning(echec);
+
+    var posees = 0;
+    for (var index = 0; index < picks.length; index++) {
+      if (propositionEcartees.contains(index)) continue;
+      final ligne = picks[index];
+      final attribution = Attribution(
+        id: 'p-${_compteur++}',
+        creneauId: ligne['shift_id']!,
+        userId: ligne['user_id']!,
+        auteurId: 'moi',
+      );
+      _attributions.add(attribution);
+      attributionsPosees.add(attribution);
+      posees++;
+    }
+
+    // Comme la base : le compte des créneaux encore à découvert est fait
+    // **après** coup, sur ce qui existe vraiment.
+    final decouverts = _creneaux
+        .where(
+          (CreneauPlanning c) =>
+              _attributions
+                  .where((Attribution a) => a.creneauId == c.id)
+                  .length <
+              c.effectifRequis,
+        )
+        .length;
+
+    return ResultatProposition(
+      posees: posees,
+      ecartees: picks.length - posees,
+      decouverts: decouverts,
+    );
+  }
+
   @override
   Future<ResultatReattribution> reattribuer({
     required String creneauId,
