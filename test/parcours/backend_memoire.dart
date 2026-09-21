@@ -1262,8 +1262,11 @@ class _SuiviMemoire implements SuiviRepository {
     }
 
     if (destinataires.isNotEmpty) {
+      // `assignment_proposed`, regroupé par publication
+      // (`docs/WORKFLOWS.md § 8`) : un pompier à sept créneaux fait une
+      // entrée, pas sept.
       _base._notifier(
-        'schedule_published',
+        'assignment_proposed',
         destinataires.toList(growable: false)..sort(),
       );
     }

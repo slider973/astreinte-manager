@@ -281,7 +281,10 @@ void main() {
         ),
         isTrue,
       );
-      expect(backend.aNotifie('schedule_published'), isTrue);
+      // `assignment_proposed`, une entrée par pompier
+      // (`docs/WORKFLOWS.md § 8`).
+      expect(backend.notifications.last.type, 'assignment_proposed');
+      expect(backend.notifications.last.destinataires, <String>[_marieId]);
     });
 
     testWidgets('5. la recrue refuse un créneau et accepte l\'autre', (
