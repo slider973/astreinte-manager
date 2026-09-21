@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/l10n/app_strings.dart';
+import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_spacing.dart';
 
 /// Les deux vues de l'écran.
@@ -35,50 +36,59 @@ class BasculeVue extends StatelessWidget {
     return Semantics(
       container: true,
       label: AppStrings.astreintesVueLabel,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.md,
-          AppSpacing.lg,
-          AppSpacing.md,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
+      // Bornée comme la liste qu'elle commande : sur un portable, deux boutons
+      // de 580 dp pour deux mots sont un défaut, pas une aération.
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
+          child: Padding(
+            // La **même** marge de page que la liste qu'elle commande : à 16
+            // sur un portable où la liste en prend 32, les deux boîtes de
+            // 720 dp ne s'alignent pas et le décalage se voit.
+            padding: EdgeInsets.symmetric(
+              horizontal: AppWindowClass.of(context).margePage,
+              vertical: AppSpacing.md,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Expanded(
-                  child: _Bouton(
-                    libelle: AppStrings.astreintesVueListe,
-                    icone: Icons.view_list_outlined,
-                    choisi: vue == VueAstreintes.liste,
-                    onChoisir: () => onChoisir(VueAstreintes.liste),
-                  ),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: _Bouton(
+                        libelle: AppStrings.astreintesVueListe,
+                        icone: Icons.view_list_outlined,
+                        choisi: vue == VueAstreintes.liste,
+                        onChoisir: () => onChoisir(VueAstreintes.liste),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.entreCibles),
+                    Expanded(
+                      child: _Bouton(
+                        libelle: AppStrings.astreintesVueCalendrier,
+                        icone: Icons.calendar_month_outlined,
+                        choisi: vue == VueAstreintes.calendrier,
+                        onChoisir: calendrierIndisponible != null
+                            ? null
+                            : () => onChoisir(VueAstreintes.calendrier),
+                        raison: calendrierIndisponible,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: AppSpacing.entreCibles),
-                Expanded(
-                  child: _Bouton(
-                    libelle: AppStrings.astreintesVueCalendrier,
-                    icone: Icons.calendar_month_outlined,
-                    choisi: vue == VueAstreintes.calendrier,
-                    onChoisir: calendrierIndisponible != null
-                        ? null
-                        : () => onChoisir(VueAstreintes.calendrier),
-                    raison: calendrierIndisponible,
+                if (calendrierIndisponible
+                    case final String raison) ...<Widget>[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    raison,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
-            if (calendrierIndisponible case final String raison) ...<Widget>[
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                raison,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );

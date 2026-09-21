@@ -61,6 +61,31 @@ class CalendrierAstreintes extends StatelessWidget {
     final parJour = donnees.parJourDuMois(mois.year, mois.month);
     final (DateTime premier, DateTime dernier) = donnees.etendue(aujourdhui);
 
+    // Bornée comme la liste : sur un portable, sept colonnes étalées sur
+    // 1 200 dp donnent des cases de 165 dp pour deux chiffres.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
+        child: _grille(
+          context,
+          ecart: ecart,
+          marge: marge,
+          parJour: parJour,
+          premier: premier,
+          dernier: dernier,
+        ),
+      ),
+    );
+  }
+
+  Widget _grille(
+    BuildContext context, {
+    required double ecart,
+    required double marge,
+    required Map<int, List<Astreinte>> parJour,
+    required DateTime premier,
+    required DateTime dernier,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -328,7 +353,8 @@ class _Case extends StatelessWidget {
     return Semantics(
       button: true,
       label: AppStrings.astreintesJourSemantique(
-        jourEtDate: aujourdhui ? '${AppStrings.jourAujourdhui}, $jourEtDate'
+        jourEtDate: aujourdhui
+            ? '${AppStrings.jourAujourdhui}, $jourEtDate'
             : jourEtDate,
         creneaux: AppStrings.astreintesCreneauxDuJour(<String>[
           for (final astreinte in astreintes)
