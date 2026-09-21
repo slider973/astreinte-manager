@@ -6,12 +6,12 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 007 | [Profil utilisateur](in-progress/007-profil.md) | P1 | 005 |  |
 
 ## À faire
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 007 | [Profil utilisateur](backlog/007-profil.md) | P1 | 005 |  |
 | 018 | [Proposition automatique de remplissage](backlog/018-proposition-automatique.md) | P1 | 017 |  |
 | 028 | [Export calendrier ICS](backlog/028-export-ics.md) | P1 | 027 |  |
 | 032 | [Build web PWA et déploiement](backlog/032-web-pwa-deploy.md) | P0 | 001 |  |

@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 005
 - **Branche** : `feat/007-profil`
+- **Statut** : en cours depuis 2026-09-21
 
 ## À faire
 - Écran profil : prénom, nom, téléphone, préférence push (non critiques), langue (fr uniquement au MVP).
