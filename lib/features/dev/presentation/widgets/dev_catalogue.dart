@@ -952,25 +952,41 @@ class _FenetreRetour extends StatefulWidget {
 class _FenetreRetourState extends State<_FenetreRetour> {
   static const String _detour = 'detour';
 
-  late final GoRouter _routeur = GoRouter(
-    initialLocation: widget.pilePleine ? '/$_detour' : AppRoutes.accueil,
-    routes: <RouteBase>[
-      GoRoute(
-        path: AppRoutes.accueil,
-        // Le nom de repli de `BoutonRetour` : sans lui, presser la sortie en
-        // pile vide chercherait une route qui n'existe pas ici.
-        name: AppRoutes.accueilName,
-        builder: (context, state) => const _BarreSeule(titre: 'Accueil'),
-        routes: <RouteBase>[
-          GoRoute(
-            path: _detour,
-            builder: (context, state) =>
-                const _BarreSeule(titre: 'Notifications'),
-          ),
-        ],
-      ),
-    ],
-  );
+  late final GoRouter _routeur = _fabriquerRouteur();
+
+  /// Le routeur du spécimen, **posé sur sa pile à la main**.
+  ///
+  /// `initialLocation` ne conviendrait pas : il transite par le fournisseur
+  /// d'information de route, que ce spécimen n'a justement pas (voir [build]),
+  /// et sur le web il serait de toute façon écrasé par l'adresse réelle de la
+  /// page — `/dev/components`, qui ne correspond à aucune route d'ici.
+  /// `currentConfiguration` est la même valeur que `Router` aurait fini par
+  /// donner au délégué, sans le détour par la plateforme.
+  GoRouter _fabriquerRouteur() {
+    final routeur = GoRouter(
+      routes: <RouteBase>[
+        GoRoute(
+          path: AppRoutes.accueil,
+          // Le nom de repli de `BoutonRetour` : sans lui, presser la sortie en
+          // pile vide chercherait une route qui n'existe pas ici.
+          name: AppRoutes.accueilName,
+          builder: (context, state) => const _BarreSeule(titre: 'Accueil'),
+          routes: <RouteBase>[
+            GoRoute(
+              path: _detour,
+              builder: (context, state) =>
+                  const _BarreSeule(titre: 'Notifications'),
+            ),
+          ],
+        ),
+      ],
+    );
+    routeur.routerDelegate.currentConfiguration = routeur.configuration
+        .findMatch(
+          Uri.parse(widget.pilePleine ? '/$_detour' : AppRoutes.accueil),
+        );
+    return routeur;
+  }
 
   @override
   void dispose() {
@@ -1003,10 +1019,21 @@ class _FenetreRetourState extends State<_FenetreRetour> {
               viewPadding: EdgeInsets.zero,
               padding: EdgeInsets.zero,
             ),
-            child: MaterialApp.router(
-              debugShowCheckedModeBanner: false,
-              theme: Theme.of(context),
-              routerConfig: _routeur,
+            // **Un `Router` nu, sans fournisseur ni analyseur d'information
+            // de route.** Une application imbriquée en aurait un : `Router`
+            // rapporte alors l'adresse de son délégué à la plateforme dès la
+            // première image, quelle que soit sa profondeur dans l'arbre, et
+            // ouvrir le catalogue réécrivait la barre d'adresse en « / » ou
+            // « /detour » — un rechargement ne revenait plus ici. Un seul
+            // `Router` écrit l'URL, celui de l'application.
+            //
+            // Ce qu'il en coûte : `go` et `goNamed` passent par ce
+            // fournisseur absent et ne font donc rien ici. La flèche de la
+            // pile pleine dépile bien — `pop` parle au délégué — et la sortie
+            // de la pile vide mène à l'accueil, qui est déjà l'écran affiché :
+            // les deux spécimens montrent à l'écran ce qu'ils promettent.
+            child: Router<RouteMatchList>(
+              routerDelegate: _routeur.routerDelegate,
             ),
           ),
         ),
