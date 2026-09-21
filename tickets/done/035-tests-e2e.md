@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 021, 020
 - **Branche** : `feat/035-tests-e2e`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/32
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
