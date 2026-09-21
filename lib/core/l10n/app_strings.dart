@@ -173,6 +173,16 @@ abstract final class AppStrings {
   static const String actionRetour = 'Retour';
   static const String actionChargement = 'Chargement…';
 
+  /// Le mot écrit **à côté** de la flèche quand il n'y a pas de pile à
+  /// dépiler : lien profond, URL collée, rechargement de la PWA. Une
+  /// info-bulle ne le dirait pas — il n'y a pas de survol en PWA
+  /// (`design/052 § 6.1`). La flèche ne bouge pas, seul le mot apparaît.
+  static const String retourAccueil = 'Accueil';
+
+  /// Ce que la même sortie annonce au lecteur d'écran, dans cet état-là. Il
+  /// reste complet même quand le mot tombe faute de place.
+  static const String retourAccueilSemantique = 'Aller à l\'accueil';
+
   // -------------------------------------------------------------------
   // Sauvegarde et réseau
   // -------------------------------------------------------------------
