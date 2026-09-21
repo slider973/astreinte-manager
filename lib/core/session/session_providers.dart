@@ -114,7 +114,24 @@ final Provider<EtatAuth> etatAuthProvider = Provider<EtatAuth>((ref) {
   if (appartenances.hasError) return EtatAuth.chargement;
   if (!appartenances.hasValue) return EtatAuth.chargement;
 
-  return ref.watch(appartenancesActivesProvider).isEmpty
-      ? EtatAuth.sansCaserne
-      : EtatAuth.connecte;
+  final actives = ref.watch(appartenancesActivesProvider);
+
+  // **Une liste vide encore en chargement ne décide rien.**
+  //
+  // `appartenancesProvider` observe `sessionProvider` : au démarrage à froid il
+  // est d'abord calculé sans session — il rend alors la liste vide — puis
+  // recalculé dès que la session est restaurée. Riverpod **garde la valeur
+  // précédente** pendant ce recalcul (`AsyncLoading` avec `hasValue`), donc
+  // cette liste vide reste lisible tant que la requête n'a pas répondu. Sans
+  // réseau, elle ne répond jamais, et décider dessus envoyait un membre
+  // parfaitement rattaché sur « Aucune caserne » — écran qui ne propose que la
+  // déconnexion. Vu dans Chrome, API coupée (`design/023 § 10`).
+  //
+  // La condition porte sur la **liste vide**, pas sur le chargement seul : un
+  // rafraîchissement de jeton en cours de session recalcule ce provider toutes
+  // les heures, et renvoyer l'écran de démarrage à chaque fois ferait clignoter
+  // l'application sous les yeux de quelqu'un qui ne demandait rien.
+  if (actives.isEmpty && appartenances.isLoading) return EtatAuth.chargement;
+
+  return actives.isEmpty ? EtatAuth.sansCaserne : EtatAuth.connecte;
 });

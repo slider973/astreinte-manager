@@ -362,11 +362,17 @@ class PlanningCaserne {
 /// - planning **validé** — la base rend tout : on affiche toutes les journées
 ///   qui portent au moins un créneau demandé. Un créneau sans personne est un
 ///   trou réel, et c'est une information ;
-/// - planning **publié** — la base ne rend que les attributions du lecteur : on
-///   n'affiche que les journées où il est attribué. Écrire « Personne n'est
-///   d'astreinte » sur les vingt-neuf autres serait un mensonge de mise en
-///   page, puisque quelqu'un y est sûrement et qu'on n'a pas le droit de
-///   savoir qui.
+/// - planning **publié** — la base ne rend que les attributions du lecteur :
+///   **on n'affiche que les créneaux où il est lui-même attribué**, et donc
+///   que les journées qui en portent au moins un. Écrire « Personne n'est
+///   d'astreinte » ailleurs serait un mensonge de mise en page, puisque
+///   quelqu'un y est sûrement et qu'on n'a pas le droit de savoir qui.
+///
+/// **Le tri se fait au créneau, pas à la journée.** Vu dans Chrome sur le
+/// planning publié de novembre : filtrer les seules journées laissait, sur un
+/// samedi où le lecteur est de nuit, un créneau de jour affiché « Personne
+/// n'est d'astreinte » — exactement la phrase que ce ticket existe pour ne pas
+/// écrire.
 List<JourneeCaserne> assemblerJournees({
   required PlanningEtat etat,
   required Map<DateTime, List<CreneauCaserne>> parJour,
@@ -377,18 +383,18 @@ List<JourneeCaserne> assemblerJournees({
   for (final entree in parJour.entries) {
     final creneaux = <CreneauCaserne>[
       for (final creneau in entree.value)
-        if (!creneau.muet) creneau,
+        if (complet ? !creneau.muet : creneau.moi) creneau,
     ]..sort(
       (CreneauCaserne a, CreneauCaserne b) =>
           a.creneau.index.compareTo(b.creneau.index),
     );
     if (creneaux.isEmpty) continue;
 
-    final journee = JourneeCaserne(date: entree.key, creneaux: creneaux);
-    if (!complet && !journee.porteMoi) continue;
-    journees.add(journee);
+    journees.add(JourneeCaserne(date: entree.key, creneaux: creneaux));
   }
 
-  journees.sort((JourneeCaserne a, JourneeCaserne b) => a.date.compareTo(b.date));
+  journees.sort(
+    (JourneeCaserne a, JourneeCaserne b) => a.date.compareTo(b.date),
+  );
   return List<JourneeCaserne>.unmodifiable(journees);
 }

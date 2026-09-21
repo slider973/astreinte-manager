@@ -271,7 +271,12 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
       return const SquelettePlanningCaserne();
     }
 
-    if (etat.hasError && !etat.hasValue) {
+    // **Un échec sans aucun mois est un échec, pas un état vide.** La
+    // condition porte sur le contenu et non sur `hasValue` : le contrôleur
+    // rend d'abord un état « en chargement » vide, que Riverpod garde ensuite
+    // à côté de l'erreur — s'arrêter à `hasValue` afficherait « Aucun planning
+    // publié » à quelqu'un dont la lecture n'a simplement pas abouti.
+    if (etat.hasError && (etat.value?.mois.isEmpty ?? true)) {
       final enLigne = ref.read(enLigneProvider).value ?? true;
       // Le seul cas où l'écran n'a vraiment rien : pas de cache, pas de
       // réseau. La phrase nomme alors ce qui manque.
