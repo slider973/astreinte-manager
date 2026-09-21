@@ -79,6 +79,17 @@ Ce sont les mêmes symptômes que les Edge Functions absentes : le dépôt sait,
 et personne ne l'apprend avant qu'un pompier reste à la porte. `supabase/config.toml` décrit déjà
 tout cela pour la pile locale ; il faut que la production le reçoive.
 
+### Le répartiteur de notifications visait la pile locale
+Découvert le 21 septembre 2026, après « les notifications ne marchent pas ». Le secret Vault
+`notify_function_url`, créé par la migration 0014 avec l'adresse Docker de la pile locale, n'avait
+jamais été remplacé en production. Toutes les minutes, `cron_dispatch_notifications` s'exécutait
+avec succès, poussait une requête `pg_net` vers un hôte inexistant, et la file restait en attente,
+tentatives comptées, sans qu'aucune notification ne parte. `supabase/functions/README.md`
+documente la commande à passer une fois ; personne ne l'avait passée, et rien ne le signalait.
+
+Même famille que les trois précédents. La mise en ligne doit poser cette adresse, ou la
+vérification d'écart doit refuser une file qui échoue sur résolution de nom.
+
 ### Le jeton Vercel
 Le jeton actuellement posé en secret est lié au projet et non au compte : la ligne de commande
 Vercel répond « User not found ». La mise en ligne de la PWA échoue donc, et le déploiement se fait
@@ -99,6 +110,8 @@ journée du 21 septembre.
 - Un écart entre le dépôt et la production est signalé par un échec, pas découvert par un 404.
 - La mise en ligne de la PWA par le workflow réussit, sans passer par l'API à la main.
 - Aucun jeton ni mot de passe n'apparaît dans le dépôt, et l'analyse de secrets passe.
+- L'adresse de la fonction de notification dans Vault vise le projet hébergé, et la mise en
+  ligne la pose.
 - La configuration d'authentification de la production est posée depuis le dépôt : gabarits de
   courriel, serveur d'envoi, plafonds, adresses de redirection.
 - `docs/DEPLOIEMENT.md` décrit les trois états et la procédure de secours.
