@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 032
 - **Branche** : `feat/049-deploiement-base-et-fonctions`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/46
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
