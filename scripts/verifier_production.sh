@@ -196,10 +196,21 @@ done
 titre "3. Répartiteur de notifications (Vault)"
 
 attendu_notify="https://$ref.supabase.co/functions/v1/send-notification"
+
+# Cette requête-ci est la seule du script à ne pas demander `read_only: true`, et
+# ce n'est pas un relâchement : le drapeau ne décrit pas la requête, il choisit le
+# rôle qui l'exécute. À vrai, l'API se connecte en `supabase_read_only_user`, qui
+# n'a pas le droit d'exécuter `_crypto_aead_det_decrypt` — lire
+# `vault.decrypted_secrets` rend alors « permission denied », que le secret soit
+# juste ou faux. Le script le rangeait dans « je n'ai pas pu conclure » et
+# échouait sur une base saine (21 septembre 2026). Le déchiffrement demande le
+# rôle `postgres`, donc `read_only: false` ; la lecture seule est rétablie dans la
+# transaction elle-même par `set transaction read only`, qui fait refuser toute
+# écriture par le moteur (`25006`) au lieu de compter sur la forme de la requête.
 reponse_vault="$(curl -sS -X POST "https://api.supabase.com/v1/projects/$ref/database/query" \
   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"read_only":true,"query":"select decrypted_secret as url from vault.decrypted_secrets where name = '"'"'notify_function_url'"'"'"}' 2>&1)"
+  -d '{"read_only":false,"query":"set transaction read only; select decrypted_secret as url from vault.decrypted_secrets where name = '"'"'notify_function_url'"'"'"}' 2>&1)"
 
 # Trois issues à distinguer, et la dernière est celle qu'on confondait : la
 # requête a abouti et rend une ligne (le secret existe) ; elle a abouti et rend
