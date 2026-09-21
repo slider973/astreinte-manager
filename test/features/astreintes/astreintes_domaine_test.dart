@@ -143,6 +143,20 @@ void main() {
       expect(fin, DateTime(2026, 12));
     });
 
+    test('le calendrier s\'ouvre sur le mois de la prochaine astreinte', () {
+      final donnees = _donnees(<Astreinte>[
+        astreinte(id: 'passe', jour: DateTime(2026, 10, 2)),
+        astreinte(id: 'venir', jour: DateTime(2026, 11, 3)),
+      ]);
+      expect(donnees.moisDouverture(aujourdhui), DateTime(2026, 11));
+
+      // Rien à venir : le mois courant, faute de mieux.
+      final passees = _donnees(<Astreinte>[
+        astreinte(id: 'passe', jour: DateTime(2026, 10, 2)),
+      ]);
+      expect(passees.moisDouverture(aujourdhui), DateTime(2026, 10));
+    });
+
     test('« jamais lu » distingue rien de pas encore lu', () {
       expect(const MesAstreintes().jamaisLu, isTrue);
       expect(_donnees(const <Astreinte>[]).jamaisLu, isFalse);

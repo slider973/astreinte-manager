@@ -1,6 +1,8 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/session/appartenances_locales.dart';
+import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
 import 'package:astreinte_sp/core/widgets/empty_state.dart';
@@ -446,6 +448,42 @@ void main() {
       await tester.tap(find.text(AppStrings.actionReessayer));
       await tester.pumpAndSettle();
       expect(find.byType(AppBanner), findsNothing);
+    });
+
+    testWidgets('un démarrage à froid sans réseau atteint quand même l\'écran', (
+      WidgetTester tester,
+    ) async {
+      // **La scène du ticket** : la PWA rouverte dans une remise. La session
+      // se restaure depuis le stockage local, mais `memberships` échoue. Sans
+      // la caserne gardée sur l'appareil, l'application s'arrêterait sur
+      // « Pas de connexion » et le cache d'astreintes ne servirait jamais.
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        erreurAppartenances: AuthErreur.reseau,
+        appartenancesLocales: AppartenancesLocalesMemoire(
+          const <Appartenance>[appartenanceMembre],
+        ),
+        astreintes: FauxAstreintesRepository(
+          erreur: ErreurAstreintes.reseau,
+        ),
+        cacheAstreintes: CacheAstreintesMemoire(
+          MesAstreintes(
+            astreintes: _quatre(),
+            luLe: _aujourdhui.subtract(const Duration(hours: 5)),
+          ),
+        ),
+        horloge: () => _aujourdhui,
+        reseau: ConnectiviteMemoire(enLigne: false),
+      );
+      await ouvrirRoute(tester, _lienNotification);
+
+      expect(find.text(AppStrings.astreintesTitre), findsOneWidget);
+      expect(find.byType(LigneDAstreinte), findsNWidgets(2));
+
+      final banniere = tester.widget<AppBanner>(find.byType(AppBanner));
+      expect(banniere.variante, AppBannerVariante.horsLigne);
+      expect(banniere.detail, contains('il y a 5 h'));
     });
 
     testWidgets('une lecture réussie réécrit le cache en entier', (

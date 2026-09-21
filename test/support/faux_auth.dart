@@ -8,6 +8,7 @@ import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/session/appartenances_locales.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/core/session/auth_repository.dart';
 import 'package:astreinte_sp/core/session/membership_repository.dart';
@@ -233,6 +234,7 @@ Future<AppMontee> monterApp(
   FileLocale? fileLocale,
   Connectivite? reseau,
   ReperesLocaux? reperes,
+  AppartenancesLocales? appartenancesLocales,
   ContextePlateforme? plateforme,
   FirebaseDemarrage firebase = FirebaseDemarrage.configurationAbsente,
   FauxMessageriePush? messagerie,
@@ -325,6 +327,12 @@ Future<AppMontee> monterApp(
         if (reseau != null) connectiviteProvider.overrideWithValue(reseau),
         reperesLocauxProvider.overrideWithValue(
           reperes ?? ReperesLocauxMemoire(),
+        ),
+        // La caserne gardée sur l'appareil (ticket 027) passe par
+        // `shared_preferences` : sans faux, chaque test attendrait un canal de
+        // plateforme qui ne répond jamais.
+        appartenancesLocalesProvider.overrideWithValue(
+          appartenancesLocales ?? AppartenancesLocalesMemoire(),
         ),
         contextePlateformeProvider.overrideWithValue(
           plateforme ?? ContextePlateforme.natif,

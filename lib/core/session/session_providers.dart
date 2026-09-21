@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../supabase/supabase_bootstrap.dart';
 import 'appartenance.dart';
+import 'appartenances_locales.dart';
 import 'auth_repository.dart';
 import 'etat_auth.dart';
 import 'membership_repository.dart';
@@ -30,14 +31,34 @@ final StreamProvider<SessionUtilisateur?> sessionProvider =
 
 /// Les appartenances de l'utilisateur connecté, relues à chaque changement de
 /// session. Liste vide si personne n'est connecté.
+///
+/// **Une lecture qui échoue retombe sur ce qui est gardé sur l'appareil**
+/// (ticket 027). Sans ce repli, un démarrage à froid sans réseau s'arrête sur
+/// « Pas de connexion » : la session se restaure toute seule, mais la caserne
+/// manque, et aucun écran de consultation n'est atteint. Le cache d'astreintes
+/// ne servirait alors jamais dans la seule scène qui le justifie — une remise
+/// sans couverture. Ce qui revient du stockage est **toujours un simple
+/// membre** (`AppartenancesLocalesPartagees.relire`).
+///
+/// Si rien n'est gardé non plus, l'échec est relancé tel quel : l'écran de
+/// démarrage propose de réessayer, il n'annonce jamais « aucune caserne ».
 final FutureProvider<List<Appartenance>> appartenancesProvider =
     FutureProvider<List<Appartenance>>((ref) async {
       final session = ref.watch(sessionProvider).value;
       if (session == null) return const <Appartenance>[];
 
-      return ref
-          .watch(membershipRepositoryProvider)
-          .mesAppartenances(session.userId);
+      final local = ref.watch(appartenancesLocalesProvider);
+      try {
+        final appartenances = await ref
+            .watch(membershipRepositoryProvider)
+            .mesAppartenances(session.userId);
+        await local.ecrire(session.userId, appartenances);
+        return appartenances;
+      } on Object {
+        final gardees = await local.lire(session.userId);
+        if (gardees.isEmpty) rethrow;
+        return gardees;
+      }
     });
 
 /// La caserne dans laquelle l'utilisateur travaille.

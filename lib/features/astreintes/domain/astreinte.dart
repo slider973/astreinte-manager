@@ -298,6 +298,22 @@ class MesAstreintes {
     return parJour;
   }
 
+  /// Le mois sur lequel le calendrier s'ouvre : **celui de la prochaine
+  /// astreinte**, et le mois courant à défaut.
+  ///
+  /// Le mois courant est souvent vide — un planning se construit un mois à
+  /// l'avance — et ouvrir sur une grille sans aucune marque demande de
+  /// comprendre qu'il faut appuyer sur une flèche. Vu dans Chrome
+  /// (`design/027 § 11`).
+  DateTime moisDouverture(DateTime aujourdhui) {
+    final prochaines = aVenir(aujourdhui);
+    if (prochaines.isEmpty) {
+      return DateTime(aujourdhui.year, aujourdhui.month);
+    }
+    final jour = prochaines.first.jour;
+    return DateTime(jour.year, jour.month);
+  }
+
   /// Les mois que le calendrier peut atteindre : du premier mois porteur
   /// d'une astreinte au dernier, et **toujours** le mois courant. Une flèche
   /// qui ne mène nulle part est désactivée, pas cachée.

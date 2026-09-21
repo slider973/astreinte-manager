@@ -74,10 +74,15 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
     // **Le cache d'abord, la requête ensuite.** `build()` du contrôleur rend
     // l'instantané local sans attendre le réseau ; c'est ici, à la première
     // image, qu'on va chercher mieux.
+    //
+    // Et à **chaque** ouverture de l'écran, pas seulement quand l'instantané
+    // vient du cache : le contrôleur n'est pas auto-disposé, donc une
+    // proposition acceptée sur l'onglet voisin ne le réveillerait jamais.
+    // Trouvé dans Chrome — accepter puis passer ici ne montrait rien
+    // (`design/027 § 11`). Le rafraîchissement ne vide pas l'écran : il
+    // remplace ce qui est déjà lisible.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final etat = ref.read(astreintesControllerProvider).value;
-      if (etat != null && etat.depuisCache) _rafraichir();
+      if (mounted) _rafraichir();
     });
   }
 
@@ -228,9 +233,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
         Expanded(
           child: vue == VueAstreintes.calendrier
               ? CalendrierAstreintes(
-                  mois:
-                      _mois ??
-                      DateTime(aujourdhui.year, aujourdhui.month),
+                  mois: _mois ?? valeur.donnees.moisDouverture(aujourdhui),
                   donnees: valeur.donnees,
                   aujourdhui: aujourdhui,
                   onMois: (DateTime mois) => setState(() => _mois = mois),
