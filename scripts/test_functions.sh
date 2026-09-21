@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests de bout en bout des Edge Functions : invitations (ticket 006), envoi de
-# notifications (ticket 025), publication d'un planning (ticket 019) et
-# réattribution d'un créneau refusé (ticket 020).
+# notifications (ticket 025), publication d'un planning (ticket 019),
+# réattribution d'un créneau refusé (ticket 020) et ligne interne d'un envoi
+# définitivement abandonné (ticket 040).
 #
 #   supabase start
 #   supabase functions serve          # dans un autre terminal
@@ -527,6 +528,87 @@ verifier "rejeu d'une demande close : 200" "200" "$STATUT"
 verifier "rien n'est renvoyé une seconde fois" "already_processed" \
   "$(jq -r '.skipped' <<<"$CORPS")"
 verifier "toujours une seule notification interne" "1" \
+  "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp'")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 13 bis. Cinq échecs, abandon, et la ligne que le membre voit (ticket 040)'
+# ---------------------------------------------------------------------------
+# Le chemin complet de bout en bout : une proposition d'astreinte dont les cinq
+# tentatives ont échoué. Avant ce ticket, elle finissait en ligne `failed` dans
+# une table que seul le rôle de service lit — le pompier concerné, lui, ne
+# l'apprenait jamais. Ici, on vérifie qu'il la voit, avec ses propres droits.
+#
+# L'état de départ est posé directement : reproduire cinq pannes de `net.http_post`
+# prendrait cinq minutes d'horloge pour vérifier exactement la même chose.
+sql "delete from notifications; delete from notification_outbox" >/dev/null
+
+PERDUE="$(sql "insert into notification_outbox
+  (station_id, type, recipients, payload, channels, created_at, attempts, locked_until)
+  values ('$STATION_A', 'assignment_proposed',
+    '[{\"user_id\":\"$MEMBRE1_A\",\"payload\":{\"shifts\":[{\"date\":\"2026-10-12\",\"slot\":\"night\"}]}}]'::jsonb,
+    '{\"period\":\"2026-10\"}'::jsonb, array['push','inapp'],
+    now() - interval '1 hour', 5, now() - interval '1 minute')
+  returning id")"
+
+sql "select cron_dispatch_notifications()" >/dev/null
+
+verifier "après cinq tentatives, la demande est abandonnée" "failed" \
+  "$(sql "select status from notification_outbox where id = '$PERDUE'")"
+
+TRACE="$(sql "select id from notification_outbox where dedupe_key = 'delivery_failure:$PERDUE'")"
+verifier "l'abandon met la ligne interne du destinataire en file" "oui" \
+  "$([ -n "$TRACE" ] && echo oui || echo non)"
+
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  ETAT="$(sql "select status from notification_outbox where id = '$TRACE'")"
+  [ "$ETAT" = "sent" ] && break
+  sleep 1
+done
+verifier "et l'Edge Function la traite" "sent" "$ETAT"
+
+verifier "une ligne interne, et une seule" "1" \
+  "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp'")"
+# Le mode trace n'envoie rien : pas de push sur un canal qui vient d'échouer cinq
+# fois, pas de courriel de rattrapage. La trace dit ce qui s'est passé.
+verifier "aucun envoi n'est rejoué" "0" \
+  "$(sql "select count(*) from notifications where channel <> 'inapp'")"
+
+# Les mots sont ceux de `construireContenu`, pas une phrase écrite en SQL : c'est
+# tout l'intérêt du détour par l'Edge Function.
+verifier "le membre lit l'astreinte qu'il a failli ne jamais connaître" \
+  "Astreinte proposée le 12 octobre, nuit" \
+  "$(sql "select title from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp'")"
+verifier "la ligne porte la marque d'échec, que l'écran traduit" "t" \
+  "$(sql "select error is not null and not delivered and sent_at is null
+            from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp'")"
+verifier "et le lien profond reste utilisable" "/proposals" \
+  "$(sql "select data ->> 'route' from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp'")"
+
+# Et surtout : elle est visible **par le membre**, avec ses propres droits, pas
+# seulement par le rôle de service. C'est ce que le ticket demande.
+MEMBRE1_A_JETON="$(connexion membre1@caserne-a.test)"
+MEMBRE1_B_JETON="$(connexion membre1@caserne-b.test)"
+
+lire_notifications() { # lire_notifications <jeton>
+  curl -s "$API_URL/rest/v1/notifications?select=title,error&channel=eq.inapp" \
+    -H "apikey: $ANON_KEY" -H "Authorization: Bearer $1"
+}
+
+VUE="$(lire_notifications "$MEMBRE1_A_JETON")"
+verifier "le destinataire voit la ligne dans son centre de notifications" "1" \
+  "$(jq -r 'length' <<<"$VUE")"
+verifier "avec son titre" "Astreinte proposée le 12 octobre, nuit" \
+  "$(jq -r '.[0].title' <<<"$VUE")"
+verifier "et sa mention d'échec" "true" "$(jq -r '.[0].error != null' <<<"$VUE")"
+verifier "un membre d'une autre caserne n'en voit rien" "0" \
+  "$(jq -r 'length' <<<"$(lire_notifications "$MEMBRE1_B_JETON")")"
+
+# Rejouée, la tâche ne produit ni seconde trace ni seconde ligne.
+sql "select cron_dispatch_notifications()" >/dev/null
+verifier "rejouée, la reprise ne double ni la trace…" "1" \
+  "$(sql "select count(*) from notification_outbox where payload ? 'delivery_failure'")"
+verifier "…ni la ligne interne" "1" \
   "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A' and channel = 'inapp'")"
 
 # ---------------------------------------------------------------------------

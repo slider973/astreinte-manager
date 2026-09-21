@@ -81,10 +81,11 @@ class NotificationInterne {
   /// `grant` de colonne l'impose (`docs/SCHEMA.md § 5`).
   final DateTime? lueLe;
 
-  /// `error`. Aujourd'hui toujours nul sur une ligne `inapp` : l'Edge Function
-  /// n'écrit la ligne qu'en cas de succès. Lu quand même, parce que la ligne
-  /// d'échec définitif attend son ticket (`design/026 § 7`) et que l'écran
-  /// doit déjà savoir la montrer.
+  /// `error`. Renseigné sur une ligne `inapp` quand la demande d'envoi a été
+  /// **abandonnée** après cinq tentatives : la base la remet alors en file sur
+  /// le seul canal interne, et `send-notification` écrit la ligne en échec
+  /// (ticket 040, migration `0022`). Seule la présence de la colonne compte —
+  /// son contenu est un motif technique, jamais montré au membre.
   final String? erreur;
 
   bool get lue => lueLe != null;

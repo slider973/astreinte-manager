@@ -359,6 +359,14 @@ create index on notifications (user_id) where read_at is null;
 Une ligne `inapp` par événement alimente le centre de notifications. Les lignes `push`
 et `email` tracent les envois.
 
+`error` est le seul signal d'échec que le client lit, et il ne lit que sa **présence** :
+une ligne `inapp` dont `error` est renseignée s'affiche avec la mention « L'envoi a
+échoué, tu ne l'as peut-être pas reçue » (ticket 026), quel que soit le motif rangé
+dedans. C'est ce qui permet d'y mettre le motif technique, et donc de n'écrire aucune
+phrase destinée au membre ailleurs que dans les chaînes de l'application et
+`notification_content.ts`. Une demande de notification abandonnée après cinq tentatives
+produit une telle ligne (ticket 040, § 2.16).
+
 ### 2.13 `subscriptions`
 
 ```sql
@@ -441,6 +449,11 @@ chaque minute ce qui n'a pas abouti, cinq fois, avant de marquer la ligne `faile
 avec sa dernière erreur. Livraison **au moins une fois**, jamais zéro : un doublon
 de notification est un désagrément, une proposition d'astreinte jamais reçue est
 une faute.
+
+Et l'abandon lui-même laisse une trace lisible **par le destinataire**, pas seulement
+en exploitation : `notify_trace_echec` (§ 3, migration `0022`, ticket 040) remet la
+demande en file sur le seul canal `inapp`, et la ligne `notifications` qui en sort porte
+son `error`.
 
 `sending` n'est pas un statut décoratif : c'est lui qui rend la prise en charge
 **exclusive**. `notify_claim` fait passer la ligne de `pending` à `sending` et ne
@@ -553,9 +566,28 @@ n'aurait aucun sens.
 | `notify_post` | `(p_outbox uuid) returns boolean` | Poste une ligne vers l'Edge Function par `net.http_post`, incrémente `attempts`, pose un verrou de deux minutes. **Ne lève jamais** : un incident pg_net ne doit pas annuler la publication d'un planning. |
 | `notify_claim` | `(p_outbox uuid) returns notification_outbox` | Prend une demande en charge : `pending` → `sending`, verrou de deux minutes. Renvoie `NULL` si elle est déjà prise ou close — la prise en charge est **exclusive**, pas seulement idempotente. Réservée à `service_role`. |
 | `notify_complete` | `(p_outbox uuid, p_ok boolean, p_error text default null, p_result jsonb default null) returns void` | Clôt la demande, `sent` ou `failed`, avec son compte rendu. Réservée à `service_role`. |
-| `cron_dispatch_notifications` | `(p_reference timestamptz default null, p_limit integer default 100, p_max_attempts integer default 5) returns integer` | Corps de la tâche `dispatch_notifications` (§ 8). Ramène à `pending` les prises en charge dont le verrou a expiré, reprend les demandes restées en attente, abandonne au bout de cinq tentatives. Idempotente, paramétrée par un instant de référence comme les tâches de `0012`. |
+| `cron_dispatch_notifications` | `(p_reference timestamptz default null, p_limit integer default 100, p_max_attempts integer default 5) returns integer` | Corps de la tâche `dispatch_notifications` (§ 8). Ramène à `pending` les prises en charge dont le verrou a expiré, reprend les demandes restées en attente, abandonne au bout de cinq tentatives et met en file la **ligne interne** de chaque abandon (`notify_trace_echec`, `0022`). Idempotente, paramétrée par un instant de référence comme les tâches de `0012`. |
+| `notify_trace_echec` | `(p_outbox uuid) returns uuid` *(migration `0022`, ticket 040)* | Met en file la ligne interne d'une demande abandonnée : même type, mêmes destinataires, même charge utile, `channels = {inapp}`, plus une clé `delivery_failure` (`{outbox_id, attempts, error}`) dans la charge utile commune. Rend `NULL` pour une demande inconnue **ou pour une demande qui est elle-même une trace** — c'est le garde-fou contre la boucle. |
 | `notify_endpoint` | `() returns (o_url text, o_secret text)` | Adresse de l'Edge Function et secret d'appel, lus dans Supabase Vault. |
 | `notify_internal_secret` | `() returns text` | Le secret d'appel, que l'Edge Function lit pour authentifier ce qui vient de pg_net. Réservée à `service_role`. |
+
+**Un abandon n'est jamais un silence pour son destinataire** *(ticket 040, migration
+`0022`)*. Avant, une demande épuisée après cinq tentatives finissait en ligne `failed`
+de `notification_outbox`, visible du seul rôle de service : le pompier à qui l'on
+proposait une astreinte pouvait ne jamais l'apprendre. `cron_dispatch_notifications`
+remet désormais la même demande en file par `notify_trace_echec`, canal `inapp` seul et
+marque `delivery_failure` ; `send-notification` la reconnaît, **n'envoie rien** et écrit
+la seule ligne `notifications` avec `delivered = false`, `sent_at` nul et `error`
+renseignée — la colonne que le centre de notifications traduit en « L'envoi a échoué, tu
+ne l'as peut-être pas reçue » (ticket 026).
+
+Le détour par l'Edge Function n'est pas un ornement : le français des notifications vit
+dans `supabase/functions/_shared/notification_content.ts`, et l'écrire une seconde fois
+en plpgsql en ferait deux endroits à tenir. La trace dit donc « Astreinte proposée le
+12 octobre, nuit », pas « une notification a échoué ». Elle hérite au passage de toute la
+file : si l'Edge Function est encore en panne — le cas probable, puisque c'est elle qui
+vient de faire échouer cinq tentatives — la trace attend et repart à la minute suivante.
+Elle peut être abandonnée à son tour, et n'engendre alors **pas** de trace d'elle-même.
 
 **Le secret d'appel n'est recopié nulle part.** La migration l'engendre au hasard et
 le range dans Vault ; l'Edge Function va l'y chercher avec sa clé de service. La base
@@ -1137,7 +1169,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 |---|---|---|
 | `create_periods` | 1er du mois, 02:00 | `select public.cron_create_periods();` — crée les périodes M+1 et M+2 manquantes pour chaque caserne *(migration `0012`)* |
 | `lock_periods` | toutes les heures | `select public.cron_lock_periods();` — passe en `locked` les périodes dont `deadline_at < now()` *(migration `0012`)* |
-| `dispatch_notifications` | chaque minute | `select public.cron_dispatch_notifications();` — repose les demandes de `notification_outbox` restées en attente, abandonne au bout de cinq tentatives *(migration `0014`)* |
+| `dispatch_notifications` | chaque minute | `select public.cron_dispatch_notifications();` — repose les demandes de `notification_outbox` restées en attente, abandonne au bout de cinq tentatives et met en file la ligne interne de chaque abandon *(migrations `0014` et `0022`)* |
 | `availability_reminders` | tous les jours 09:00 | `select public.cron_availability_reminders();` — push J-3 et email J-1 aux membres actifs sans aucune ligne `availabilities` sur le mois d'une période ouverte *(migration `0016`)* |
 | `assignment_reminders` | toutes les heures (:15) | `select public.cron_assignment_reminders();` — rappel push à `response_reminder_hours`, courriel à `response_email_hours`, aux membres actifs dont l'attribution est restée sans réponse *(migration `0021`)* |
 | `late_responders_report` | toutes les heures (:45) | `select public.cron_late_responders_report();` — notifie les admins des attributions en attente depuis plus de `late_report_hours`, une fois par jour et par planning, entre 08:00 et 20:59 heure de la caserne *(migration `0021`)* |
@@ -1254,6 +1286,7 @@ Ordre proposé :
 19. `0019_publication_suivi.sql` (ticket 019 : `schedules_guard_transition`, `schedules_guard_suppression` et `shifts_guard_suppression`, suppression d'un planning et d'un créneau réservée au brouillon, `publish_schedule`, `schedule_complet`, `schedule_reevaluer`, `schedule_auto_validate`, `shifts_effectif_revalide`, `remind_schedule`, inscription de `schedules` dans `supabase_realtime`)
 20. `0020_reattribution.sql` (ticket 020 : `assignments_guard_reattribution`, `reassign_shift`, `cancel_assignment`, clause `when` de `schedule_auto_validate` élargie aux acceptations qui disparaissent)
 21. `0021_cron_relances.sql` (ticket 022 : `assignment_reminder_targets`, `cron_assignment_reminders`, `cron_late_responders_report`, les deux tâches `pg_cron` des relances)
+22. `0022_notification_echec_definitif.sql` (ticket 040 : `notify_trace_echec`, `cron_dispatch_notifications` trace désormais ses abandons)
 22. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
     `prune_notifications`
 
@@ -1283,7 +1316,7 @@ dès qu'une politique fuit). Les fonctions d'invitation de `0009` sont couvertes
 `supabase/tests/memberships_admin_test.sql`, les paramètres de caserne de `0011` par
 `supabase/tests/station_settings_test.sql` le cycle de vie des périodes de `0012` par
 `supabase/tests/periods_cron_test.sql` et le chemin d'appel des notifications de `0014`
-par `supabase/tests/notifications_test.sql`, les rappels de saisie de `0016` par
+et `0022` par `supabase/tests/notifications_test.sql`, les rappels de saisie de `0016` par
 `supabase/tests/availability_reminders_test.sql`, la matrice de `0017` par
 `supabase/tests/matrice_admin_test.sql`, la publication de `0019` par
 `supabase/tests/publication_test.sql`, la réattribution de `0020` par

@@ -560,6 +560,44 @@ pour un membre font **une** notification qui les résume, pas sept.
 il figure dans les canaux, **avant tout envoi** : le centre de notifications (ticket 026) ne dépend
 pas de la réussite de FCM.
 
+#### Le mode « trace » d'un envoi abandonné (ticket 040)
+
+Une troisième forme, que **seule la base produit**. Quand une demande de `notification_outbox` a
+épuisé ses cinq tentatives, `cron_dispatch_notifications` l'abandonne et `notify_trace_echec`
+(migration `0022`) remet la même demande en file avec une clé de plus dans la charge utile commune :
+
+```jsonc
+{
+  "type": "assignment_proposed",
+  "station_id": "uuid",
+  "channels": ["inapp"],
+  "payload": {
+    "period": "2026-10",
+    "delivery_failure": {
+      "outbox_id": "uuid", // la demande abandonnée
+      "attempts": 5,
+      "error": "abandon après 5 tentatives sans réponse" // motif technique
+    }
+  },
+  "recipients": [{ "user_id": "uuid", "payload": { "shifts": [/* … */] } }]
+}
+```
+
+`delivery_failure` **force le canal `inapp` seul** — rien n'est renvoyé, ni push sur un canal qui
+vient d'échouer cinq fois, ni courriel de rattrapage — et fait écrire la ligne `notifications` en
+échec : `delivered = false`, `sent_at` nul, `error` renseignée. C'est cette colonne, et sa seule
+présence, que le centre de notifications traduit en « L'envoi a échoué, tu ne l'as peut-être pas
+reçue » (ticket 026).
+
+**Pourquoi la base ne l'écrit pas elle-même** : le titre et le corps sortent de `construireContenu`,
+comme pour n'importe quel envoi. Le membre lit « Astreinte proposée le 12 octobre, nuit », pas « une
+notification a échoué ». Recopier ces phrases en plpgsql aurait donné deux endroits où le même
+français vieillirait séparément.
+
+La réponse porte `"delivery_failure": true` au premier niveau. Une marque présente mais vide laisse
+quand même `error` renseignée (`"delivery_failure"`), sans quoi la ligne ressemblerait à un envoi
+réussi et la mention disparaîtrait.
+
 ### Charges utiles par type
 
 | Type                    | Clés lues                                             | Exemple de titre                                                                   |
@@ -652,6 +690,10 @@ Erreurs, forme `{"error": {"code", "message"}}` : `method_not_allowed` (405), `u
 
 ### Les règles qui ne se voient pas
 
+- **Une demande abandonnée après cinq tentatives laisse une ligne**, et c'est le destinataire qu'on
+  prévient, pas les administrateurs (décision du ticket 026). Il est celui qui perd quelque chose ;
+  alerter un chef de centre transformerait un incident technique en tâche humaine chez des
+  bénévoles. Voir « Le mode trace » plus haut.
 - **La ligne `inapp` est écrite en premier**, avant tout envoi. Une notification dont le push et le
   courriel échouent reste lisible dans l'application. Si cette écriture **échoue**, le destinataire
   n'est pas compté comme servi (`inapp: false`, `ok: false`, `code: "no_channel_delivered"`) : la
@@ -678,15 +720,15 @@ Erreurs, forme `{"error": {"code", "message"}}` : `method_not_allowed` (405), `u
 
 ## Tests
 
-| Quoi                                                                         | Où                                                                      | En CI ? |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------- |
-| Fonctions SQL `create_invitation` / `accept_invitation`                      | `supabase/tests/invitations_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
-| Couche HTTP des cinq Edge Functions                                          | `scripts/test_functions.sh`                                             | non     |
-| Publication, gardes de transition, validation automatique, relance           | `supabase/tests/publication_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
-| Réattribution, annulation, garde des statuts terminaux                       | `supabase/tests/reattribution_test.sql`, joué par `scripts/test_rls.sh` | oui     |
-| File d'attente et `notify(...)` (migration `0014`)                           | `supabase/tests/notifications_test.sql`, joué par `scripts/test_rls.sh` | oui     |
-| Rappels de saisie (migration `0016`)                                         | `supabase/tests/availability_reminders_test.sql`, même script           | oui     |
-| Libellés, regroupement, liens profonds, erreurs FCM, enchaînement d'un envoi | `deno test supabase/functions/tests/`                                   | oui     |
+| Quoi                                                                            | Où                                                                      | En CI ? |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------- |
+| Fonctions SQL `create_invitation` / `accept_invitation`                         | `supabase/tests/invitations_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
+| Couche HTTP des cinq Edge Functions                                             | `scripts/test_functions.sh`                                             | non     |
+| Publication, gardes de transition, validation automatique, relance              | `supabase/tests/publication_test.sql`, joué par `scripts/test_rls.sh`   | oui     |
+| Réattribution, annulation, garde des statuts terminaux                          | `supabase/tests/reattribution_test.sql`, joué par `scripts/test_rls.sh` | oui     |
+| File d'attente, `notify(...)` et trace d'un abandon (migrations `0014`, `0022`) | `supabase/tests/notifications_test.sql`, joué par `scripts/test_rls.sh` | oui     |
+| Rappels de saisie (migration `0016`)                                            | `supabase/tests/availability_reminders_test.sql`, même script           | oui     |
+| Libellés, regroupement, liens profonds, erreurs FCM, enchaînement d'un envoi    | `deno test supabase/functions/tests/`                                   | oui     |
 
 La CI (`.github/workflows/ci.yml`) démarre la pile sans `edge-runtime` ni `kong` : les Edge
 Functions n'y sont pas joignables. Toute la logique de décision vit donc en SQL, où elle est testée

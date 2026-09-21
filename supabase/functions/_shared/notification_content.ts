@@ -410,6 +410,53 @@ function motifCode(payload: ChargeUtile): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Envoi abandonné — la trace du ticket 040
+// ---------------------------------------------------------------------------
+
+/**
+ * La clé que `notify_trace_echec` (migration `0022`) pose dans la charge utile
+ * commune d'une demande de trace.
+ *
+ * Une demande de notification qui a épuisé ses cinq tentatives est abandonnée.
+ * Sans rien de plus, l'abandon est une ligne de `notification_outbox` que seul
+ * le rôle de service voit : le pompier à qui on proposait une astreinte, lui, ne
+ * l'apprend jamais. La base remet donc la même demande en file, avec cette clé
+ * et le seul canal `inapp` : on n'envoie plus rien, on écrit la ligne du centre
+ * de notifications avec son `error`, et l'écran affiche sa mention (ticket 026).
+ *
+ * Le titre et le corps sortent de `construireContenu` comme d'habitude — c'est
+ * tout l'intérêt de passer par ici plutôt que d'écrire la ligne en SQL : le
+ * français des notifications ne vit qu'à un seul endroit.
+ */
+export const CLE_ECHEC_LIVRAISON = "delivery_failure";
+
+export type EchecLivraison = {
+  /** Motif **technique**, rangé tel quel dans `notifications.error`. */
+  motif: string;
+  /** La demande abandonnée, pour retrouver l'incident en exploitation. */
+  outboxId: string | null;
+  tentatives: number | null;
+};
+
+/**
+ * Lit la marque d'une demande de trace, ou `null` pour un envoi ordinaire.
+ *
+ * `motif` n'est jamais vide : c'est lui qui remplit `notifications.error`, et
+ * c'est le fait que cette colonne soit renseignée — pas son contenu — qui fait
+ * apparaître la mention côté client.
+ */
+export function lireEchecLivraison(payload: ChargeUtile): EchecLivraison | null {
+  const brut = payload[CLE_ECHEC_LIVRAISON];
+  if (typeof brut !== "object" || brut === null || Array.isArray(brut)) return null;
+  const objet = brut as ChargeUtile;
+  return {
+    motif: texte(objet, "error") ?? CLE_ECHEC_LIVRAISON,
+    outboxId: texte(objet, "outbox_id"),
+    tentatives: nombre(objet, "attempts"),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Le contenu, type par type
 // ---------------------------------------------------------------------------
 
