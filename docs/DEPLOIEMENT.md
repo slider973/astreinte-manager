@@ -50,9 +50,11 @@ de bon, dans le même travail et sur le même commit ; le résultat est écrit d
 l'exécution. L'approbation a été écartée parce que le ticket 049 demande qu'une migration parte
 **sans intervention manuelle** : un relecteur requis ferait attendre un clic à chaque fusion, y
 compris pour les neuf PR sur dix qui ne touchent pas la base. Le choix reste réversible sans
-toucher au workflow — le travail « base » déclare `environment: production`, il suffit d'ajouter un
-relecteur requis à cet environnement dans **Settings → Environments** pour que la mise en ligne
-attende.
+toucher au workflow — le travail « base » déclare `environment: production-base`, **un environnement
+à lui**, quand les trois autres déclarent `production`. Il suffit d'ajouter un relecteur requis à
+`production-base` dans **Settings → Environments** pour que les migrations attendent un humain. La
+séparation est là pour ça : un relecteur posé sur `production` demanderait quatre approbations par
+mise en ligne, PWA comprise, pour protéger la seule base.
 
 ## 2. Une fois pour toutes — créer le projet chez Vercel
 
@@ -76,6 +78,15 @@ secrets GitHub.
 ## 3. Les secrets GitHub
 
 Dépôt → **Settings → Secrets and variables → Actions → New repository secret**.
+
+**Des secrets de dépôt, jamais des secrets d'environnement.** Le bouton voisin, « Manage
+environment secrets », rangerait la valeur dans `production` ou `production-base` — et le travail
+« vérification » ne la verrait pas : il appelle `.github/workflows/verifier-production.yml`, un
+workflow réutilisable qui ne déclare aucun `environment:`, et un secret d'environnement n'est
+visible que d'un travail qui déclare cet environnement. `secrets: inherit` ne transmet que ce que
+l'appelant voit lui-même. Le symptôme serait trompeur : la mise en ligne réussit, puis la
+vérification s'arrête en disant « Secrets absents : SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF »
+alors qu'ils sont bien posés. Cela vaut pour les deux `SUPABASE_*` obligatoires ci-dessous.
 
 ### Obligatoires — sans eux, rien ne se déploie
 
@@ -294,6 +305,16 @@ Rend `0` quand le dépôt et la production disent la même chose, `1` en nommant
 commande qui le rattrape, `2` s'il n'a pas pu conclure. Il tourne aussi à chaque mise en ligne et à
 la demande (§ 5).
 
+Il compare quatre choses : les migrations, les Edge Functions (présence, état, `verify_jwt`),
+l'adresse Vault du répartiteur de notifications, et la configuration d'authentification — **sujet
+du courriel de connexion et son corps**. Le corps est lu séparément, par
+`GET /v1/projects/{ref}/config/auth`, champ `mailer_templates_magic_link_content` : `config diff`
+ne le voit pas, `content_path` étant un fichier que `config push` téléverse et non une valeur qu'il
+compare. C'est pourtant le corps qui était en anglais le 21 septembre 2026. Avant de comparer, trois
+choses sont normalisées de part et d'autre et **elles seules** : les retours chariot des fins de
+ligne Windows, les espaces en fin de ligne, les lignes vides. Une ligne ajoutée, un mot changé, une
+balise déplacée font un écart.
+
 ### Rattraper — la procédure manuelle de secours
 
 C'est elle qui a sauvé la journée du 21 septembre 2026, avant que le workflow existe. Elle reste
@@ -351,6 +372,18 @@ poussée ramènerait la production sur `http://127.0.0.1:3000`.
 | **Secrets des Edge Functions** (`RESEND_API_KEY`, `STRIPE_*`, `FIREBASE_SERVICE_ACCOUNT`, `APP_BASE_URL`) | **manuel** : `supabase secrets set`, une fois. Voir `supabase/functions/README.md` |
 | **Domaine et certificat** chez Vercel | **manuel** : § 4 |
 | **Jetons** (accès Supabase, Vercel) | **manuel** : secrets GitHub, § 3 |
+| `auth.sms.twilio.enabled` | **ni l'un ni l'autre** : non poussée, non surveillée — voir ci-dessous |
+
+**Une propriété ne converge pas, et elle est traitée comme telle.** `config diff` rend
+`auth.sms.twilio.enabled` en écart — dépôt `false`, production `true` — sans qu'aucune décision
+produit soit derrière. L'API hébergée rend toujours un `sms_provider` et le sien vaut « twilio » par
+défaut ; `external_phone_enabled` est à faux, aucun compte Twilio n'est renseigné, aucun SMS ne part
+et aucun ne partira, le MVP n'authentifiant que par courriel. La déclarer vraie dans
+`[remotes.production]` est refusé par le CLI, qui réclame alors un `account_sid` et un
+`message_service_sid` inexistants ; la pousser à `false` ne tient pas, l'API la redonne `true` au
+passage suivant. Elle est donc **non poussée et non comparée** : `scripts/verifier_production.sh`
+la range dans une liste nommée, la signale en information, et ne compte pas d'écart. Une alarme qui
+sonne à chaque déploiement ne dit plus rien.
 
 Ce qui reste manuel l'est pour une seule raison : ce sont des secrets, ou des actions que seul le
 propriétaire du compte peut faire. Tout le reste est dans le dépôt et se rejoue.
