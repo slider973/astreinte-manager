@@ -59,6 +59,26 @@ migrations du dépôt à celles de la production et les fonctions attendues à c
 échoue bruyamment en cas d'écart. Elle tourne à la mise en ligne, et elle doit pouvoir être lancée
 à la demande pour répondre à la question « est-ce que la production est à jour ? ».
 
+### La configuration de l'authentification n'est reproductible nulle part
+Découvert le 21 septembre 2026, en cherchant pourquoi une invitation acceptée renvoyait sur
+« Aucune caserne ». La production servait le gabarit de courriel **par défaut de Supabase**, en
+anglais, qui envoie un lien de connexion là où l'application attend un code à six chiffres. Ouvrir
+ce lien change de page, le jeton d'invitation vit en mémoire seulement, il est donc perdu, et
+l'invitation ne peut plus être acceptée. Le gabarit français existe pourtant dans le dépôt depuis le
+ticket 001, à `supabase/templates/magic_link.html`, et `supabase/config.toml` le déclare.
+
+Rien ne le posait en production, parce que rien ne pose la configuration d'authentification en
+production. Quatre réglages étaient dans ce cas, tous corrigés à la main le jour même :
+
+- le gabarit et le sujet du courriel de connexion ;
+- le serveur d'envoi, resté celui de Supabase, ce qui interdisait le gabarit personnalisé ;
+- le plafond d'envoi, resté à deux courriels par heure, la valeur du plan gratuit ;
+- les adresses de redirection autorisées, qui ignoraient le domaine propre de l'application.
+
+Ce sont les mêmes symptômes que les Edge Functions absentes : le dépôt sait, la production ignore,
+et personne ne l'apprend avant qu'un pompier reste à la porte. `supabase/config.toml` décrit déjà
+tout cela pour la pile locale ; il faut que la production le reçoive.
+
 ### Le jeton Vercel
 Le jeton actuellement posé en secret est lié au projet et non au compte : la ligne de commande
 Vercel répond « User not found ». La mise en ligne de la PWA échoue donc, et le déploiement se fait
@@ -79,4 +99,6 @@ journée du 21 septembre.
 - Un écart entre le dépôt et la production est signalé par un échec, pas découvert par un 404.
 - La mise en ligne de la PWA par le workflow réussit, sans passer par l'API à la main.
 - Aucun jeton ni mot de passe n'apparaît dans le dépôt, et l'analyse de secrets passe.
+- La configuration d'authentification de la production est posée depuis le dépôt : gabarits de
+  courriel, serveur d'envoi, plafonds, adresses de redirection.
 - `docs/DEPLOIEMENT.md` décrit les trois états et la procédure de secours.
