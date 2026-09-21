@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 019, 025
 - **Branche** : `feat/022-relances-auto`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/23
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
