@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 034
 - **Branche** : `feat/043-purge-notifications`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/36
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
