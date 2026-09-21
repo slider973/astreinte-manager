@@ -127,12 +127,16 @@ export function renderInvitationEmail(data: InvitationEmailData): {
 
 /**
  * Lien d'invitation. Le chemin est une variable d'environnement : la PWA peut
- * basculer entre `/invite/{token}` et `/#/invite/{token}` selon la stratégie
- * d'URL retenue côté go_router, sans redéployer la fonction.
+ * changer de stratégie d'URL sans redéployer la fonction.
+ *
+ * La valeur par défaut est celle de l'application depuis le ticket 046 : les
+ * routes vivent dans le chemin, **sans dièse**. Le fragment appartient au
+ * fournisseur d'authentification, qui y dépose ses jetons ; un lien en
+ * `/#/invite/{token}` tomberait aujourd'hui sur l'accueil.
  */
 export function invitationUrl(token: string): string {
   const base = (Deno.env.get("APP_BASE_URL") ?? "http://127.0.0.1:3000")
     .replace(/\/+$/, "");
-  const path = Deno.env.get("APP_INVITE_PATH") ?? "/#/invite/{token}";
+  const path = Deno.env.get("APP_INVITE_PATH") ?? "/invite/{token}";
   return base + path.replace("{token}", encodeURIComponent(token));
 }

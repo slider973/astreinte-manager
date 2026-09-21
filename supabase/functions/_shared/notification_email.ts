@@ -29,13 +29,16 @@ function escapeHtml(valeur: string): string {
 /**
  * L'adresse d'une destination de l'application.
  *
- * Le chemin est une variable d'environnement, comme `APP_INVITE_PATH` : la PWA
- * sert ses routes derrière un dièse (stratégie par défaut de go_router), et ce
- * choix peut changer sans redéployer les fonctions.
+ * Le chemin est une variable d'environnement, comme `APP_INVITE_PATH` : la
+ * stratégie d'URL de la PWA peut changer sans redéployer les fonctions.
+ *
+ * Depuis le ticket 046, la route est le chemin de l'adresse, **sans dièse** :
+ * le fragment appartient au fournisseur d'authentification, qui y dépose ses
+ * jetons.
  */
 export function lienApplication(route: string): string {
   const base = (Deno.env.get("APP_BASE_URL") ?? "http://127.0.0.1:3000").replace(/\/+$/, "");
-  const modele = Deno.env.get("APP_LINK_PATH") ?? "/#{route}";
+  const modele = Deno.env.get("APP_LINK_PATH") ?? "{route}";
   return base + modele.replace("{route}", route.startsWith("/") ? route : `/${route}`);
 }
 

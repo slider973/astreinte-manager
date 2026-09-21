@@ -215,7 +215,7 @@ Deno.test("le lien du push est une adresse complète, pas le chemin interne", as
   await traiterEnvoi(deps, demande());
 
   const lien = journal.pushEnvoyes[0].lien;
-  assert(lien !== undefined && lien.endsWith("/#/proposals"), `lien inattendu : ${lien}`);
+  assert(lien !== undefined && lien.endsWith("/proposals"), `lien inattendu : ${lien}`);
   assert(
     lien.startsWith("http://") || lien.startsWith("https://"),
     "le lien doit être une adresse complète",

@@ -157,27 +157,46 @@ void main() {
       );
     });
 
+    // Depuis le ticket 046, les routes vivent dans le chemin de l'adresse :
+    // sans cette réécriture, **tout** rechargement sur une route profonde —
+    // `/install`, `/invite/xyz`, `/admin/planning` — rendrait une 404 de
+    // l'hébergeur avant que l'application ait la moindre chance de s'ouvrir.
     test('toute adresse inconnue rend index.html : les routes sont côté client',
         () {
       final reecritures = (vercel['rewrites'] as List<dynamic>)
           .cast<Map<String, dynamic>>();
       expect(reecritures.last['destination'], '/index.html');
+      // La source doit tout attraper, y compris les chemins à plusieurs
+      // segments : `/(.*)` et non `/([^/]*)`.
+      final motif = RegExp(reecritures.last['source'] as String);
+      for (final route in <String>[
+        '/install',
+        '/invite/8f3c-token',
+        '/admin/planning',
+        '/schedule/2026-10',
+      ]) {
+        expect(
+          motif.stringMatch(route),
+          route,
+          reason: '$route ne retomberait pas sur index.html',
+        );
+      }
     });
 
-    // L'application est servie avec la stratégie de hash de go_router
-    // (`supabase/functions/README.md`, `APP_INVITE_PATH`). L'adresse qu'un
-    // chef de centre dicte au téléphone, elle, ne peut pas contenir un dièse :
-    // l'hébergeur fait le pont.
-    test('/install dicté sans dièse arrive bien sur la page', () {
-      final redirections = (vercel['redirects'] as List<dynamic>)
+    // Le ticket 032 redirigeait `/install` vers `/#/install`, faute de mieux.
+    // Le dièse est parti (ticket 046) : `/install` est une route comme les
+    // autres, et une redirection survivante renverrait sur une adresse que
+    // plus personne ne sait lire.
+    test('aucune redirection ne fabrique de dièse', () {
+      final redirections = (vercel['redirects'] as List<dynamic>? ?? <dynamic>[])
           .cast<Map<String, dynamic>>();
-      final install = redirections
-          .where((entree) => entree['source'] == '/install')
-          .single;
-      expect(install['destination'], '/#/install');
-      // Non permanente : le jour où `usePathUrlStrategy()` est activé, une
-      // 308 déjà mise en cache par les navigateurs survivrait au changement.
-      expect(install['permanent'], isFalse);
+      for (final regle in redirections) {
+        expect(
+          regle['destination'],
+          isNot(contains('#')),
+          reason: 'redirection vers ${regle['destination']}',
+        );
+      }
     });
 
     test('la sortie déployée est celle de flutter build web', () {

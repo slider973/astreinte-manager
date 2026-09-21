@@ -85,38 +85,43 @@ Fournies par la plateforme, à ne pas déclarer :
 
 À régler par le projet :
 
-| Variable                   | Défaut                                          | Rôle                                                                                                                                                                                                                  |
-| -------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `APP_BASE_URL`             | `http://127.0.0.1:3000`                         | Origine de la PWA, base du lien d'invitation                                                                                                                                                                          |
-| `APP_INVITE_PATH`          | `/#/invite/{token}`                             | Chemin du lien. `{token}` est remplacé. La valeur par défaut suit la stratégie de hash de go_router, en vigueur dans l'application. Passer à `/invite/{token}` seulement si `usePathUrlStrategy()` est activé         |
-| `MAIL_FROM`                | `Astreinte SP <invitations@astreinte-sp.local>` | Expéditeur. En production, un domaine vérifié chez Resend                                                                                                                                                             |
-| `RESEND_API_KEY`           | —                                               | Présente : les courriels partent par Resend. Absente : repli sur le serveur de courriel local                                                                                                                         |
-| `MAILPIT_URL`              | `http://supabase_inbucket_pompier:8025`         | API HTTP de Mailpit, joignable depuis le réseau Docker de la pile locale. Les courriels sont lisibles sur <http://127.0.0.1:54324>                                                                                    |
-| `APP_LINK_PATH`            | `/#{route}`                                     | Chemin d'une destination de notification dans la PWA. `{route}` est remplacé par `notifications.data.route` (`/proposals`, `/schedule/2026-10`…). Même logique que `APP_INVITE_PATH`                                  |
-| `FIREBASE_SERVICE_ACCOUNT` | —                                               | Le fichier JSON du compte de service Firebase, tel quel (`docs/FIREBASE.md § 5`). Absent : le push est **indisponible** — la ligne interne est écrite, le courriel prend le relais, et **aucun jeton n'est supprimé** |
-| `STRIPE_SECRET_KEY`        | —                                               | Clé secrète du compte Stripe (`sk_live_…`). Ne quitte jamais le serveur (`docs/STRIPE.md § 3`)                                                                                                                        |
-| `STRIPE_PRICE_MONTHLY`     | —                                               | Identifiant du tarif mensuel (`price_…`)                                                                                                                                                                              |
-| `STRIPE_PRICE_YEARLY`      | —                                               | Identifiant du tarif annuel (`price_…`)                                                                                                                                                                               |
-| `STRIPE_WEBHOOK_SECRET`    | —                                               | Secret de signature du point de terminaison (`whsec_…`). **Absent : `stripe-webhook` refuse tout en 503**, et `create-checkout` répond `stripe_not_configured`                                                        |
-| `STRIPE_AMOUNT_MONTHLY`    | `1200`                                          | Le montant **affiché** par l'écran, en centimes. Séparé du tarif Stripe : un prix ne se modifie pas chez Stripe, il se remplace                                                                                       |
-| `STRIPE_AMOUNT_YEARLY`     | `12000`                                         | Idem pour l'annuel. L'écran en déduit l'économie annoncée                                                                                                                                                             |
-| `STRIPE_CURRENCY`          | `eur`                                           | Le symbole affiché à côté des montants                                                                                                                                                                                |
-| `APP_SUBSCRIPTION_PATH`    | `/#/admin/abonnement`                           | Chemin de l'écran d'abonnement, base des deux adresses de retour de Stripe (`?paiement=ok`, `?paiement=annule`). Même logique que `APP_INVITE_PATH`                                                                   |
+| Variable                   | Défaut                                          | Rôle                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_BASE_URL`             | `http://127.0.0.1:3000`                         | Origine de la PWA, base du lien d'invitation                                                                                                                                                                                                                                             |
+| `APP_INVITE_PATH`          | `/invite/{token}`                               | Chemin du lien. `{token}` est remplacé. La valeur par défaut suit la stratégie d'URL de l'application : **sans dièse** depuis le ticket 046, parce que le fragment appartient au fournisseur d'authentification, qui y dépose ses jetons. Un `/#/invite/{token}` tomberait sur l'accueil |
+| `MAIL_FROM`                | `Astreinte SP <invitations@astreinte-sp.local>` | Expéditeur. En production, un domaine vérifié chez Resend                                                                                                                                                                                                                                |
+| `RESEND_API_KEY`           | —                                               | Présente : les courriels partent par Resend. Absente : repli sur le serveur de courriel local                                                                                                                                                                                            |
+| `MAILPIT_URL`              | `http://supabase_inbucket_pompier:8025`         | API HTTP de Mailpit, joignable depuis le réseau Docker de la pile locale. Les courriels sont lisibles sur <http://127.0.0.1:54324>                                                                                                                                                       |
+| `APP_LINK_PATH`            | `{route}`                                       | Chemin d'une destination de notification dans la PWA. `{route}` est remplacé par `notifications.data.route` (`/proposals`, `/schedule/2026-10`…). Même logique que `APP_INVITE_PATH`                                                                                                     |
+| `FIREBASE_SERVICE_ACCOUNT` | —                                               | Le fichier JSON du compte de service Firebase, tel quel (`docs/FIREBASE.md § 5`). Absent : le push est **indisponible** — la ligne interne est écrite, le courriel prend le relais, et **aucun jeton n'est supprimé**                                                                    |
+| `STRIPE_SECRET_KEY`        | —                                               | Clé secrète du compte Stripe (`sk_live_…`). Ne quitte jamais le serveur (`docs/STRIPE.md § 3`)                                                                                                                                                                                           |
+| `STRIPE_PRICE_MONTHLY`     | —                                               | Identifiant du tarif mensuel (`price_…`)                                                                                                                                                                                                                                                 |
+| `STRIPE_PRICE_YEARLY`      | —                                               | Identifiant du tarif annuel (`price_…`)                                                                                                                                                                                                                                                  |
+| `STRIPE_WEBHOOK_SECRET`    | —                                               | Secret de signature du point de terminaison (`whsec_…`). **Absent : `stripe-webhook` refuse tout en 503**, et `create-checkout` répond `stripe_not_configured`                                                                                                                           |
+| `STRIPE_AMOUNT_MONTHLY`    | `1200`                                          | Le montant **affiché** par l'écran, en centimes. Séparé du tarif Stripe : un prix ne se modifie pas chez Stripe, il se remplace                                                                                                                                                          |
+| `STRIPE_AMOUNT_YEARLY`     | `12000`                                         | Idem pour l'annuel. L'écran en déduit l'économie annoncée                                                                                                                                                                                                                                |
+| `STRIPE_CURRENCY`          | `eur`                                           | Le symbole affiché à côté des montants                                                                                                                                                                                                                                                   |
+| `APP_SUBSCRIPTION_PATH`    | `/admin/abonnement`                             | Chemin de l'écran d'abonnement, base des deux adresses de retour de Stripe (`?paiement=ok`, `?paiement=annule`). Même logique que `APP_INVITE_PATH`                                                                                                                                      |
 
 En production :
 
 ```sh
 supabase secrets set APP_BASE_URL=https://app.astreinte-sp.fr
-supabase secrets set APP_INVITE_PATH='/#/invite/{token}'
 supabase secrets set MAIL_FROM='Astreinte SP <invitations@astreinte-sp.fr>'
 supabase secrets set RESEND_API_KEY=re_…
-supabase secrets set APP_LINK_PATH='/#{route}'
 supabase secrets set FIREBASE_SERVICE_ACCOUNT="$(cat chemin/vers/le-compte-de-service.json)"
 supabase secrets set STRIPE_SECRET_KEY=sk_live_…
 supabase secrets set STRIPE_PRICE_MONTHLY=price_…
 supabase secrets set STRIPE_PRICE_YEARLY=price_…
 supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_…
-supabase secrets set APP_SUBSCRIPTION_PATH='/#/admin/abonnement'
+```
+
+Les trois chemins — `APP_INVITE_PATH`, `APP_LINK_PATH`, `APP_SUBSCRIPTION_PATH` — n'ont plus à être
+posés : leur valeur par défaut est celle de l'application. S'ils l'ont été avant le ticket 046, ils
+portent un dièse et fabriquent des liens morts ; il faut les **retirer** :
+
+```sh
+supabase secrets unset APP_INVITE_PATH APP_LINK_PATH APP_SUBSCRIPTION_PATH
 ```
 
 Les quatre secrets Stripe et ce qu'il faut créer dans le tableau de bord pour les obtenir :

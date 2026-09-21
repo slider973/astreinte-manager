@@ -67,9 +67,9 @@ class DestinationInitiale {
     // d'autre. Une adresse absolue (`https://ailleurs/…`), une adresse de
     // protocole (`javascript:…`) ou un chemin à double barre oblique
     // (`//ailleurs/…`, qui est une autorité) sortiraient de l'application.
-    // La stratégie d'URL en vigueur — le dièse de `go_router` — contient
-    // aujourd'hui les dégâts ; le ticket 032 peut la changer, et le contrôle
-    // ne doit pas dépendre de ce choix.
+    // Depuis le ticket 046, les routes vivent dans le chemin de l'adresse et
+    // plus derrière un dièse : ce contrôle est le seul garde-fou qui reste, et
+    // il ne dépend d'aucune stratégie d'URL.
     if (!emplacement.startsWith('/')) return false;
     if (emplacement.startsWith('//')) return false;
     // Certains navigateurs lisent `/\ailleurs` comme `//ailleurs`.

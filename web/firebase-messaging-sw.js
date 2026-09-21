@@ -42,12 +42,13 @@ const VERSION_SDK = '12.19.0';
 const PORTEE = new URL('./', self.location).pathname;
 
 /*
- * L'application sert ses routes derrière un dièse : c'est la stratégie d'URL
- * par défaut de go_router, celle que suit déjà le lien d'invitation du
- * ticket 006 (`APP_INVITE_PATH` = `/#/invite/{token}`). Une notification
- * ouverte application fermée doit produire la même forme, sinon elle tombe sur
- * une page introuvable — et c'est le seul mode de réception qui compte
- * vraiment pour un pompier à qui on propose une astreinte.
+ * L'application sert ses routes dans le **chemin** de l'adresse, sans dièse
+ * (ticket 046 : le fragment appartient au fournisseur d'authentification, qui
+ * y dépose ses jetons). C'est la forme que suit déjà le lien d'invitation
+ * (`APP_INVITE_PATH` = `/invite/{token}`). Une notification ouverte
+ * application fermée doit produire la même forme, sinon elle tombe sur une
+ * page introuvable — et c'est le seul mode de réception qui compte vraiment
+ * pour un pompier à qui on propose une astreinte.
  */
 const ACCUEIL = '/';
 
@@ -89,7 +90,11 @@ if (configComplete) {
 }
 
 /*
- * L'adresse complète d'une destination interne, dièse compris.
+ * L'adresse complète d'une destination interne.
+ *
+ * Le chemin de l'application est collé à sa portée — `/proposals` sous une PWA
+ * servie à la racine, `/sous-chemin/proposals` ailleurs. Aucun dièse : le
+ * routeur lit le chemin (ticket 046).
  *
  * Tout ce qui n'est pas un chemin de l'application — adresse absolue, adresse
  * de protocole, chemin à double barre oblique, qui est une autorité — retombe
@@ -103,10 +108,10 @@ function adresseInterne(lien) {
     !lien.startsWith('//') &&
     !lien.includes('\\');
 
-  const accueil = new URL(`${PORTEE}#${ACCUEIL}`, self.location.origin);
+  const accueil = new URL(`${PORTEE}${ACCUEIL.slice(1)}`, self.location.origin);
   if (!interne) return accueil.href;
 
-  const cible = new URL(`${PORTEE}#${lien}`, self.location.origin);
+  const cible = new URL(`${PORTEE}${lien.slice(1)}`, self.location.origin);
   return cible.origin === self.location.origin ? cible.href : accueil.href;
 }
 
