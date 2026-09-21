@@ -30,10 +30,7 @@ Future<FauxProfilRepository> _ouvrirProfil(
 /// Le bouton d'enregistrement est sous la ligne de flottaison d'un téléphone :
 /// trois champs et une adresse le poussent hors de l'écran.
 Future<void> _enregistrer(WidgetTester tester) async {
-  await defilerJusqua(
-    tester,
-    find.text(AppStrings.profilEnregistrerIdentite),
-  );
+  await defilerJusqua(tester, find.text(AppStrings.profilEnregistrerIdentite));
   await tester.tap(find.text(AppStrings.profilEnregistrerIdentite));
   await tester.pumpAndSettle();
 }

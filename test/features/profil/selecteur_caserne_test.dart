@@ -150,10 +150,7 @@ void main() {
       await tester.tap(find.text('CIS Val-de-Loue'));
       await tester.pumpAndSettle();
 
-      expect(
-        await local.lire(sessionMembre.userId),
-        _secondeCaserne.stationId,
-      );
+      expect(await local.lire(sessionMembre.userId), _secondeCaserne.stationId);
       // Rangé par utilisateur : sur un téléphone partagé, la caserne de l'un
       // n'est pas celle de l'autre.
       expect(await local.lire('aaaaaaaa-0000-4000-8000-000000000199'), isNull);
@@ -181,23 +178,22 @@ void main() {
       );
     });
 
-    testWidgets(
-      'un choix devenu invalide retombe sur la caserne qui reste',
-      (tester) async {
-        // Retiré de la caserne B entre deux ouvertures : l'application ne se
-        // bloque pas sur un souvenir.
-        await _ouvrirProfil(
-          tester,
-          appartenances: const <Appartenance>[appartenanceMembre],
-          caserneChoisie: CaserneChoisieLocaleMemoire(<String, String>{
-            sessionMembre.userId: _secondeCaserne.stationId,
-          }),
-        );
+    testWidgets('un choix devenu invalide retombe sur la caserne qui reste', (
+      tester,
+    ) async {
+      // Retiré de la caserne B entre deux ouvertures : l'application ne se
+      // bloque pas sur un souvenir.
+      await _ouvrirProfil(
+        tester,
+        appartenances: const <Appartenance>[appartenanceMembre],
+        caserneChoisie: CaserneChoisieLocaleMemoire(<String, String>{
+          sessionMembre.userId: _secondeCaserne.stationId,
+        }),
+      );
 
-        expect(find.text('CIS Saint-Martin'), findsOneWidget);
-        expect(find.text(AppStrings.aucuneCaserneTitre), findsNothing);
-      },
-    );
+      expect(find.text('CIS Saint-Martin'), findsOneWidget);
+      expect(find.text(AppStrings.aucuneCaserneTitre), findsNothing);
+    });
 
     test('le stockage réel range par utilisateur et s\'efface', () async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -207,10 +203,7 @@ void main() {
       await local.ecrire(sessionMembre.userId, _secondeCaserne.stationId);
       await local.ecrire(autre, appartenanceMembre.stationId);
 
-      expect(
-        await local.lire(sessionMembre.userId),
-        _secondeCaserne.stationId,
-      );
+      expect(await local.lire(sessionMembre.userId), _secondeCaserne.stationId);
       expect(await local.lire(autre), appartenanceMembre.stationId);
 
       await local.effacer(sessionMembre.userId);

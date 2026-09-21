@@ -94,9 +94,7 @@ class _Contenu extends StatelessWidget {
         // l'admin ouvre cet écran sur un ordinateur.
         Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppSpacing.colonneMax,
-            ),
+            constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
@@ -163,10 +161,7 @@ class _IdentiteEnAttente extends StatelessWidget {
               SizedBox(
                 width: AppSpacing.lg,
                 height: AppSpacing.lg,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: encre,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2, color: encre),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(

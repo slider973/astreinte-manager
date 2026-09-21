@@ -143,11 +143,7 @@ class _Corps extends ConsumerWidget {
 /// la couleur en quatrième (`DESIGN.md § Do's`) — et ici il n'y a pas de
 /// couleur du tout : ce qui reste à la caserne n'est pas une alarme.
 class _Volet extends StatelessWidget {
-  const _Volet({
-    required this.icone,
-    required this.titre,
-    required this.texte,
-  });
+  const _Volet({required this.icone, required this.titre, required this.texte});
 
   final IconData icone;
   final String titre;

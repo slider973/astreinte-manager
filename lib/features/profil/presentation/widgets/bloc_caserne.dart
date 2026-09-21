@@ -124,9 +124,7 @@ class _Choix extends StatelessWidget {
       child: RadioListTile<String>(
         value: appartenance.stationId,
         title: Text(appartenance.nomCaserne),
-        subtitle: Text(
-          AppStrings.profilCaserneRole(appartenance.role.libelle),
-        ),
+        subtitle: Text(AppStrings.profilCaserneRole(appartenance.role.libelle)),
         contentPadding: EdgeInsets.zero,
         // 48 dp au minimum, comme toute cible de cet écran.
         visualDensity: VisualDensity.standard,

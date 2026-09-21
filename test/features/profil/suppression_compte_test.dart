@@ -112,7 +112,8 @@ void main() {
       expect(
         find.text(AppStrings.suppressionCeQuiReste),
         findsOneWidget,
-        reason: 'La mention « Membre supprimé » doit être annoncée à l\'avance.',
+        reason:
+            'La mention « Membre supprimé » doit être annoncée à l\'avance.',
       );
 
       // Rien n'est parti tant qu'on n'a pas confirmé.

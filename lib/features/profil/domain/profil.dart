@@ -145,9 +145,10 @@ enum ErreurSuppression {
   /// Le message affiché sous le bouton de la feuille. Il nomme le problème
   /// **et** la sortie (`DESIGN.md § Do's`).
   String message({String? caserne}) => switch (this) {
-    ErreurSuppression.dernierAdmin => caserne == null
-        ? AppStrings.suppressionDernierAdmin
-        : AppStrings.suppressionDernierAdminCaserne(caserne),
+    ErreurSuppression.dernierAdmin =>
+      caserne == null
+          ? AppStrings.suppressionDernierAdmin
+          : AppStrings.suppressionDernierAdminCaserne(caserne),
     ErreurSuppression.profilIntrouvable =>
       AppStrings.suppressionProfilIntrouvable,
     ErreurSuppression.accesNonFerme => AppStrings.suppressionAccesNonFerme,
