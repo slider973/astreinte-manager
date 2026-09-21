@@ -58,6 +58,19 @@ réessaie. » Le réseau allait très bien, la fonction rendait 404. Le repli de
 défaut est ailleurs. Distinguer au moins une fonction absente ou en erreur d'une panne de liaison,
 et le dire sans envoyer chercher au mauvais endroit. Vaut pour l'import comme pour l'invitation.
 
+### Une invitation dont le courriel n'est jamais parti ressemble à une invitation normale (P2)
+Constaté en production le 21 septembre 2026, dans la foulée du défaut précédent : aucun fournisseur
+de courriel n'était configuré, la fonction se repliait sur l'outil de développement local, et
+l'envoi échouait à chaque fois. L'application le dit correctement sur le moment, par
+`AppStrings.resultatCourrielNonParti`, puis l'information disparaît avec le compte rendu.
+
+Dans « Invitations en attente », la ligne affiche alors « En attente » et sa date d'expiration,
+exactement comme une invitation partie que le destinataire tarde à accepter. L'admin attend une
+réponse que personne ne peut donner. Or `invitations` et `notifications` gardent la trace de
+l'envoi : la liste peut le dire. Distinguer, sur la ligne, une invitation dont le courriel est parti
+d'une invitation dont personne n'a jamais été prévenu, et proposer le geste utile — renvoyer, ou
+copier le lien.
+
 ### Trois broutilles (P3)
 - `ImporterController._phraseDeLecture` passe `maxOctetsFichier` comme taille réelle à
   `AppStrings.importTropGros` : le message affiche la limite deux fois.
@@ -76,4 +89,6 @@ et le dire sans envoyer chercher au mauvais endroit. Vaut pour l'import comme po
   ligne quand tout est passé.
 - Les trois broutilles P3 sont corrigées ou le code mort est retiré.
 - Une réponse d'erreur du serveur n'est plus annoncée comme une panne de connexion.
+- Une invitation dont le courriel n'est pas parti se distingue, dans la liste, d'une invitation
+  partie et sans réponse.
 - `flutter analyze` sans avertissement, `flutter test` verts, `flutter build web` qui passe.
