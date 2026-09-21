@@ -5,7 +5,7 @@
 - **Dépend de** : 032
 - **Branche** : `feat/049-deploiement-base-et-fonctions`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-21
 
 ## Contexte
 
