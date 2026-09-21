@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 018 | [Proposition automatique de remplissage](in-progress/018-proposition-automatique.md) | P1 | 017 |  |
 
 ## À faire
 
@@ -44,6 +43,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 015 | [Rappels de saisie des disponibilités](done/015-rappels-saisie.md) | P1 | 014 025 | https://github.com/slider973/astreinte-manager/pull/17 |
 | 016 | [Matrice des disponibilités pour l'admin](done/016-matrice-admin.md) | P0 | 008 013 014 | https://github.com/slider973/astreinte-manager/pull/18 |
 | 017 | [Construction du planning en brouillon](done/017-brouillon-attribution.md) | P0 | 016 | https://github.com/slider973/astreinte-manager/pull/19 |
+| 018 | [Proposition automatique de remplissage](done/018-proposition-automatique.md) | P1 | 017 |  |
 | 019 | [Publication et suivi des réponses](done/019-publication-suivi.md) | P0 | 017 025 | https://github.com/slider973/astreinte-manager/pull/20 |
 | 020 | [Réattribution d'un créneau refusé ou modifié](done/020-reattribution.md) | P0 | 019 | https://github.com/slider973/astreinte-manager/pull/22 |
 | 021 | [Écran des propositions pour le membre](done/021-ecran-propositions.md) | P0 | 008 024 | https://github.com/slider973/astreinte-manager/pull/21 |
