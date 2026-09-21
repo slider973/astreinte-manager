@@ -54,7 +54,7 @@ FaitCaserne? faitCaserne({
       banniere: AppBanner(
         variante: AppBannerVariante.lectureSeule,
         texte: depuis == null
-            ? AppStrings.lectureSeuleDetail
+            ? AppStrings.lectureSeuleBanniere
             : AppStrings.lectureSeuleDepuis(formaterDateLongue(depuis)),
         detail: admin
             ? AppStrings.lectureSeuleAdminDetail
@@ -77,7 +77,7 @@ FaitCaserne? faitCaserne({
       banniere: AppBanner(
         variante: AppBannerVariante.attention,
         texte: AppStrings.essaiTermine,
-        detail: AppStrings.essaiDetailAdmin,
+        detail: AppStrings.essaiTermineDetail,
         libelleAction: versAbonnement == null
             ? null
             : AppStrings.lectureSeuleAction,

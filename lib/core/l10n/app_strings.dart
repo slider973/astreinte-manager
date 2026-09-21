@@ -190,32 +190,44 @@ abstract final class AppStrings {
   // Caserne suspendue et fin d'essai — ticket 030
   // -------------------------------------------------------------------
 
-  /// La seconde ligne de la bannière, pour un **membre**.
+  /// La première ligne de la bannière, quand la base ne connaît pas la date de
+  /// bascule. Reprise mot pour mot de `DESIGN.md § AppBanner`.
+  static const String lectureSeuleBanniere = 'Caserne suspendue : lecture seule.';
+
+  /// La même, quand la date est connue.
+  ///
+  /// **Le fait, et rien de plus.** La conséquence descend dans le détail : avec
+  /// le bouton « Abonnement » à droite, la colonne de texte tombe à ~220 dp sur
+  /// un téléphone, et une première ligne plus longue se faisait tronquer.
+  static String lectureSeuleDepuis(String date) =>
+      'Caserne suspendue depuis le $date.';
+
+  /// La seconde ligne, pour un **membre**.
   ///
   /// « Rien n'a été supprimé » est obligatoire : c'est une promesse du produit
   /// (`docs/PRD.md § 6.6` et § 7.6) et la seule phrase qui compte pour
   /// quelqu'un qui découvre l'écran inerte un mardi soir.
   static const String lectureSeuleMembreDetail =
-      'Rien n\'a été supprimé. Contacte ton chef de centre.';
+      'Tu peux consulter, pas modifier. Rien n\'a été supprimé.';
 
-  /// La même, pour un **administrateur** : lui a une sortie.
+  /// La même, pour un **administrateur** : lui a une sortie, et le bouton
+  /// « Abonnement » la nomme juste à côté.
   static const String lectureSeuleAdminDetail =
-      'Rien n\'a été supprimé. Reprends l\'abonnement pour rouvrir la saisie.';
-
-  /// La bannière nomme la date de bascule quand la base la connaît.
-  static String lectureSeuleDepuis(String date) =>
-      'Caserne suspendue depuis le $date : tu peux consulter, pas modifier.';
+      'Rien n\'a été supprimé. Reprends l\'abonnement.';
 
   static const String lectureSeuleAction = 'Abonnement';
 
   static String essaiJusquAu(String date, int jours) =>
       'Essai jusqu\'au $date — il reste ${jours == 1 ? '1 jour' : '$jours jours'}.';
 
-  static const String essaiTermine =
-      'Ta période d\'essai est terminée. La caserne passera en lecture seule.';
+  static const String essaiTermine = 'Ta période d\'essai est terminée.';
 
-  static const String essaiDetailAdmin =
-      'Abonne-toi pour continuer à saisir et à publier.';
+  /// Le détail d'un essai **terminé** : la conséquence, qui n'est pas encore
+  /// arrivée — la tâche de suspension passe une fois par jour.
+  static const String essaiTermineDetail =
+      'La caserne passera en lecture seule.';
+
+  static const String essaiDetailAdmin = 'Abonne-toi pour continuer.';
 
   // -------------------------------------------------------------------
   // États vides et erreurs
