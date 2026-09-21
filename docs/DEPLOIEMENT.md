@@ -101,13 +101,16 @@ renouvelé ; il n'y a rien à faire de plus.
 Une fois le domaine connu, deux choses le suivent :
 
 1. **Supabase** → Authentication → URL Configuration → `Site URL` et `Redirect URLs`, sans quoi le
-   lien magique de connexion renvoie sur `localhost`.
+   lien magique de connexion renvoie sur `localhost`. `Site URL` vaut l'origine nue,
+   `https://<domaine>`, et `Redirect URLs` doit contenir `https://<domaine>/**` — le lien
+   d'invitation ramène sur `/invite/<jeton>`, pas sur la racine.
 2. **Le lien d'invitation** des Edge Functions :
    ```sh
    supabase secrets set APP_BASE_URL='https://<domaine>'
    ```
-   Voir `supabase/functions/README.md`. Laisser `APP_INVITE_PATH` sur sa valeur par défaut
-   (`/#/invite/{token}`) : l'application utilise la stratégie de hash de `go_router`.
+   Voir `supabase/functions/README.md`. Les trois chemins — `APP_INVITE_PATH`, `APP_LINK_PATH`,
+   `APP_SUBSCRIPTION_PATH` — restent sur leur valeur par défaut, **sans dièse** (ticket 046). S'ils
+   ont été posés avant, les retirer : ils fabriqueraient des liens morts.
 
 ## 5. Mettre en ligne
 
@@ -159,9 +162,12 @@ curl -sI -H 'Accept-Encoding: br' https://<domaine>/canvaskit/chromium/canvaskit
 curl -sI https://<domaine>/flutter_service_worker.js | grep -i cache-control
 # attendu : public, max-age=0, must-revalidate
 
-# 4. L'adresse qu'on dicte au téléphone.
-curl -sI https://<domaine>/install | grep -i -e '^HTTP' -e location
-# attendu : 307 → /#/install
+# 4. Une route profonde rechargée ne rend pas une page introuvable.
+#    C'est la réécriture vers index.html : sans elle, plus rien ne marche
+#    depuis que les routes vivent dans le chemin (ticket 046).
+curl -so /dev/null -w '%{http_code}\n' https://<domaine>/install
+curl -so /dev/null -w '%{http_code}\n' https://<domaine>/admin/planning
+# attendu : 200, deux fois
 ```
 
 Le workflow fait lui-même les vérifications 1 à 3 après chaque mise en ligne et **échoue** si elles
@@ -184,8 +190,8 @@ Puis, sur un téléphone :
 | Règle | Raison |
 |---|---|
 | `outputDirectory: build/web`, `buildCommand` réduit à un `echo` | la construction a déjà eu lieu dans Actions ; `vercel build` ne fait qu'empaqueter |
-| Réécriture de tout vers `/index.html` | `go_router` résout les routes côté client ; sans elle, un rechargement sur une sous-page rendrait 404 |
-| Redirection `/install` → `/#/install` | l'adresse qu'on dicte au téléphone ne peut pas contenir un dièse. Temporaire (307) exprès : elle disparaîtra le jour où `usePathUrlStrategy()` sera activé |
+| Réécriture de tout vers `/index.html` | `go_router` résout les routes côté client, et depuis le ticket 046 elles vivent dans le **chemin** de l'adresse : sans cette règle, un rechargement sur `/admin/planning` — ou l'ouverture d'un lien d'invitation — rendrait 404 avant même que l'application démarre. C'est la contrepartie obligatoire des adresses sans dièse |
+| Aucune redirection | `/install` est une route comme les autres depuis le ticket 046. La redirection `/install` → `/#/install` du ticket 032 n'a plus d'objet : elle enverrait sur une adresse que le routeur ne sait plus lire |
 | `Cache-Control: max-age=0, must-revalidate` presque partout | c'est le service worker de Flutter qui gère les versions, par empreinte de contenu. Un cache HTTP long figerait l'application sur les téléphones déjà installés. La revalidation coûte une requête conditionnelle, et seulement au premier chargement : ensuite, le service worker sert tout hors ligne |
 | `Content-Encoding: br` sur `assets/assets/fonts/*.ttf` | les polices sont **livrées déjà compressées** par `scripts/build_web.sh`. Flutter web ne décode pas le WOFF2 (`assets/fonts/README.md`), le seul levier est la compression de transport : 194 Ko → 88 Ko |
 | `Content-Encoding: br` sur `canvaskit/**` | même mécanique, et c'est elle qui rend l'auto-hébergement du moteur viable (ticket 037) : 5,7 Mo de `.wasm` deviennent 1,6 Mo, exactement ce que servait le CDN de Google. Servi sans cet en-tête, le moteur ne démarre pas |

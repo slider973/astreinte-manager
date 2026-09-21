@@ -158,15 +158,14 @@ Et l'adresse de retour, partagée avec les autres fonctions :
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `APP_BASE_URL` | `http://127.0.0.1:3000` | Origine de la PWA. **À régler en production**, sinon Stripe renverra le navigateur sur `127.0.0.1`. |
-| `APP_SUBSCRIPTION_PATH` | `/#/admin/abonnement` | Le chemin de l'écran d'abonnement. La valeur par défaut suit la stratégie de hash de `go_router`, en vigueur dans l'application. |
+| `APP_SUBSCRIPTION_PATH` | `/admin/abonnement` | Le chemin de l'écran d'abonnement. La valeur par défaut suit la stratégie d'URL de l'application : **sans dièse** depuis le ticket 046. Rien à poser ; s'il a été posé avant, le retirer (`supabase secrets unset APP_SUBSCRIPTION_PATH`). |
 
 ```sh
 supabase secrets set APP_BASE_URL=https://app.astreinte-sp.fr
-supabase secrets set APP_SUBSCRIPTION_PATH='/#/admin/abonnement'
 ```
 
 Ces deux-là servent à construire les deux adresses de retour, que Stripe appelle après le
-paiement : `…/#/admin/abonnement?paiement=ok` et `…?paiement=annule`. **Il n'y a rien à déclarer
+paiement : `…/admin/abonnement?paiement=ok` et `…?paiement=annule`. **Il n'y a rien à déclarer
 chez Stripe** : l'application les envoie avec chaque session.
 
 ## 6. Vérifier que ça marche
