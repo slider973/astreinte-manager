@@ -5,11 +5,13 @@
     scripts/servir_web.py            # puis http://127.0.0.1:8099
 
 Un serveur statique ordinaire ne suffit pas pour cette vérification : les
-polices sont livrées **déjà compressées** (`scripts/build_web.sh`) et ne sont
-lisibles qu'avec l'en-tête `Content-Encoding: br` que pose `vercel.json`.
-Servies sans lui, elles échouent au décodage **en silence** et l'application
-retombe sur un Roboto téléchargé chez Google — la panne exacte que le ticket 037
-cherche à supprimer, et celle qu'on ne voit pas si on ne la cherche pas.
+polices **et le moteur CanvasKit** sont livrés déjà compressés
+(`scripts/build_web.sh`) et ne sont lisibles qu'avec l'en-tête
+`Content-Encoding: br` que pose `vercel.json`. Servi sans lui, CanvasKit ne
+démarre pas du tout (« expected magic word ») ; les polices, elles, échouent au
+décodage **en silence** et l'application retombe sur un Roboto téléchargé chez
+Google — la panne que le ticket 037 a supprimée, et celle qu'on ne voit pas si
+on ne la cherche pas.
 
 Ce serveur rejoue donc `vercel.json` : redirections, en-têtes, réécriture de
 toute adresse inconnue vers `index.html`. Il ajoute la compression à la volée
@@ -48,6 +50,12 @@ TYPES_COMPRESSIBLES = (
     "application/json",
     "application/manifest+json",
 )
+
+# Compresser `main.dart.js` (3,7 Mo) coûte plus d'une seconde de processeur.
+# Un CDN le fait une fois ; sans ce cache, ce serveur le referait à chaque
+# requête et toute mesure de temps de chargement mesurerait la machine de
+# développement au lieu du réseau (ticket 037).
+_CACHE: dict[str, bytes] = {}
 
 
 def entetes_pour(chemin: str) -> dict[str, str]:
@@ -96,15 +104,21 @@ class Serveur(BaseHTTPRequestHandler):
             # Réécriture : go_router résout la route côté client.
             fichier = os.path.join(SORTIE, "index.html")
 
-        with open(fichier, "rb") as source:
-            octets = source.read()
         type_mime = mimetypes.guess_type(fichier)[0] or "application/octet-stream"
         entetes = entetes_pour(chemin)
 
         compressible = type_mime.startswith(TYPES_COMPRESSIBLES)
         accepte_gzip = "gzip" in self.headers.get("Accept-Encoding", "")
-        if compressible and accepte_gzip and "Content-Encoding" not in entetes:
-            octets = gzip.compress(octets, 6)
+        compresser = compressible and accepte_gzip and "Content-Encoding" not in entetes
+
+        empreinte = f"{fichier}|{compresser}"
+        if empreinte not in _CACHE:
+            with open(fichier, "rb") as source:
+                brut = source.read()
+            _CACHE[empreinte] = gzip.compress(brut, 6) if compresser else brut
+        octets = _CACHE[empreinte]
+
+        if compresser:
             entetes["Content-Encoding"] = "gzip"
             entetes["Vary"] = "Accept-Encoding"
 
