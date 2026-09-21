@@ -286,21 +286,27 @@ class _Case extends StatelessWidget {
             ? theme.colorScheme.surfaceDim
             : theme.colorScheme.surface,
         borderRadius: AppRadius.caseRegistreRadius,
-        border: Border(
-          top: BorderSide(color: statuts.filetDecoratif),
-          right: BorderSide(color: statuts.filetDecoratif),
-          bottom: BorderSide(color: statuts.filetDecoratif),
-          // Le jour courant porte un filet `primary` de 2 dp sur son bord
-          // gauche, comme `DayCell` au ticket 011.
-          left: aujourdhui
-              ? BorderSide(
-                  color: theme.colorScheme.primary,
-                  width: AppStroke.etat,
-                )
-              : BorderSide(color: statuts.filetDecoratif),
-        ),
+        border: Border.all(color: statuts.filetDecoratif),
       ),
-      child: contenu,
+      child: Stack(
+        children: <Widget>[
+          // Le jour courant porte un filet `primary` de 2 dp sur son bord
+          // gauche, comme `DayCell` au ticket 011 — posé par-dessus le bloc et
+          // non dans sa bordure : un `Border` non uniforme et un rayon de coin
+          // ne cohabitent pas.
+          if (aujourdhui)
+            PositionedDirectional(
+              top: 0,
+              bottom: 0,
+              start: 0,
+              child: ColoredBox(
+                color: theme.colorScheme.primary,
+                child: const SizedBox(width: AppStroke.etat),
+              ),
+            ),
+          contenu,
+        ],
+      ),
     );
 
     final jourEtDate = dateAvecJourSemaine(date);

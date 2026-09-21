@@ -160,7 +160,12 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
     final detail = fraicheur == null
         ? null
         : AppStrings.astreintesFraicheur(
-            formaterInstantRelatif(fraicheur),
+            // La même horloge que le tri « à venir » / « passé ». Deux
+            // horloges sur un même écran finissent toujours par se contredire.
+            formaterInstantRelatif(
+              fraicheur,
+              maintenant: ref.read(horlogeAstreintesProvider)(),
+            ),
           );
 
     if (!enLigne) {
@@ -299,10 +304,14 @@ class _Liste extends StatelessWidget {
             itemCount: elements.length + entete,
             itemBuilder: (BuildContext context, int index) {
               if (vide && index == 0) {
-                return SizedBox(
-                  height:
-                      MediaQuery.sizeOf(context).height *
-                      (elements.isEmpty ? 0.5 : 0.4),
+                return ConstrainedBox(
+                  // Un **minimum**, jamais une hauteur figée : l'état vide
+                  // grandit avec l'échelle de texte au lieu de déborder.
+                  constraints: BoxConstraints(
+                    minHeight: elements.isEmpty
+                        ? MediaQuery.sizeOf(context).height * 0.5
+                        : 0,
+                  ),
                   child: EmptyState(
                     titre: AppStrings.videAstreintesTitre,
                     texte: AppStrings.videAstreintesTexte,
