@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 048 | [Finition de l'écran d'import des membres](in-progress/048-finition-import-membres.md) | P1 | 047 | — |
 
 ## À faire
 
@@ -63,4 +62,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 045 | [Destination perdue au chargement à froid d'un écran d'administration](done/045-destination-perdue-a-froid.md) | P1 | 024 031 | https://github.com/slider973/astreinte-manager/pull/44 |
 | 046 | [Servir les routes sans dièse, pour que la connexion par lien fonctionne](done/046-strategie-url-sans-diese.md) | P0 — bloquant en production | 032 | https://github.com/slider973/astreinte-manager/pull/42 |
 | 047 | [Importer les membres d'une caserne depuis un fichier](done/047-import-membres.md) | P0 | 006 009 038 | https://github.com/slider973/astreinte-manager/pull/43 |
+| 048 | [Finition de l'écran d'import des membres](done/048-finition-import-membres.md) | P1 | 047 | — |
 
