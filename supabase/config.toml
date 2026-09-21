@@ -590,6 +590,16 @@ email_sent = 60
 # Une seconde entre deux envois est bon pour Mailpit, pas pour de vraies boîtes.
 [remotes.production.auth.email]
 max_frequency = "60s"
+# **Confirmation d'adresse : la production reste comme elle est.** Le bloc de
+# base la met à faux parce que Mailpit avale tout et qu'un aller-retour de plus
+# ralentit chaque test ; cette valeur vient du gabarit `supabase init`, pas d'une
+# décision. La pousser à faux ouvrirait l'inscription directe à n'importe quelle
+# adresse non vérifiée — le formulaire de connexion crée le compte au premier
+# code demandé. Sur l'invitation, elle n'a aucun effet : `invite-member` crée le
+# compte par l'API d'administration avec `email_confirm: true`, l'adresse est
+# donc déjà confirmée quand le pompier reçoit son courriel. Vrai, donc : ce que
+# la production porte déjà, et ce qu'elle doit porter.
+enable_confirmations = true
 
 # **Le serveur d'envoi.** Resté celui de Supabase, il interdit tout gabarit
 # personnalisé : c'est la cause directe du courriel anglais. Le mot de passe est
@@ -605,6 +615,27 @@ user = "resend"
 pass = "env(SUPABASE_AUTH_SMTP_PASSWORD)"
 admin_email = "invitations@staticflow.ch"
 sender_name = "Astreinte SP"
+
+# **`auth.sms.twilio.enabled` n'est pas déclarée ici, et c'est délibéré.**
+# `config diff` la rend en écart — dépôt `false`, production `true` — sans qu'une
+# décision produit soit derrière : le bloc de base porte la valeur du gabarit
+# `supabase init`, et le `true` d'en face n'est pas un branchement. L'API hébergée
+# rend toujours un `sms_provider`, le sien vaut « twilio » par défaut ;
+# `external_phone_enabled` est à faux, aucun compte Twilio n'est renseigné, aucun
+# SMS ne part et aucun ne partira — le MVP n'authentifie que par courriel.
+#
+# Les deux valeurs ne se rejoindront jamais, et les deux façons de les rapprocher
+# échouent :
+#   - écrire `[remotes.production.auth.sms.twilio] enabled = true` est refusé par
+#     le CLI, qui exige alors `account_sid` et `message_service_sid` — mesuré le
+#     21 septembre 2026 : « Missing required field in config:
+#     auth.sms.twilio.account_sid ». Les inventer écrirait un faux en production ;
+#   - la pousser à `false` ne tient pas : l'API renormalise et la redonne `true`
+#     au passage suivant, donc elle clignoterait à chaque déploiement.
+# Elle est donc **non poussée et non comparée** : `scripts/verifier_production.sh`
+# la range dans les propriétés qui ne peuvent pas converger, en le disant.
+# Le jour où une caserne voudra de vrais SMS, ce sont les identifiants Twilio qui
+# manqueront, pas cette ligne.
 
 # Les trois blocs qui suivent ne changent rien : ils **empêchent** `config push`
 # de ramener la production sur des valeurs de développement. Sans eux, la mise en
@@ -631,7 +662,7 @@ max_namespaces = 10
 # les migrations. La mise en ligne la pose donc à chaque passage, sans effet quand
 # elle est déjà bonne, et `scripts/verifier_production.sh` la contrôle ensuite.
 # Ce n'est pas un secret : c'est l'adresse publique de la fonction. Le secret qui
-# l'accompagne (`notify_shared_secret`) est engendré au hasard par la migration et
+# l'accompagne (`notify_internal_secret`) est engendré au hasard par la migration et
 # n'est recopié nulle part — voir supabase/functions/README.md.
 [remotes.production.db.vault]
 notify_function_url = "https://axvflcgwsmrjrnjheoly.supabase.co/functions/v1/send-notification"
