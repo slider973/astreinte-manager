@@ -140,6 +140,8 @@ jobs:
           deno check accept-invitation/index.ts
           deno check publish-schedule/index.ts
           deno check reassign-shift/index.ts
+          deno check create-checkout/index.ts
+          deno check stripe-webhook/index.ts
 
       - name: Tester
         run: deno test tests/ --allow-env

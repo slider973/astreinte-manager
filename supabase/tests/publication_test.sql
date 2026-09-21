@@ -549,8 +549,10 @@ begin
     'not_admin', 'l''admin de la caserne voisine ne publie pas');
 
   -- Caserne suspendue : lecture seule, publication comprise.
+  -- `on conflict` : depuis la migration 0023, la ligne existe déjà (essai).
   insert into subscriptions (station_id, status)
-  values ('55555555-0000-4000-8000-000000000001', 'suspended');
+  values ('55555555-0000-4000-8000-000000000001', 'suspended')
+  on conflict (station_id) do update set status = excluded.status;
   perform tests_pub.egal(
     publish_schedule(planning, '55555555-0000-4000-8000-000000000100') ->> 'code',
     'station_suspended', 'une caserne suspendue ne publie pas');

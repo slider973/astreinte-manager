@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests de bout en bout des Edge Functions : invitations (ticket 006), envoi de
 # notifications (ticket 025), publication d'un planning (ticket 019),
-# réattribution d'un créneau refusé (ticket 020) et ligne interne d'un envoi
-# définitivement abandonné (ticket 040).
+# réattribution d'un créneau refusé (ticket 020), ligne interne d'un envoi
+# définitivement abandonné (ticket 040) et abonnement par caserne (ticket 029).
 #
 #   supabase start
 #   supabase functions serve          # dans un autre terminal
@@ -121,7 +121,12 @@ nettoyer() {
        delete from notifications where type <> 'invitation';
        delete from notification_outbox;
        delete from push_tokens where token like 'jeton-test-%';
-       update profiles set push_enabled = true where push_enabled = false;" >/dev/null
+       update profiles set push_enabled = true where push_enabled = false;
+       delete from audit_log where action like 'subscription.%';
+       -- Les traces laissées par les sections 15 à 17 : sans elles, deux
+       -- exécutions de suite comptent les lignes de la précédente.
+       delete from audit_log where action like 'assignment.%'
+                                or action like 'schedule.%';" >/dev/null
 
   # Le planning du test de publication. Depuis la migration 0019, un planning
   # publié ne se supprime plus — pas même par le rôle de service, et c'est tout
@@ -800,6 +805,198 @@ verifier "la réponse dit les places tenues" "1" "$(jq -r '.error.filled' <<<"$C
 verifier "et les places demandées" "1" "$(jq -r '.error.required' <<<"$CORPS")"
 verifier "rien de plus n'est parti" "1" \
   "$(sql "select count(*) from notifications where channel = 'inapp'")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 18. create-checkout : qui a le droit d'"'"'ouvrir un paiement'
+# ---------------------------------------------------------------------------
+# `create-checkout` ouvre une session de paiement **et** le portail de gestion,
+# où l'on peut résilier. Le droit s'établit en base, jamais sur le `station_id`
+# du corps de la requête.
+appeler create-checkout - "{\"station_id\":\"$STATION_A\",\"action\":\"state\"}"
+verifier "sans jeton porteur : 401" "401" "$STATUT"
+
+appeler create-checkout "$ANON_KEY" "{\"station_id\":\"$STATION_A\",\"action\":\"state\"}"
+verifier "la clé anon seule ne suffit pas : 401" "401" "$STATUT"
+verifier "code unauthenticated" "unauthenticated" "$(jq -r '.error.code' <<<"$CORPS")"
+
+appeler create-checkout "$MEMBRE_A" "{\"station_id\":\"$STATION_A\",\"action\":\"state\"}"
+verifier "un membre simple ne voit pas l'abonnement : 403" "403" "$STATUT"
+verifier "code not_admin" "not_admin" "$(jq -r '.error.code' <<<"$CORPS")"
+
+appeler create-checkout "$ADMIN_B" "{\"station_id\":\"$STATION_A\",\"action\":\"state\"}"
+verifier "un admin d'une autre caserne : 403" "403" "$STATUT"
+verifier "et le message ne dit pas si la caserne existe" "not_admin" \
+  "$(jq -r '.error.code' <<<"$CORPS")"
+
+appeler create-checkout "$ADMIN_A" "{\"station_id\":\"$STATION_INCONNUE\",\"action\":\"state\"}"
+verifier "une caserne inconnue : 403, pas 404" "403" "$STATUT"
+
+appeler create-checkout "$ADMIN_A" '{}'
+verifier "sans station_id : 400" "400" "$STATUT"
+verifier "code invalid_body" "invalid_body" "$(jq -r '.error.code' <<<"$CORPS")"
+
+appeler create-checkout "$ADMIN_A" "{\"station_id\":\"$STATION_A\",\"action\":\"resilier\"}"
+verifier "une action inconnue : 400" "400" "$STATUT"
+
+code_http="$(curl -s -o /dev/null -w '%{http_code}' -X GET \
+  "$API_URL/functions/v1/create-checkout" -H "apikey: $ANON_KEY" \
+  -H "Authorization: Bearer $ADMIN_A" || true)"
+verifier "un GET est refusé : 405" "405" "$code_http"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 19. create-checkout : l'"'"'état, sans compte chez le prestataire'
+# ---------------------------------------------------------------------------
+# **Le cas du projet aujourd'"'"'hui.** L'action « state » répond quand même :
+# c'est ce qui permet à l'écran d'annoncer le tarif au lieu de planter.
+appeler create-checkout "$ADMIN_A" "{\"station_id\":\"$STATION_A\",\"action\":\"state\"}"
+verifier "l'état se lit : 200" "200" "$STATUT"
+verifier "les tarifs sont ceux du PRD, en centimes" "1200" \
+  "$(jq -r '.prices.monthly' <<<"$CORPS")"
+verifier "et l'annuel aussi" "12000" "$(jq -r '.prices.yearly' <<<"$CORPS")"
+verifier "la caserne du seed est en essai" "trialing" \
+  "$(jq -r '.subscription.status' <<<"$CORPS")"
+verifier "avec sa date de fin d'essai" "true" \
+  "$(jq -r '.subscription.trial_ends_at != null' <<<"$CORPS")"
+verifier "aucun portail à ouvrir" "false" "$(jq -r '.portal_available' <<<"$CORPS")"
+
+# Ce que la fonction répond dépend de ce que le propriétaire a branché. Les deux
+# cas sont vérifiés, et c'est le second — sans compte — qui est celui du projet
+# aujourd'hui.
+if [ -z "${STRIPE_WEBHOOK_SECRET:-}" ]; then
+  verifier "sans compte, l'état le dit" "false" "$(jq -r '.configured' <<<"$CORPS")"
+
+  # Souscrire sans compte : refus clair, jamais une erreur serveur.
+  appeler create-checkout "$ADMIN_A" \
+    "{\"station_id\":\"$STATION_A\",\"action\":\"checkout\",\"plan\":\"monthly\"}"
+  verifier "souscrire sans compte : 503" "503" "$STATUT"
+  verifier "code stripe_not_configured" "stripe_not_configured" \
+    "$(jq -r '.error.code' <<<"$CORPS")"
+
+  appeler create-checkout "$ADMIN_A" "{\"station_id\":\"$STATION_A\",\"action\":\"portal\"}"
+  verifier "le portail non plus : 503" "503" "$STATUT"
+else
+  verifier "avec un compte, l'état le dit" "true" "$(jq -r '.configured' <<<"$CORPS")"
+
+  # Une formule inconnue est refusée **avant** tout appel au prestataire.
+  appeler create-checkout "$ADMIN_A" \
+    "{\"station_id\":\"$STATION_A\",\"action\":\"checkout\",\"plan\":\"weekly\"}"
+  verifier "une formule inconnue : 400" "400" "$STATUT"
+  verifier "code invalid_plan" "invalid_plan" "$(jq -r '.error.code' <<<"$CORPS")"
+
+  # Sans client chez le prestataire, il n'y a rien à gérer : 409, et la phrase
+  # le dit. Ce n'est pas une panne.
+  appeler create-checkout "$ADMIN_A" "{\"station_id\":\"$STATION_A\",\"action\":\"portal\"}"
+  verifier "le portail sans client : 409" "409" "$STATUT"
+  verifier "code no_customer" "no_customer" "$(jq -r '.error.code' <<<"$CORPS")"
+fi
+
+# Et la caserne écrit toujours : une caserne sans abonnement configuré reste
+# pleinement utilisable (`station_writable`, migration 0007).
+verifier "la caserne reste en écriture" "t" \
+  "$(sql "select station_writable('$STATION_A')")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 20. stripe-webhook : un événement non signé est rejeté'
+# ---------------------------------------------------------------------------
+# **Le point de sécurité du ticket 029.** Cette fonction est publique par
+# nature : Stripe appelle sans jeton. La signature est donc tout ce qui
+# distingue un vrai événement d'un événement forgé — et un événement forgé
+# vaudrait « cette caserne est active », ou « suspendue », sans qu'un euro
+# ait circulé.
+EVENEMENT="{\"id\":\"evt_forge\",\"type\":\"invoice.paid\",\"data\":{\"object\":{\"customer\":\"cus_forge\"}}}"
+
+webhook() { # webhook <en-tête de signature|-> <corps>
+  local entetes=(-H 'content-type: application/json')
+  [ "$1" != "-" ] && entetes+=(-H "Stripe-Signature: $1")
+  local reponse
+  reponse="$(curl -s -w $'\n%{http_code}' -X POST "$API_URL/functions/v1/stripe-webhook" \
+    "${entetes[@]}" -d "$2")"
+  STATUT="$(printf '%s' "$reponse" | tail -1)"
+  CORPS="$(printf '%s' "$reponse" | sed '$d')"
+}
+
+code_http="$(curl -s -o /dev/null -w '%{http_code}' -X GET \
+  "$API_URL/functions/v1/stripe-webhook" || true)"
+verifier "un GET est refusé : 405" "405" "$code_http"
+
+webhook - "$EVENEMENT"
+if [ -z "${STRIPE_WEBHOOK_SECRET:-}" ]; then
+  # Tant qu'aucun secret n'est posé, **tout** est refusé : le repli n'est pas
+  # « accepter sans vérifier », ce serait ouvrir la porte en grand.
+  verifier "sans secret configuré, rien n'est traité : 503" "503" "$STATUT"
+  verifier "code stripe_not_configured" "stripe_not_configured" \
+    "$(jq -r '.error.code' <<<"$CORPS")"
+
+  webhook "t=1730000000,v1=$(printf 'f%.0s' {1..64})" "$EVENEMENT"
+  verifier "un événement forgé non plus : 503" "503" "$STATUT"
+else
+  verifier "sans en-tête de signature : 400" "400" "$STATUT"
+  verifier "code missing_signature" "missing_signature" \
+    "$(jq -r '.error.code' <<<"$CORPS")"
+fi
+
+# Et rien n'a bougé en base : c'est la vérification qui compte.
+verifier "aucun abonnement n'a changé de statut" "trialing" \
+  "$(sql "select status from subscriptions where station_id = '$STATION_A'")"
+verifier "aucune ligne d'audit de paiement" "0" \
+  "$(sql "select count(*) from audit_log where action like 'subscription.%'")"
+
+# **Avec un secret posé**, la signature devient la seule porte. Ce bloc n'est
+# joué que si `supabase functions serve --env-file` a fourni le secret : sans
+# lui, la fonction répond 503 et le test ci-dessus le vérifie déjà.
+if [ -n "${STRIPE_WEBHOOK_SECRET:-}" ]; then
+  echo '    (secret de test présent : vérification de la signature complète)'
+  signer() { # signer <horodatage> <corps>
+    printf '%s.%s' "$1" "$2" \
+      | openssl dgst -sha256 -hmac "$STRIPE_WEBHOOK_SECRET" -hex \
+      | sed 's/^.*= //'
+  }
+  T="$(date +%s)"
+
+  webhook "t=$T,v1=$(signer "$T" "$EVENEMENT")" "$EVENEMENT"
+  verifier "un événement signé passe : 200" "200" "$STATUT"
+  verifier "et un client inconnu est ignoré, pas rejoué" "station_not_found" \
+    "$(jq -r '.skipped' <<<"$CORPS")"
+
+  webhook "t=$T,v1=$(printf 'f%.0s' {1..64})" "$EVENEMENT"
+  verifier "une signature forgée : 400" "400" "$STATUT"
+  verifier "code signature_mismatch" "signature_mismatch" \
+    "$(jq -r '.error.code' <<<"$CORPS")"
+
+  VIEUX=$((T - 3600))
+  webhook "t=$VIEUX,v1=$(signer "$VIEUX" "$EVENEMENT")" "$EVENEMENT"
+  verifier "un événement rejoué une heure plus tard : 400" "400" "$STATUT"
+  verifier "code timestamp_out_of_tolerance" "timestamp_out_of_tolerance" \
+    "$(jq -r '.error.code' <<<"$CORPS")"
+
+  ALTERE="${EVENEMENT/cus_forge/cus_autre}"
+  webhook "t=$T,v1=$(signer "$T" "$EVENEMENT")" "$ALTERE"
+  verifier "un corps modifié après signature : 400" "400" "$STATUT"
+
+  # Le tour complet : un événement signé qui touche vraiment une caserne.
+  sql "update subscriptions set stripe_customer_id = 'cus_test_029'
+        where station_id = '$STATION_A'" >/dev/null
+
+  PAYE="{\"id\":\"evt_paye\",\"type\":\"invoice.paid\",\"data\":{\"object\":{\"customer\":\"cus_test_029\",\"subscription\":\"sub_test_029\",\"period_end\":1800000000}}}"
+  webhook "t=$T,v1=$(signer "$T" "$PAYE")" "$PAYE"
+  verifier "invoice.paid signé : 200" "200" "$STATUT"
+  verifier "la caserne devient active" "active" "$(jq -r '.status' <<<"$CORPS")"
+  verifier "et la base le dit aussi" "active" \
+    "$(sql "select status from subscriptions where station_id = '$STATION_A'")"
+  verifier "le passage est journalisé" "1" \
+    "$(sql "select count(*) from audit_log where action = 'subscription.invoice.paid'")"
+
+  # Remise du décor : la caserne du seed repart en essai.
+  sql "update subscriptions
+          set status = 'trialing', stripe_customer_id = null,
+              stripe_subscription_id = null, plan = null,
+              current_period_end = null, suspended_at = null
+        where station_id = '$STATION_A';
+       delete from audit_log where action like 'subscription.%';" >/dev/null
+fi
 
 # ---------------------------------------------------------------------------
 echo ''

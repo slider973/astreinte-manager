@@ -52,7 +52,7 @@
 -- date, ce qui est le comportement voulu — on ne raccourcit pas un essai déjà
 -- promis.
 create function subscription_bootstrap() returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, pg_temp as $$
 begin
   insert into subscriptions (station_id, status, trial_ends_at)
   values (new.id, 'trialing', now() + interval '60 days')
@@ -114,7 +114,7 @@ create function subscription_sync(
   p_event       text                default null,
   p_reference   timestamptz         default now()
 ) returns jsonb
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v_station uuid;
   v_avant   subscriptions%rowtype;
@@ -217,7 +217,7 @@ revoke execute on function subscription_sync(uuid, text, text, subscription_stat
 -- moment-là rien n'est payé.
 create function subscription_set_customer(p_station uuid, p_customer text)
 returns jsonb
-language sql security definer set search_path = public as $$
+language sql security definer set search_path = public, pg_temp as $$
   select subscription_sync(
     p_station  => p_station,
     p_customer => p_customer,
@@ -253,7 +253,7 @@ revoke execute on function subscription_set_customer(uuid, text) from public, an
 -- conditions, et un rejeu après redémarrage de l'ordonnanceur ne fait rien.
 create function cron_suspend_subscriptions(p_reference timestamptz default now())
 returns integer
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   ligne     record;
   suspendus integer := 0;

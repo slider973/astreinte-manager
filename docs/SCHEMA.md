@@ -726,6 +726,23 @@ Exécution révoquée de `public`, `anon` et `authenticated` pour les trois : un
 tourne avec des droits élevés n'est pas un bouton de client. Le bouton, c'est
 `remind_schedule`.
 
+### Abonnement par caserne (migration `0023`, ticket 029)
+
+| Fonction | Rôle |
+|---|---|
+| `subscription_bootstrap()` | Déclencheur `after insert` sur `stations` : toute caserne naît en `trialing` avec `trial_ends_at = now() + 60 jours`. **L'essai est géré côté application, sans carte bancaire** (`docs/PRD.md § 6.6`) — aucun essai n'est déclaré chez le prestataire. `on conflict do nothing` : une ligne posée à la main reste telle quelle |
+| `subscription_sync(p_station, p_customer, p_subscription, p_status, p_plan, p_period_end, p_event, p_reference)` | **Le seul chemin d'écriture de `subscriptions`.** Appelée par `stripe-webhook` une fois la signature vérifiée. Retrouve la caserne par `p_station` (le `client_reference_id` de la session) ou par `p_customer` ; verrou de ligne ; les paramètres **nuls ne remplacent rien**, ce qui rend les cinq événements applicables dans n'importe quel ordre ; tient `suspended_at` ; journalise `subscription.<événement>` dans `audit_log`. Une caserne introuvable rend `station_not_found` sans erreur — l'événement ne nous concerne pas |
+| `subscription_set_customer(p_station, p_customer)` | Retient l'identifiant client du prestataire **sans toucher au statut** : au moment où `create-checkout` crée le client, rien n'est encore payé |
+| `cron_suspend_subscriptions(p_reference)` | Corps de la tâche `suspend_subscriptions` (§ 8). Deux populations : essai expiré **sans abonnement souscrit** (la condition sur `stripe_subscription_id` évite de suspendre une caserne qui vient de payer), et `past_due` dont `coalesce(current_period_end, updated_at)` remonte à plus de quatorze jours. Idempotente |
+
+Les trois premières sont réservées au rôle de service ; la quatrième à l'ordonnanceur. Aucune
+n'est appelable par `anon` ni `authenticated`.
+
+**Pourquoi `current_period_end` et non `updated_at`** pour dater un impayé : le prestataire
+n'avance `current_period_end` qu'après un paiement réussi, alors qu'`updated_at` bouge à **chaque**
+tentative de carte. Compter les quatorze jours sur `updated_at` repousserait indéfiniment la
+suspension d'une caserne dont la carte est relancée tous les trois jours.
+
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
 Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
@@ -1158,8 +1175,8 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `auto-propose` | app admin | Heuristique de remplissage du brouillon |
 | `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`) |
 | `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006) |
-| `stripe-webhook` | Stripe | Met à jour `subscriptions` |
-| `create-checkout` | app admin | Crée une session Stripe Checkout |
+| `stripe-webhook` | Stripe | **Vérifie la signature de l'événement** (HMAC-SHA256 du corps brut, fenêtre de cinq minutes), puis applique les cinq événements de l'abonnement par `subscription_sync`. Un événement non signé, mal signé ou rejoué est refusé en 4xx ; sans secret configuré, **tout** est refusé en 503 (ticket 029, contrat dans `supabase/functions/README.md`) |
+| `create-checkout` | app admin | Trois actions pour l'écran « Abonnement » : `state` (statut, tarifs, configuration — **répond même sans compte Stripe**), `checkout` (crée le client si besoin, ouvre la session, rend l'adresse) et `portal` (portail de gestion). Rôle d'administrateur revérifié en base (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `ics-feed` | GET public avec token par membre | Génère le flux calendrier des astreintes acceptées |
 | `export-user-data` | app | Export RGPD en JSON |
 
@@ -1173,6 +1190,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `availability_reminders` | tous les jours 09:00 | `select public.cron_availability_reminders();` — push J-3 et email J-1 aux membres actifs sans aucune ligne `availabilities` sur le mois d'une période ouverte *(migration `0016`)* |
 | `assignment_reminders` | toutes les heures (:15) | `select public.cron_assignment_reminders();` — rappel push à `response_reminder_hours`, courriel à `response_email_hours`, aux membres actifs dont l'attribution est restée sans réponse *(migration `0021`)* |
 | `late_responders_report` | toutes les heures (:45) | `select public.cron_late_responders_report();` — notifie les admins des attributions en attente depuis plus de `late_report_hours`, une fois par jour et par planning, entre 08:00 et 20:59 heure de la caserne *(migration `0021`)* |
+| `suspend_subscriptions` | tous les jours 03:30 | `select public.cron_suspend_subscriptions();` — passe en `suspended` les essais expirés sans abonnement et les `past_due` dont la dernière période payée remonte à plus de 14 jours. **Rien n'est supprimé** : la caserne passe en lecture seule via `station_writable()` *(migration `0023`)* |
 | `archive_schedules` | 1er du mois | Archive les plannings des mois passés |
 | `prune_notifications` | hebdomadaire | Supprime les notifications lues de plus de 90 jours |
 
@@ -1287,7 +1305,8 @@ Ordre proposé :
 20. `0020_reattribution.sql` (ticket 020 : `assignments_guard_reattribution`, `reassign_shift`, `cancel_assignment`, clause `when` de `schedule_auto_validate` élargie aux acceptations qui disparaissent)
 21. `0021_cron_relances.sql` (ticket 022 : `assignment_reminder_targets`, `cron_assignment_reminders`, `cron_late_responders_report`, les deux tâches `pg_cron` des relances)
 22. `0022_notification_echec_definitif.sql` (ticket 040 : `notify_trace_echec`, `cron_dispatch_notifications` trace désormais ses abandons)
-22. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
+23. `0023_abonnement_stripe.sql` (ticket 029 : `subscription_bootstrap` et son déclencheur, `subscription_sync`, `subscription_set_customer`, `cron_suspend_subscriptions` et la tâche `suspend_subscriptions`)
+24. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
     `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des

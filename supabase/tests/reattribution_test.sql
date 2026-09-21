@@ -498,8 +498,11 @@ begin
    where id = '77777777-0000-4000-8000-000000000401';
 
   -- Caserne suspendue : l'application entière est en lecture seule.
+  -- `on conflict` : depuis la migration 0023, la ligne existe déjà (essai).
   insert into subscriptions (station_id, status, plan)
-  values ('77777777-0000-4000-8000-000000000001', 'suspended', 'starter');
+  values ('77777777-0000-4000-8000-000000000001', 'suspended', 'monthly')
+  on conflict (station_id) do update
+    set status = excluded.status, plan = excluded.plan;
 
   perform tests_rea.code(
     reassign_shift('77777777-0000-4000-8000-000000000402',
