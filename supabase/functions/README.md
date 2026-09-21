@@ -12,8 +12,8 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
 | `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                  |
 | `create-checkout`   | 029    | État de l'abonnement d'une caserne, ouverture d'une session de paiement, ouverture du portail de gestion — réservé aux administrateurs de la caserne  |
 | `stripe-webhook`    | 029    | Reçoit les événements du prestataire de paiement, **vérifie leur signature**, met à jour `subscriptions`                                              |
-| `delete-account`    | 007    | Le membre supprime son compte : profil anonymisé en « Membre supprimé », appartenances désactivées, attributions passées conservées                    |
-| `export-user-data`  | 034    | Le membre récupère en JSON tout ce que l'application sait de lui, et rien de ce qu'elle sait des autres                                                |
+| `delete-account`    | 007    | Le membre supprime son compte : profil anonymisé en « Membre supprimé », appartenances désactivées, attributions passées conservées                   |
+| `export-user-data`  | 034    | Le membre récupère en JSON tout ce que l'application sait de lui, et rien de ce qu'elle sait des autres                                               |
 
 ## Règles qui ne se négocient pas
 
@@ -423,10 +423,9 @@ pour cette raison. Si la lecture échoue, `compte` vaut `null` et le reste de l'
 même : un profil anonymisé survit à son compte d'authentification (migration `0026`).
 
 **Le fichier n'est pas fabriqué ici.** La réponse est du JSON, pas une pièce jointe : c'est le
-client qui compose le nom et déclenche l'enregistrement
-(`lib/core/plateforme/telechargement.dart`). Servir un `Content-Disposition` obligerait le
-navigateur à visiter l'URL lui-même, donc à porter le jeton d'accès **dans l'URL**, donc dans
-l'historique et dans les journaux de la passerelle.
+client qui compose le nom et déclenche l'enregistrement (`lib/core/plateforme/telechargement.dart`).
+Servir un `Content-Disposition` obligerait le navigateur à visiter l'URL lui-même, donc à porter le
+jeton d'accès **dans l'URL**, donc dans l'historique et dans les journaux de la passerelle.
 
 Erreurs :
 
