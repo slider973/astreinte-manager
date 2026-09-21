@@ -1239,6 +1239,7 @@ export type Database = {
         Returns: boolean
       }
       station_settings_valid: { Args: { p_settings: Json }; Returns: boolean }
+      station_slug: { Args: { p_name: string }; Returns: string }
       station_writable: { Args: { p_station: string }; Returns: boolean }
       stripe_event_close: {
         Args: { p_code: string; p_event_id: string; p_station: string }
@@ -1264,6 +1265,38 @@ export type Database = {
           p_status?: Database["public"]["Enums"]["subscription_status"]
           p_subscription?: string
         }
+        Returns: Json
+      }
+      super_admin_create_station: {
+        Args: { p_name: string; p_timezone?: string }
+        Returns: Json
+      }
+      super_admin_set_station_suspended: {
+        Args: { p_reason: string; p_station: string; p_suspended: boolean }
+        Returns: Json
+      }
+      super_admin_stations: {
+        Args: never
+        Returns: {
+          active_admins: number
+          active_members: number
+          created_at: string
+          last_published_at: string
+          last_published_month: number
+          last_published_year: number
+          name: string
+          pending_invites: number
+          slug: string
+          station_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          suspended_at: string
+          timezone: string
+          trial_ends_at: string
+          writable: boolean
+        }[]
+      }
+      super_admin_support_schedules: {
+        Args: { p_reason: string; p_station: string }
         Returns: Json
       }
       unite_weekend: { Args: { p_date: string }; Returns: string }
