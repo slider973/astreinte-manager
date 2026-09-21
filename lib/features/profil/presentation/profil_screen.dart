@@ -63,16 +63,21 @@ class ProfilScreen extends ConsumerWidget {
               onAction: () => ref.invalidate(monProfilProvider),
             )
           : null,
-      child: _Contenu(profil: profil.value),
+      child: _Contenu(profil: profil.value, enChargement: profil.isLoading),
     );
   }
 }
 
 class _Contenu extends StatelessWidget {
-  const _Contenu({required this.profil});
+  const _Contenu({required this.profil, required this.enChargement});
 
   /// `null` tant que la première lecture n'a pas répondu, ou après un échec.
   final Profil? profil;
+
+  /// Distingue « pas encore » de « pas du tout » : un échec de lecture ne doit
+  /// pas laisser un indicateur tourner indéfiniment devant quelqu'un. La
+  /// bannière de l'écran porte déjà le motif et la reprise.
+  final bool enChargement;
 
   @override
   Widget build(BuildContext context) {
@@ -105,9 +110,18 @@ class _Contenu extends StatelessWidget {
                 // Le bloc d'identité attend la première lecture : pré-remplir
                 // des champs vides puis les remplacer sous les doigts de
                 // quelqu'un qui écrit déjà serait le pire des deux mondes.
-                if (profil case final Profil lu) BlocIdentite(profil: lu),
-                if (profil == null) const _IdentiteEnAttente(),
-                const SizedBox(height: AppSpacing.auDessusTitre),
+                if (profil case final Profil lu) ...<Widget>[
+                  BlocIdentite(profil: lu),
+                  const SizedBox(height: AppSpacing.auDessusTitre),
+                ],
+                // **Un échec de lecture ne laisse rien ici.** Ni squelette ni
+                // message : la bannière de l'écran porte déjà le motif et la
+                // reprise, et un indicateur qui tourne devant quelqu'un après
+                // un renoncement le fait attendre pour rien.
+                if (profil == null && enChargement) ...<Widget>[
+                  const _IdentiteEnAttente(),
+                  const SizedBox(height: AppSpacing.auDessusTitre),
+                ],
                 const BlocCaserne(),
                 const SizedBox(height: AppSpacing.auDessusTitre),
                 // Déménagé tel quel depuis l'onglet d'accueil, où le ticket 024
@@ -137,6 +151,7 @@ class _IdentiteEnAttente extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final encre = theme.colorScheme.onSurfaceVariant;
 
     return BlocRegle(
       titre: AppStrings.profilIdentiteTitre,
@@ -150,14 +165,14 @@ class _IdentiteEnAttente extends StatelessWidget {
                 height: AppSpacing.lg,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: encre,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              Text(
-                AppStrings.actionChargement,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              Expanded(
+                child: Text(
+                  AppStrings.actionChargement,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: encre),
                 ),
               ),
             ],

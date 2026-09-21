@@ -115,6 +115,11 @@ class _Corps extends ConsumerWidget {
                   onPressed: etat.enCours
                       ? null
                       : () => Navigator.of(context).pop(false),
+                  // La raison est **annoncée** mais pas réécrite sous le
+                  // bouton : c'est la ligne d'état commune aux deux, juste en
+                  // dessous, qui la porte (`PrimaryButton.raisonVisible`).
+                  raisonDesactivation: AppStrings.suppressionEnCours,
+                  raisonVisible: false,
                 ),
                 if (etat.enCours || etat.message != null) ...<Widget>[
                   const SizedBox(height: AppSpacing.md),
