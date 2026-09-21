@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 019
 - **Branche** : `feat/044-archivage-plannings`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/37
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
