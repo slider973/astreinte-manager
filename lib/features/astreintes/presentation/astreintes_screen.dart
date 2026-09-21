@@ -1,0 +1,362 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/l10n/app_strings.dart';
+import '../../../core/l10n/format_date.dart';
+import '../../../core/reseau/connectivite.dart';
+import '../../../core/theme/app_breakpoints.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/app_banner.dart';
+import '../../../core/widgets/app_divider.dart';
+import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/entete_section.dart';
+import '../../notifications/presentation/widgets/bouton_notifications.dart';
+import '../domain/astreinte.dart';
+import '../domain/astreintes_providers.dart';
+import 'widgets/bascule_vue.dart';
+import 'widgets/calendrier_astreintes.dart';
+import 'widgets/feuille_astreinte.dart';
+import 'widgets/ligne_astreinte.dart';
+import 'widgets/squelette_astreintes.dart';
+
+/// **« Mes astreintes »** — l'écran que ce produit affichera le plus souvent
+/// une fois le planning validé.
+///
+/// Il répond à une seule question — « suis-je d'astreinte, et quand ? » — et il
+/// doit y répondre **sans réseau** : une caserne est un bâtiment de béton dans
+/// une zone rurale (`design/027 § 1`). La source de vérité de l'affichage est
+/// donc le cache local, et la requête vient par-dessus.
+///
+/// L'écran vit dans l'onglet 2 de la coquille d'accueil, la destination
+/// « Astreintes », où mène déjà le lien public `/schedule/<période>` d'une
+/// notification de planning validé.
+class AstreintesScreen extends ConsumerStatefulWidget {
+  const AstreintesScreen({
+    required this.destinations,
+    required this.indexSelectionne,
+    required this.onDestination,
+    required this.onVersPropositions,
+    super.key,
+  });
+
+  /// Au-delà de cette échelle de texte, la vue calendrier **change de forme**
+  /// plutôt que de rogner : elle cède la place à la liste
+  /// (`DESIGN.md § Typography — Named Rules`).
+  static const double echelleMaxCalendrier = 1.6;
+
+  final List<AppDestination> destinations;
+  final int indexSelectionne;
+  final ValueChanged<int> onDestination;
+
+  /// L'action de l'état vide : il n'y a rien à consulter, il y a peut-être
+  /// quelque chose à répondre.
+  final VoidCallback onVersPropositions;
+
+  @override
+  ConsumerState<AstreintesScreen> createState() => _AstreintesScreenState();
+}
+
+class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
+    with WidgetsBindingObserver {
+  VueAstreintes _vue = VueAstreintes.liste;
+
+  /// Le mois affiché par le calendrier. `null` tant qu'il n'a pas été ouvert :
+  /// il s'ouvre alors sur le mois courant.
+  DateTime? _mois;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // **Le cache d'abord, la requête ensuite.** `build()` du contrôleur rend
+    // l'instantané local sans attendre le réseau ; c'est ici, à la première
+    // image, qu'on va chercher mieux.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final etat = ref.read(astreintesControllerProvider).value;
+      if (etat != null && etat.depuisCache) _rafraichir();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Le retour au premier plan est le seul moment où la liste peut avoir
+  /// vieilli sans qu'on l'ait demandé. Posé dans l'écran et non dans le
+  /// contrôleur, qui vit sur tous les onglets (même raison qu'au ticket 021).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState etat) {
+    if (etat == AppLifecycleState.resumed) _rafraichir();
+  }
+
+  void _rafraichir() {
+    unawaited(ref.read(astreintesControllerProvider.notifier).rafraichir());
+  }
+
+  void _ouvrir(List<Astreinte> astreintes, HeuresAffichage heures) {
+    unawaited(
+      ouvrirDetailAstreinte(
+        context,
+        astreintes: astreintes,
+        heures: heures,
+      ),
+    );
+  }
+
+  /// Vrai quand le calendrier ne tient plus : au-delà de ×1,6, sept colonnes
+  /// coupent leurs chiffres.
+  bool get _calendrierTropGrand =>
+      MediaQuery.textScalerOf(context).scale(16) / 16 >
+      AstreintesScreen.echelleMaxCalendrier;
+
+  @override
+  Widget build(BuildContext context) {
+    final etat = ref.watch(astreintesControllerProvider);
+    final enLigne = ref.watch(enLigneProvider).value ?? true;
+    final valeur = etat.value;
+
+    // Le bouton « Calendrier » cesse d'être sélectionnable **et** la vue
+    // retombe sur la liste : un bouton sélectionné qui montre autre chose que
+    // ce qu'il nomme est un mensonge.
+    final vue = _calendrierTropGrand ? VueAstreintes.liste : _vue;
+
+    return AppScaffold(
+      titre: AppStrings.astreintesTitre,
+      destinations: widget.destinations,
+      indexSelectionne: widget.indexSelectionne,
+      onDestination: widget.onDestination,
+      actions: <Widget>[
+        // Le geste de tirage n'est jamais le seul chemin : il lui faut son
+        // équivalent visible, au clavier comme à la souris.
+        IconButton(
+          onPressed: _rafraichir,
+          icon: const Icon(Icons.refresh),
+          tooltip: AppStrings.astreintesRafraichir,
+        ),
+        const BoutonNotifications(),
+      ],
+      banniere: _banniere(enLigne: enLigne, valeur: valeur),
+      child: _corps(etat: etat, vue: vue),
+    );
+  }
+
+  /// **Une seule bannière à la fois**, par l'ordre de priorité du système.
+  ///
+  /// Hors ligne, cet écran ne promet pas d'envoyer des modifications — il ne
+  /// fait que lire. Ce qu'il dit, c'est l'âge de ce qu'on lit
+  /// (`design/027 § 9`).
+  AppBanner? _banniere({
+    required bool enLigne,
+    required EtatAstreintes? valeur,
+  }) {
+    if (valeur == null) return null;
+    final fraicheur = valeur.donnees.luLe;
+    final detail = fraicheur == null
+        ? null
+        : AppStrings.astreintesFraicheur(
+            formaterInstantRelatif(fraicheur),
+          );
+
+    if (!enLigne) {
+      return AppBanner(
+        variante: AppBannerVariante.horsLigne,
+        texte: AppStrings.astreintesHorsLigne,
+        detail: detail,
+      );
+    }
+
+    if (valeur.depuisCache) {
+      return AppBanner(
+        variante: AppBannerVariante.attention,
+        texte: AppStrings.astreintesNonActualisees,
+        detail: detail,
+        libelleAction: AppStrings.actionReessayer,
+        onAction: _rafraichir,
+      );
+    }
+
+    return null;
+  }
+
+  Widget _corps({
+    required AsyncValue<EtatAstreintes> etat,
+    required VueAstreintes vue,
+  }) {
+    if (etat.isLoading && !etat.hasValue) {
+      return const SqueletteAstreintes();
+    }
+
+    if (etat.hasError && !etat.hasValue) {
+      final enLigne = ref.read(enLigneProvider).value ?? true;
+      // Le seul cas où l'écran n'a vraiment rien : pas de cache, pas de
+      // réseau. La phrase nomme alors ce qui manque.
+      return enLigne
+          ? EmptyState.erreur(
+              texte: AppStrings.astreintesErreurTexte,
+              onAction: _rafraichir,
+            )
+          : EmptyState.horsLigne(onAction: _rafraichir);
+    }
+
+    final valeur = etat.value ?? const EtatAstreintes();
+    final heures = valeur.donnees.heures;
+    final aujourdhui = ref.watch(horlogeAstreintesProvider)();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        BasculeVue(
+          vue: vue,
+          onChoisir: (VueAstreintes choisie) =>
+              setState(() => _vue = choisie),
+          calendrierIndisponible: _calendrierTropGrand
+              ? AppStrings.astreintesCalendrierTropGrand
+              : null,
+        ),
+        const AppDivider(),
+        Expanded(
+          child: vue == VueAstreintes.calendrier
+              ? CalendrierAstreintes(
+                  mois:
+                      _mois ??
+                      DateTime(aujourdhui.year, aujourdhui.month),
+                  donnees: valeur.donnees,
+                  aujourdhui: aujourdhui,
+                  onMois: (DateTime mois) => setState(() => _mois = mois),
+                  onOuvrir: (List<Astreinte> astreintes) =>
+                      _ouvrir(astreintes, heures),
+                )
+              : _Liste(
+                  elements: ref.watch(elementsAstreintesProvider),
+                  heures: heures,
+                  onOuvrir: (Astreinte astreinte) =>
+                      _ouvrir(<Astreinte>[astreinte], heures),
+                  onBasculerPassees: () => ref
+                      .read(passeesOuvertesProvider.notifier)
+                      .basculer(),
+                  onRafraichir: ref
+                      .read(astreintesControllerProvider.notifier)
+                      .rafraichir,
+                  onVersPropositions: widget.onVersPropositions,
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// La liste, groupée par mois et **virtualisée**.
+///
+/// L'historique n'est jamais supprimé (`docs/PRD.md § 7.6`) : les passées se
+/// comptent en centaines après deux ans d'usage, et un `Column` dans un
+/// `SingleChildScrollView` les construirait toutes à chaque image.
+class _Liste extends StatelessWidget {
+  const _Liste({
+    required this.elements,
+    required this.heures,
+    required this.onOuvrir,
+    required this.onBasculerPassees,
+    required this.onRafraichir,
+    required this.onVersPropositions,
+  });
+
+  final List<ElementAstreintes> elements;
+  final HeuresAffichage heures;
+  final ValueChanged<Astreinte> onOuvrir;
+  final VoidCallback onBasculerPassees;
+  final Future<void> Function() onRafraichir;
+  final VoidCallback onVersPropositions;
+
+  /// Vrai quand rien n'est à venir. Le repli des passées peut alors être le
+  /// seul élément de la liste : l'état vide se pose au-dessus de lui plutôt
+  /// que de laisser une ligne seule au milieu de l'écran.
+  bool get _aucuneAVenir =>
+      elements.isEmpty || elements.first is ReplisPassees;
+
+  @override
+  Widget build(BuildContext context) {
+    final classe = AppWindowClass.of(context);
+    final marge = classe.margePage;
+    final vide = _aucuneAVenir;
+    final entete = vide ? 1 : 0;
+
+    return RefreshIndicator(
+      onRefresh: onRafraichir,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
+          child: ListView.builder(
+            // L'état vide reste tirable : c'est ainsi qu'on vérifie qu'il n'y
+            // a vraiment rien.
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(marge, 0, marge, AppSpacing.xxl),
+            itemCount: elements.length + entete,
+            itemBuilder: (BuildContext context, int index) {
+              if (vide && index == 0) {
+                return SizedBox(
+                  height:
+                      MediaQuery.sizeOf(context).height *
+                      (elements.isEmpty ? 0.5 : 0.4),
+                  child: EmptyState(
+                    titre: AppStrings.videAstreintesTitre,
+                    texte: AppStrings.videAstreintesTexte,
+                    icone: Icons.event_available_outlined,
+                    libelleAction: AppStrings.astreintesVideAction,
+                    onAction: onVersPropositions,
+                  ),
+                );
+              }
+
+              final element = elements[index - entete];
+              return switch (element) {
+                EnteteMoisAstreintes() => EnteteSection(
+                  titre: element.libelle,
+                  compte: AppStrings.astreintesCompte(element.compte),
+                  premiere: element.premier,
+                ),
+                ReplisPassees() => Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      const AppDivider(),
+                      ReplisPasseesLigne(
+                        compte: element.compte,
+                        ouvert: element.ouvert,
+                        onBasculer: onBasculerPassees,
+                      ),
+                      const AppDivider(),
+                    ],
+                  ),
+                ),
+                LigneAstreinte(:final astreinte, :final passee) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    LigneDAstreinte(
+                      key: ValueKey<String>(astreinte.id),
+                      astreinte: astreinte,
+                      heures: heures,
+                      passee: passee,
+                      onOuvrir: () => onOuvrir(astreinte),
+                    ),
+                    if (_suivant(index - entete) is LigneAstreinte)
+                      const AppDivider(),
+                  ],
+                ),
+              };
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  ElementAstreintes? _suivant(int index) =>
+      index + 1 < elements.length ? elements[index + 1] : null;
+}

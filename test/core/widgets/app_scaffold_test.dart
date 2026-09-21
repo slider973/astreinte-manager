@@ -38,7 +38,7 @@ void main() {
         <String>[
           AppStrings.navMonMois,
           AppStrings.navPropositions,
-          AppStrings.navPlanning,
+          AppStrings.navAstreintes,
           AppStrings.navProfil,
           AppStrings.navAdmin,
         ],
@@ -211,7 +211,7 @@ void main() {
         _ossature(onDestination: (index) => dernier = index),
       );
 
-      await tester.tap(find.text(AppStrings.navPlanning));
+      await tester.tap(find.text(AppStrings.navAstreintes));
       await tester.pumpAndSettle();
       expect(dernier, 2);
     });

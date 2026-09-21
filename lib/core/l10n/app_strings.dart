@@ -20,7 +20,12 @@ abstract final class AppStrings {
 
   static const String navMonMois = 'Mon mois';
   static const String navPropositions = 'Propositions';
-  static const String navPlanning = 'Planning';
+
+  /// Ni « Mes astreintes » ni « Planning » : le mot couvre les deux vues que
+  /// cette destination portera — les miennes (ticket 027) et celles de la
+  /// caserne (ticket 023), qui sont deux filtres d'une même donnée
+  /// (`design/027 § 4`).
+  static const String navAstreintes = 'Astreintes';
   static const String navProfil = 'Profil';
   static const String navAdmin = 'Admin';
   static const String navOuvrirMenu = 'Ouvrir le menu';
@@ -191,6 +196,10 @@ abstract final class AppStrings {
   static const String videPropositionsTexte =
       'Quand ton chef de centre publiera le planning, tes astreintes '
       'proposées s\'afficheront ici.';
+  static const String videAstreintesTitre = 'Aucune astreinte à venir';
+  static const String videAstreintesTexte =
+      'Quand ton chef de centre publiera le planning et que tu auras accepté '
+      'une astreinte, elle s\'affichera ici.';
 
   static const String erreurTitre = 'Ça n\'a pas marché';
   static const String erreurTexteGenerique =
@@ -2283,4 +2292,126 @@ abstract final class AppStrings {
   /// La limite du motif : court par construction, parce qu'il se lit dans une
   /// liste de trente lignes.
   static const int refusMotifLongueurMax = 120;
+
+  // -------------------------------------------------------------------
+  // Mes astreintes (ticket 027)
+  // -------------------------------------------------------------------
+
+  static const String astreintesTitre = 'Mes astreintes';
+  static const String astreintesRafraichir = 'Rafraîchir mes astreintes';
+
+  /// Le sous-titre d'un en-tête de mois : « 2 astreintes ».
+  static String astreintesCompte(int n) =>
+      n <= 1 ? '$n astreinte' : '$n astreintes';
+
+  // --- La bascule de vue --------------------------------------------------
+
+  static const String astreintesVueLabel = 'Vue de mes astreintes';
+  static const String astreintesVueListe = 'Liste';
+  static const String astreintesVueCalendrier = 'Calendrier';
+
+  /// Au-delà de ×1,6, le calendrier **change de forme** plutôt que de rogner
+  /// son texte (`DESIGN.md § Typography — Named Rules`). Un bouton désactivé
+  /// qui dit pourquoi vaut mieux qu'un bouton sélectionné qui montre autre
+  /// chose que ce qu'il nomme.
+  static const String astreintesCalendrierTropGrand =
+      'Le calendrier ne tient pas à cette taille de texte. La liste dit la '
+      'même chose.';
+
+  // --- La ligne et le créneau ---------------------------------------------
+
+  /// « 19:00 → 07:00 ». Les heures viennent des paramètres de la caserne
+  /// (`docs/SCHEMA.md § 2.1`), jamais d'un 7 h – 19 h écrit en dur.
+  static String astreintesIntervalle(String debut, String fin) =>
+      '$debut → $fin';
+
+  /// La même chose, dite : la flèche ne se lit pas à voix haute.
+  static String astreintesIntervalleDit(String debut, String fin) =>
+      'de $debut à $fin';
+
+  /// La phrase complète d'une ligne : « Samedi 12 octobre, nuit, de 19:00 à
+  /// 07:00. Voir le détail. »
+  static String astreintesLigneSemantique({
+    required String jourEtDate,
+    required String creneau,
+    required String heures,
+  }) => '$jourEtDate, ${creneau.toLowerCase()}, $heures. $astreintesVoirDetail';
+
+  static const String astreintesVoirDetail = 'Voir le détail.';
+
+  // --- Le repli des passées -----------------------------------------------
+
+  static String astreintesPassees(int n) => 'Astreintes passées ($n)';
+  static const String astreintesPasseesAfficher =
+      'Afficher les astreintes passées';
+  static const String astreintesPasseesMasquer =
+      'Masquer les astreintes passées';
+
+  // --- Le calendrier ------------------------------------------------------
+
+  static const String astreintesMoisPrecedent = 'Mois précédent';
+  static const String astreintesMoisSuivant = 'Mois suivant';
+  static const String astreintesMoisAvantDebut =
+      'Tu n\'as pas d\'astreinte avant ce mois.';
+  static const String astreintesMoisApresFin =
+      'Tu n\'as pas d\'astreinte après ce mois.';
+
+  /// « jour », « nuit », ou « jour et nuit » — ce que porte une case du
+  /// calendrier.
+  static String astreintesCreneauxDuJour(List<String> creneaux) =>
+      creneaux.map(_enMinuscule).join(' et ');
+
+  /// La phrase d'une case marquée : « Samedi 12 octobre, jour et nuit. Voir le
+  /// détail. »
+  static String astreintesJourSemantique({
+    required String jourEtDate,
+    required String creneaux,
+  }) => '$jourEtDate, $creneaux. $astreintesVoirDetail';
+
+  /// La phrase d'une case sans astreinte. Elle n'est pas actionnable, mais
+  /// elle reste lue : un calendrier où les jours vides sont muets ne se
+  /// parcourt pas au lecteur d'écran.
+  static String astreintesJourLibre(String jourEtDate) =>
+      '$jourEtDate, pas d\'astreinte';
+
+  // --- Le détail ----------------------------------------------------------
+
+  /// « Samedi 12 octobre 2026 ». Avec l'année : la feuille s'ouvre depuis un
+  /// calendrier où l'année n'est plus à l'écran.
+  static String astreintesDetailTitre(String jourEtDate, int annee) =>
+      '${jourEtDate[0].toUpperCase()}${jourEtDate.substring(1)} $annee';
+
+  static const String astreintesEquipiersTitre = 'Avec toi sur ce créneau';
+
+  /// La RLS ne rend les attributions des autres qu'une fois le planning
+  /// validé (`docs/SCHEMA.md § 4`). L'écran dit pourquoi, au lieu de montrer
+  /// une liste vide qui se lirait « personne d'autre n'est de garde ».
+  static const String astreintesEquipiersAttente =
+      'Les autres noms s\'afficheront quand ton chef de centre aura validé le '
+      'planning.';
+
+  /// Une information, pas une absence.
+  static const String astreintesSeul = 'Tu es seul sur ce créneau.';
+
+  static const String astreintesFermer = 'Fermer';
+
+  // --- Fraîcheur, hors ligne, erreurs -------------------------------------
+
+  /// « Dernière mise à jour : il y a 2 h. » Le deux-points tient aussi bien un
+  /// relatif qu'une date (« 15 sept. »), là où « mise à jour 15 sept. » ne se
+  /// lirait pas.
+  static String astreintesFraicheur(String depuis) =>
+      'Dernière mise à jour : ${_enMinuscule(depuis)}.';
+
+  /// Hors ligne, cet écran ne promet **pas** d'envoyer des modifications : il
+  /// ne fait que lire. Ce qu'il doit dire, c'est l'âge de ce qu'on lit.
+  static const String astreintesHorsLigne = 'Hors ligne.';
+
+  static const String astreintesNonActualisees =
+      'Ces astreintes n\'ont pas pu être actualisées.';
+
+  static const String astreintesErreurTexte =
+      'Impossible de charger tes astreintes.';
+
+  static const String astreintesVideAction = 'Voir mes propositions';
 }
