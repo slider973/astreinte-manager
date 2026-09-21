@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 007 | [Profil utilisateur](in-progress/007-profil.md) | P1 | 005 |  |
 
 ## À faire
 
@@ -34,6 +33,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 004 | [Thème et composants de base](done/004-design-system.md) | P1 | 001 | https://github.com/slider973/astreinte-manager/pull/4 |
 | 005 | [Connexion par email et code OTP](done/005-auth-otp.md) | P0 | 001 002 | https://github.com/slider973/astreinte-manager/pull/6 |
 | 006 | [Invitations et onboarding des membres](done/006-invitations-onboarding.md) | P0 | 005 008 | https://github.com/slider973/astreinte-manager/pull/7 |
+| 007 | [Profil utilisateur](done/007-profil.md) | P1 | 005 | https://github.com/slider973/astreinte-manager/pull/30 |
 | 008 | [Row Level Security et fonctions d'accès](done/008-rls-multi-tenant.md) | P0 | 002 | https://github.com/slider973/astreinte-manager/pull/3 |
 | 009 | [Gestion des membres par l'admin](done/009-gestion-membres.md) | P0 | 006 008 | https://github.com/slider973/astreinte-manager/pull/8 |
 | 010 | [Paramètres de la caserne](done/010-parametres-caserne.md) | P1 | 008 | https://github.com/slider973/astreinte-manager/pull/9 |

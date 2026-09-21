@@ -10,8 +10,8 @@ import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/champ_texte.dart';
 import '../../../core/widgets/ecran_simple.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../profil/domain/profil_providers.dart';
 import '../domain/parcours_accueil.dart';
-import '../domain/profil_providers.dart';
 
 /// Le complément de profil, juste après l'entrée dans la caserne.
 ///

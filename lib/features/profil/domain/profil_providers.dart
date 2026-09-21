@@ -5,12 +5,30 @@ import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../data/profil_repository.dart';
+import 'profil.dart';
 
 /// Le dépôt du profil. Surchargé par un faux dans les tests.
 final Provider<ProfilRepository> profilRepositoryProvider =
     Provider<ProfilRepository>(
       (ref) => SupabaseProfilRepository(ref.watch(supabaseClientProvider)),
     );
+
+/// Le profil de la personne connectée.
+///
+/// Relu à chaque changement de session, et **invalidé après un
+/// enregistrement** : l'écran de profil montre alors ce que la base a accepté,
+/// pas ce qu'on lui a envoyé.
+final FutureProvider<Profil> monProfilProvider = FutureProvider<Profil>((
+  ref,
+) async {
+  final session = ref.watch(sessionProvider).value;
+  if (session == null) {
+    // Pas d'exception : personne n'est connecté, il n'y a rien à lire et rien
+    // à signaler. L'écran de profil n'est pas atteignable dans cet état.
+    return const Profil(prenom: '', nom: '', email: '');
+  }
+  return ref.watch(profilRepositoryProvider).lire(session.userId);
+});
 
 /// L'état du complément de profil.
 @immutable
@@ -83,6 +101,9 @@ class ProfilController extends Notifier<EtatProfil> {
             nom: nomPropre,
             telephone: telephone,
           );
+      // La lecture repart de la base : l'écran de profil affiche ce qui a été
+      // accepté, jamais ce qu'on croit avoir écrit.
+      ref.invalidate(monProfilProvider);
       state = const EtatProfil();
       return true;
     } on Object {

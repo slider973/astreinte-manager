@@ -5,6 +5,7 @@ import 'appartenance.dart';
 import 'appartenances_locales.dart';
 import 'auth_erreur.dart';
 import 'auth_repository.dart';
+import 'caserne_choisie.dart';
 import 'etat_auth.dart';
 import 'membership_repository.dart';
 import 'session_utilisateur.dart';
@@ -77,13 +78,28 @@ final FutureProvider<List<Appartenance>> appartenancesProvider =
 
 /// La caserne dans laquelle l'utilisateur travaille.
 ///
-/// Le cas multi-caserne existe (`docs/PRD.md § 6.1`) mais son sélecteur n'est
-/// pas au périmètre de ce ticket : on prend la première appartenance active,
-/// dans un ordre stable, pour que l'app affiche toujours la même.
+/// **Le choix du membre gagne** depuis le ticket 007 : quelqu'un qui appartient
+/// à deux casernes en désigne une dans son profil, et tout ce que l'application
+/// affiche ensuite — son mois, ses astreintes, le planning, les droits d'admin
+/// lus par le routeur — suit ce choix, parce que tout passe par ce provider.
+///
+/// À défaut, la première appartenance active dans un ordre stable, comme avant.
+/// C'est aussi ce qui arrive quand le choix gardé **ne correspond plus à aucune
+/// appartenance active** — on a été retiré de cette caserne entre deux
+/// ouvertures : l'application ne se bloque pas sur un souvenir, elle affiche la
+/// caserne qui reste.
 final Provider<Appartenance?> appartenanceCouranteProvider =
     Provider<Appartenance?>((ref) {
       final actives = ref.watch(appartenancesActivesProvider);
-      return actives.isEmpty ? null : actives.first;
+      if (actives.isEmpty) return null;
+
+      final choisie = ref.watch(caserneChoisieProvider);
+      if (choisie == null) return actives.first;
+
+      return actives.firstWhere(
+        (Appartenance a) => a.stationId == choisie,
+        orElse: () => actives.first,
+      );
     });
 
 /// Les appartenances actives, triées par nom de caserne.

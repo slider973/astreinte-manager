@@ -2918,4 +2918,110 @@ abstract final class AppStrings {
   /// un « (s) » entre parenthèses.
   static String _pluriel(int n, String singulier, String pluriel) =>
       '$n ${n <= 1 ? singulier : pluriel}';
+
+  // ===================================================================
+  // Profil (ticket 007)
+  // ===================================================================
+
+  static const String profilEcranTitre = 'Profil';
+  static const String profilEcranIntro =
+      'Ce que la caserne voit de toi, et comment l\'application te joint.';
+
+  // --- Identité ------------------------------------------------------
+
+  static const String profilIdentiteTitre = 'Ton identité';
+  static const String profilIdentiteAide =
+      'Ce nom est celui qui apparaît dans le planning de ta caserne.';
+  static const String profilEmailLabel = 'Adresse de connexion';
+
+  /// Le courriel ne se change pas ici : c'est l'identifiant du compte, pas une
+  /// donnée de profil. La raison est écrite à côté du champ inerte
+  /// (`DESIGN.md § Do's`).
+  static const String profilEmailRaison =
+      'C\'est ton identifiant de connexion. Pour en changer, demande à ton '
+      'chef de centre.';
+  static const String profilEnregistrerIdentite = 'Enregistrer mes informations';
+  static const String profilEnregistre = 'Informations enregistrées.';
+  static const String profilLectureEchec =
+      'Ton profil n\'a pas pu être lu. Vérifie ta connexion, puis réessaie.';
+
+  // --- Caserne -------------------------------------------------------
+
+  static const String profilCaserneTitre = 'Ta caserne';
+
+  /// N'apparaît qu'à partir de deux appartenances actives : un contrôle à un
+  /// seul choix est un contrôle de trop (`design/007-profil.md § 5.2`).
+  static const String profilCaserneChoixTitre = 'Choisis ta caserne';
+  static const String profilCaserneChoixAide =
+      'Tout ce que l\'application affiche — ton mois, tes astreintes, le '
+      'planning — suit ce choix.';
+
+  static String profilCaserneNombre(int n) =>
+      'Tu appartiens à ${_pluriel(n, 'caserne', 'casernes')}.';
+
+  static String profilCaserneRole(String role) => 'Ton rôle : $role.';
+
+  // --- Langue --------------------------------------------------------
+
+  static const String profilLangueTitre = 'Langue';
+  static const String profilLangueFrancais = 'Français';
+
+  /// La raison du contrôle inerte, à côté du contrôle. Le jour où une
+  /// deuxième langue arrive, la ligne devient un choix sans bouger de place.
+  static const String profilLangueRaison =
+      'L\'application n\'existe qu\'en français pour le moment.';
+
+  // --- Compte --------------------------------------------------------
+
+  static const String profilCompteTitre = 'Ton compte';
+
+  static const String profilSupprimerCompte = 'Supprimer mon compte';
+
+  // --- La feuille de suppression -------------------------------------
+
+  static const String suppressionTitre = 'Supprimer ton compte';
+  static const String suppressionDefinitif =
+      'C\'est définitif : personne ne peut annuler cette suppression, pas même '
+      'ton chef de centre.';
+  static const String suppressionCeQuiPartTitre = 'Ce qui est effacé';
+  static const String suppressionCeQuiPart =
+      'Ton nom, ton téléphone, ton adresse, tes disponibilités saisies, tes '
+      'notifications et les appareils qui les reçoivent.';
+  static const String suppressionCeQuiResteTitre = 'Ce qui reste à la caserne';
+  static const String suppressionCeQuiReste =
+      'Tes astreintes passées, sous la mention « Membre supprimé ». La caserne '
+      'en a besoin pour ses statistiques ; elles ne portent plus ton nom.';
+  static const String suppressionConfirmer = 'Supprimer définitivement';
+  static const String suppressionAnnuler = 'Annuler';
+  static const String suppressionEnCours = 'Suppression en cours…';
+
+  // --- Les refus -----------------------------------------------------
+
+  static const String suppressionDernierAdmin =
+      'Tu es le seul administrateur actif de ta caserne. Nomme quelqu\'un '
+      'd\'autre avant de supprimer ton compte.';
+
+  static String suppressionDernierAdminCaserne(String caserne) =>
+      'Tu es le seul administrateur actif de $caserne. Nomme quelqu\'un '
+      'd\'autre avant de supprimer ton compte.';
+
+  static const String suppressionProfilIntrouvable =
+      'Ton profil est introuvable. Déconnecte-toi, reconnecte-toi, puis '
+      'réessaie.';
+
+  /// Le pire des cas, et il faut le dire tel qu'il est : les données sont
+  /// parties, l'accès non.
+  static const String suppressionAccesNonFerme =
+      'Tes données ont été effacées, mais ton accès n\'a pas pu être fermé. '
+      'Préviens ton chef de centre.';
+
+  static const String suppressionNonAuthentifie =
+      'Ta session a expiré. Reconnecte-toi, puis réessaie.';
+
+  static const String suppressionReseau =
+      'Pas de connexion. Rien n\'a été supprimé : réessaie quand le réseau '
+      'revient.';
+
+  static const String suppressionEchec =
+      'La suppression n\'a pas abouti. Réessaie dans un instant.';
 }

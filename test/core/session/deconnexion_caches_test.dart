@@ -140,11 +140,7 @@ void main() {
 
       await tester.tap(find.text(AppStrings.navProfil));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text(AppStrings.seDeconnecter),
-        200,
-      );
-      await tester.pumpAndSettle();
+      await defilerJusqua(tester, find.text(AppStrings.seDeconnecter));
       await tester.tap(find.text(AppStrings.seDeconnecter));
       await tester.pumpAndSettle();
 
@@ -188,11 +184,7 @@ void main() {
 
       await tester.tap(find.text(AppStrings.navProfil));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text(AppStrings.seDeconnecter),
-        200,
-      );
-      await tester.pumpAndSettle();
+      await defilerJusqua(tester, find.text(AppStrings.seDeconnecter));
       await tester.tap(find.text(AppStrings.seDeconnecter));
       await tester.pumpAndSettle();
 

@@ -4,7 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 005
 - **Branche** : `feat/007-profil`
-- **Statut** : en cours depuis 2026-09-21
+- **PR** : https://github.com/slider973/astreinte-manager/pull/30
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
 - Écran profil : prénom, nom, téléphone, préférence push (non critiques), langue (fr uniquement au MVP).

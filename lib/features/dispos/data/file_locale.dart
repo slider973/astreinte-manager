@@ -60,6 +60,21 @@ abstract interface class FileLocale {
     required String periodId,
     required PreferencesMois? preferences,
   });
+
+  /// Oublie **tout** ce qui attend pour ce membre dans cette caserne, mois et
+  /// préférences confondus.
+  ///
+  /// Appelée par `OubliLocal` (`core/session/oubli_local.dart`) à la
+  /// déconnexion et à la suppression de compte, **avant** la fermeture de
+  /// session : après, ni l'identifiant du membre ni celui de sa caserne ne sont
+  /// plus lisibles, et une clé qu'on ne sait plus composer ne s'efface pas.
+  ///
+  /// Ce qui part est une déclaration que la personne a faite sur cet appareil.
+  /// Sur un téléphone prêté, elle n'a rien à y faire pour la suivante — même
+  /// règle que le reste (`DESIGN.md § Écarts, ticket 024`). Et une file qui
+  /// survivrait à une suppression de compte tenterait d'écrire au nom de
+  /// quelqu'un qui n'existe plus.
+  Future<void> effacer({required String stationId, required String userId});
 }
 
 /// La valeur écrite pour une case revenue à « non saisi ».
@@ -237,6 +252,28 @@ class FileLocalePartagee implements FileLocale {
     }
   }
 
+  @override
+  Future<void> effacer({
+    required String stationId,
+    required String userId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final debuts = <String>[
+        _prefixeMembre(stationId: stationId, userId: userId),
+        _prefixeMembrePreferences(stationId: stationId, userId: userId),
+      ];
+      // La liste est figée avant la boucle : `getKeys` rend une vue, et
+      // supprimer pendant qu'on la parcourt est un pari qu'on ne fait pas.
+      for (final cle in prefs.getKeys().toList(growable: false)) {
+        if (debuts.any(cle.startsWith)) await prefs.remove(cle);
+      }
+    } on Object {
+      // Même politique que partout : une panne de stockage ne fait pas échouer
+      // une déconnexion. La session, elle, est bien fermée.
+    }
+  }
+
   static PreferencesMois? _relirePreference(String? brut) {
     if (brut == null) return null;
     try {
@@ -333,6 +370,18 @@ class FileLocaleMemoire implements FileLocale {
       return;
     }
     this.preferences[periodId] = preferences;
+  }
+
+  int effacements = 0;
+
+  @override
+  Future<void> effacer({
+    required String stationId,
+    required String userId,
+  }) async {
+    effacements++;
+    _mois.clear();
+    preferences.clear();
   }
 }
 

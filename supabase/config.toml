@@ -459,6 +459,14 @@ verify_jwt = true
 enabled = true
 verify_jwt = false
 
+# Edge Function du ticket 007. `verify_jwt = true`, et la fonction **n'accepte aucun
+# corps** : l'identité du compte à supprimer vient du JWT, vérifiée auprès de GoTrue.
+# Un `user_id` lu dans la requête ferait de cette fonction une porte pour supprimer
+# le compte d'un autre. Voir supabase/functions/README.md et migration 0026.
+[functions.delete-account]
+enabled = true
+verify_jwt = true
+
 # Désactivé en local : Logflare et Vector échouent leur bilan de santé sous Rancher Desktop
 # et ne servent qu'aux journaux dans Studio. Aucun effet sur le projet hébergé.
 [analytics]
