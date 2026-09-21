@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 024, 031
 - **Branche** : `feat/045-destination-perdue-a-froid`
+- **Statut** : en cours depuis 2026-09-21
 
 ## Contexte
 Observé pendant le ticket 042, de façon reproductible mais intermittente : ouvrir l'application
