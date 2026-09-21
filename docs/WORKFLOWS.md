@@ -150,15 +150,35 @@ sequenceDiagram
   participant DB as Postgres
   participant N as send-notification
 
-  C->>DB: select assignments proposed, proposed_at + reminder_hours < now(), reminder_count = 0
+  C->>DB: select assignments proposed, proposed_at + reminder_hours <= now(), reminder_count = 0
   DB->>N: assignment_reminder (push)
-  N->>DB: reminder_count = 1, last_reminder_at
-  C->>DB: select proposed, proposed_at + email_hours < now(), reminder_count = 1
+  N->>DB: reminder_count += 1, last_reminder_at
+  C->>DB: select proposed, proposed_at + email_hours <= now(), palier courriel dû
   DB->>N: assignment_reminder (email)
-  N->>DB: reminder_count = 2
+  N->>DB: reminder_count += 1, last_reminder_at
   C->>DB: select proposed, proposed_at + late_report_hours < now()
   DB->>N: late_responders aux admins (une fois par jour et par planning)
 ```
+
+Règles (migration `0021`, ticket 022) :
+
+- **Une réponse ferme la porte.** `status = 'proposed'` est la seule condition de relance :
+  accepté, refusé, remplacé, annulé, plus rien ne part.
+- **Les délais sont ceux de chaque caserne** (`settings`, § 2.1 de `docs/SCHEMA.md`).
+- **Un envoi par membre**, ses gardes groupées dedans, jamais un par garde.
+- **La marque suit l'envoi** : `reminder_count` et `last_reminder_at` ne bougent que lorsqu'une
+  demande est réellement mise en file. Sinon un palier se franchirait sans que personne ne
+  reçoive rien.
+- **« Palier courriel dû »** se lit : `reminder_count >= 1` **et** (`reminder_count = 1`
+  **ou** aucune relance depuis l'échéance du courriel). Le diagramme disait d'abord
+  `reminder_count = 1` tout court ; deux clics de l'administrateur sur « Relancer maintenant »
+  (ticket 019, qui incrémente le même compteur) auraient alors privé le pompier du courriel
+  pour toujours, et une reprise après panne longue aussi. La seconde branche est le filet.
+- **Une relance manuelle tient lieu de premier palier** : le push de `reminder_hours` est sauté
+  quand `reminder_count` vaut déjà 1.
+- **Le rapport aux administrateurs part entre 08:00 et 20:59 dans le fuseau de la caserne**, et
+  sa clé de dédoublonnage porte la date locale : une fois par jour et par planning, jamais au
+  milieu de la nuit.
 
 ## 7. Cycle de vie d'un mois (vue d'ensemble)
 
