@@ -64,6 +64,7 @@ jobs:
       - name: Vérifier les jetons de l'hébergeur
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_SCOPE: ${{ secrets.VERCEL_SCOPE }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
@@ -147,14 +148,19 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_SCOPE: ${{ secrets.VERCEL_SCOPE }}
         run: |
           # `vercel build` ne reconstruit rien : `vercel.json` porte un
           # `buildCommand` qui ne fait qu'un `echo`. Il empaquette `build/web`
           # dans `.vercel/output` avec les en-têtes et les réécritures, que
           # `--prebuilt` téléverse tels quels.
-          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
-          npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
-          url="$(npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          # `--scope` est indispensable avec un jeton limité à une équipe :
+          # sans lui, le client cherche un contexte utilisateur qu'un tel jeton
+          # n'a pas, et échoue sur « Could not retrieve Project Settings ».
+          portee=(); if [ -n "${VERCEL_SCOPE:-}" ]; then portee=(--scope "$VERCEL_SCOPE"); fi
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" "${portee[@]}"
+          npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN" "${portee[@]}"
+          url="$(npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN" "${portee[@]}")"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Mis en ligne : $url" >> "$GITHUB_STEP_SUMMARY"
 
