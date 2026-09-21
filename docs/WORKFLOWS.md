@@ -57,9 +57,25 @@ stateDiagram-v2
 
 Règles :
 - Un membre passe uniquement de `proposed` à `accepted` ou `declined`.
-- `replaced` porte `replaced_by` vers la nouvelle attribution.
+- `replaced` porte `replaced_by` vers la nouvelle attribution. **Un refus et une annulation
+  aussi** : ils gardent leur statut — c'est l'histoire de la caserne, et elle a déjà été notifiée
+  sous ce nom — et leur `replaced_by` dit quelle attribution a comblé le trou (migration `0020`).
+- **Les états terminaux sont à sens unique, et hors de portée d'un client** (migration `0020`).
+  `declined`, `replaced` et `cancelled` ne s'écrivent ni par une insertion ni par une mise à jour
+  cliente, et on n'en **sort** pas : l'historique de la caserne ne se réécrit pas. Le motif d'un
+  refus est gelé. Ces écritures passent par `reassign_shift` ou `cancel_assignment`, qui préviennent
+  le pompier concerné dans la même transaction : un changement d'état qui ne se dit pas laisse
+  quelqu'un se croire d'astreinte.
+- **Une réattribution remplace, elle n'ajoute pas.** Le nombre d'attributions actives d'un créneau ne
+  dépasse jamais son effectif requis : `reassign_shift` compte les places après avoir pris ses
+  verrous et refuse en `shift_already_filled` sinon. Renforcer un créneau publié se dit autrement —
+  en augmentant son effectif requis.
+- **La notification marque les transitions venues d'`accepted`, et elles seules.** Retirer une
+  proposition sans réponse ne prévient personne : rien n'était acquis, et l'écran « Propositions »
+  du membre sera simplement plus court.
 - En brouillon, les attributions existent avec `status = 'proposed'` et `proposed_at = null`.
   La publication renseigne `proposed_at`. Les crons de relance ignorent `proposed_at is null`.
+  Une attribution née d'une réattribution est horodatée **dès sa création** : elle est partie.
 
 ## 4. Séquence : publication et validation
 
@@ -97,10 +113,34 @@ sequenceDiagram
   DB->>N: assignment_declined à l'admin
   N-->>A: push "X a refusé le 12 nuit"
   A->>EF: réattribuer shift_id à M2
-  EF->>DB: ancienne attribution reste declined ; nouvelle attribution proposed, proposed_at = now()
-  EF->>N: assignment_proposed à M2 uniquement
+  EF->>DB: reassign_shift — une transaction
+  DB->>DB: ancienne reste declined, replaced_by posé ; nouvelle proposed, proposed_at = now()
+  DB->>N: assignment_proposed à M2 uniquement
   N-->>M2: push
+  DB->>DB: schedule_reevaluer — le planning reste publié
 ```
+
+**Le compte, c'est un.** Un refus suivi d'une réattribution ne produit qu'une notification, au
+nouveau membre. Le refus a déjà produit la sienne — `assignment_declined` aux administrateurs — au
+moment où il a été prononcé. Rien n'est renvoyé au reste de la caserne : c'est exactement ce que
+l'outil remplacé imposait, et la raison d'être du ticket 020.
+
+Les variantes du même geste :
+
+| Ce que remplace la réattribution | Ancienne attribution | Nouveau membre | Ancien membre |
+|---|---|---|---|
+| un refus | reste `declined`, `replaced_by` posé | `assignment_proposed` | rien |
+| une annulation | reste `cancelled`, `replaced_by` posé | `assignment_proposed` | rien : il a déjà été prévenu |
+| une proposition sans réponse | `replaced` | `assignment_proposed` | rien |
+| une garde acceptée | `replaced` | `assignment_proposed` | `assignment_cancelled` |
+| un créneau vide | — | `assignment_proposed` | — |
+
+**Annuler** (`cancel_assignment`) suit la même règle : `accepted → cancelled` prévient le membre
+avec le motif, `proposed → cancelled` ne prévient personne.
+
+Dans les deux cas, une acceptation qui disparaît fait repasser le planning de `validated` à
+`published` (§ 2) : seuls les créneaux touchés changent d'état, `published_at` ne se réécrit pas, et
+personne n'est notifié de ce recul — la conséquence est déjà partie à qui de droit.
 
 ## 6. Séquence : relances
 

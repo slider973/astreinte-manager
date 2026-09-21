@@ -562,10 +562,21 @@ savepoint s4c;
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-4000-8000-000000000100","role":"authenticated"}';
 
-select tests.allowed(
+-- **Toutes les transitions sauf deux.** Depuis la migration 0020,
+-- `assignments_guard_reattribution` réserve `replaced` et `cancelled` aux
+-- fonctions qui notifient le pompier concerné : un administrateur qui les
+-- écrirait à la main retirerait sa garde à quelqu'un sans que rien ne parte.
+-- L'annulation passe par `cancel_assignment`, la réattribution par
+-- `reassign_shift` (supabase/tests/reattribution_test.sql).
+select tests.denied(
   $q$ update assignments set status = 'cancelled'
       where id = '11111111-0000-4000-8000-000000000008' $q$,
-  'admin : accepted -> cancelled autorisé');
+  'admin : accepted -> cancelled passe par cancel_assignment, pas par un update');
+
+select tests.allowed(
+  $q$ update assignments set status = 'declined', decline_reason = 'décidé en salle de garde'
+      where id = '11111111-0000-4000-8000-000000000008' $q$,
+  'admin : accepted -> declined autorisé');
 
 select tests.allowed(
   $q$ update assignments set was_available = false

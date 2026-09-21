@@ -17,6 +17,7 @@ AttributionSuivi attributionSuivi({
   String? motifRefus,
   int relances = 0,
   DateTime? derniereRelance,
+  String? remplaceParId,
 }) => AttributionSuivi(
   id: id,
   creneauId: creneauId,
@@ -28,6 +29,7 @@ AttributionSuivi attributionSuivi({
   motifRefus: motifRefus,
   relances: relances,
   derniereRelance: derniereRelance,
+  remplaceParId: remplaceParId,
 );
 
 /// Le planning publié de référence.
@@ -196,6 +198,9 @@ class FauxSuiviRepository implements SuiviRepository {
           acceptees++;
         case AttributionEtat.refuse:
           refusees++;
+        // Ni remplacée ni annulée ne compte nulle part : la vue
+        // `v_schedule_progress` ne compte que les trois états vivants.
+        case AttributionEtat.remplace:
         case AttributionEtat.annule:
           break;
       }

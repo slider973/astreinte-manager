@@ -97,6 +97,27 @@ class FauxPlanningRepository implements PlanningRepository {
   final List<({String creneauId, int effectif})> effectifs =
       <({String creneauId, int effectif})>[];
 
+  /// Les réattributions demandées, dans l'ordre : c'est ce que le test lit pour
+  /// vérifier **quelle** attribution la nouvelle vient réparer.
+  final List<({String creneauId, String userId, String? ancienneId})>
+  reattributions =
+      <({String creneauId, String userId, String? ancienneId})>[];
+
+  final List<({String attributionId, String? motif})> annulations =
+      <({String attributionId, String? motif})>[];
+
+  /// Ce que la base répond à une réattribution : l'ancien titulaire tenait-il
+  /// une garde acceptée ? Lui seul est prévenu.
+  bool ancienPrevenu = false;
+
+  /// Ce que `cancel_assignment` répond : le membre a-t-il été prévenu ? Faux
+  /// pour une proposition retirée avant réponse.
+  bool annulationPrevient = true;
+
+  /// Vrai quand la réattribution a fait retomber le planning de « validé » à
+  /// « publié ».
+  bool planningRetombe = false;
+
   final StreamController<EvenementPlanning> _canal =
       StreamController<EvenementPlanning>.broadcast();
 
@@ -215,6 +236,58 @@ class FauxPlanningRepository implements PlanningRepository {
         if (c.id == creneauId) c.avecEffectif(effectif) else c,
     ];
     return true;
+  }
+
+  @override
+  Future<ResultatReattribution> reattribuer({
+    required String creneauId,
+    required String userId,
+    String? ancienneId,
+  }) async {
+    reattributions.add((
+      creneauId: creneauId,
+      userId: userId,
+      ancienneId: ancienneId,
+    ));
+    final echec = erreurEcriture;
+    if (echec != null) throw EchecPlanning(echec);
+
+    // La contrainte d'unicité vaut ici aussi : la base répond
+    // `already_assigned` avant même de regarder l'ancienne attribution.
+    final existe = _attributions.any(
+      (Attribution a) => a.creneauId == creneauId && a.userId == userId,
+    );
+    if (existe) throw const EchecPlanning(ErreurPlanning.dejaAttribue);
+
+    final attribution = Attribution(
+      id: 'r-${_compteur++}',
+      creneauId: creneauId,
+      userId: userId,
+      etaitDisponible: disponibles.contains('$userId@$creneauId'),
+      auteurId: 'moi',
+    );
+    _attributions.add(attribution);
+    attributionsPosees.add(attribution);
+
+    return ResultatReattribution(
+      attribution: attribution,
+      ancienUserId: ancienneId,
+      ancienPrevenu: ancienPrevenu,
+      planningPublie: planningRetombe,
+    );
+  }
+
+  @override
+  Future<bool> annuler({
+    required String attributionId,
+    String? motif,
+  }) async {
+    annulations.add((attributionId: attributionId, motif: motif));
+    final echec = erreurEcriture;
+    if (echec != null) throw EchecPlanning(echec);
+
+    _attributions.removeWhere((Attribution a) => a.id == attributionId);
+    return annulationPrevient;
   }
 
   @override

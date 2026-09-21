@@ -17,9 +17,23 @@ import 'ligne_creneaux.dart';
 /// `surface-dim`, nom en gras, `Icons.star` — pour qu'un chef n'ait rien à
 /// réapprendre d'un écran à l'autre.
 class JourneeSuiviBloc extends StatelessWidget {
-  const JourneeSuiviBloc({required this.journee, super.key});
+  const JourneeSuiviBloc({
+    required this.journee,
+    super.key,
+    this.onReparer,
+    this.raisonInactif,
+  });
 
   final JourneeSuivi journee;
+
+  /// Ouvrir le panneau des candidats sur un créneau à réparer. `null` quand il
+  /// n'y a rien à ouvrir : planning en brouillon, archivé, ou lecteur non
+  /// administrateur.
+  final ValueChanged<CreneauSuivi>? onReparer;
+
+  /// Pourquoi l'action est impossible — hors ligne, caserne suspendue.
+  /// **Affichée à côté du contrôle**, jamais seulement supposée.
+  final String? raisonInactif;
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +81,12 @@ class JourneeSuiviBloc extends StatelessWidget {
         ),
         const AppDivider(),
         for (final creneau in journee.creneaux)
-          _LigneCreneauSuivi(journee: journee, creneau: creneau),
+          _LigneCreneauSuivi(
+            journee: journee,
+            creneau: creneau,
+            onReparer: onReparer,
+            raisonInactif: raisonInactif,
+          ),
       ],
     );
   }
@@ -75,14 +94,24 @@ class JourneeSuiviBloc extends StatelessWidget {
 
 /// Un créneau et les réponses reçues.
 ///
-/// **La ligne n'est pas cliquable.** Il n'y a rien à ouvrir : la réattribution
-/// est le ticket 020, et un élément qui a l'air cliquable sans rien faire est
-/// pire qu'un élément inerte.
+/// **La ligne n'est toujours pas cliquable ; un bouton nommé l'est.** La ligne
+/// porte déjà trois cibles de lecture — la fraction, les noms, les motifs — et
+/// une zone cliquable de la largeur de l'écran s'ouvre par accident au doigt,
+/// avec des gants, pendant un défilement. Le bouton n'apparaît que sur les
+/// créneaux qui ont quelque chose à réparer : une ligne entièrement acceptée
+/// reste inerte, comme au 019.
 class _LigneCreneauSuivi extends StatelessWidget {
-  const _LigneCreneauSuivi({required this.journee, required this.creneau});
+  const _LigneCreneauSuivi({
+    required this.journee,
+    required this.creneau,
+    this.onReparer,
+    this.raisonInactif,
+  });
 
   final JourneeSuivi journee;
   final CreneauSuivi creneau;
+  final ValueChanged<CreneauSuivi>? onReparer;
+  final String? raisonInactif;
 
   @override
   Widget build(BuildContext context) {
@@ -95,10 +124,15 @@ class _LigneCreneauSuivi extends StatelessWidget {
     );
 
     final reponses = creneau.attributions
-        .map((AttributionSuivi a) => _resume(context, a))
+        .map((AttributionSuivi a) => _resumeAvecRemplacant(context, a))
         .toList(growable: false);
 
-    return Semantics(
+    final reparable = onReparer != null && creneau.aReparer;
+
+    // **La ligne se résume, le bouton reste à part.** `excludeSemantics` ne
+    // couvre que la lecture : mis autour du bouton, il le ferait disparaître du
+    // lecteur d'écran, et le seul geste de l'écran serait devenu inatteignable.
+    final lecture = Semantics(
       container: true,
       label: AppStrings.suiviLigneSemantique(
         jourEtDate: dateAvecJourSemaine(journee.date),
@@ -108,44 +142,63 @@ class _LigneCreneauSuivi extends StatelessWidget {
         detail: reponses.isEmpty ? AppStrings.suiviPersonne : reponses.join('. '),
       ),
       excludeSemantics: true,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.sm,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Icon(
-              descripteurCreneau.icone,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            descripteurCreneau.icone,
+            size: 20,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          SizedBox(
+            width: 56,
+            child: Text(
+              descripteurCreneau.libelle,
+              style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(width: AppSpacing.sm),
-            SizedBox(
-              width: 56,
-              child: Text(
-                descripteurCreneau.libelle,
-                style: theme.textTheme.bodyMedium,
-              ),
-            ),
-            // La fraction, exactement celle de la ligne des créneaux du 017 :
-            // même grammaire, même signification, rien à réapprendre.
-            _Fraction(couverture: couverture, creneau: creneau),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: creneau.attributions.isEmpty
-                  ? const _Personne()
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        for (final attribution in creneau.attributions)
-                          _LigneReponse(attribution: attribution),
-                      ],
-                    ),
+          ),
+          // La fraction, exactement celle de la ligne des créneaux du 017 :
+          // même grammaire, même signification, rien à réapprendre.
+          _Fraction(couverture: couverture, creneau: creneau),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: creneau.attributions.isEmpty
+                ? const _Personne()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      for (final attribution in creneau.attributions)
+                        _LigneReponse(
+                          attribution: attribution,
+                          remplacant: creneau.remplacantDe(attribution),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(child: lecture),
+          if (reparable) ...<Widget>[
+            const SizedBox(width: AppSpacing.entreCibles),
+            _BoutonReparer(
+              journee: journee,
+              creneau: creneau,
+              raisonInactif: raisonInactif,
+              onReparer: () => onReparer!(creneau),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -156,6 +209,17 @@ class _LigneCreneauSuivi extends StatelessWidget {
         ? ' ${AppStrings.suiviMotifRefus(attribution.motifRefus!)}'
         : '';
     return '${attribution.nom} — ${etat.toLowerCase()}$motif';
+  }
+
+  String _resumeAvecRemplacant(
+    BuildContext context,
+    AttributionSuivi attribution,
+  ) {
+    final remplacant = creneau.remplacantDe(attribution);
+    final base = _resume(context, attribution);
+    return remplacant == null
+        ? base
+        : '$base, ${AppStrings.suiviRemplacePar(remplacant)}';
   }
 }
 
@@ -226,11 +290,94 @@ class _Personne extends StatelessWidget {
   }
 }
 
-/// Une réponse : le nom, son état, et le motif quand il existe.
+/// **« Réattribuer »** quand le créneau porte un refus, une annulation ou un
+/// remplacement ; **« Pourvoir »** quand il est seulement vide.
+///
+/// Le libellé nomme l'action, l'étiquette d'accessibilité nomme le créneau :
+/// soixante-deux boutons « Réattribuer » à la suite ne disent rien de ce qu'on
+/// ouvre.
+class _BoutonReparer extends StatelessWidget {
+  const _BoutonReparer({
+    required this.journee,
+    required this.creneau,
+    required this.onReparer,
+    this.raisonInactif,
+  });
+
+  final JourneeSuivi journee;
+  final CreneauSuivi creneau;
+  final VoidCallback onReparer;
+  final String? raisonInactif;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final refus = creneau.porteUnRefus;
+    final jourEtDate = dateAvecJourSemaine(journee.date);
+    final libelleCreneau = context.statuts
+        .creneau(creneau.creneau.creneau)
+        .libelle;
+
+    // **L'étiquette passe par le texte du bouton, pas par un `Semantics`
+    // englobant.** Un `Semantics(excludeSemantics: true)` autour d'un
+    // `TextButton` efface l'action du nœud : le bouton se lit mais ne
+    // s'active plus, et le seul geste de l'écran devient inatteignable au
+    // lecteur d'écran. `Text.semanticsLabel` remplace ce qui est *annoncé*
+    // sans toucher à ce qui est *affiché*, et le bouton garde son action, son
+    // focus et son état désactivé.
+    final bouton = TextButton.icon(
+      onPressed: raisonInactif == null ? onReparer : null,
+      icon: Icon(
+        refus ? Icons.published_with_changes : Icons.person_add_alt_1,
+        size: AppTouch.icone,
+      ),
+      label: Text(
+        refus ? AppStrings.reattribuerAction : AppStrings.pourvoirAction,
+        semanticsLabel: refus
+            ? AppStrings.reattribuerSemantique(
+                jourEtDate: jourEtDate,
+                creneau: libelleCreneau,
+              )
+            : AppStrings.pourvoirSemantique(
+                jourEtDate: jourEtDate,
+                creneau: libelleCreneau,
+              ),
+      ),
+    );
+
+    if (raisonInactif == null) return bouton;
+
+    // **Un contrôle désactivé porte sa raison** (`DESIGN.md § Do's`), à côté de
+    // lui et non dans une bulle qu'il faut survoler.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: <Widget>[
+        bouton,
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 180),
+          child: Text(
+            raisonInactif!,
+            textAlign: TextAlign.end,
+            style: AppTextStyles.mention.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Une réponse : le nom, son état, le motif quand il existe, et — pour une
+/// attribution close — **qui a repris la garde**.
 class _LigneReponse extends StatelessWidget {
-  const _LigneReponse({required this.attribution});
+  const _LigneReponse({required this.attribution, this.remplacant});
 
   final AttributionSuivi attribution;
+
+  /// Le nom de celui qui a couvert ce trou, quand la base a posé le lien.
+  /// Sans cette phrase, l'historique montre une sortie sans montrer l'entrée.
+  final String? remplacant;
 
   @override
   Widget build(BuildContext context) {
@@ -282,6 +429,16 @@ class _LigneReponse extends StatelessWidget {
               padding: const EdgeInsets.only(left: 20),
               child: Text(
                 AppStrings.suiviMotifRefus(attribution.motifRefus!),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (remplacant != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 20),
+              child: Text(
+                AppStrings.suiviRemplacePar(remplacant!),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

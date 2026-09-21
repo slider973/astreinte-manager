@@ -477,18 +477,27 @@ void main() {
       expect(ProgressionPlanning.vide.attendues, 0);
     });
 
-    test('cancelled et replaced se lisent comme « annulé »', () {
+    // Le ticket 020 est le premier à produire ces deux statuts : ils cessent
+    // d'être lus comme un seul. Ils partagent la marque barrée et l'encre
+    // atténuée, jamais l'icône ni le libellé.
+    test('replaced et cancelled ont chacun leur état d\'affichage', () {
+      expect(
+        AttributionSuivi.etatDepuisSql('replaced'),
+        AttributionEtat.remplace,
+      );
       expect(
         AttributionSuivi.etatDepuisSql('cancelled'),
         AttributionEtat.annule,
       );
       expect(
-        AttributionSuivi.etatDepuisSql('replaced'),
-        AttributionEtat.annule,
-      );
-      expect(
         AttributionSuivi.etatDepuisSql('proposed'),
         AttributionEtat.propose,
+      );
+      // Un statut que la base n'a pas encore appris se lit du côté sûr : celui
+      // qui ne compte pas dans la couverture.
+      expect(
+        AttributionSuivi.etatDepuisSql('quelque_chose_de_neuf'),
+        AttributionEtat.annule,
       );
     });
   });

@@ -15,7 +15,15 @@ enum DisponibiliteEtat { disponible, absent, nonSaisi }
 enum CreneauType { jour, nuit }
 
 /// Cycle de vie d'une proposition d'astreinte.
-enum AttributionEtat { propose, accepte, refuse, annule }
+///
+/// **L'ordre est celui de la lecture du suivi** : ce qui reste à faire d'abord,
+/// puis ce qui est acquis, puis ce qui a cassé, puis ce qui a été réparé. Le
+/// tri des réponses d'un créneau s'appuie dessus (`SuiviPlanning`).
+///
+/// [remplace] et [annule] disent tous deux « cette attribution ne compte
+/// plus » ; ils se distinguent par l'icône et le libellé, jamais par une
+/// cinquième couleur (`DESIGN.md § Écarts, ticket 020`).
+enum AttributionEtat { propose, accepte, refuse, remplace, annule }
 
 /// Cycle de vie d'un planning mensuel.
 enum PlanningEtat { brouillon, publie, valide, archive }
@@ -259,6 +267,13 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         fond: AppColors.etatAbsentFond,
         barre: true,
       ),
+      AttributionEtat.remplace: StatusDescriptor(
+        icone: Icons.swap_horiz,
+        libelle: AppStrings.attributionRemplace,
+        encre: AppColors.etatAnnule,
+        fond: AppColors.etatNeutreFond,
+        barre: true,
+      ),
       AttributionEtat.annule: StatusDescriptor(
         icone: Icons.block,
         libelle: AppStrings.attributionAnnule,
@@ -411,6 +426,13 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         libelle: AppStrings.attributionRefuse,
         encre: AppColors.darkOnErrorContainer,
         fond: AppColors.darkErrorContainer,
+        barre: true,
+      ),
+      AttributionEtat.remplace: StatusDescriptor(
+        icone: Icons.swap_horiz,
+        libelle: AppStrings.attributionRemplace,
+        encre: AppColors.darkEtatNeutre,
+        fond: AppColors.darkEtatNeutreFond,
         barre: true,
       ),
       AttributionEtat.annule: StatusDescriptor(

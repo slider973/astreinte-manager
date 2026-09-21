@@ -267,7 +267,7 @@ create table assignments (
   was_available   boolean not null default true,  -- false si attribué hors disponibilité
   proposed_at     timestamptz,                    -- renseigné à la publication
   responded_at    timestamptz,
-  decline_reason  text,
+  decline_reason  text,                           -- le motif du refus, ou celui de l'annulation
   replaced_by     uuid references assignments(id),
   reminder_count  int not null default 0,
   last_reminder_at timestamptz,
@@ -295,6 +295,27 @@ faire disparaître une attribution forcée du journal de la caserne. Même raiso
 il n'y a rien à conserver (`docs/WORKFLOWS.md § 3`). Après publication, la même attribution
 s'annule ou se remplace et **reste** : la politique `assignments_delete_admin` (durcie en `0018`)
 n'autorise la suppression que si le planning est encore `draft`.
+
+**Les états terminaux (`declined`, `replaced`, `cancelled`) et `replaced_by` sont hors de portée
+d'un client** (déclencheur `assignments_guard_reattribution`, migration `0020`, ticket 020). On n'y
+**entre** pas par une insertion — une attribution ne naît pas refusée —, on n'en **sort** pas par une
+mise à jour — l'historique ne se réécrit pas —, le **motif d'un refus est gelé**, et `replaced_by` ne
+se pose pas à la main. Ces écritures passent par `reassign_shift` ou `cancel_assignment`, qui
+préviennent le pompier concerné **dans la même transaction** : un changement d'état qui ne se dit pas
+laisserait quelqu'un se croire d'astreinte.
+
+Deux règles du même déclencheur valent pour **tout le monde**, rôle de service compris :
+`replaced_by` ne désigne jamais la ligne elle-même (`assignment_link_self`) et toujours une
+attribution **du même créneau** (`assignment_link_foreign_shift`). Ce n'est pas une règle
+d'interface, c'est la cohérence du fil de l'histoire — et rien d'autre n'empêchait un lien de
+traverser les créneaux, ni les casernes. `replaced_by` est posé dans les quatre cas de réattribution, y compris quand l'ancienne
+attribution reste `declined` ou `cancelled` — c'est le fil qui dit « ce trou-là a été comblé par
+cette attribution-là ».
+
+**`decline_reason` porte le motif d'un `declined` comme celui d'un `cancelled`** (migration
+`0020`). La colonne répond à « pourquoi cette garde n'est pas tenue » ; `status` dit déjà qui l'a
+écrit — le membre en refusant, l'administrateur en annulant. Sans cet élargissement, le suivi
+afficherait « annulé » sans jamais pouvoir dire pourquoi.
 
 ### 2.11 `push_tokens`
 
@@ -605,6 +626,31 @@ Function, et ne peut donc pas défaire une publication acquise : une notificatio
 (file de `notify`, relance manuelle, crons du 022), une publication à moitié faite ne se rattrape
 pas.
 
+### Réattribution et annulation (migration `0020`, ticket 020)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `reassign_shift` | `(p_shift uuid, p_user uuid, p_actor uuid, p_previous uuid default null) returns jsonb` `security definer`, **réservée à `service_role`** | La réattribution, **en une transaction** : nouvelle attribution `proposed` avec `proposed_at = now()`, `created_by` et `was_available` posés par la fonction, ancienne marquée `replaced` (`accepted` ou `proposed`) ou **laissée telle quelle** (`declined`, `cancelled` : un statut terminal a déjà été notifié sous ce nom), `replaced_by` posé dans les quatre cas, notifications, `audit_log` et `schedule_reevaluer`. `p_previous` omis sur un créneau qui porte un trou non comblé — un refus ou une annulation : la fonction rattache la nouvelle au **plus ancien** d'entre eux. Seul `replaced` n'est pas remplaçable : ce qui a déjà trouvé son remplaçant ne s'en cherche pas un second. **Deux verrous, dans l'ordre d'une réponse de membre** — l'attribution remplacée, puis le planning —, et **le compte des places** après eux : une réattribution remplace, elle n'ajoute pas. Refus métier en `{"ok": false, "code": …}` : `shift_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `member_not_active`, `already_assigned`, `shift_already_filled`, `assignment_not_found`, `assignment_not_replaceable`. |
+| `cancel_assignment` | `(p_assignment uuid, p_reason text default null) returns jsonb` `security definer`, ouverte à `authenticated` | L'annulation d'une attribution d'un planning publié : statut `cancelled`, motif conservé dans `decline_reason`, notification `assignment_cancelled` **si la garde était acceptée**, `audit_log` et `schedule_reevaluer`. Refus : `assignment_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `assignment_not_active`. |
+
+**Une notification, et une seule, sauf quand une garde acquise disparaît.** Un refus suivi d'une
+réattribution ne produit qu'un envoi : `assignment_proposed` au nouveau membre. Celui qui a refusé
+n'est pas prévenu — il sait. Celui qui n'avait pas encore répondu non plus : `docs/WORKFLOWS.md § 3`
+marque la notification sur les seules transitions venues d'`accepted`, et une proposition retirée
+avant réponse disparaît simplement de son écran. Seul le pompier dont la garde était **acceptée**
+reçoit `assignment_cancelled` — c'est le seul à qui on retire quelque chose.
+
+**`assignment_cancelled` et non `assignment_changed` pour l'ancien titulaire.** De son point de vue
+rien n'a « changé » : il n'a plus cette garde. Le lien profond d'`assignment_cancelled` mène au
+planning du mois, là où il vérifiera ; celui d'`assignment_changed` mène à l'écran des propositions,
+où il n'a plus rien à faire.
+
+**Les notifications sont posées dans la transaction, par `notify(...)`.** Contrairement à
+`publish_schedule`, qui rend ses destinataires à l'Edge Function pour un envoi postérieur, il n'y a
+ici ni regroupement à faire ni compte rendu à montrer — et la file garantit le rejeu si le processus
+appelant meurt. Un pompier qui ignore qu'il est d'astreinte est le seul défaut que ce geste n'a pas
+le droit de produire.
+
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
 Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
@@ -790,12 +836,33 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   viendra plus le réveiller ; le porter de 1 à 2 sur un planning validé le rend incomplet, et
   le laisser « validé » mentirait à toute la caserne. Appelle `schedule_reevaluer`, qui traite
   les deux sens.
-- `schedule_auto_validate` (migration `0019`, ticket 019) : `after update` sur `assignments`,
-  `when (new.status = 'accepted' and old.status is distinct from new.status)`. Délègue à
-  `schedule_reevaluer` : si **chaque** créneau du planning atteint son effectif requis en
-  attributions **acceptées** — la validation se juge sur les acceptations seules, jamais sur
-  `v_schedule_progress.shifts_filled` (§ 6) —, le planning passe en `validated` et
-  `schedule_validated` part à tous les membres actifs.
+- `assignments_guard_reattribution` (migration `0020`, ticket 020) : `before insert or update` sur
+  `assignments`. Quatre règles, dont chacune a été franchie en revue avant d'être écrite :
+  **on n'entre pas** dans un état terminal par une insertion (`assignment_transition_reserved` —
+  sinon un client fabrique un refus que personne n'a prononcé) ; **on n'en sort pas** par une mise
+  à jour (`assignment_transition_terminal` — sinon un refus redevient une proposition sans que rien
+  ne parte, et un remplacement ressuscite en acceptation avec son lien) ; **le motif d'un refus est
+  gelé** (`assignment_reason_frozen` — il appartient au pompier qui l'a écrit) ; **`replaced_by` ne
+  se pose pas à la main** (`assignment_link_reserved`) et ne désigne ni la ligne elle-même
+  (`assignment_link_self`) ni une attribution d'un autre créneau
+  (`assignment_link_foreign_shift`) — ces deux dernières pour tout le monde. Sans ce déclencheur,
+  `assignments_update_admin` et `assignments_insert_admin` (`0008`) laissaient un administrateur
+  retirer sa garde à quelqu'un d'une requête PostgREST, **sans que rien ne parte** : le pompier
+  notait la date et ne venait pas. Security invoker et nommé pour passer **avant**
+  `assignments_member_transition`, pour les deux raisons déjà données à propos
+  d'`assignments_trace_disponibilite`.
+- `schedule_auto_validate` (migration `0019`, ticket 019 ; clause `when` élargie par `0020`) :
+  `after update` sur `assignments`, `when (new.status is distinct from old.status and (new.status
+  = 'accepted' or old.status = 'accepted'))`. Délègue à `schedule_reevaluer` : si **chaque**
+  créneau du planning atteint son effectif requis en attributions **acceptées** — la validation se
+  juge sur les acceptations seules, jamais sur `v_schedule_progress.shifts_filled` (§ 6) —, le
+  planning passe en `validated` et `schedule_validated` part à tous les membres actifs.
+
+  **Les deux sens, depuis le ticket 020.** Une acceptation qui *disparaît* — remplacée ou annulée —
+  retire une acceptation : un planning `validated` cesse d'être complet et doit repasser en
+  `published` (`docs/WORKFLOWS.md § 2`), sans quoi la caserne lirait « Validé » sur un mois à trou.
+  `schedule_reevaluer` traitait déjà ce cas depuis le `0019` ; il lui manquait un appelant. Ce
+  retour ne notifie personne : la conséquence est déjà partie, à la personne concernée.
 
   **Le verrou de ligne précède le test, et c'est structurel.** Deux membres qui acceptent en
   même temps les deux places d'un créneau qui en demande deux lisent chacun leur instantané et
@@ -1012,7 +1079,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 |---|---|---|
 | `send-notification` | appel interne : `public.notify(...)` → pg_net (déclencheurs, crons), ou HTTP direct depuis une autre Edge Function | Prend un `notification_type`, des destinataires, une caserne et une charge utile ; regroupe, construit le texte français, écrit la ligne `inapp`, envoie le push FCM à tous les appareils du membre, envoie le courriel si le canal est demandé ou si le membre n'a aucun appareil, supprime les jetons définitivement rejetés (ticket 025, contrat dans `supabase/functions/README.md`) |
 | `publish-schedule` | app admin | Appelle `publish_schedule` (SQL, atomique), puis `send-notification` avec les destinataires **déjà groupés par membre** : sept créneaux font une notification, pas sept (ticket 019, contrat dans `supabase/functions/README.md`) |
-| `reassign-shift` | app admin | Marque l'ancienne attribution `replaced`, crée la nouvelle, notifie le nouveau membre et l'admin |
+| `reassign-shift` | app admin | Appelle `reassign_shift` (SQL, atomique) : l'ancienne attribution est marquée `replaced` ou reste `declined`, la nouvelle est créée `proposed` et horodatée, `replaced_by` relie les deux, et **une seule** notification part — au nouveau membre, plus l'ancien si sa garde était acceptée (ticket 020, contrat dans `supabase/functions/README.md`). L'annulation, elle, est une RPC (`cancel_assignment`) et non une Edge Function |
 | `auto-propose` | app admin | Heuristique de remplissage du brouillon |
 | `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`) |
 | `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006) |
@@ -1142,7 +1209,8 @@ Ordre proposé :
 17. `0017_matrice_admin.sql` (ticket 016 : calendrier français en base, vue `v_member_load`, fonction `availability_matrix`)
 18. `0018_planning_brouillon.sql` (ticket 017 : `station_required_count`, `create_schedule`, `assignments_trace_disponibilite`, `assignments_audit_hors_dispo`, suppression d'attribution réservée au brouillon, vue `v_schedule_progress`, inscription d'`assignments` dans `supabase_realtime`)
 19. `0019_publication_suivi.sql` (ticket 019 : `schedules_guard_transition`, `schedules_guard_suppression` et `shifts_guard_suppression`, suppression d'un planning et d'un créneau réservée au brouillon, `publish_schedule`, `schedule_complet`, `schedule_reevaluer`, `schedule_auto_validate`, `shifts_effectif_revalide`, `remind_schedule`, inscription de `schedules` dans `supabase_realtime`)
-20. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
+20. `0020_reattribution.sql` (ticket 020 : `assignments_guard_reattribution`, `reassign_shift`, `cancel_assignment`, clause `when` de `schedule_auto_validate` élargie aux acceptations qui disparaissent)
+21. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
     `late_responders_report` (ticket 022), `archive_schedules` et `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
@@ -1172,8 +1240,10 @@ dès qu'une politique fuit). Les fonctions d'invitation de `0009` sont couvertes
 `supabase/tests/station_settings_test.sql` le cycle de vie des périodes de `0012` par
 `supabase/tests/periods_cron_test.sql` et le chemin d'appel des notifications de `0014`
 par `supabase/tests/notifications_test.sql`, les rappels de saisie de `0016` par
-`supabase/tests/availability_reminders_test.sql` et la matrice de `0017` par
-`supabase/tests/matrice_admin_test.sql`, joués par le même script. La logique pure
+`supabase/tests/availability_reminders_test.sql`, la matrice de `0017` par
+`supabase/tests/matrice_admin_test.sql`, la publication de `0019` par
+`supabase/tests/publication_test.sql` et la réattribution de `0020` par
+`supabase/tests/reattribution_test.sql`, joués par le même script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge

@@ -20,14 +20,20 @@ import '../../dispos/domain/dispos_providers.dart';
 import '../../dispos/domain/periode_saisie.dart';
 import '../../dispos/presentation/widgets/selecteur_mois.dart';
 import '../../membres/domain/membres_providers.dart';
+import '../domain/candidat.dart';
 import '../domain/matrice_providers.dart';
+import '../domain/planning_providers.dart';
 import '../domain/suivi_planning.dart';
 import '../domain/suivi_providers.dart';
 import 'widgets/bloc_progression.dart';
 import 'widgets/bloc_retardataires.dart';
+import 'widgets/confirmation_annulation.dart';
+import 'widgets/confirmation_reattribution.dart';
 import 'widgets/filtres_suivi.dart';
 import 'widgets/indicateur_direct.dart';
 import 'widgets/journee_suivi.dart';
+import 'widgets/panneau_creneau.dart';
+import 'widgets/squelette_panneau.dart';
 import 'widgets/squelette_suivi.dart';
 
 /// **« Suivi du planning »** — ce qui se passe après l'envoi.
@@ -78,6 +84,9 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
   SuiviController get _controleur =>
       ref.read(suiviControllerProvider.notifier);
 
+  PlanningController get _planning =>
+      ref.read(planningControllerProvider.notifier);
+
   void _choisirMois(PeriodeSaisie periode) {
     ref.read(moisMatriceProvider.notifier).definir(periode.cle);
     context.goNamed(
@@ -111,6 +120,202 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
       return AppStrings.suiviRelanceArchive;
     }
     return null;
+  }
+
+  // -------------------------------------------------------------------
+  // La réattribution — le geste que le 019 laissait au chef à faire ailleurs
+  // -------------------------------------------------------------------
+
+  /// Ouvre le panneau des candidats sur un créneau à réparer.
+  ///
+  /// **Le panneau est celui du 017, et il vit ailleurs** : il se nourrit du
+  /// planning et de la matrice du mois, que cet écran ne lit pas. Les deux
+  /// providers se chargent ici, à l'ouverture, et pas une seconde plus tôt — un
+  /// écran de suivi ne doit pas payer deux requêtes pour un panneau qu'on
+  /// n'ouvrira peut-être pas.
+  void _ouvrirCreneau(CreneauSuivi creneau) {
+    ref.read(creneauSelectionneProvider.notifier).choisir(creneau.creneau.id);
+    // Ce que la réattribution vient réparer, désigné plutôt que deviné : le
+    // lien `replaced_by` pointera ce refus-là.
+    ref
+        .read(cibleReattributionProvider.notifier)
+        .viser(creneau.aRemplacer?.id);
+    if (!AppWindowClass.of(context).estLarge) unawaited(_ouvrirFeuille());
+  }
+
+  Future<void> _ouvrirFeuille() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (BuildContext contexteFeuille) => FractionallySizedBox(
+        heightFactor: 0.85,
+        child: Consumer(
+          builder: (BuildContext context, WidgetRef ref, Widget? _) => _panneau(
+            onFermer: () => Navigator.of(contexteFeuille).pop(),
+          ),
+        ),
+      ),
+    );
+    if (mounted) ref.read(creneauSelectionneProvider.notifier).fermer();
+  }
+
+  /// Le panneau, ou son squelette tant que la matrice du mois n'est pas lue.
+  Widget _panneau({VoidCallback? onFermer}) {
+    final panneau = ref.watch(panneauCandidatsProvider);
+    if (panneau == null) return const SquelettePanneau();
+
+    final fermer =
+        onFermer ?? ref.read(creneauSelectionneProvider.notifier).fermer;
+
+    return PanneauCreneau(
+      panneau: panneau,
+      raisonInactif: _raisonReattribution(),
+      messageReattribution: _messageReattribution(panneau),
+      onFermer: fermer,
+      onAttribuer: (Candidat candidat) =>
+          unawaited(_reattribuer(candidat, panneau)),
+      onRetirer: (Candidat candidat) => unawaited(_annuler(candidat, panneau)),
+      onEffectif: (int effectif) => unawaited(
+        _planning.definirEffectif(
+          creneauId: panneau.creneau.id,
+          effectif: effectif,
+        ),
+      ),
+    );
+  }
+
+  /// « Bruno B. a refusé ce créneau. La personne choisie sera notifiée tout de
+  /// suite. » — le nom quand on le connaît, la conséquence toujours.
+  String? _messageReattribution(PanneauCandidats panneau) {
+    if (!panneau.notifie) return null;
+    final cible = ref.read(cibleReattributionProvider);
+    if (cible == null) return AppStrings.reattributionBandeau;
+    final refusee = ref
+        .read(suiviControllerProvider)
+        .value
+        ?.suivi
+        .attributionParId(cible);
+    if (refusee == null || refusee.nom.isEmpty) {
+      return AppStrings.reattributionBandeau;
+    }
+    // Un refus et une annulation ne se disent pas de la même façon : l'un est
+    // la réponse d'un pompier, l'autre une décision de la caserne.
+    return refusee.etat == AttributionEtat.refuse
+        ? AppStrings.reattributionBandeauRefus(refusee.nom)
+        : AppStrings.reattributionBandeauAnnulation(refusee.nom);
+  }
+
+  /// Pourquoi la réattribution est impossible, ou `null`.
+  ///
+  /// **Hors ligne, elle est refusée plutôt que mise en file** : la
+  /// notification partirait une heure plus tard, pour un créneau peut-être déjà
+  /// pourvu par l'adjoint.
+  String? _raisonReattribution() {
+    final etat = ref.watch(suiviControllerProvider).value;
+    if (etat == null) return null;
+    if (etat.lectureSeule) return AppStrings.lectureSeuleDetail;
+    if (!(ref.watch(enLigneProvider).value ?? true)) {
+      return AppStrings.reattribuerHorsLigne;
+    }
+    return switch (etat.suivi.etat) {
+      PlanningEtat.brouillon => AppStrings.reattribuerBrouillon,
+      PlanningEtat.archive => AppStrings.reattribuerArchive,
+      _ => null,
+    };
+  }
+
+  Future<void> _reattribuer(Candidat candidat, PanneauCandidats panneau) async {
+    final cible = ref.read(cibleReattributionProvider);
+    final sortant = cible == null
+        ? null
+        : ref.read(suiviControllerProvider).value?.suivi.attributionParId(cible);
+
+    final confirme = await confirmerReattribution(
+      context,
+      candidat: candidat,
+      jour: panneau.jour,
+      creneau: panneau.creneau.creneau,
+      // On ne nomme le titulaire sortant que si on lui retire vraiment quelque
+      // chose : celui qui a refusé ne perd rien et ne sera pas prévenu.
+      titulaireSortant: sortant?.etat == AttributionEtat.accepte
+          ? sortant?.nom
+          : null,
+    );
+    if (!confirme || !mounted) return;
+
+    final reponse = await _planning.reattribuer(
+      creneauId: panneau.creneau.id,
+      userId: candidat.userId,
+      ancienneId: cible,
+    );
+    if (!mounted) return;
+
+    final resultat = reponse.fait;
+    if (resultat == null) {
+      // **Le refus se dit avec ses mots.** « Ce créneau est déjà pourvu » nomme
+      // la sortie ; « la réattribution n'a pas abouti » ne nomme rien.
+      _annoncer(reponse.erreur?.message ?? AppStrings.reattribuerErreur);
+      unawaited(_controleur.rafraichir());
+      return;
+    }
+
+    // Le panneau se referme : le créneau est réparé, et le laisser ouvert
+    // inviterait à recommencer.
+    ref.read(creneauSelectionneProvider.notifier).fermer();
+    _annoncer(
+      resultat.ancienPrevenu && sortant != null
+          ? AppStrings.reattribuerFaiteEtAncien(
+              candidat.membre.nomAffiche,
+              sortant.nom,
+            )
+          : AppStrings.reattribuerFaite(candidat.membre.nomAffiche),
+    );
+    unawaited(_controleur.rafraichir());
+  }
+
+  Future<void> _annuler(Candidat candidat, PanneauCandidats panneau) async {
+    final attribution = candidat.attribution;
+    if (attribution == null) return;
+
+    // Accepté ou seulement proposé : la feuille le dit, parce que la
+    // conséquence n'est pas la même — un téléphone sonne, ou personne n'est
+    // prévenu.
+    final connue = ref
+        .read(suiviControllerProvider)
+        .value
+        ?.suivi
+        .attributionParId(attribution.id);
+    final acquise = connue?.etat == AttributionEtat.accepte;
+
+    final demande = await confirmerAnnulation(
+      context,
+      membre: candidat.membre.nomAffiche,
+      jour: panneau.jour,
+      creneau: panneau.creneau.creneau,
+      prevenu: acquise,
+    );
+    if (demande == null || !mounted) return;
+
+    final reponse = await _planning.annuler(
+      attributionId: attribution.id,
+      motif: demande.motif,
+    );
+    if (!mounted) return;
+
+    final prevenu = reponse.prevenu;
+    if (prevenu == null) {
+      _annoncer(reponse.erreur?.message ?? AppStrings.annulerErreur);
+      unawaited(_controleur.rafraichir());
+      return;
+    }
+
+    _annoncer(
+      prevenu
+          ? AppStrings.annulerFaite(candidat.membre.nomAffiche)
+          : AppStrings.annulerFaiteSansEnvoi(candidat.membre.nomAffiche),
+    );
+    unawaited(_controleur.rafraichir());
   }
 
   void _versDestination(int index, List<AppDestination> destinations) {
@@ -168,6 +373,11 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
         ),
       ],
       banniere: _banniere(etat),
+      // Le panneau des candidats prend, sur cet écran aussi, la place que le
+      // 016 lui avait réservée. Il n'existe que si un créneau est ouvert.
+      panneauLateral: ref.watch(creneauSelectionneProvider) == null
+          ? null
+          : _panneau(),
       child: _corps(admin: admin, asynchrone: asynchrone, etat: etat),
     );
   }
@@ -318,7 +528,16 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
         }
 
         if (index > journees.length) return const SizedBox.shrink();
-        return JourneeSuiviBloc(journee: journees[index - 1]);
+        return JourneeSuiviBloc(
+          journee: journees[index - 1],
+          // Rien à ouvrir sur un brouillon ni sur un mois archivé : le bouton
+          // ne s'affiche pas plutôt que de s'afficher inerte.
+          onReparer: etat.suivi.etat == PlanningEtat.publie ||
+                  etat.suivi.etat == PlanningEtat.valide
+              ? _ouvrirCreneau
+              : null,
+          raisonInactif: _raisonReattribution(),
+        );
       },
     );
   }

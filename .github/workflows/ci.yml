@@ -138,6 +138,8 @@ jobs:
           deno check send-notification/index.ts
           deno check invite-member/index.ts
           deno check accept-invitation/index.ts
+          deno check publish-schedule/index.ts
+          deno check reassign-shift/index.ts
 
       - name: Tester
         run: deno test tests/ --allow-env

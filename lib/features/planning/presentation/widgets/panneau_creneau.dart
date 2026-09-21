@@ -34,6 +34,7 @@ class PanneauCreneau extends StatefulWidget {
     super.key,
     this.raisonInactif,
     this.messageDistant,
+    this.messageReattribution,
   });
 
   final PanneauCandidats panneau;
@@ -56,6 +57,14 @@ class PanneauCreneau extends StatefulWidget {
   /// « Modifié à l'instant par Jean D. » — quand ce créneau-là a bougé sous
   /// une autre main.
   final String? messageDistant;
+
+  /// Ce que coûte un appui sur un planning publié : « la personne choisie sera
+  /// notifiée tout de suite », et le nom de qui a refusé quand l'écran le sait.
+  ///
+  /// **Il remplace [messageDistant]** quand les deux voudraient s'afficher :
+  /// l'en-tête porte une mention, une seule, et celle-ci décrit la conséquence
+  /// du geste — elle passe devant l'anecdote de qui a touché le créneau.
+  final String? messageReattribution;
 
   @override
   State<PanneauCreneau> createState() => _PanneauCreneauState();
@@ -87,6 +96,7 @@ class _PanneauCreneauState extends State<PanneauCreneau> {
           panneau: panneau,
           onFermer: widget.onFermer,
           messageDistant: widget.messageDistant,
+          messageReattribution: widget.messageReattribution,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -118,13 +128,22 @@ class _PanneauCreneauState extends State<PanneauCreneau> {
   List<Widget> _elements(PanneauCandidats panneau) {
     final actif = panneau.modifiable && widget.raisonInactif == null;
 
+    // Le geste ne change pas, sa conséquence si : sur un planning publié,
+    // poser quelqu'un le notifie et retirer quelqu'un l'annule.
+    final poser = panneau.notifie
+        ? ActionCandidat.reattribuer
+        : ActionCandidat.attribuer;
+    final oter = panneau.notifie
+        ? ActionCandidat.annuler
+        : ActionCandidat.retirer;
+
     return <Widget>[
       _Titre(texte: AppStrings.planningSectionAttribues(panneau.pourvus)),
       if (panneau.attribues.isEmpty)
         const _Message(texte: AppStrings.planningAucunAttribue)
       else
         for (final candidat in panneau.attribues)
-          _ligne(candidat, ActionCandidat.retirer, actif: actif),
+          _ligne(candidat, oter, actif: actif),
 
       _Titre(
         texte: AppStrings.planningSectionDisponibles(
@@ -139,7 +158,7 @@ class _PanneauCreneauState extends State<PanneauCreneau> {
         )
       else
         for (final candidat in panneau.disponibles)
-          _ligne(candidat, ActionCandidat.attribuer, actif: actif),
+          _ligne(candidat, poser, actif: actif),
 
       if (panneau.nonDisponibles.isNotEmpty) ...<Widget>[
         _BasculeNonDisponibles(
@@ -149,7 +168,7 @@ class _PanneauCreneauState extends State<PanneauCreneau> {
         ),
         if (_deplie)
           for (final candidat in panneau.nonDisponibles)
-            _ligne(candidat, ActionCandidat.attribuer, actif: actif),
+            _ligne(candidat, poser, actif: actif),
       ],
     ];
   }
@@ -170,7 +189,7 @@ class _PanneauCreneauState extends State<PanneauCreneau> {
           raison: actif ? null : widget.raisonInactif,
           onAction: !actif
               ? null
-              : () => action == ActionCandidat.attribuer
+              : () => action.pose
                     ? widget.onAttribuer(candidat)
                     : widget.onRetirer(candidat),
         ),
@@ -186,11 +205,13 @@ class _EnTete extends StatelessWidget {
     required this.panneau,
     required this.onFermer,
     this.messageDistant,
+    this.messageReattribution,
   });
 
   final PanneauCandidats panneau;
   final VoidCallback onFermer;
   final String? messageDistant;
+  final String? messageReattribution;
 
   @override
   Widget build(BuildContext context) {
@@ -257,10 +278,16 @@ class _EnTete extends StatelessWidget {
               ),
             ],
           ),
+          // **Ce que coûte un appui**, dit avant l'appui. Bleu de réglure :
+          // c'est une information, pas une alarme.
+          if (messageReattribution != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.sm),
+            _BandeauReattribution(texte: messageReattribution!),
+          ],
           // **Une seule mention, et seulement là où elle sert.** Aucun toast
           // par événement : deux adjoints qui attribuent trente créneaux
           // produiraient trente `SnackBar`, et le signal est déjà à l'écran.
-          if (messageDistant != null) ...<Widget>[
+          if (messageDistant != null && messageReattribution == null) ...<Widget>[
             const SizedBox(height: AppSpacing.xs),
             Semantics(
               liveRegion: true,
@@ -272,6 +299,51 @@ class _EnTete extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// « Planning publié : la personne choisie sera notifiée tout de suite. »
+///
+/// Icône + libellé, jamais la couleur seule. Pas de filet coloré à gauche : le
+/// fond `secondary-container` et l'icône suffisent, et un liseré de 4 dp sur un
+/// bloc d'information est une habitude, pas une décision (`DESIGN.md § Don't`).
+class _BandeauReattribution extends StatelessWidget {
+  const _BandeauReattribution({required this.texte});
+
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: AppRadius.controleRadius,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            Icons.campaign,
+            size: AppTouch.iconePetite,
+            color: theme.colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              texte,
+              style: AppTextStyles.corpsSecondaire.copyWith(
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
+            ),
+          ),
         ],
       ),
     );

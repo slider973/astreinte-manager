@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests de bout en bout des Edge Functions : invitations (ticket 006), envoi de
-# notifications (ticket 025) et publication d'un planning (ticket 019).
+# notifications (ticket 025), publication d'un planning (ticket 019) et
+# réattribution d'un créneau refusé (ticket 020).
 #
 #   supabase start
 #   supabase functions serve          # dans un autre terminal
@@ -102,6 +103,9 @@ connexion() { # connexion <email> -> jeton d'accès
 
 MEMBRE1_A="aaaaaaaa-0000-4000-8000-000000000101"
 MEMBRE2_A="aaaaaaaa-0000-4000-8000-000000000102"
+# Le remplaçant du ticket 020 : il n'a aucune attribution dans ce planning, donc
+# aucune notification à son nom avant la réattribution.
+MEMBRE3_A="aaaaaaaa-0000-4000-8000-000000000103"
 
 # Le mois M+2 de la caserne A, celui sur lequel le test de publication travaille :
 # le seed le crée et rien d'autre ne s'en sert.
@@ -619,6 +623,101 @@ verifier "l'audit garde la trace de la publication" "1" \
 appeler publish-schedule "$ADMIN_A" "{\"schedule_id\": \"$PLANNING\"}"
 verifier "republier : 409" "409" "$STATUT"
 verifier "et le code le dit" "schedule_not_draft" "$(jq -r '.error.code' <<<"$CORPS")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 16. reassign-shift : identité, rôle et corps de requête'
+# ---------------------------------------------------------------------------
+# Le premier créneau du planning publié, celui de membre1. Il va refuser.
+CRENEAU="$(sql "select sh.id from shifts sh
+                 where sh.schedule_id = '$PLANNING'
+                 order by sh.date, sh.slot limit 1")"
+ATTRIBUTION="$(sql "select a.id from assignments a
+                     where a.shift_id = '$CRENEAU' and a.user_id = '$MEMBRE1_A'")"
+
+appeler reassign-shift - "{\"shift_id\": \"$CRENEAU\", \"user_id\": \"$MEMBRE3_A\"}"
+verifier "sans jeton : 401" "401" "$STATUT"
+
+appeler reassign-shift "$MEMBRE_A" "{\"shift_id\": \"$CRENEAU\", \"user_id\": \"$MEMBRE3_A\"}"
+verifier "un membre ne réattribue pas : 403" "403" "$STATUT"
+verifier "et le code le dit" "not_admin" "$(jq -r '.error.code' <<<"$CORPS")"
+
+appeler reassign-shift "$ADMIN_B" "{\"shift_id\": \"$CRENEAU\", \"user_id\": \"$MEMBRE3_A\"}"
+verifier "l'admin de la caserne voisine ne réattribue pas : 403" "403" "$STATUT"
+
+appeler reassign-shift "$ADMIN_A" "{\"user_id\": \"$MEMBRE3_A\"}"
+verifier "sans shift_id : 400" "400" "$STATUT"
+
+appeler reassign-shift "$ADMIN_A" "{\"shift_id\": \"$STATION_INCONNUE\", \"user_id\": \"$MEMBRE3_A\"}"
+verifier "créneau inconnu : 404" "404" "$STATUT"
+
+appeler reassign-shift "$ADMIN_A" "{\"shift_id\": \"$CRENEAU\", \"user_id\": \"$MEMBRE1_A\"}"
+verifier "le titulaire actuel n'est pas réattribué à lui-même : 409" "409" "$STATUT"
+verifier "et le code le dit" "already_assigned" "$(jq -r '.error.code' <<<"$CORPS")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 17. reassign-shift : un refus, une réattribution, UNE notification'
+# ---------------------------------------------------------------------------
+# Le refus de membre1, tel qu'il l'écrit depuis son écran.
+sql "update assignments
+        set status = 'declined', responded_at = now(), decline_reason = 'en formation'
+      where id = '$ATTRIBUTION'" >/dev/null
+
+sql "delete from notifications; delete from notification_outbox" >/dev/null
+
+appeler reassign-shift "$ADMIN_A" \
+  "{\"shift_id\": \"$CRENEAU\", \"user_id\": \"$MEMBRE3_A\", \"previous_assignment_id\": \"$ATTRIBUTION\"}"
+verifier "la réattribution réussit : 200" "200" "$STATUT"
+verifier "l'ancienne attribution était un refus" "declined" \
+  "$(jq -r '.previous.status' <<<"$CORPS")"
+verifier "et son titulaire n'est pas notifié" "false" \
+  "$(jq -r '.previous.notified' <<<"$CORPS")"
+verifier "le planning reste publié" "published" "$(jq -r '.schedule.status' <<<"$CORPS")"
+
+# **Le critère d'acceptation du ticket**, vu depuis la table des notifications.
+# La file de `notify` passe par pg_net : on laisse une seconde à la boucle.
+sleep 2
+verifier "une seule notification interne au total" "1" \
+  "$(sql "select count(*) from notifications where channel = 'inapp'")"
+verifier "et elle est pour le nouveau membre" "1" \
+  "$(sql "select count(*) from notifications
+           where user_id = '$MEMBRE3_A' and type = 'assignment_proposed' and channel = 'inapp'")"
+verifier "l'ancien titulaire n'a rien reçu" "0" \
+  "$(sql "select count(*) from notifications where user_id = '$MEMBRE1_A'")"
+verifier "le refus reste un refus" "declined" \
+  "$(sql "select status from assignments where id = '$ATTRIBUTION'")"
+verifier "et il porte le fil vers l'attribution qui l'a couvert" "1" \
+  "$(sql "select count(*) from assignments
+           where id = '$ATTRIBUTION' and replaced_by is not null")"
+verifier "la nouvelle attribution est horodatée" "1" \
+  "$(sql "select count(*) from assignments
+           where shift_id = '$CRENEAU' and user_id = '$MEMBRE3_A'
+             and status = 'proposed' and proposed_at is not null")"
+verifier "le reste du planning n'a pas bougé" "8" \
+  "$(sql "select count(*) from assignments a join shifts sh on sh.id = a.shift_id
+           where sh.schedule_id = '$PLANNING' and a.shift_id <> '$CRENEAU'
+             and a.status = 'proposed'")"
+verifier "l'audit garde la trace de la réattribution" "1" \
+  "$(sql "select count(*) from audit_log where action = 'assignment.reassigned'")"
+
+# Remplacer deux fois la même attribution : refus lisible, rien de plus n'est parti.
+appeler reassign-shift "$ADMIN_A" \
+  "{\"shift_id\": \"$CRENEAU\", \"user_id\": \"$MEMBRE2_A\", \"previous_assignment_id\": \"$ATTRIBUTION\"}"
+verifier "remplacer deux fois la même attribution : 409" "409" "$STATUT"
+verifier "et le code le dit" "assignment_not_replaceable" "$(jq -r '.error.code' <<<"$CORPS")"
+
+# **Une réattribution remplace, elle n'ajoute pas.** Le créneau demande une
+# personne et membre3 la tient : un appel de plus ferait sonner un téléphone
+# pour une garde déjà couverte.
+appeler reassign-shift "$ADMIN_A" \
+  "{\"shift_id\": \"$CRENEAU\", \"user_id\": \"$MEMBRE2_A\"}"
+verifier "un créneau déjà pourvu : 409" "409" "$STATUT"
+verifier "et le code le dit" "shift_already_filled" "$(jq -r '.error.code' <<<"$CORPS")"
+verifier "la réponse dit les places tenues" "1" "$(jq -r '.error.filled' <<<"$CORPS")"
+verifier "et les places demandées" "1" "$(jq -r '.error.required' <<<"$CORPS")"
+verifier "rien de plus n'est parti" "1" \
+  "$(sql "select count(*) from notifications where channel = 'inapp'")"
 
 # ---------------------------------------------------------------------------
 echo ''
