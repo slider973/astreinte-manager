@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 024, 031
 - **Branche** : `feat/045-destination-perdue-a-froid`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/44
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
