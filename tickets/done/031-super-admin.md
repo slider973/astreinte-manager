@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 008, 029
 - **Branche** : `feat/031-super-admin`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/29
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
