@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 008, 029
 - **Branche** : `feat/031-super-admin`
+- **Statut** : en cours depuis 2026-09-21
 
 ## À faire
 - Route `/superadmin` réservée à `super_admins` : liste des casernes (nom, membres actifs, statut abonnement, dernier planning publié, création), créer une caserne, nommer le premier admin par email (invitation), suspendre / réactiver manuellement.
