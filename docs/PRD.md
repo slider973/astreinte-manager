@@ -239,7 +239,9 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
   La saisie hors ligne n'est pas au MVP.
 - **Accessibilité** : contrastes conformes, cibles tactiles de 44 pt minimum, tailles de
   police dynamiques.
-- **Web** : Flutter web avec renderer CanvasKit, manifeste PWA, service worker par défaut.
+- **Web** : Flutter web avec renderer CanvasKit **auto-hébergé** — ni le moteur, ni les polices
+  de repli ne sont téléchargés chez un tiers, au démarrage comme en navigation (ticket 037).
+  Manifeste PWA, service worker par défaut.
   Écran d'aide pour l'installation sur iOS. La PWA est le canal principal : chaque écran est
   vérifié sur Chrome et sur un téléphone avec la PWA installée, jamais seulement en natif.
 - **Coût** : un seul projet Supabase pour toutes les casernes. Objectif < 3 €/mois par

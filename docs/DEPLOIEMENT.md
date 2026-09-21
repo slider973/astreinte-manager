@@ -24,7 +24,8 @@ CI (.github/workflows/ci.yml)        analyse, tests, build web, parcours, migrat
       ↓  (uniquement si tout est vert)
 Déploiement (.github/workflows/deploy.yml)
       ↓
-scripts/build_web.sh env/prod.json   flutter build web --release + compression brotli des polices
+scripts/build_web.sh env/prod.json   flutter build web --release, élagage et compression brotli
+                                     du moteur CanvasKit et des polices
       ↓
 vercel deploy --prebuilt --prod      téléversement de build/web tel quel
 ```
@@ -130,9 +131,10 @@ npx vercel deploy --prebuilt --prod --token=<token>
 ```
 
 **Regarder la construction avant de l'envoyer.** Un serveur statique ordinaire ne convient pas :
-il ne pose pas `Content-Encoding: br` sur les polices pré-compressées, qui échouent alors au
-décodage **en silence**. `scripts/servir_web.py` rejoue `vercel.json` — redirections, en-têtes,
-réécriture vers `index.html` — et comprime les types texte comme le fait le CDN.
+il ne pose pas `Content-Encoding: br` sur les polices et le moteur pré-compressés. Les polices
+échouent alors au décodage **en silence**, le moteur refuse de démarrer et la page reste blanche.
+`scripts/servir_web.py` rejoue `vercel.json` — redirections, en-têtes, réécriture vers
+`index.html` — et comprime les types texte comme le fait le CDN.
 
 ```sh
 scripts/build_web.sh env/prod.json
@@ -142,25 +144,31 @@ scripts/servir_web.py            # puis http://127.0.0.1:8099
 ## 6. Vérifier, dans cet ordre
 
 ```sh
-# 1. Les polices sont bien servies pré-compressées : 83 Ko au lieu de 184.
+# 1. Les polices sont bien servies pré-compressées : 88 Ko au lieu de 194.
 curl -sI -H 'Accept-Encoding: br' \
   https://<domaine>/assets/assets/fonts/AtkinsonHyperlegibleNext-Regular.ttf \
   | grep -i -e content-encoding -e content-length
 # attendu : content-encoding: br   /   content-length: ~17600
 
-# 2. Le service worker n'est pas figé par le CDN.
+# 2. Le moteur de rendu aussi, sans quoi l'application ne démarre pas du tout.
+curl -sI -H 'Accept-Encoding: br' https://<domaine>/canvaskit/chromium/canvaskit.wasm \
+  | grep -i -e content-encoding -e content-length
+# attendu : content-encoding: br   /   content-length: ~1616000
+
+# 3. Le service worker n'est pas figé par le CDN.
 curl -sI https://<domaine>/flutter_service_worker.js | grep -i cache-control
 # attendu : public, max-age=0, must-revalidate
 
-# 3. L'adresse qu'on dicte au téléphone.
+# 4. L'adresse qu'on dicte au téléphone.
 curl -sI https://<domaine>/install | grep -i -e '^HTTP' -e location
 # attendu : 307 → /#/install
 ```
 
-Le workflow fait lui-même les vérifications 1 et 2 après chaque mise en ligne et **échoue** si
-elles ne passent pas. La raison est dans `assets/fonts/README.md` : une police qui n'est pas
-décodée échoue **en silence**, et l'application retombe alors sur un Roboto téléchargé chez Google.
-Mieux vaut une mise en ligne rouge qu'une PWA qui appelle `fonts.gstatic.com` à chaque ouverture.
+Le workflow fait lui-même les vérifications 1 à 3 après chaque mise en ligne et **échoue** si elles
+ne passent pas. La raison est dans `assets/fonts/README.md` : une police qui n'est pas décodée
+échoue **en silence**, et l'application retombe alors sur un Roboto téléchargé chez Google. Le
+moteur, lui, échoue bruyamment — `WebAssembly.compileStreaming(): expected magic word` — et la page
+reste blanche. Mieux vaut une mise en ligne rouge qu'une PWA muette ou qui appelle gstatic.
 
 Puis, sur un téléphone :
 
@@ -179,8 +187,9 @@ Puis, sur un téléphone :
 | Réécriture de tout vers `/index.html` | `go_router` résout les routes côté client ; sans elle, un rechargement sur une sous-page rendrait 404 |
 | Redirection `/install` → `/#/install` | l'adresse qu'on dicte au téléphone ne peut pas contenir un dièse. Temporaire (307) exprès : elle disparaîtra le jour où `usePathUrlStrategy()` sera activé |
 | `Cache-Control: max-age=0, must-revalidate` presque partout | c'est le service worker de Flutter qui gère les versions, par empreinte de contenu. Un cache HTTP long figerait l'application sur les téléphones déjà installés. La revalidation coûte une requête conditionnelle, et seulement au premier chargement : ensuite, le service worker sert tout hors ligne |
-| `Content-Encoding: br` sur `assets/assets/fonts/*.ttf` | les polices sont **livrées déjà compressées** par `scripts/build_web.sh`. Flutter web ne décode pas le WOFF2 (`assets/fonts/README.md`), le seul levier est la compression de transport : 184 Ko → 83 Ko |
-| `canvaskit/**` en cache immuable | le chemin est lié à la révision du moteur Flutter |
+| `Content-Encoding: br` sur `assets/assets/fonts/*.ttf` | les polices sont **livrées déjà compressées** par `scripts/build_web.sh`. Flutter web ne décode pas le WOFF2 (`assets/fonts/README.md`), le seul levier est la compression de transport : 194 Ko → 88 Ko |
+| `Content-Encoding: br` sur `canvaskit/**` | même mécanique, et c'est elle qui rend l'auto-hébergement du moteur viable (ticket 037) : 5,7 Mo de `.wasm` deviennent 1,6 Mo, exactement ce que servait le CDN de Google. Servi sans cet en-tête, le moteur ne démarre pas |
+| `canvaskit/**` **sans** cache long | auto-hébergé, le chemin n'a plus la révision du moteur dedans. Un `immutable` d'un an figerait la version d'aujourd'hui et la prochaine montée de Flutter servirait un moteur périmé aux téléphones déjà venus. C'est le service worker qui gère les versions, par empreinte |
 | `nosniff`, `Referrer-Policy`, `X-Frame-Options` | le minimum, sans politique de sécurité de contenu : CanvasKit a besoin de `wasm-unsafe-eval` et une CSP mal posée casse l'application en silence |
 
 ## 8. Ce qui n'est pas encore branché, et ce que ça donne
@@ -194,11 +203,28 @@ Puis, sur un téléphone :
 Rien ne plante, rien n'affiche de trace technique. C'est vérifié par
 `test/features/onboarding/aide_installation_test.dart` et `test/app_test.dart`.
 
-## 9. Ce qui reste à faire après ce ticket
+## 9. Ce qui sort de chez nous, et ce qui n'en sort pas
 
-- **`tickets/backlog/037`** — CanvasKit est encore téléchargé depuis `www.gstatic.com`
-  (1,6 Mo mesuré au ticket 032) et Roboto depuis `fonts.gstatic.com` (62 Ko). C'est le repli
-  inconditionnel du chargeur Flutter, pas un réglage de l'application. C'est **le premier poste du
-  temps de chargement** et le volet RGPD du PRD (§ 8) le vise.
-- La compression de `main.dart.js` est faite par Vercel à la volée (3,6 Mo → environ 1,1 Mo en
-  gzip, moins en brotli). Rien à configurer.
+Depuis le ticket 037, **une PWA qui s'ouvre et qu'on parcourt ne contacte aucun domaine tiers.**
+Vérifié au journal réseau, au démarrage comme pendant la navigation, y compris en saisissant des
+caractères absents du sous-ensemble embarqué. Trois réglages tiennent ce résultat, et les trois
+sont couverts par `test/web/aucun_tiers_test.dart` :
+
+| Réglage | Où | Ce qu'il supprime |
+|---|---|---|
+| `canvasKitBaseUrl` + `--no-web-resources-cdn` | `web/flutter_bootstrap.js`, `scripts/build_web.sh` | 1 620 Ko de CanvasKit depuis `www.gstatic.com` |
+| famille `Roboto` déclarée | `pubspec.yaml` | 63 Ko de Roboto depuis `fonts.gstatic.com`, à chaque ouverture |
+| `fontFallbackBaseUrl` | `web/flutter_bootstrap.js` | les polices Noto depuis `fonts.gstatic.com`, déclenchées par le texte saisi (`web/polices-de-repli/README.md`) |
+
+Ce qui part encore, et pourquoi :
+
+- **Supabase** (`<ref>.supabase.co`) : c'est la base du produit, hébergée en Europe. Ce n'est pas un
+  tiers au sens du registre des données personnelles, c'est le sous-traitant déclaré.
+- **Firebase**, le jour où les cinq secrets `FIREBASE_*` seront posés : `firebase_core_web` injecte
+  le SDK depuis `www.gstatic.com`, et `web/firebase-messaging-sw.js` fait un `importScripts` vers la
+  même adresse. Tant que la configuration est absente — c'est le cas aujourd'hui —, **aucune de ces
+  requêtes ne part**. Le jour où elle sera posée, ce sera une dépendance tierce assumée, à déclarer
+  dans la politique de confidentialité ; elle sort du périmètre du ticket 037.
+
+La compression de `main.dart.js` est faite par Vercel à la volée (3,7 Mo → environ 1,1 Mo en gzip,
+moins en brotli). Rien à configurer.

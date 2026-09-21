@@ -55,12 +55,21 @@
     d'abord dans la police système puis saute (FOUT), ce qui est un défaut de
     lecture sur une matrice de 62 cases. Seules les graisses présentes au
     premier écran sont préchargées ; les autres suivent avec le bundle.
+
+    `as="fetch"` et non `as="font"`, bien que ce soient des polices. Le
+    navigateur ne réutilise une ressource préchargée que si la requête qui
+    suit a la **même destination** : `as="font"` attend une police demandée
+    par une règle CSS `@font-face`, alors que CanvasKit, lui, les récupère au
+    `fetch()`. Avec `as="font"`, les deux requêtes ne se rencontrent jamais :
+    les trois fichiers partaient deux fois — 52 Ko pour rien — et la console
+    affichait « preloaded using link preload but not used ». Mesuré et corrigé
+    au ticket 037.
   -->
-  <link rel="preload" as="font" type="font/ttf" crossorigin
+  <link rel="preload" as="fetch" type="font/ttf" crossorigin
         href="assets/assets/fonts/AtkinsonHyperlegibleNext-Regular.ttf">
-  <link rel="preload" as="font" type="font/ttf" crossorigin
+  <link rel="preload" as="fetch" type="font/ttf" crossorigin
         href="assets/assets/fonts/AtkinsonHyperlegibleNext-Bold.ttf">
-  <link rel="preload" as="font" type="font/ttf" crossorigin
+  <link rel="preload" as="fetch" type="font/ttf" crossorigin
         href="assets/assets/fonts/AtkinsonHyperlegibleMono-SemiBold.ttf">
 
   <title>Astreinte SP</title>

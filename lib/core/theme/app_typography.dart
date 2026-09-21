@@ -17,11 +17,16 @@ abstract final class AppFonts {
   /// Replis système, dans l'ordre. Utilisés si un glyphe manque au
   /// sous-ensemble embarqué ou si le chargement échoue.
   ///
-  /// **`Roboto` n'y figure pas volontairement.** Sur Flutter web, nommer une
-  /// famille que le moteur ne connaît pas localement déclenche son
-  /// téléchargement depuis `fonts.gstatic.com` : 63 Ko pris chez un tiers, sur
-  /// une 4G rurale, pour une police de repli qu'on n'affichera jamais. Les
-  /// replis listés ici sont tous résolus par le système.
+  /// **`Roboto` n'y figure pas volontairement.** Les replis listés ici sont
+  /// tous résolus par le système, sans une seule requête réseau.
+  ///
+  /// Le moteur web, lui, garde un dernier recours à part, qu'il nomme
+  /// `Roboto` et qu'aucun `TextStyle` ne peut lui retirer. Le ticket 037 l'a
+  /// désamorcé là où il se règle : `pubspec.yaml` déclare une famille de ce
+  /// nom, pointée sur l'Atkinson régulière. Sans cette déclaration, CanvasKit
+  /// téléchargeait Roboto depuis `fonts.gstatic.com` à chaque démarrage —
+  /// 63 Ko pris chez un tiers, sur une 4G rurale, pour une police qu'on
+  /// n'affiche jamais.
   static const List<String> replis = <String>[
     'system-ui',
     '-apple-system',

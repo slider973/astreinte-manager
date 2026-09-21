@@ -138,7 +138,8 @@ jobs:
       - name: Installer brotli
         run: sudo apt-get update -qq && sudo apt-get install -y -qq brotli
 
-      # Construction + compression des polices (184 Ko → ~83 Ko, ticket 037).
+      # Construction, élagage et compression brotli du moteur CanvasKit
+      # (5,7 Mo → 1,6 Mo) et des polices (194 Ko → ~88 Ko) — ticket 037.
       - name: Construire la PWA
         run: scripts/build_web.sh env/prod.json
 
@@ -164,11 +165,10 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Mis en ligne : $url" >> "$GITHUB_STEP_SUMMARY"
 
-      # Le piège numéro un de ce déploiement : un CDN qui recompresserait les
-      # polices déjà compressées, ou qui oublierait l'en-tête. Dans les deux
-      # cas Flutter échoue au décodage **en silence** et retombe sur un Roboto
-      # téléchargé chez Google — ce que le ticket 037 cherche à supprimer.
-      # Mieux vaut une mise en ligne rouge qu'une PWA qui appelle gstatic.
+      # Le piège numéro un de ce déploiement : un CDN qui recompresserait ce
+      # qui l'est déjà, ou qui oublierait l'en-tête. Pour les polices, Flutter
+      # échoue au décodage **en silence** ; pour le moteur, il ne démarre pas
+      # du tout et la page reste blanche. Mieux vaut une mise en ligne rouge.
       - name: Vérifier les en-têtes servis
         env:
           URL: ${{ steps.mise_en_ligne.outputs.url }}
@@ -178,6 +178,16 @@ jobs:
           echo "$entetes"
           echo "$entetes" | grep -q 'content-encoding: br' || {
             echo "::error::Les polices ne sont pas servies en brotli : Flutter retombera sur Roboto depuis fonts.gstatic.com."
+            exit 1
+          }
+
+          # Auto-hébergé depuis le ticket 037 : c'est cette compression qui
+          # rend l'opération neutre en octets face au CDN de Google.
+          moteur="$URL/canvaskit/chromium/canvaskit.wasm"
+          entetes="$(curl -sSIL -H 'Accept-Encoding: br' "$moteur" | tr 'A-Z' 'a-z')"
+          echo "$entetes"
+          echo "$entetes" | grep -q 'content-encoding: br' || {
+            echo "::error::Le moteur CanvasKit n'est pas servi en brotli : l'application ne démarrera pas (« expected magic word »)."
             exit 1
           }
 
