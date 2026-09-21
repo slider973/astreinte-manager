@@ -40,6 +40,20 @@ Règles :
 - `validated` : tous les membres voient le planning complet.
 - Une modification en `validated` renvoie le planning en `published` et ne touche que les
   attributions modifiées.
+- **`archived` : le mois est passé, et il se lit comme le tableau de garde punaisé au mur.**
+  Chaque membre voit les créneaux du mois, **toutes ses propres attributions** — y compris ses
+  refus et leurs motifs, c'est son historique — et les attributions **acceptées** des autres,
+  c'est-à-dire qui a tenu la garde. Il ne voit ni les propositions restées sans réponse ni les
+  refus **des autres** : c'était de l'information de construction, le mois révolu elle
+  n'appartient plus qu'à l'administration, qui garde tout. Décidé au ticket 044, détaillé dans
+  `docs/SCHEMA.md § 4` et dans la migration `0031`.
+- **`archived` est terminal, dans les deux sens.** On n'en sort pas
+  (`schedules_guard_transition`), et **rien ne s'y écrit plus** : ni un créneau, ni une
+  attribution, ni une réponse de membre, ni une réattribution ou une annulation — les deux
+  fonctions rendent `schedule_not_published` (migrations `0019`, `0020` et `0031`).
+- **Un `draft` n'est jamais archivé.** La transition n'existe pas dans le diagramme, et un
+  brouillon oublié est la seule chose du produit qui se supprime encore : l'archiver le rendrait
+  indestructible sans avoir jamais été lu.
 
 ## 3. Attribution (`assignments.status`)
 
@@ -194,7 +208,7 @@ Règles (migration `0021`, ticket 022) :
 | +72 h | Rapport des retardataires à l'admin |
 | Tout accepté | Planning validé, visible de tous |
 | Pendant M | Modifications ponctuelles, notifications ciblées |
-| 1er de M+1 | Planning archivé |
+| 1er de M+1 | Planning archivé (tâche `archive_schedules`, quotidienne à 02:30 : le 1er du mois **de la caserne**, dans son fuseau, jamais la veille) |
 
 ## 8. Notifications par événement
 

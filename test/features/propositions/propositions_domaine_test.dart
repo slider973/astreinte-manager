@@ -60,6 +60,28 @@ void main() {
       expect(Proposition.colonnes, isNot(contains('was_available')));
     });
 
+    test(
+      'une proposition d\'un mois archivé n\'est plus répondable',
+      () {
+        // `assignments_update_member_response` n'ouvre l'écriture que sur un
+        // planning `published` ou `validated` : sur un mois archivé, la ligne
+        // se lit — c'est l'histoire du membre — mais la réponse ne touche
+        // aucune ligne (ticket 044).
+        final archivee = Proposition.depuisJson(
+          _ligne(date: '2026-08-14', statutPlanning: 'archived'),
+        )!;
+        expect(archivee.planningEtat, PlanningEtat.archive);
+        expect(archivee.repondable, isFalse);
+
+        expect(Proposition.depuisJson(_ligne())!.repondable, isTrue);
+        expect(
+          Proposition.depuisJson(_ligne(statutPlanning: 'validated'))!
+              .repondable,
+          isTrue,
+        );
+      },
+    );
+
     test('le mois du créneau nomme le planning', () {
       final lue = Proposition.depuisJson(_ligne(date: '2026-11-03'))!;
       expect(lue.cleMois, '2026-11');

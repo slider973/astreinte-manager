@@ -1105,6 +1105,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cron_archive_schedules: {
+        Args: { p_reference?: string }
+        Returns: number
+      }
       cron_assignment_reminders: {
         Args: { p_reference?: string }
         Returns: number

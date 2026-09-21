@@ -5,6 +5,22 @@ import '../../../core/l10n/format_date.dart';
 import '../../../core/supabase/enums.dart';
 import '../../../core/theme/app_status.dart';
 
+/// Vrai quand la base rend les attributions de **toute** la caserne sur un
+/// planning dans cet état, et pas seulement celles du lecteur.
+///
+/// Deux états, deux politiques, une seule règle écrite ici :
+///
+/// - `validated` — `assignments_select_station_validated` ouvre le mois figé ;
+/// - `archived` — `assignments_select_station_archived` (migration `0031`)
+///   ouvre les attributions `accepted` du mois écoulé. C'est la décision du
+///   ticket 044 : un planning archivé se lit comme le tableau de garde du mois
+///   passé, punaisé au mur.
+///
+/// Sur un planning `published`, la base ne rend que les attributions du
+/// lecteur : l'écran ne montre que ses propres créneaux, et dit pourquoi.
+bool caserneEntiereLisible(PlanningEtat etat) =>
+    etat == PlanningEtat.valide || etat == PlanningEtat.archive;
+
 /// Les heures d'affichage d'une caserne (`stations.settings`,
 /// `docs/SCHEMA.md § 2.1`).
 ///
@@ -114,24 +130,34 @@ class Astreinte {
 
   final CreneauType creneau;
 
-  /// L'état du planning qui porte ce créneau. **Jamais `brouillon` ni
-  /// `archive`** : la RLS ne laisse sortir que `published` et `validated`
-  /// (`supabase/migrations/0007`, politiques `shifts_select_member_published`
-  /// et `assignments_select_own_published`).
+  /// L'état du planning qui porte ce créneau. **Jamais `brouillon`** : la RLS
+  /// ne laisse sortir que `published`, `validated` et — depuis le ticket 044 —
+  /// `archived` (`supabase/migrations/0031`, politiques
+  /// `shifts_select_member_published` et `assignments_select_own_published`).
+  ///
+  /// `archive` arrive bel et bien jusqu'ici : l'écran remonte un an
+  /// d'historique, et tout mois révolu est archivé le 1er du mois suivant.
   final PlanningEtat planningEtat;
 
   /// Les autres membres acceptés sur ce créneau, par nom d'usage.
   ///
-  /// **Vide tant que le planning n'est pas validé**, et c'est la base qui le
-  /// décide : `assignments_select_station_validated` n'ouvre les attributions
-  /// des autres que sur un planning `validated`. L'écran n'affiche donc pas
-  /// une liste vide, il affiche la phrase qui explique l'attente.
+  /// **Vide tant que le planning est seulement publié**, et c'est la base qui
+  /// le décide : `assignments_select_station_validated` n'ouvre les
+  /// attributions des autres que sur un planning `validated`, et
+  /// `assignments_select_station_archived` les gardes tenues d'un mois
+  /// archivé. L'écran n'affiche donc pas une liste vide, il affiche la phrase
+  /// qui explique l'attente.
   final List<String> equipiers;
 
   /// Vrai quand les autres noms sont **connaissables**. Ce n'est pas la même
   /// chose que « il y a des équipiers » : sur un planning validé, une liste
   /// vide veut dire « tu es seul », ce qui est une information.
-  bool get equipiersConnus => planningEtat == PlanningEtat.valide;
+  ///
+  /// **Archivé compte comme validé** (ticket 044) : sur un mois écoulé, la
+  /// base rend les attributions `accepted` de toute la caserne. Écrire « en
+  /// attente de la validation » sur une garde tenue il y a huit mois serait
+  /// annoncer une décision qui n'arrivera jamais.
+  bool get equipiersConnus => caserneEntiereLisible(planningEtat);
 
   /// La clé du mois : `2026-10`.
   String get cleMois =>

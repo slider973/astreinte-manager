@@ -60,6 +60,9 @@ abstract interface class PropositionsRepository {
   /// attribution de brouillon n'a rien demandé à personne
   /// (`docs/WORKFLOWS.md § 3`). Un planning encore en brouillon ne renvoie de
   /// toute façon rien du tout — la RLS s'en charge, et c'est voulu.
+  ///
+  /// **Ni les propositions d'un mois archivé** ([Proposition.repondable]) :
+  /// elles restent lisibles en base, mais plus répondables.
   Future<List<Proposition>> lister({
     required String userId,
     required String stationId,
@@ -110,12 +113,21 @@ class SupabasePropositionsRepository implements PropositionsRepository {
           // un pompier à un planning que son chef est en train d'écrire.
           .not('proposed_at', 'is', null);
 
-      // Le tri est fait en Dart : soixante-deux lignes au pire, et ordonner
-      // par une colonne de table jointe côté PostgREST échangerait une
-      // comparaison contre une syntaxe fragile.
+      // Le tri et le filtre sur l'état du planning sont faits en Dart :
+      // soixante-deux lignes au pire, `schedules.status` est déjà sur le fil
+      // (`Proposition.colonnes`), et filtrer côté PostgREST une colonne d'une
+      // table jointe en second niveau échangerait une comparaison lisible
+      // contre une syntaxe fragile.
+      //
+      // **Une proposition d'un mois archivé est écartée ici** : la RLS la rend
+      // toujours — c'est l'histoire du membre —, mais
+      // `assignments_update_member_response` ne l'écrit plus. La laisser dans
+      // la liste donnerait une carte dont « Accepter » ne fait rien
+      // (ticket 044).
       return <Proposition>[
         for (final ligne in lignes)
-          if (Proposition.depuisJson(ligne) case final Proposition proposition)
+          if (Proposition.depuisJson(ligne) case final Proposition proposition
+              when proposition.repondable)
             proposition,
       ]..sort((Proposition a, Proposition b) => a.comparer(b));
     } on Object catch (echec) {

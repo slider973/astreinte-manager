@@ -988,8 +988,8 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `availabilities` | membre : les siennes ; admin : toutes celles de la caserne | membre : les siennes si période `open` et caserne writable ; admin : toutes |
 | `availability_preferences` | idem availabilities | idem |
 | `schedules` | membre si `status <> 'draft'` ; admin toujours | admin, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0019`), et sauf les transitions de statut interdites par `docs/WORKFLOWS.md § 2`, que `schedules_guard_transition` refuse à tout le monde |
-| `shifts` | membre si le schedule est publié ou validé ; admin toujours | admin, **sauf le `delete`, réservé aux créneaux d'un planning encore `draft`** (migration `0019`) : supprimer un créneau publié effacerait ses attributions par cascade |
-| `assignments` | membre : les siennes si schedule publié ; tous les membres si validé ; admin toutes | membre : `status` uniquement, de `proposed` vers `accepted` ou `declined`, sur les siennes ; admin : tout, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0018`) |
+| `shifts` | membre si le schedule est publié, validé **ou archivé** (migration `0031`) ; admin toujours | admin, **sauf le `delete`, réservé aux créneaux d'un planning encore `draft`** (migration `0019`) : supprimer un créneau publié effacerait ses attributions par cascade. **`insert` et `update` refusés sur un planning `archived`** (migration `0031`) |
+| `assignments` | membre : les siennes si schedule publié, validé **ou archivé** ; tous les membres si validé ; **si archivé, les `accepted` de tous les membres et celles-là seulement** (migration `0031`) ; admin toutes | membre : `status` uniquement, de `proposed` vers `accepted` ou `declined`, sur les siennes, planning publié ou validé ; admin : tout, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0018`) et **sauf `insert` et `update` sur un planning `archived`** (migration `0031`) |
 | `push_tokens` | soi-même | soi-même |
 | `notifications` | soi-même | soi-même (`read_at` uniquement, imposé par un grant de colonne : `revoke update on notifications from authenticated` puis `grant update (read_at)`) ; insert par service role |
 | `subscriptions` | admin de la caserne | service role uniquement (webhook Stripe) |
@@ -1002,6 +1002,41 @@ du schéma : `super_admins_select_super_admin`.** C'est une propriété vérifia
 l'éditeur du produit peut faire passe par les quatre fonctions du § 3, et chacune de celles
 qui écrit — ou qui lit un planning — laisse une ligne dans l'`audit_log` **de la caserne
 concernée**, donc lisible par ses administrateurs.
+
+### Ce qu'un membre lit d'un planning `archived` *(décision du ticket 044, migration `0031`)*
+
+**Un planning archivé se lit comme le tableau de garde du mois écoulé, punaisé au mur de la
+caserne.** Pour un membre : tous les créneaux du mois, **toutes ses propres attributions** quel
+qu'en soit le statut — accepté, refusé, annulé, remplacé, motif de refus compris —, et les
+attributions **`accepted`** de tous les autres membres. Rien d'autre. L'administrateur, lui,
+continue de tout voir.
+
+Trois conséquences à avoir en tête :
+
+- Ce que l'archivage **ouvre** : avant le ticket 044, les trois politiques de lecture
+  s'arrêtaient à `validated` alors que `schedules_select_member_published` laissait passer
+  `archived`. Un membre lisait la ligne du planning et rien dedans — un mois vide là où le
+  produit promet de conserver l'historique (`docs/PRD.md § 7`, règle 6). C'était un effet de
+  bord de trois énumérations écrites séparément, pas une décision.
+- Ce que l'archivage **ferme** : sur un planning `validated`, `assignments_select_station_validated`
+  ouvre à tout membre **toutes** les lignes du mois, `decline_reason` compris. Passé le mois, qui
+  a refusé quoi et en quels termes ne regarde plus que l'administration.
+- La règle **ne dépend pas de l'état d'où vient l'archivage**. Un mois terminé en `published`
+  devient donc lisible de tous, ce qu'il n'était pas la veille : le mois a été vécu, qui était
+  d'astreinte le 14 n'est plus une décision à protéger. Faire autrement demanderait de mémoriser
+  l'état d'avant l'archivage dans une colonne que le § 2.8 ne prévoit pas.
+
+Les politiques `shifts_select_member_published` et `assignments_select_own_published` gardent
+leur nom : le « published » qu'il porte est historique, il ne dit plus toute leur portée. Elles
+sont citées sous ce nom-là dans la migration `0029` et dans les commentaires de plusieurs
+fichiers Dart.
+
+Corollaire, posé par la même migration : **un planning archivé ne se modifie plus**. La machine
+à états interdisait déjà d'en sortir, les suppressions étaient déjà bornées au brouillon et
+`reassign_shift` / `cancel_assignment` refusaient déjà autre chose que `published` ou
+`validated` ; il manquait l'`insert` et l'`update` d'un créneau et d'une attribution, que les
+politiques `*_admin` laissaient passer sans regarder le statut du planning parent. Une décision
+de lecture ne se pose pas sur une table qu'on peut encore réécrire.
 
 Exemple de politique pour `availabilities` :
 
@@ -1399,7 +1434,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `late_responders_report` | toutes les heures (:45) | `select public.cron_late_responders_report();` — notifie les admins des attributions en attente depuis plus de `late_report_hours`, une fois par jour et par planning, entre 08:00 et 20:59 heure de la caserne *(migration `0021`)* |
 | `suspend_subscriptions` | tous les jours 03:30 | `select public.cron_suspend_subscriptions();` — passe en `suspended` les essais expirés sans abonnement et les `past_due` dont la dernière période payée remonte à plus de 14 jours. **Rien n'est supprimé** : la caserne passe en lecture seule via `station_writable()`, et les administrateurs sont prévenus par courriel *(migrations `0023` et `0024`)* |
 | `subscription_reminders` | tous les jours 03:20 | `select public.cron_subscription_reminders();` — courriel + notification interne aux administrateurs quand l'essai se termine dans sept jours et qu'aucun abonnement n'a été souscrit *(migration `0024`)* |
-| `archive_schedules` | 1er du mois | Archive les plannings des mois passés |
+| `archive_schedules` | tous les jours 02:30 | `select public.cron_archive_schedules();` — passe en `archived` les plannings `published` ou `validated` dont le mois est **strictement antérieur au mois courant de leur caserne**, calculé dans son fuseau. Un `draft` n'est jamais archivé. Idempotente, rend le nombre de plannings archivés *(migration `0031`)* |
 | `prune_notifications` | dimanche 04:00 | `select public.cron_prune_notifications();` — supprime les notifications **lues** il y a plus de 90 jours et celles **jamais lues** créées il y a plus de 365 jours *(migration `0030`)* |
 | `prune_retention` | dimanche 04:20 | `select public.cron_prune_retention();` — applique les autres durées de conservation de `docs/RGPD.md` : `audit_log` 3 ans, `invitations` 30 jours après expiration et 3 ans après acceptation, `notification_outbox` 30 jours après traitement (jamais une demande `pending` ou `sending`), `push_tokens` 365 jours sans usage, `stripe_events` 90 jours pour les `processed`/`skipped` (jamais un `failed`). Rend le compte par table *(migration `0030`)* |
 
@@ -1409,6 +1444,15 @@ frontière à la journée près sans fabriquer des lignes vieilles de trois ans,
 caserne qui doit changer un chiffre change un chiffre. Le contrat qui les tient :
 **une durée annoncée dans `docs/RGPD.md` est une durée appliquée par une de ces tâches** — le
 tableau du § 2 de ce document nomme, pour chaque table, le mécanisme qui la borne.
+
+**`archive_schedules` est quotidienne et non mensuelle** *(écart assumé au ticket 044, justifié
+dans la migration `0031`)*. Le mois de référence se calcule dans le fuseau de chaque caserne.
+Une tâche qui ne tirerait que le 1er à 02:30 UTC trouverait une caserne de Polynésie (UTC-10)
+encore au **dernier jour du mois précédent** : ne rien archiver est alors le bon geste — archiver
+serait archiver un jour à l'avance, sous les yeux de pompiers encore d'astreinte — mais comme la
+tâche ne repasserait que le mois suivant, ce planning resterait `published` trente jours de plus,
+avec les relances de `assignment_reminders` qui continuent de partir. Une exécution quotidienne
+archive chaque caserne dans les vingt-quatre heures de son propre 1er du mois, jamais avant.
 
 Chaque tâche est un appel **qualifié** (`public.…`) et **sans argument** d'une fonction
 `security definer` dont le `search_path` est figé : rien n'est interpolé dans la commande, et
@@ -1531,7 +1575,11 @@ Ordre proposé :
 30. `0030_purges_conservation.sql` (ticket 043 : `cron_prune_notifications` et la tâche
     `prune_notifications`, `prune_audit_log`, `prune_invitations`, `prune_notification_outbox`,
     `prune_push_tokens`, `prune_stripe_events` et la tâche `prune_retention`)
-31. la dernière tâche d'entretien du § 8 : `archive_schedules`
+31. `0031_archivage_plannings.sql` (ticket 044 : `cron_archive_schedules` et la tâche
+    `archive_schedules`, lecture d'un planning archivé ouverte aux membres — créneaux, ses
+    propres attributions, les attributions `accepted` des autres —, écritures gelées sur un
+    planning archivé (`shifts` et `assignments`, insert et update), `ics_feed_events` élargie
+    aux plannings archivés)
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà

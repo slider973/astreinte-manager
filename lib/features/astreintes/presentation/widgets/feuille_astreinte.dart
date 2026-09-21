@@ -183,8 +183,9 @@ class _BlocCreneau extends StatelessWidget {
 /// pas là**.
 ///
 /// La RLS n'ouvre les attributions des autres que sur un planning `validated`
-/// (`docs/SCHEMA.md § 4`). Tant qu'il est `published`, afficher une liste vide
-/// se lirait « personne d'autre n'est de garde », ce qui est faux.
+/// ou `archived` (`docs/SCHEMA.md § 4`). Tant qu'il est `published`, afficher
+/// une liste vide se lirait « personne d'autre n'est de garde », ce qui est
+/// faux.
 class _Equipiers extends StatelessWidget {
   const _Equipiers({required this.astreinte});
 

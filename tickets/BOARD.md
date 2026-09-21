@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 044 | [Archiver réellement les plannings des mois passés](in-progress/044-archivage-plannings.md) | P1 | 019 |  |
 
 ## À faire
 
@@ -59,4 +58,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 035 | [Tests d'intégration bout en bout](done/035-tests-e2e.md) | P1 | 021 020 | https://github.com/slider973/astreinte-manager/pull/32 |
 | 040 | [Rendre visible une notification définitivement perdue](done/040-ligne-interne-echec-definitif.md) | P0 | 025 026 | https://github.com/slider973/astreinte-manager/pull/26 |
 | 043 | [Purger réellement les anciennes notifications](done/043-purge-notifications.md) | P0 | 034 | https://github.com/slider973/astreinte-manager/pull/36 |
+| 044 | [Archiver réellement les plannings des mois passés](done/044-archivage-plannings.md) | P1 | 019 | https://github.com/slider973/astreinte-manager/pull/37 |
 

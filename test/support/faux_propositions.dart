@@ -74,8 +74,13 @@ class FauxPropositionsRepository implements PropositionsRepository {
     lectures++;
     final echec = erreurLecture;
     if (echec != null) throw EchecProposition(echec);
-    return <Proposition>[..._propositions]
-      ..sort((Proposition a, Proposition b) => a.comparer(b));
+    // Le même tri que `SupabasePropositionsRepository` : une proposition d'un
+    // mois archivé n'est plus répondable, donc elle n'est plus listée
+    // (ticket 044).
+    return <Proposition>[
+      for (final proposition in _propositions)
+        if (proposition.repondable) proposition,
+    ]..sort((Proposition a, Proposition b) => a.comparer(b));
   }
 
   @override

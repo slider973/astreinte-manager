@@ -28,6 +28,30 @@ final MoisPlanning _novembre = moisPlanning(
   etat: PlanningEtat.publie,
 );
 
+final MoisPlanning _aout = moisPlanning(
+  annee: 2026,
+  mois: 8,
+  etat: PlanningEtat.archive,
+);
+
+/// Août archivé le 1er septembre par `cron_archive_schedules` : le tableau de
+/// garde du mois écoulé, trous compris (ticket 044).
+PlanningCaserne _aoutArchive() => planningCaserne(
+  mois: _aout,
+  journees: <int, List<CreneauCaserne>>{
+    14: <CreneauCaserne>[
+      creneauCaserne(
+        id: 'c-14-nuit',
+        moi: true,
+        noms: const <String>['Camille G.'],
+      ),
+    ],
+    // Personne n'a tenu cette garde-là, et le mois est fini : c'est un fait.
+    15: <CreneauCaserne>[creneauCaserne(id: 'c-15-nuit')],
+  },
+  luLe: _aujourdhui,
+);
+
 /// Octobre validé : trois journées, toute la caserne nommée.
 PlanningCaserne _octobreValide() => planningCaserne(
   mois: _octobre,
@@ -257,6 +281,41 @@ void main() {
           ),
           findsOneWidget,
         );
+      },
+    );
+  });
+
+  group('un planning archivé', () {
+    testWidgets(
+      'reste atteignable et se lit en entier : le tableau du mois écoulé',
+      (WidgetTester tester) async {
+        // Sans le ticket 044, août aurait disparu du sélecteur le 1er
+        // septembre — et chaque mois passé après lui.
+        await _ouvrirCaserne(
+          tester,
+          depot: FauxPlanningCaserneRepository(
+            mois: <MoisPlanning>[_aout, _octobre],
+            plannings: <String, PlanningCaserne>{
+              '2026-08': _aoutArchive(),
+              '2026-10': _octobreValide(),
+            },
+          ),
+        );
+
+        expect(find.text('Octobre 2026'), findsOneWidget);
+
+        await tester.tap(find.byTooltip(AppStrings.astreintesMoisPrecedent));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Août 2026'), findsOneWidget);
+        // Toute la caserne, comme sur un mois validé : les gardes tenues sont
+        // rendues par `assignments_select_station_archived`.
+        expect(find.text('Camille G.'), findsOneWidget);
+        expect(find.text(AppStrings.planningCaserneToi), findsOneWidget);
+        expect(find.text(AppStrings.planningCaserneCreneauVide), findsOneWidget);
+        // Et **aucune** attente de validation : le mois est terminé, plus
+        // personne ne le validera.
+        expect(find.byType(BlocAttenteValidation), findsNothing);
       },
     );
   });

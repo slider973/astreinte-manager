@@ -36,15 +36,20 @@ class EchecPlanningCaserne implements Exception {
 
 /// Tout ce que la vue « La caserne » sait faire.
 abstract interface class PlanningCaserneRepository {
-  /// Les mois atteignables : les plannings `published` et `validated` de la
-  /// caserne, dans l'ordre du calendrier.
+  /// Les mois atteignables : les plannings `published`, `validated` et
+  /// `archived` de la caserne, dans l'ordre du calendrier
+  /// ([MoisPlanning.etatsLisibles]).
   Future<List<MoisPlanning>> moisLisibles({required String stationId});
 
   /// Le planning d'un mois, tel que ce membre a le droit de le lire.
   ///
   /// Rend `null` quand le planning n'a plus de créneau lisible : il a été
-  /// archivé ou supprimé entre la lecture de la liste des mois et celle-ci.
-  /// Ce n'est pas une erreur, c'est un mois qui n'existe plus.
+  /// supprimé, ou remis en brouillon, entre la lecture de la liste des mois et
+  /// celle-ci. Ce n'est pas une erreur, c'est un mois qui n'existe plus.
+  ///
+  /// **L'archivage n'est pas un de ces cas depuis le ticket 044** : un mois
+  /// archivé rend ses créneaux comme un mois publié
+  /// (`shifts_select_member_published`, migration `0031`).
   Future<PlanningCaserne?> lireMois({
     required String stationId,
     required String userId,
@@ -90,8 +95,9 @@ class SupabasePlanningCaserneRepository implements PlanningCaserneRepository {
   }) async {
     try {
       // 1. L'ossature du mois : soixante-deux créneaux, quatre colonnes.
-      // Lisible dès que le planning est publié
-      // (`shifts_select_member_published`).
+      // Lisible dès que le planning est publié, et **toujours une fois
+      // archivé** (`shifts_select_member_published`, migration `0031`) : un
+      // mois passé garde sa grille, c'est ce qui en fait un tableau de garde.
       final lignes = await _client
           .from('shifts')
           .select(CreneauCaserne.colonnes)
@@ -100,9 +106,11 @@ class SupabasePlanningCaserneRepository implements PlanningCaserneRepository {
 
       // 2. Les attributions acceptées. **C'est ici que la RLS tranche, et
       // nulle part ailleurs** : publié, elle ne rend que celles du lecteur ;
-      // validé, elle rend celles de toute la caserne. Aucun filtre sur
-      // `user_id` n'est ajouté selon l'état du planning — le client n'a pas à
-      // deviner un droit qu'il ne détient pas.
+      // validé ou archivé, elle rend celles de toute la caserne
+      // (`assignments_select_station_validated`,
+      // `assignments_select_station_archived`). Aucun filtre sur `user_id`
+      // n'est ajouté selon l'état du planning — le client n'a pas à deviner un
+      // droit qu'il ne détient pas.
       //
       // La jointure interne sur `shifts` remplace une liste de soixante-deux
       // identifiants dans l'URL.

@@ -150,6 +150,39 @@ void main() {
       );
     });
 
+    testWidgets(
+      'une proposition d\'un mois archivé n\'est pas proposée à la réponse',
+      (tester) async {
+        // Le mois d'août s'est terminé sans réponse. La ligne existe toujours
+        // en base — c'est l'histoire du membre — mais elle ne s'écrit plus :
+        // afficher « Accepter » serait afficher un bouton qui ne fait rien
+        // (ticket 044).
+        await _ouvrir(
+          tester,
+          depot: _depot(
+            propositions: <Proposition>[
+              proposition(
+                id: 'a-aout',
+                creneauId: 'c-aout',
+                planningId: 'plan-08',
+                jour: DateTime(2026, 8, 14),
+                planningEtat: PlanningEtat.archive,
+              ),
+              proposition(
+                id: 'a-12',
+                creneauId: 'c-12',
+                jour: DateTime(2026, 10, 12),
+              ),
+            ],
+          ),
+        );
+
+        expect(find.byType(LigneDeProposition), findsOneWidget);
+        expect(find.text('Août 2026'), findsNothing);
+        expect(find.text('lundi 12 octobre'), findsOneWidget);
+      },
+    );
+
     testWidgets('chaque ligne porte sa date, son créneau et ses deux actions', (
       tester,
     ) async {

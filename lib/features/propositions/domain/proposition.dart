@@ -76,7 +76,8 @@ class Proposition {
   final CreneauType creneau;
 
   /// L'état du planning qui porte ce créneau. `draft` n'arrive jamais ici :
-  /// la RLS ne le laisse pas sortir (`docs/SCHEMA.md § 4`).
+  /// la RLS ne le laisse pas sortir (`docs/SCHEMA.md § 4`). `archived`, lui,
+  /// arrive depuis le ticket 044 — d'où [repondable].
   final PlanningEtat planningEtat;
 
   /// L'instant de la publication. **Jamais nul dans cet écran** : une
@@ -86,6 +87,23 @@ class Proposition {
 
   final int relances;
   final DateTime? derniereRelance;
+
+  /// Vrai quand la base acceptera encore une réponse sur cette attribution.
+  ///
+  /// `assignments_update_member_response` (`docs/SCHEMA.md § 4`) n'ouvre
+  /// l'écriture que sur un planning `published` ou `validated`. Sur un mois
+  /// **archivé**, la ligne reste lisible — c'est l'histoire du membre, et
+  /// `assignments_select_own_published` la lui rend quel que soit son statut —
+  /// mais l'`update` ne toucherait plus aucune ligne. Afficher la carte, c'est
+  /// afficher un bouton « Accepter » qui ne fait rien, puis le message « cette
+  /// proposition n'est plus là » à chaque appui.
+  ///
+  /// Une garde du mois de mars ne se prend pas en novembre : ce n'est plus une
+  /// question posée, c'est un fait. L'écran des propositions est une liste de
+  /// choses à faire (`design/021 § 1`), et il n'y a plus rien à y faire.
+  bool get repondable =>
+      planningEtat == PlanningEtat.publie ||
+      planningEtat == PlanningEtat.valide;
 
   /// La clé du mois auquel la proposition appartient : `2026-10`.
   String get cleMois =>

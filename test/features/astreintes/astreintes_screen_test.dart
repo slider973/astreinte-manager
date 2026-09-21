@@ -319,6 +319,48 @@ void main() {
       expect(find.text(AppStrings.astreintesSeul), findsNothing);
     });
 
+    testWidgets(
+      'un mois archivé nomme ses équipiers : pas d\'attente sur un mois '
+      'terminé',
+      (WidgetTester tester) async {
+        // L'écran remonte un an d'historique, et tout mois révolu est archivé
+        // le 1er du mois suivant (ticket 044). Sans ce cas, une garde tenue en
+        // février afficherait « en attente de la validation du planning »
+        // jusqu'à la fin des temps.
+        await _ouvrir(
+          tester,
+          depot: FauxAstreintesRepository(
+            astreintes: <Astreinte>[
+              astreinte(
+                id: 'a-fev',
+                creneauId: 'c-fev',
+                planningId: 'plan-02',
+                jour: DateTime(2026, 2, 14),
+                planningEtat: PlanningEtat.archive,
+                equipiers: const <String>['Camille G.'],
+              ),
+            ],
+          ),
+        );
+
+        await tester.tap(find.text(AppStrings.astreintesPassees(1)));
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('samedi 14 février'),
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('samedi 14 février'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(DetailAstreinte), findsOneWidget);
+        expect(find.text(AppStrings.astreintesEquipiersTitre), findsOneWidget);
+        expect(find.text('Camille G.'), findsOneWidget);
+        expect(find.text(AppStrings.astreintesEquipiersAttente), findsNothing);
+      },
+    );
+
     testWidgets('« tu es seul » est une information, pas une absence', (
       WidgetTester tester,
     ) async {
