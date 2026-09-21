@@ -391,16 +391,45 @@ class CreneauSuivi {
   bool get porteUnRefus =>
       attributions.any((AttributionSuivi a) => a.close);
 
-  /// La dernière attribution close de ce créneau qui n'a pas encore été
-  /// couverte — celle que la réattribution vient réparer, et à laquelle la base
-  /// posera le lien.
+  /// L'attribution close de ce créneau qui n'a pas encore été couverte — celle
+  /// que la réattribution vient réparer, et à laquelle la base posera le lien.
+  ///
+  /// **Le même ordre que `reassign_shift` (migration 0020)** : la plus ancienne
+  /// réponse d'abord, celles qui n'en ont pas à la fin, puis la proposition la
+  /// plus ancienne pour départager. L'écran et la base doivent désigner la
+  /// **même** ligne, sinon le bandeau nomme un pompier et le lien en relie un
+  /// autre le jour où l'écran cesse de fournir l'identifiant. Ici la liste ne
+  /// dépasse jamais quelques entrées : un tri suffit, et il se lit.
   AttributionSuivi? get aRemplacer {
-    for (final attribution in attributions) {
-      if (attribution.close && attribution.remplaceParId == null) {
-        return attribution;
-      }
+    final candidates =
+        attributions
+            .where(
+              (AttributionSuivi a) => a.close && a.remplaceParId == null,
+            )
+            .toList(growable: false)
+          ..sort(_ordreDuPlusAncienTrou);
+    return candidates.isEmpty ? null : candidates.first;
+  }
+
+  /// `order by responded_at nulls last, created_at` — le `order by` de la base,
+  /// avec `proposeeLe` en second, seule date de création que l'écran connaisse.
+  static int _ordreDuPlusAncienTrou(AttributionSuivi a, AttributionSuivi b) {
+    final reponseA = a.repondueLe;
+    final reponseB = b.repondueLe;
+    if (reponseA != null && reponseB != null && reponseA != reponseB) {
+      return reponseA.compareTo(reponseB);
     }
-    return null;
+    if (reponseA == null && reponseB != null) return 1;
+    if (reponseB == null && reponseA != null) return -1;
+
+    final proposeeA = a.proposeeLe;
+    final proposeeB = b.proposeeLe;
+    if (proposeeA != null && proposeeB != null) {
+      return proposeeA.compareTo(proposeeB);
+    }
+    if (proposeeA == null && proposeeB != null) return 1;
+    if (proposeeB == null && proposeeA != null) return -1;
+    return a.id.compareTo(b.id);
   }
 
   /// Vrai quand le créneau répond à au moins l'un des filtres retenus.

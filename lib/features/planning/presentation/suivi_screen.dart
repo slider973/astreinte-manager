@@ -244,18 +244,18 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     );
     if (!confirme || !mounted) return;
 
-    final resultat = await _planning.reattribuer(
+    final reponse = await _planning.reattribuer(
       creneauId: panneau.creneau.id,
       userId: candidat.userId,
       ancienneId: cible,
     );
     if (!mounted) return;
 
+    final resultat = reponse.fait;
     if (resultat == null) {
-      final message =
-          ref.read(planningControllerProvider).value?.messageErreur ??
-          AppStrings.reattribuerErreur;
-      _annoncer(message);
+      // **Le refus se dit avec ses mots.** « Ce créneau est déjà pourvu » nomme
+      // la sortie ; « la réattribution n'a pas abouti » ne nomme rien.
+      _annoncer(reponse.erreur?.message ?? AppStrings.reattribuerErreur);
       unawaited(_controleur.rafraichir());
       return;
     }
@@ -297,17 +297,15 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     );
     if (demande == null || !mounted) return;
 
-    final prevenu = await _planning.annuler(
+    final reponse = await _planning.annuler(
       attributionId: attribution.id,
       motif: demande.motif,
     );
     if (!mounted) return;
 
+    final prevenu = reponse.prevenu;
     if (prevenu == null) {
-      _annoncer(
-        ref.read(planningControllerProvider).value?.messageErreur ??
-            AppStrings.annulerErreur,
-      );
+      _annoncer(reponse.erreur?.message ?? AppStrings.annulerErreur);
       unawaited(_controleur.rafraichir());
       return;
     }

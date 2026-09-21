@@ -211,6 +211,51 @@ Deno.test("assignment_cancelled rassure : il n'y a rien à faire", () => {
   assertEquals(contenu.route, "/schedule/2026-10");
 });
 
+// La base envoie un **code**, jamais une phrase : le français des notifications
+// vit dans `_shared/notification_content.ts`, où il est relu et testé d'un seul
+// endroit. `reassign_shift` (migration 0020) s'en sert pour dire au pompier
+// remplacé pourquoi sa garde disparaît.
+Deno.test("assignment_cancelled traduit le motif que la base donne en code", () => {
+  const contenu = construireContenu(
+    "assignment_cancelled",
+    {
+      period: "2026-10",
+      reason_code: "reassigned",
+      shifts: [{ date: "2026-10-12", slot: "night" }],
+    },
+    CASERNE,
+  );
+  assertStringIncludes(contenu.corps, "Motif : le créneau a été confié à un autre pompier.");
+});
+
+Deno.test("un motif en clair l'emporte sur le code, et un code inconnu ne rend rien", () => {
+  const explicite = construireContenu(
+    "assignment_cancelled",
+    {
+      period: "2026-10",
+      reason: "manœuvre annulée",
+      reason_code: "reassigned",
+      shifts: [{ date: "2026-10-12", slot: "night" }],
+    },
+    CASERNE,
+  );
+  assertStringIncludes(explicite.corps, "Motif : manœuvre annulée.");
+
+  // Une notification dégradée vaut mieux qu'une notification perdue : le code
+  // inconnu retire une ligne, il ne casse rien.
+  const inconnu = construireContenu(
+    "assignment_cancelled",
+    {
+      period: "2026-10",
+      reason_code: "quelque_chose_de_neuf",
+      shifts: [{ date: "2026-10-12", slot: "night" }],
+    },
+    CASERNE,
+  );
+  assertStringIncludes(inconnu.corps, "est annulée.");
+  assertEquals(inconnu.corps.includes("Motif"), false);
+});
+
 Deno.test("schedule_validated compte les astreintes du membre", () => {
   const contenu = construireContenu(
     "schedule_validated",

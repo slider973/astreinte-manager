@@ -707,6 +707,18 @@ appeler reassign-shift "$ADMIN_A" \
 verifier "remplacer deux fois la même attribution : 409" "409" "$STATUT"
 verifier "et le code le dit" "assignment_not_replaceable" "$(jq -r '.error.code' <<<"$CORPS")"
 
+# **Une réattribution remplace, elle n'ajoute pas.** Le créneau demande une
+# personne et membre3 la tient : un appel de plus ferait sonner un téléphone
+# pour une garde déjà couverte.
+appeler reassign-shift "$ADMIN_A" \
+  "{\"shift_id\": \"$CRENEAU\", \"user_id\": \"$MEMBRE2_A\"}"
+verifier "un créneau déjà pourvu : 409" "409" "$STATUT"
+verifier "et le code le dit" "shift_already_filled" "$(jq -r '.error.code' <<<"$CORPS")"
+verifier "la réponse dit les places tenues" "1" "$(jq -r '.error.filled' <<<"$CORPS")"
+verifier "et les places demandées" "1" "$(jq -r '.error.required' <<<"$CORPS")"
+verifier "rien de plus n'est parti" "1" \
+  "$(sql "select count(*) from notifications where channel = 'inapp'")"
+
 # ---------------------------------------------------------------------------
 echo ''
 if [ "$echecs" -eq 0 ]; then

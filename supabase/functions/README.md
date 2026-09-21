@@ -374,13 +374,24 @@ au rôle de service — fait tout, en une fois :
 3. l'ancienne, s'il y en a une : `accepted → replaced`, `proposed → replaced`, et **`declined` et
    `cancelled` restent tels quels** — un statut terminal est l'histoire de la caserne, et il a déjà
    été notifié sous ce nom. Dans les quatre cas, `replaced_by` pointe la nouvelle ;
-4. les **demandes de notification**, dans la même transaction, par `notify(...)` ;
+4. les **demandes de notification**, dans la même transaction, par `notify(...)`. Le motif envoyé au
+   pompier remplacé est un **code** (`reason_code`), traduit en français par
+   `_shared/notification_content.ts` : le texte des notifications vit à un seul endroit ;
 5. `audit_log` (`assignment.reassigned`) et `schedule_reevaluer`, qui ramène un planning validé en
    `published` quand une acceptation vient de disparaître.
 
 `previous_assignment_id` est facultatif : laissé vide sur un créneau qui porte un trou non encore
 comblé — un refus ou une annulation —, la base rattache la nouvelle attribution au **plus ancien**
 d'entre eux. Seule une attribution déjà `replaced` est refusée : elle a trouvé son remplaçant.
+
+### Une réattribution remplace, elle n'ajoute pas
+
+Le créneau ne gagne jamais une place : il en change le titulaire. Deux appels identiques, ou deux
+adjoints simultanés, ne produisent donc qu'**une** attribution active et **une** notification — le
+verrou sérialise, et le compte des places décide. Renforcer un créneau publié se dit autrement : on
+augmente son effectif requis, et le panneau le propose juste au-dessus de la liste des candidats. Le
+dire ainsi vaut mieux que de laisser une réattribution faire en douce ce qu'un réglage dit en clair.
+Vérifié à deux sessions réelles par `scripts/test_concurrence.sh`.
 
 ### Pourquoi elle n'appelle pas `send-notification`, contrairement à `publish-schedule`
 

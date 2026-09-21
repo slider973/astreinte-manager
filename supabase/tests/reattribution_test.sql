@@ -4,10 +4,16 @@
 -- Ce qui est vérifié, section par section
 -- ---------------------------------------
 -- 1. `assignments_guard_reattribution` : ni `replaced`, ni `cancelled`, ni
---    `replaced_by` ne s'écrivent depuis un client, **administrateur compris**.
+--    `replaced_by` ne s'écrivent depuis un client, **administrateur compris**,
+--    ni par une mise à jour ni par une **insertion**. On n'entre pas dans un
+--    état terminal et on n'en sort pas ; le motif d'un refus est gelé ; un lien
+--    de remplacement désigne toujours une autre attribution du même créneau.
 --    Sans cette garde, une requête PostgREST retirait sa garde à un pompier
---    sans que rien ne parte.
--- 2. Les refus métier de `reassign_shift`, les huit.
+--    sans que rien ne parte, fabriquait un refus que personne n'avait prononcé,
+--    ou ressuscitait une garde remplacée.
+-- 2. Les refus métier de `reassign_shift`, dont **le compte des places** : une
+--    réattribution remplace, elle n'ajoute pas. C'est ce test qui tient
+--    « aucune notification en trop ».
 -- 3. **Le scénario fondateur du produit** : un refus, une réattribution, et
 --    *une seule* notification — au nouveau membre. Le refus reste un refus, le
 --    lien `replaced_by` est posé, et **le reste du planning n'a pas bougé**.
@@ -217,7 +223,13 @@ insert into assignments (id, station_id, shift_id, user_id, status, proposed_at,
    'proposed', now(), '77777777-0000-4000-8000-000000000100'),
   ('77777777-0000-4000-8000-000000000502', '77777777-0000-4000-8000-000000000001',
    '77777777-0000-4000-8000-000000000402', '77777777-0000-4000-8000-000000000102',
-   'accepted', now(), '77777777-0000-4000-8000-000000000100');
+   'accepted', now(), '77777777-0000-4000-8000-000000000100'),
+  -- Sur le **même** créneau que 501 : c'est la seule façon d'atteindre la règle
+  -- réservée au client, la cohérence du lien étant vérifiée avant elle et pour
+  -- tout le monde.
+  ('77777777-0000-4000-8000-000000000503', '77777777-0000-4000-8000-000000000001',
+   '77777777-0000-4000-8000-000000000401', '77777777-0000-4000-8000-000000000103',
+   'proposed', now(), '77777777-0000-4000-8000-000000000100');
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"77777777-0000-4000-8000-000000000100","role":"authenticated"}';
@@ -242,19 +254,118 @@ begin
 
   perform tests_rea.refuse(
     $sql$update assignments
-            set replaced_by = '77777777-0000-4000-8000-000000000502'
+            set replaced_by = '77777777-0000-4000-8000-000000000503'
           where id = '77777777-0000-4000-8000-000000000501'$sql$,
     'assignment_link_reserved',
     'un admin ne pose pas replaced_by depuis un client');
 
+  -- ----------------------------------------------------------------
+  -- On n'**entre** pas dans un état terminal par une insertion.
+  -- ----------------------------------------------------------------
+  -- La garde ne portait d'abord que sur la mise à jour : une insertion directe
+  -- fabriquait un refus que personne n'avait prononcé, avec son lien.
+  perform tests_rea.refuse(
+    $sql$insert into assignments (station_id, shift_id, user_id, status)
+          values ('77777777-0000-4000-8000-000000000001',
+                  '77777777-0000-4000-8000-000000000403',
+                  '77777777-0000-4000-8000-000000000103', 'declined')$sql$,
+    'assignment_transition_reserved',
+    'une attribution ne naît pas refusée');
+
+  perform tests_rea.refuse(
+    $sql$insert into assignments (station_id, shift_id, user_id, status)
+          values ('77777777-0000-4000-8000-000000000001',
+                  '77777777-0000-4000-8000-000000000403',
+                  '77777777-0000-4000-8000-000000000103', 'cancelled')$sql$,
+    'assignment_transition_reserved',
+    'ni annulée');
+
+  -- Le lien, posé à la main à l'insertion — le client fournit l'identifiant,
+  -- donc il peut viser ce qu'il veut, y compris un autre créneau.
+  perform tests_rea.refuse(
+    format($sql$insert into assignments (station_id, shift_id, user_id, replaced_by)
+          values ('77777777-0000-4000-8000-000000000001',
+                  '77777777-0000-4000-8000-000000000401',
+                  '77777777-0000-4000-8000-000000000104', %L)$sql$,
+           '77777777-0000-4000-8000-000000000503'),
+    'assignment_link_reserved',
+    'un client ne pose pas replaced_by à l''insertion');
+
+  -- ----------------------------------------------------------------
+  -- On n'en **sort** pas davantage.
+  -- ----------------------------------------------------------------
+  update assignments
+     set status = 'declined', responded_at = now(), decline_reason = 'en formation'
+   where id = '77777777-0000-4000-8000-000000000501';
+
+  perform tests_rea.refuse(
+    $sql$update assignments set status = 'proposed', decline_reason = null
+          where id = '77777777-0000-4000-8000-000000000501'$sql$,
+    'assignment_transition_terminal',
+    'un refus ne redevient pas une proposition : l''historique ne se réécrit pas');
+
+  perform tests_rea.refuse(
+    $sql$update assignments set decline_reason = 'autre chose'
+          where id = '77777777-0000-4000-8000-000000000501'$sql$,
+    'assignment_reason_frozen',
+    'le motif d''un refus appartient au pompier qui l''a écrit');
+
   -- Ce que l'admin garde le droit de faire, et qui ne doit pas être cassé :
-  -- écrire une attribution ordinaire.
+  -- écrire une attribution ordinaire, et en insérer une nouvelle.
   update assignments set reminder_count = 1
    where id = '77777777-0000-4000-8000-000000000501';
   perform tests_rea.egal(
     (select reminder_count from assignments
       where id = '77777777-0000-4000-8000-000000000501'),
     1, 'un admin écrit toujours les colonnes ordinaires');
+
+  insert into assignments (station_id, shift_id, user_id)
+  values ('77777777-0000-4000-8000-000000000001',
+          '77777777-0000-4000-8000-000000000403',
+          '77777777-0000-4000-8000-000000000103');
+  perform tests_rea.egal(
+    (select count(*)::integer from assignments
+      where shift_id = '77777777-0000-4000-8000-000000000403'),
+    1, 'et il attribue toujours normalement');
+end $$;
+
+reset role;
+
+-- Les deux règles qui valent pour **tout le monde**, rôle de service compris :
+-- un lien de remplacement ne boucle pas sur lui-même et ne traverse pas les
+-- créneaux. Ce n'est pas une règle d'interface, c'est la cohérence du fil.
+do $$
+declare
+  boucle uuid;
+begin
+  update assignments set status = 'replaced'
+   where id = '77777777-0000-4000-8000-000000000502';
+
+  perform tests_rea.refuse(
+    $sql$update assignments
+            set replaced_by = '77777777-0000-4000-8000-000000000502'
+          where id = '77777777-0000-4000-8000-000000000502'$sql$,
+    'assignment_link_self',
+    'une attribution ne se remplace pas elle-même');
+
+  perform tests_rea.refuse(
+    $sql$update assignments
+            set replaced_by = '77777777-0000-4000-8000-000000000501'
+          where id = '77777777-0000-4000-8000-000000000502'$sql$,
+    'assignment_link_foreign_shift',
+    'un lien de remplacement ne traverse pas les créneaux — ni les casernes');
+end $$;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"77777777-0000-4000-8000-000000000100","role":"authenticated"}';
+
+do $$
+begin
+  perform tests_rea.refuse(
+    $sql$update assignments set status = 'accepted'
+          where id = '77777777-0000-4000-8000-000000000502'$sql$,
+    'assignment_transition_terminal',
+    'un remplacement ne ressuscite pas en acceptation');
 end $$;
 
 reset role;
@@ -266,7 +377,7 @@ release savepoint s1;
 -- 2. Les refus métier de reassign_shift
 -- ===========================================================================
 \echo ''
-\echo '--- 2. Les huit refus de reassign_shift'
+\echo '--- 2. Les refus de reassign_shift, dont le compte des places'
 savepoint s2;
 
 insert into assignments (id, station_id, shift_id, user_id, status, created_by) values
@@ -346,6 +457,45 @@ begin
                    '77777777-0000-4000-8000-000000000100',
                    '77777777-0000-4000-8000-000000000511'),
     'assignment_not_replaceable', 'une attribution déjà remplacée ne se remplace pas deux fois');
+
+  -- **Le compte des places.** Le créneau 401 demande une personne et Damien la
+  -- tient depuis la réattribution ci-dessus : ajouter quelqu'un ferait sonner un
+  -- téléphone pour une garde déjà couverte. C'est le défaut que deux appels
+  -- successifs — ou deux adjoints simultanés — produisaient.
+  perform tests_rea.code(
+    reassign_shift('77777777-0000-4000-8000-000000000401',
+                   '77777777-0000-4000-8000-000000000102',
+                   '77777777-0000-4000-8000-000000000100'),
+    'shift_already_filled', 'un créneau pourvu ne reçoit personne de plus');
+
+  -- **Et le même défaut hors concurrence** : remplacer une garde acquise sans
+  -- désigner l'ancienne ajoutait une personne au lieu d'en remplacer une, la
+  -- recherche implicite ne regardant que les trous. Désignée, elle passe.
+  r := reassign_shift('77777777-0000-4000-8000-000000000401',
+                      '77777777-0000-4000-8000-000000000102',
+                      '77777777-0000-4000-8000-000000000100',
+                      (select id from assignments
+                        where shift_id = '77777777-0000-4000-8000-000000000401'
+                          and status = 'proposed'
+                        order by created_at desc limit 1));
+  perform tests_rea.check((r ->> 'ok')::boolean,
+    'remplacer le titulaire, en le désignant, reste possible');
+  perform tests_rea.egal(
+    (select count(*)::integer from assignments
+      where shift_id = '77777777-0000-4000-8000-000000000401'
+        and status in ('proposed', 'accepted')),
+    1, 'et le créneau garde exactement une attribution active');
+
+  -- Le renfort passe par l'effectif requis, qui le dit en clair.
+  update shifts set required_count = 2
+   where id = '77777777-0000-4000-8000-000000000401';
+  r := reassign_shift('77777777-0000-4000-8000-000000000401',
+                      '77777777-0000-4000-8000-000000000101',
+                      '77777777-0000-4000-8000-000000000100');
+  perform tests_rea.check((r ->> 'ok')::boolean,
+    'une place de plus, une personne de plus : le renfort se déclare');
+  update shifts set required_count = 1
+   where id = '77777777-0000-4000-8000-000000000401';
 
   -- Caserne suspendue : l'application entière est en lecture seule.
   insert into subscriptions (station_id, status, plan)
@@ -570,10 +720,14 @@ begin
     (select payload -> 'shifts' -> 0 ->> 'slot' from notification_outbox
       where type = 'assignment_cancelled'),
     'day', 'l''annulation dit de quel créneau il s''agit');
-  perform tests_rea.check(
-    (select payload ->> 'reason' is not null from notification_outbox
+  -- **Un code, pas une phrase.** Le français vit dans
+  -- `_shared/notification_content.ts`, qui traduit `reassigned` ; une phrase
+  -- écrite dans la migration aurait échappé au système de chaînes.
+  perform tests_rea.egal(
+    (select payload ->> 'reason_code' from notification_outbox
       where type = 'assignment_cancelled'),
-    'l''annulation dit pourquoi : « annulée » sans raison produit un coup de téléphone');
+    'reassigned',
+    'l''annulation dit pourquoi, par un code que le texte traduira');
 
   -- **Le planning recule, et son histoire ne se réécrit pas.**
   select * into planning from schedules where id = '77777777-0000-4000-8000-000000000302';

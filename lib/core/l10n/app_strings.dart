@@ -2143,6 +2143,13 @@ abstract final class AppStrings {
   static const String reattribuerDejaAttribue =
       'Ce pompier tient déjà ce créneau.';
 
+  /// **Une réattribution remplace, elle n'ajoute pas.** Renforcer un créneau
+  /// publié se dit en clair : on augmente son effectif requis, et le panneau le
+  /// propose juste au-dessus de la liste des candidats.
+  static const String reattribuerCreneauPourvu =
+      'Ce créneau est déjà pourvu. Augmente son effectif requis pour y ajouter '
+      'quelqu\'un.';
+
   static const String reattribuerDejaRemplacee =
       'Cette attribution a déjà été remplacée. L\'écran se remet à jour.';
 

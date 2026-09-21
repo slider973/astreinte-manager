@@ -388,6 +388,27 @@ function nombre(payload: ChargeUtile, cle: string): number | null {
   return typeof valeur === "number" && Number.isFinite(valeur) ? valeur : null;
 }
 
+/**
+ * Les motifs que la **base** connaît, rendus en français ici.
+ *
+ * `reassign_shift` (migration 0020) annule la garde du pompier remplacé et doit
+ * lui en donner la raison. Elle envoie un **code**, pas une phrase : le français
+ * des notifications vit dans ce fichier, où il est testé et relu d'un seul
+ * endroit. Une phrase écrite dans une migration aurait échappé au système de
+ * chaînes et vieilli seule.
+ *
+ * Un code inconnu ne rend rien : la notification perd une ligne, elle ne perd
+ * pas son sens.
+ */
+const MOTIFS: Record<string, string> = {
+  reassigned: "le créneau a été confié à un autre pompier",
+};
+
+function motifCode(payload: ChargeUtile): string | null {
+  const code = texte(payload, "reason_code");
+  return code === null ? null : MOTIFS[code] ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Le contenu, type par type
 // ---------------------------------------------------------------------------
@@ -535,7 +556,7 @@ export function construireContenu(
 
     case "assignment_cancelled": {
       const c = creneaux[0];
-      const motif = texte(payload, "reason");
+      const motif = texte(payload, "reason") ?? motifCode(payload);
       return {
         titre: c
           ? `Astreinte annulée : ${jourCourt(c.date)}, ${creneauCourt(c.slot)}`

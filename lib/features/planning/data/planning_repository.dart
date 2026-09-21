@@ -39,6 +39,10 @@ enum ErreurPlanning {
   /// `assignment_not_replaceable` : l'adjoint a réattribué le premier.
   dejaRemplacee(AppStrings.reattribuerDejaRemplacee),
 
+  /// `shift_already_filled` : toutes les places du créneau sont tenues. Ajouter
+  /// quelqu'un ferait sonner un téléphone pour une garde déjà couverte.
+  creneauPourvu(AppStrings.reattribuerCreneauPourvu),
+
   reseau(AppStrings.erreurReseauTexte),
 
   inconnue(AppStrings.planningErreurTexte);
@@ -55,6 +59,7 @@ enum ErreurPlanning {
     'schedule_not_published' => ErreurPlanning.brouillon,
     'member_not_active' => ErreurPlanning.membreInactif,
     'already_assigned' => ErreurPlanning.dejaAttribue,
+    'shift_already_filled' => ErreurPlanning.creneauPourvu,
     'assignment_not_replaceable' => ErreurPlanning.dejaRemplacee,
     'assignment_not_active' => ErreurPlanning.dejaRemplacee,
     'shift_not_found' => ErreurPlanning.moisIntrouvable,

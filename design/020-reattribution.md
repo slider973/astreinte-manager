@@ -252,12 +252,18 @@ C'est la démonstration visuelle de la promesse : **le reste du mois n'a pas bou
 
 Une transaction, dans cet ordre :
 
-1. verrou de ligne sur le planning — deux adjoints qui réattribuent le même créneau en même temps
-   ne doivent pas créer deux attributions et deux notifications ;
-2. les refus métier, rendus en `{"ok": false, "code": …}` comme partout :
+1. les refus métier, rendus en `{"ok": false, "code": …}` comme partout :
    `shift_not_found`, `not_admin`, `station_suspended`, `schedule_not_published` (un brouillon se
    modifie par insertion et suppression, pas par réattribution), `member_not_active`,
-   `already_assigned`, `assignment_not_found`, `assignment_not_replaceable` ;
+   `already_assigned`, `assignment_not_found`, `assignment_not_replaceable`,
+   `shift_already_filled` ;
+2. **deux verrous, dans l'ordre d'une réponse de membre** — l'attribution remplacée, puis le
+   planning. Un pompier qui accepte verrouille sa ligne puis celle du planning ; prendre les deux
+   dans l'autre sens produirait un interblocage dès qu'il accepte à l'instant où un adjoint
+   remplace sa proposition, et le chef lirait une panne là où il n'y a qu'une simultanéité. Puis
+   **le compte des places** : le verrou sérialise, mais sérialiser ne sert à rien si la seconde
+   transaction ne regarde pas ce que la première a écrit. Une réattribution **remplace**, elle
+   n'ajoute pas ;
 3. la nouvelle attribution : `proposed`, **`proposed_at = now()`** — elle est partie, les crons de
    relance doivent la voir —, `created_by = p_actor` et `was_available` **relu dans
    `availabilities`**. Une écriture serveur ne passe pas par
@@ -326,6 +332,14 @@ concernée.
   « L'astreinte de X a été annulée » n'est pas « X a refusé », et mettre un refus sur le dos de
   quelqu'un qui n'a rien refusé serait une faute.
 - **La réattribution est refusée hors ligne** plutôt que mise en file. Décision assumée au § 6.5.
+- **Le renfort n'est pas une réattribution.** Ajouter quelqu'un sur un créneau déjà pourvu est
+  refusé (`shift_already_filled`), et l'écran nomme la sortie : augmenter l'effectif requis, que le
+  panneau propose juste au-dessus de la liste. Laisser une réattribution faire en douce ce qu'un
+  réglage dit en clair coûterait un téléphone qui sonne pour une garde déjà couverte.
+- **L'écran et la base désignent la même ligne.** `CreneauSuivi.aRemplacer` trie comme le `order by`
+  de `reassign_shift` — réponse la plus ancienne, sans réponse en queue. Sans cela, le bandeau
+  nommerait un pompier et le lien en relierait un autre le jour où l'écran cesserait de fournir
+  l'identifiant.
 - **Le panneau chargé depuis le suivi relit la matrice du mois.** Deux requêtes de plus, à
   l'ouverture du panneau seulement, jamais au chargement de l'écran. Mesurées au 016 : ~20 ms de
   bout en bout pour la matrice. Le faire autrement demanderait de dupliquer le calcul des candidats.

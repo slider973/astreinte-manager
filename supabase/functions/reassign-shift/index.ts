@@ -39,6 +39,9 @@ type ResultatReattribution = {
   ok: boolean;
   code?: string;
   status?: string;
+  /** Places occupées et places demandées, quand le créneau est déjà pourvu. */
+  filled?: number;
+  required?: number;
   assignment_id?: string;
   shift_id?: string;
   user_id?: string;
@@ -64,6 +67,8 @@ const MESSAGES: Record<string, string> = {
     "Ce planning n'est pas publié : les attributions s'y posent et s'y retirent directement.",
   member_not_active: "Ce pompier n'est pas un membre actif de la caserne.",
   already_assigned: "Ce pompier est déjà attribué à ce créneau.",
+  shift_already_filled:
+    "Ce créneau est déjà pourvu. Augmente son effectif requis pour y ajouter quelqu'un.",
   assignment_not_found: "L'attribution à remplacer n'existe pas sur ce créneau.",
   assignment_not_replaceable: "Cette attribution a déjà été remplacée.",
 };
@@ -76,6 +81,7 @@ const STATUTS: Record<string, number> = {
   schedule_not_published: 409,
   member_not_active: 422,
   already_assigned: 409,
+  shift_already_filled: 409,
   assignment_not_found: 404,
   assignment_not_replaceable: 409,
 };
@@ -152,6 +158,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const code = resultat?.code ?? "internal_error";
     return errorResponse(STATUTS[code] ?? 500, code, message(code), {
       status: resultat?.status,
+      filled: resultat?.filled,
+      required: resultat?.required,
     });
   }
 

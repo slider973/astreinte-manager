@@ -499,15 +499,17 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
   /// qui apparaît puis disparaît laisserait croire qu'une notification est
   /// partie.
   ///
-  /// Rend le compte rendu, ou `null` en cas d'échec : c'est l'écran qui choisit
-  /// la surface.
-  Future<ResultatReattribution?> reattribuer({
+  /// Rend le compte rendu **et** l'erreur : c'est l'écran qui choisit la
+  /// surface, et il ne peut la choisir que s'il sait ce qui a échoué. « Ce
+  /// créneau est déjà pourvu » et « la réattribution n'a pas abouti » ne se
+  /// disent pas de la même façon, et la seconde ne dit rien.
+  Future<({ResultatReattribution? fait, ErreurPlanning? erreur})> reattribuer({
     required String creneauId,
     required String userId,
     String? ancienneId,
   }) async {
     final courant = state.value;
-    if (courant == null) return null;
+    if (courant == null) return (fait: null, erreur: null);
 
     state = AsyncValue<EtatPlanning?>.data(
       courant.copie(
@@ -527,33 +529,38 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
           );
 
       final apres = state.value;
-      if (!ref.mounted || apres == null) return resultat;
+      if (!ref.mounted || apres == null) return (fait: resultat, erreur: null);
       state = AsyncValue<EtatPlanning?>.data(
         apres.copie(
           planning: apres.planning.avecAttribution(resultat.attribution),
           sync: SyncEtat.enregistre,
         ),
       );
-      return resultat;
+      return (fait: resultat, erreur: null);
     } on EchecPlanning catch (echec) {
       _echouer(echec);
-      // Une course perdue — l'adjoint a réattribué le premier — se répare en
-      // relisant, pas en gardant une image fausse à l'écran.
+      // Une course perdue — l'adjoint a réattribué le premier, le créneau s'est
+      // rempli entre-temps — se répare en relisant, pas en gardant une image
+      // fausse à l'écran.
       if (echec.erreur == ErreurPlanning.dejaRemplacee ||
+          echec.erreur == ErreurPlanning.creneauPourvu ||
           echec.erreur == ErreurPlanning.dejaAttribue) {
         unawaited(rafraichir());
       }
-      return null;
+      return (fait: null, erreur: echec.erreur);
     }
   }
 
   /// Annule une attribution d'un planning publié.
   ///
-  /// Rend `true` quand le membre a été prévenu, `false` quand il n'y avait rien
-  /// à lui apprendre, `null` en cas d'échec.
-  Future<bool?> annuler({required String attributionId, String? motif}) async {
+  /// Rend `prevenu` à `true` quand le membre a été averti, `false` quand il n'y
+  /// avait rien à lui apprendre, et l'erreur quand rien n'a été fait.
+  Future<({bool? prevenu, ErreurPlanning? erreur})> annuler({
+    required String attributionId,
+    String? motif,
+  }) async {
     final courant = state.value;
-    if (courant == null) return null;
+    if (courant == null) return (prevenu: null, erreur: null);
 
     state = AsyncValue<EtatPlanning?>.data(
       courant.copie(sync: SyncEtat.enregistrement, effacerMessage: true),
@@ -565,7 +572,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
           .annuler(attributionId: attributionId, motif: motif);
 
       final apres = state.value;
-      if (!ref.mounted || apres == null) return prevenu;
+      if (!ref.mounted || apres == null) return (prevenu: prevenu, erreur: null);
       // L'attribution quitte les statuts actifs : elle libère sa place à
       // l'écran comme en base, et le suivi la garde barrée dans l'historique.
       state = AsyncValue<EtatPlanning?>.data(
@@ -574,10 +581,10 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
           sync: SyncEtat.enregistre,
         ),
       );
-      return prevenu;
+      return (prevenu: prevenu, erreur: null);
     } on EchecPlanning catch (echec) {
       _echouer(echec);
-      return null;
+      return (prevenu: null, erreur: echec.erreur);
     }
   }
 
@@ -656,6 +663,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
     final passagere =
         echec.erreur == ErreurPlanning.dejaAttribue ||
         echec.erreur == ErreurPlanning.dejaRemplacee ||
+        echec.erreur == ErreurPlanning.creneauPourvu ||
         echec.erreur == ErreurPlanning.membreInactif;
     state = AsyncValue<EtatPlanning?>.data(
       courant.copie(

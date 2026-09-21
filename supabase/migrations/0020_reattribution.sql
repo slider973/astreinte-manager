@@ -41,17 +41,42 @@
 --     plutôt que seulement poli.
 
 -- ===========================================================================
--- 1. Les trois colonnes que personne n'écrit à la main
+-- 1. Les statuts terminaux et le lien de remplacement, hors de portée du client
 -- ===========================================================================
--- `assignments_update_admin` (0008) laisse un administrateur écrire n'importe
--- quel statut sur n'importe quelle attribution de sa caserne, `replaced` et
--- `cancelled` compris, et `assignments_member_transition` (0008) le laisse
--- passer dès la première ligne (`if is_admin(...) then return new`). Une
--- requête PostgREST suffisait donc à retirer sa garde à un pompier **sans que
--- rien ne parte**.
+-- `assignments_update_admin` et `assignments_insert_admin` (0008) laissent un
+-- administrateur écrire **n'importe quel statut** sur n'importe quelle
+-- attribution de sa caserne, `replaced` et `cancelled` compris, et
+-- `assignments_member_transition` (0008) le laisse passer dès sa première ligne
+-- (`if is_admin(...) then return new`). Une requête PostgREST suffisait donc à
+-- retirer sa garde à un pompier **sans que rien ne parte**.
 --
--- Le déclencheur ferme cette porte : les deux statuts terminaux et le lien
--- `replaced_by` sont réservés aux fonctions de cette migration, qui notifient.
+-- Le déclencheur ferme cette porte. Quatre règles, et chacune a été franchie en
+-- revue avant d'être écrite :
+--
+--   1. **Aucune entrée dans un état terminal.** La garde ne portait d'abord que
+--      sur la mise à jour : un client insérait alors directement une ligne
+--      `declined` ou `cancelled`, avec son lien de remplacement, et fabriquait
+--      un refus que personne n'avait prononcé. Un statut terminal se **rejoint**
+--      par une transition notifiée, il ne s'écrit pas d'un coup.
+--   2. **Aucune sortie d'un état terminal.** La garde regardait le nouveau
+--      statut et jamais l'ancien : ramener un refus à `proposed` en effaçant son
+--      motif faisait disparaître le refus du suivi et redonnait au pompier une
+--      proposition sans rien lui envoyer ; ramener un `replaced` à `accepted`
+--      ressuscitait une garde qui gardait son lien et pouvait valider le
+--      planning. **L'historique n'est jamais réécrit** (docs/PRD.md § 7.6) : la
+--      suppression était déjà fermée (0018, 0019), l'aller-retour ne l'était
+--      pas.
+--   3. **Le motif d'un refus est gelé.** Il appartient au pompier qui l'a écrit.
+--      `assignments_member_transition` ne l'autorise que dans la transition
+--      `proposed -> declined` ; un administrateur passait à travers.
+--   4. **`replaced_by` ne se pose pas à la main, et ne désigne pas n'importe
+--      quoi.** Le client fournissant l'identifiant de la ligne qu'il insère, il
+--      pouvait relier une attribution à elle-même, ou à une attribution d'un
+--      autre créneau — voire d'une autre caserne, que nulle contrainte
+--      n'empêchait. Ces deux dernières vérifications valent pour **tout le
+--      monde**, rôle de service compris : ce n'est pas une règle d'interface,
+--      c'est la cohérence du fil de l'histoire.
+--
 -- Même construction que `assignments_trace_disponibilite` (0018) :
 --
 --   - **security invoker**, et c'est structurel. En `security definer`,
@@ -65,17 +90,74 @@ create function assignments_guard_reattribution() returns trigger
 language plpgsql
 set search_path = public, pg_temp
 as $$
+declare
+  terminaux constant assignment_status[] :=
+    array['declined', 'replaced', 'cancelled']::assignment_status[];
+  client boolean := current_user in ('authenticated', 'anon');
 begin
+  -- ----------------------------------------------------------------
+  -- Ce qui vaut pour tout le monde : la cohérence du lien.
+  -- ----------------------------------------------------------------
+  if new.replaced_by is not null then
+    if new.replaced_by = new.id then
+      raise exception 'assignment_link_self'
+        using hint = 'Une attribution ne se remplace pas elle-même.';
+    end if;
+
+    if not exists (
+      select 1 from assignments a
+       where a.id = new.replaced_by
+         and a.shift_id = new.shift_id
+    ) then
+      raise exception 'assignment_link_foreign_shift'
+        using hint = 'Le remplacement d''une attribution se trouve sur le même créneau qu''elle : un lien vers un autre créneau, ou une autre caserne, ne raconte aucune histoire.';
+    end if;
+  end if;
+
   -- Écritures serveur : `reassign_shift`, `cancel_assignment`, le seed, les
   -- migrations. Elles savent ce qu'elles écrivent, et elles notifient.
-  if current_user not in ('authenticated', 'anon') then
+  if not client then
     return new;
   end if;
 
-  if new.status is distinct from old.status
-     and new.status in ('replaced', 'cancelled') then
-    raise exception 'assignment_transition_reserved'
-      using hint = 'Remplacer ou annuler une attribution passe par reassign_shift ou cancel_assignment : le pompier concerné doit être prévenu dans la même transaction.';
+  -- ----------------------------------------------------------------
+  -- Ce qui vaut pour un client : on n'entre, on ne sort et on ne relie pas.
+  -- ----------------------------------------------------------------
+  if tg_op = 'INSERT' then
+    if new.status = any(terminaux) then
+      raise exception 'assignment_transition_reserved'
+        using hint = 'Une attribution ne naît pas refusée, remplacée ni annulée : ces états se rejoignent par une transition que quelqu''un reçoit.';
+    end if;
+
+    if new.replaced_by is not null then
+      raise exception 'assignment_link_reserved'
+        using hint = 'Le lien entre une attribution et celle qui la remplace est posé par reassign_shift.';
+    end if;
+
+    return new;
+  end if;
+
+  if new.status is distinct from old.status then
+    if new.status in ('replaced', 'cancelled') then
+      raise exception 'assignment_transition_reserved'
+        using hint = 'Remplacer ou annuler une attribution passe par reassign_shift ou cancel_assignment : le pompier concerné doit être prévenu dans la même transaction.';
+    end if;
+
+    if old.status = any(terminaux) then
+      raise exception 'assignment_transition_terminal'
+        using hint = format(
+          'Une attribution %s ne repart pas : l''historique de la caserne ne se réécrit pas (docs/PRD.md § 7.6). Pour repourvoir le créneau, réattribuer.',
+          old.status);
+    end if;
+  end if;
+
+  -- Le motif appartient à qui l'a écrit. Une fois le refus prononcé, il est
+  -- l'information la plus utile du suivi : l'effacer ferait disparaître la
+  -- raison de chercher quelqu'un d'autre.
+  if old.status = 'declined'
+     and new.decline_reason is distinct from old.decline_reason then
+    raise exception 'assignment_reason_frozen'
+      using hint = 'Le motif d''un refus appartient au pompier qui l''a écrit.';
   end if;
 
   if new.replaced_by is distinct from old.replaced_by then
@@ -87,12 +169,12 @@ begin
 end $$;
 
 comment on function assignments_guard_reattribution() is
-  'Réserve les statuts replaced et cancelled, et la colonne replaced_by, aux fonctions qui notifient le pompier concerné. Un changement d''état qui ne se dit pas est un mensonge.';
+  'Tient les statuts terminaux et le lien replaced_by hors de portée d''un client : on n''y entre pas par une insertion, on n''en sort pas par une mise à jour, le motif d''un refus est gelé, et un lien de remplacement désigne toujours une autre attribution du même créneau. Un changement d''état qui ne se dit pas est un mensonge.';
 
 revoke execute on function assignments_guard_reattribution() from public, anon, authenticated;
 
 create trigger assignments_guard_reattribution
-  before update on assignments
+  before insert or update on assignments
   for each row execute function assignments_guard_reattribution();
 
 -- ===========================================================================
@@ -104,13 +186,27 @@ create trigger assignments_guard_reattribution
 -- les refus métier sortent en `{"ok": false, "code": …}`, et rien ne lève pour
 -- un refus attendu.
 --
--- **Le verrou de ligne sur le planning est pris en tête.** Deux adjoints qui
--- repourvoient le même créneau refusé en même temps liraient chacun leur
--- instantané, créeraient chacun une attribution et feraient sonner deux
--- téléphones pour une place. La contrainte `assignments_active_uniq` arrêterait
--- le second seulement s'il visait la même personne ; elle ne dit rien de deux
--- personnes différentes. Le verrou, lui, les sérialise, et le second voit alors
--- le créneau déjà pourvu.
+-- **Deux verrous, dans l'ordre d'une réponse de membre : l'attribution, puis le
+-- planning.** L'ordre n'est pas un détail de style. Un pompier qui accepte
+-- verrouille sa ligne d'`assignments`, puis — par `schedule_auto_validate` —
+-- celle de `schedules`. Une réattribution qui prendrait les deux dans l'autre
+-- sens produirait un interblocage dès qu'un pompier accepte à l'instant où un
+-- adjoint remplace sa proposition : PostgreSQL en tuerait une au hasard, et le
+-- chef lirait une panne là où il n'y a qu'une simultanéité. Les refus métier
+-- sont donc établis sur une lecture **sans verrou**, et les deux verrous sont
+-- pris ensuite, dans le même ordre que partout ailleurs.
+--
+-- Ce que le verrou du planning sérialise : deux adjoints qui repourvoient le
+-- même créneau en même temps. Sans lui, chacun lit son instantané, crée une
+-- attribution, et deux téléphones sonnent pour une place. La contrainte
+-- `assignments_active_uniq` n'arrêterait que deux tentatives sur **la même**
+-- personne ; elle ne dit rien de deux personnes différentes.
+--
+-- **Et le verrou ne suffit pas : il faut compter.** Sérialiser deux
+-- transactions ne sert à rien si la seconde ne regarde pas ce que la première a
+-- écrit. Le compte des attributions actives contre l'effectif requis est fait
+-- après le verrou, et c'est lui — pas le verrou — qui tient la promesse
+-- « aucune notification en trop ».
 --
 -- **`p_previous` est facultatif, et les trois cas sont réels** :
 --   - l'identifiant d'un refus, d'une annulation ou d'une attribution vivante à
@@ -145,16 +241,22 @@ declare
   ancienne       assignments;
   nouvelle       assignments;
   dispo          boolean;
+  actives        integer;
   ancien_statut  assignment_status;
   prevenu_ancien boolean := false;
 begin
+  -- ------------------------------------------------------------------
+  -- Les refus métier, sur une lecture **sans verrou**.
+  -- ------------------------------------------------------------------
+  -- Un appelant sans droit ne doit pas faire attendre une transaction qui, elle,
+  -- travaille — et surtout, rien ne doit être verrouillé avant que l'ordre des
+  -- verrous ne soit tenu (voir l'en-tête).
   select * into creneau from shifts where id = p_shift;
   if creneau.id is null then
     return jsonb_build_object('ok', false, 'code', 'shift_not_found');
   end if;
 
-  -- Le verrou d'abord. Tout le reste en dépend.
-  select * into planning from schedules where id = creneau.schedule_id for update;
+  select * into planning from schedules where id = creneau.schedule_id;
   if planning.id is null then
     return jsonb_build_object('ok', false, 'code', 'shift_not_found');
   end if;
@@ -192,24 +294,13 @@ begin
     return jsonb_build_object('ok', false, 'code', 'member_not_active');
   end if;
 
-  -- Déjà en place sur ce créneau : ce n'est pas une panne, c'est l'autre
-  -- administrateur — ou le même, deux fois. La contrainte d'unicité le dirait
-  -- en `23505` ; un code métier se traduit mieux à l'écran.
-  if exists (
-    select 1 from assignments a
-    where a.shift_id = p_shift
-      and a.user_id  = p_user
-      and a.status in ('proposed', 'accepted')
-  ) then
-    return jsonb_build_object('ok', false, 'code', 'already_assigned');
-  end if;
-
   -- ------------------------------------------------------------------
-  -- L'ancienne attribution : désignée, devinée, ou absente.
+  -- L'ancienne attribution : désignée, devinée, ou absente. **Premier verrou.**
   -- ------------------------------------------------------------------
   if p_previous is not null then
     select * into ancienne from assignments a
-     where a.id = p_previous and a.shift_id = p_shift;
+     where a.id = p_previous and a.shift_id = p_shift
+       for update;
 
     if ancienne.id is null then
       return jsonb_build_object('ok', false, 'code', 'assignment_not_found');
@@ -232,16 +323,79 @@ begin
   else
     -- Le plus ancien trou non encore comblé de ce créneau — un refus ou une
     -- annulation. `order by` sur la réponse puis sur la création : deux refus
-    -- dans la même seconde restent départagés.
+    -- dans la même seconde restent départagés. **L'écran applique exactement le
+    -- même ordre** (`CreneauSuivi.aRemplacer`), pour que le nom annoncé dans le
+    -- bandeau soit celui que la base reliera.
+    --
+    -- Une transaction concurrente qui aurait comblé ce trou pendant l'attente du
+    -- verrou fait sortir la ligne de la qualification : `ancienne` est alors
+    -- nulle, et c'est le compte des places ci-dessous qui refuse.
     select * into ancienne from assignments a
      where a.shift_id    = p_shift
        and a.status in ('declined', 'cancelled')
        and a.replaced_by is null
      order by a.responded_at nulls last, a.created_at
-     limit 1;
+     limit 1
+       for update;
   end if;
 
   ancien_statut := ancienne.status;
+
+  -- ------------------------------------------------------------------
+  -- **Second verrou** : le planning. Ordre tenu, on peut compter.
+  -- ------------------------------------------------------------------
+  select * into planning from schedules where id = creneau.schedule_id for update;
+
+  -- Relus sous verrou : l'adjoint a pu publier, valider, ou changer l'effectif
+  -- requis pendant qu'on attendait.
+  select * into creneau from shifts where id = p_shift;
+
+  if planning.status not in ('published', 'validated') then
+    return jsonb_build_object('ok', false, 'code', 'schedule_not_published',
+                              'status', planning.status);
+  end if;
+
+  -- Déjà en place sur ce créneau : ce n'est pas une panne, c'est l'autre
+  -- administrateur — ou le même, deux fois. La contrainte d'unicité le dirait
+  -- en `23505` ; un code métier se traduit mieux à l'écran.
+  if exists (
+    select 1 from assignments a
+    where a.shift_id = p_shift
+      and a.user_id  = p_user
+      and a.status in ('proposed', 'accepted')
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'already_assigned');
+  end if;
+
+  -- ------------------------------------------------------------------
+  -- **Le compte des places.** C'est lui qui tient « aucune notification en trop ».
+  -- ------------------------------------------------------------------
+  -- Une réattribution remplace ; elle n'ajoute pas. Le créneau gagne une
+  -- attribution active et en perd une — sauf quand l'ancienne était déjà sortie
+  -- du jeu (un refus, une annulation), auquel cas elle ne libérait rien de plus
+  -- qu'elle n'avait déjà libéré.
+  --
+  -- Sans ce test, deux appels identiques sur un créneau d'une place créaient
+  -- deux attributions actives et faisaient sonner deux téléphones ; et remplacer
+  -- une garde **acquise** sans désigner l'ancienne ajoutait une personne au lieu
+  -- d'en remplacer une, la recherche implicite ne regardant que les trous.
+  --
+  -- Renforcer un créneau publié reste possible : cela s'appelle augmenter son
+  -- effectif requis, et le panneau le propose juste au-dessus de la liste des
+  -- candidats. Le dire ainsi vaut mieux que de laisser une réattribution faire
+  -- en douce ce qu'un réglage dit en clair.
+  select count(*) into actives
+    from assignments a
+   where a.shift_id = p_shift
+     and a.status in ('proposed', 'accepted');
+
+  if actives + 1
+     - (case when ancien_statut in ('proposed', 'accepted') then 1 else 0 end)
+     > creneau.required_count then
+    return jsonb_build_object(
+      'ok', false, 'code', 'shift_already_filled',
+      'filled', actives, 'required', creneau.required_count);
+  end if;
 
   select * into periode from periods where id = planning.period_id;
   cle_periode := to_char(make_date(periode.year, periode.month, 1), 'YYYY-MM');
@@ -319,7 +473,11 @@ begin
       p_station  => planning.station_id,
       p_payload  => jsonb_build_object(
         'period', cle_periode,
-        'reason', 'le créneau a été confié à un autre pompier',
+        -- **Un code, pas une phrase.** Le français des notifications vit dans
+        -- `_shared/notification_content.ts`, où il est testé et relu d'un seul
+        -- endroit ; une phrase écrite ici aurait échappé au système de chaînes
+        -- et vieilli seule dans une migration.
+        'reason_code', 'reassigned',
         'shifts', jsonb_build_array(jsonb_build_object(
           'date', creneau.date,
           'slot', creneau.slot))));
@@ -413,7 +571,11 @@ declare
   motif        text;
   prevenu      boolean := false;
 begin
-  select * into attribution from assignments where id = p_assignment;
+  -- **L'attribution d'abord, le planning ensuite** : le même ordre qu'une
+  -- réponse de membre et que `reassign_shift`. Pris dans l'autre sens, un
+  -- pompier qui accepte à l'instant où un adjoint annule sa garde produirait un
+  -- interblocage, rendu au chef comme une panne.
+  select * into attribution from assignments where id = p_assignment for update;
   if attribution.id is null then
     return jsonb_build_object('ok', false, 'code', 'assignment_not_found');
   end if;

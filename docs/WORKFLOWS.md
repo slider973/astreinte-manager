@@ -60,10 +60,16 @@ Règles :
 - `replaced` porte `replaced_by` vers la nouvelle attribution. **Un refus et une annulation
   aussi** : ils gardent leur statut — c'est l'histoire de la caserne, et elle a déjà été notifiée
   sous ce nom — et leur `replaced_by` dit quelle attribution a comblé le trou (migration `0020`).
-- **`replaced`, `cancelled` et `replaced_by` ne s'écrivent pas depuis un client** (migration
-  `0020`). Ils passent par `reassign_shift` ou `cancel_assignment`, qui préviennent le pompier
-  concerné dans la même transaction : un changement d'état qui ne se dit pas laisse quelqu'un se
-  croire d'astreinte.
+- **Les états terminaux sont à sens unique, et hors de portée d'un client** (migration `0020`).
+  `declined`, `replaced` et `cancelled` ne s'écrivent ni par une insertion ni par une mise à jour
+  cliente, et on n'en **sort** pas : l'historique de la caserne ne se réécrit pas. Le motif d'un
+  refus est gelé. Ces écritures passent par `reassign_shift` ou `cancel_assignment`, qui préviennent
+  le pompier concerné dans la même transaction : un changement d'état qui ne se dit pas laisse
+  quelqu'un se croire d'astreinte.
+- **Une réattribution remplace, elle n'ajoute pas.** Le nombre d'attributions actives d'un créneau ne
+  dépasse jamais son effectif requis : `reassign_shift` compte les places après avoir pris ses
+  verrous et refuse en `shift_already_filled` sinon. Renforcer un créneau publié se dit autrement —
+  en augmentant son effectif requis.
 - **La notification marque les transitions venues d'`accepted`, et elles seules.** Retirer une
   proposition sans réponse ne prévient personne : rien n'était acquis, et l'écran « Propositions »
   du membre sera simplement plus court.

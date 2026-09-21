@@ -296,11 +296,19 @@ il n'y a rien à conserver (`docs/WORKFLOWS.md § 3`). Après publication, la m�
 s'annule ou se remplace et **reste** : la politique `assignments_delete_admin` (durcie en `0018`)
 n'autorise la suppression que si le planning est encore `draft`.
 
-**`status` à `replaced` ou `cancelled`, et `replaced_by`, ne s'écrivent pas depuis un client**
-(déclencheur `assignments_guard_reattribution`, migration `0020`, ticket 020). Ces trois écritures
-passent par `reassign_shift` ou `cancel_assignment`, qui préviennent le pompier concerné **dans la
-même transaction** : un changement d'état qui ne se dit pas laisserait quelqu'un se croire
-d'astreinte. `replaced_by` est posé dans les quatre cas de réattribution, y compris quand l'ancienne
+**Les états terminaux (`declined`, `replaced`, `cancelled`) et `replaced_by` sont hors de portée
+d'un client** (déclencheur `assignments_guard_reattribution`, migration `0020`, ticket 020). On n'y
+**entre** pas par une insertion — une attribution ne naît pas refusée —, on n'en **sort** pas par une
+mise à jour — l'historique ne se réécrit pas —, le **motif d'un refus est gelé**, et `replaced_by` ne
+se pose pas à la main. Ces écritures passent par `reassign_shift` ou `cancel_assignment`, qui
+préviennent le pompier concerné **dans la même transaction** : un changement d'état qui ne se dit pas
+laisserait quelqu'un se croire d'astreinte.
+
+Deux règles du même déclencheur valent pour **tout le monde**, rôle de service compris :
+`replaced_by` ne désigne jamais la ligne elle-même (`assignment_link_self`) et toujours une
+attribution **du même créneau** (`assignment_link_foreign_shift`). Ce n'est pas une règle
+d'interface, c'est la cohérence du fil de l'histoire — et rien d'autre n'empêchait un lien de
+traverser les créneaux, ni les casernes. `replaced_by` est posé dans les quatre cas de réattribution, y compris quand l'ancienne
 attribution reste `declined` ou `cancelled` — c'est le fil qui dit « ce trou-là a été comblé par
 cette attribution-là ».
 
@@ -622,7 +630,7 @@ pas.
 
 | Fonction | Signature | Rôle |
 |---|---|---|
-| `reassign_shift` | `(p_shift uuid, p_user uuid, p_actor uuid, p_previous uuid default null) returns jsonb` `security definer`, **réservée à `service_role`** | La réattribution, **en une transaction** : verrou du planning, nouvelle attribution `proposed` avec `proposed_at = now()`, `created_by` et `was_available` posés par la fonction, ancienne marquée `replaced` (`accepted` ou `proposed`) ou **laissée telle quelle** (`declined`, `cancelled` : un statut terminal a déjà été notifié sous ce nom), `replaced_by` posé dans les quatre cas, notifications, `audit_log` et `schedule_reevaluer`. `p_previous` omis sur un créneau qui porte un trou non comblé — un refus ou une annulation : la fonction rattache la nouvelle au **plus ancien** d'entre eux. Seul `replaced` n'est pas remplaçable : ce qui a déjà trouvé son remplaçant ne s'en cherche pas un second. Refus métier en `{"ok": false, "code": …}` : `shift_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `member_not_active`, `already_assigned`, `assignment_not_found`, `assignment_not_replaceable`. |
+| `reassign_shift` | `(p_shift uuid, p_user uuid, p_actor uuid, p_previous uuid default null) returns jsonb` `security definer`, **réservée à `service_role`** | La réattribution, **en une transaction** : nouvelle attribution `proposed` avec `proposed_at = now()`, `created_by` et `was_available` posés par la fonction, ancienne marquée `replaced` (`accepted` ou `proposed`) ou **laissée telle quelle** (`declined`, `cancelled` : un statut terminal a déjà été notifié sous ce nom), `replaced_by` posé dans les quatre cas, notifications, `audit_log` et `schedule_reevaluer`. `p_previous` omis sur un créneau qui porte un trou non comblé — un refus ou une annulation : la fonction rattache la nouvelle au **plus ancien** d'entre eux. Seul `replaced` n'est pas remplaçable : ce qui a déjà trouvé son remplaçant ne s'en cherche pas un second. **Deux verrous, dans l'ordre d'une réponse de membre** — l'attribution remplacée, puis le planning —, et **le compte des places** après eux : une réattribution remplace, elle n'ajoute pas. Refus métier en `{"ok": false, "code": …}` : `shift_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `member_not_active`, `already_assigned`, `shift_already_filled`, `assignment_not_found`, `assignment_not_replaceable`. |
 | `cancel_assignment` | `(p_assignment uuid, p_reason text default null) returns jsonb` `security definer`, ouverte à `authenticated` | L'annulation d'une attribution d'un planning publié : statut `cancelled`, motif conservé dans `decline_reason`, notification `assignment_cancelled` **si la garde était acceptée**, `audit_log` et `schedule_reevaluer`. Refus : `assignment_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `assignment_not_active`. |
 
 **Une notification, et une seule, sauf quand une garde acquise disparaît.** Un refus suivi d'une
@@ -828,15 +836,21 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   viendra plus le réveiller ; le porter de 1 à 2 sur un planning validé le rend incomplet, et
   le laisser « validé » mentirait à toute la caserne. Appelle `schedule_reevaluer`, qui traite
   les deux sens.
-- `assignments_guard_reattribution` (migration `0020`, ticket 020) : `before update` sur
-  `assignments`. Réserve les statuts `replaced` et `cancelled`, ainsi que la colonne
-  `replaced_by`, aux écritures serveur — c'est-à-dire à `reassign_shift` et `cancel_assignment`,
-  qui notifient le pompier concerné dans la même transaction
-  (`assignment_transition_reserved`, `assignment_link_reserved`). Sans lui,
-  `assignments_update_admin` (`0008`) laissait un administrateur retirer sa garde à quelqu'un
-  d'une requête PostgREST, **sans que rien ne parte** : le pompier notait la date et ne venait
-  pas. Security invoker et nommé pour passer **avant** `assignments_member_transition`, pour les
-  deux raisons déjà données à propos d'`assignments_trace_disponibilite`.
+- `assignments_guard_reattribution` (migration `0020`, ticket 020) : `before insert or update` sur
+  `assignments`. Quatre règles, dont chacune a été franchie en revue avant d'être écrite :
+  **on n'entre pas** dans un état terminal par une insertion (`assignment_transition_reserved` —
+  sinon un client fabrique un refus que personne n'a prononcé) ; **on n'en sort pas** par une mise
+  à jour (`assignment_transition_terminal` — sinon un refus redevient une proposition sans que rien
+  ne parte, et un remplacement ressuscite en acceptation avec son lien) ; **le motif d'un refus est
+  gelé** (`assignment_reason_frozen` — il appartient au pompier qui l'a écrit) ; **`replaced_by` ne
+  se pose pas à la main** (`assignment_link_reserved`) et ne désigne ni la ligne elle-même
+  (`assignment_link_self`) ni une attribution d'un autre créneau
+  (`assignment_link_foreign_shift`) — ces deux dernières pour tout le monde. Sans ce déclencheur,
+  `assignments_update_admin` et `assignments_insert_admin` (`0008`) laissaient un administrateur
+  retirer sa garde à quelqu'un d'une requête PostgREST, **sans que rien ne parte** : le pompier
+  notait la date et ne venait pas. Security invoker et nommé pour passer **avant**
+  `assignments_member_transition`, pour les deux raisons déjà données à propos
+  d'`assignments_trace_disponibilite`.
 - `schedule_auto_validate` (migration `0019`, ticket 019 ; clause `when` élargie par `0020`) :
   `after update` sur `assignments`, `when (new.status is distinct from old.status and (new.status
   = 'accepted' or old.status = 'accepted'))`. Délègue à `schedule_reevaluer` : si **chaque**

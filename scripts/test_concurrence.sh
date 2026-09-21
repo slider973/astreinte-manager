@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Concurrence de la validation automatique d'un planning (migration 0019, ticket 019).
+# Concurrence de la validation automatique d'un planning (migration 0019,
+# ticket 019) et de la réattribution d'un créneau (migration 0020, ticket 020).
 #
 # Lancé par scripts/test_rls.sh, donc joué en CI comme en local.
 #
@@ -58,6 +59,8 @@ M1="77777777-0000-4000-8000-000000000102"
 M2="77777777-0000-4000-8000-000000000103"
 A1="77777777-0000-4000-8000-000000000201"
 A2="77777777-0000-4000-8000-000000000202"
+CRENEAU2="77777777-0000-4000-8000-000000000005"
+A3="77777777-0000-4000-8000-000000000203"
 
 total=0
 echecs=0
@@ -93,6 +96,7 @@ nettoyer() {
        delete from memberships where station_id = '$STATION';
        delete from stations where id = '$STATION';
        delete from auth.users where email like '%@concurrence.test';
+       drop table if exists concurrence_resultats;
        alter table shifts    enable trigger shifts_guard_suppression;
        alter table schedules enable trigger schedules_guard_suppression;" >/dev/null 2>&1 || true
   rm -rf "$travail"
@@ -209,6 +213,94 @@ verifier "une seule notification de validation" "1" \
 verifier "elle vise les trois membres actifs" "3" \
   "$(sql "select jsonb_array_length(recipients) from notification_outbox
            where station_id = '$STATION' and type = 'schedule_validated'")"
+
+# ---------------------------------------------------------------------------
+# Deux réattributions simultanées sur un créneau d'une seule place (0020).
+# ---------------------------------------------------------------------------
+# Le verrou sérialise les deux transactions, mais sérialiser ne suffit pas : il
+# faut que la seconde **compte** ce que la première a écrit. Sans le test de
+# capacité, les deux réussissaient — deux attributions actives, deux
+# notifications, deux téléphones qui sonnent pour une place.
+echo "== concurrence de la réattribution"
+
+# Les fixtures du second scénario arrivent **après** les assertions du premier :
+# un créneau de plus, non pourvu, empêcherait le planning de se valider et
+# ferait échouer le scénario précédent pour une raison qui ne le regarde pas.
+"${PSQL[@]}" >/dev/null <<SQL
+-- **Un créneau d'une seule place, déjà refusé** : celui du ticket 020. Deux
+-- adjoints vont le repourvoir en même temps ; il ne doit en sortir qu'une
+-- attribution et qu'une notification.
+insert into shifts (id, station_id, schedule_id, date, slot, required_count)
+values ('$CRENEAU2', '$STATION', '$PLANNING', '2029-04-02', 'day', 1);
+
+insert into assignments (id, station_id, shift_id, user_id, status, proposed_at, created_by)
+values ('$A3', '$STATION', '$CRENEAU2', '$M1', 'proposed', now(), '$ADMIN');
+
+-- Bilal refuse : le trou que les deux adjoints verront.
+update assignments set status = 'declined', responded_at = now(),
+                       decline_reason = 'en formation'
+ where id = '$A3';
+
+-- Où les deux sessions déposeront ce que la fonction leur a répondu : une
+-- session \`psql\` pilotée par tube ne rend pas sa sortie de façon exploitable.
+create table if not exists concurrence_resultats (qui text primary key, r jsonb);
+delete from concurrence_resultats;
+SQL
+
+sql "delete from notification_outbox where station_id = '$STATION'" >/dev/null
+
+mkfifo "$travail/c.in" "$travail/d.in"
+"${PSQL[@]}" < "$travail/c.in" > "$travail/c.out" 2>&1 &
+pid_c=$!
+"${PSQL[@]}" < "$travail/d.in" > "$travail/d.out" 2>&1 &
+pid_d=$!
+exec 7> "$travail/c.in"
+exec 8> "$travail/d.in"
+
+# C repourvoit et **reste ouverte** : elle tient le refus et le planning.
+printf "begin;\ninsert into concurrence_resultats values ('c', reassign_shift('%s', '%s', '%s'));\n" \
+  "$CRENEAU2" "$M2" "$ADMIN" >&7
+sleep 1
+
+# D repourvoit le même créneau, pour quelqu'un d'autre. La contrainte d'unicité
+# ne dit rien de deux personnes différentes : seul le verrou puis le compte des
+# places peuvent l'arrêter.
+printf "begin;\ninsert into concurrence_resultats values ('d', reassign_shift('%s', '%s', '%s'));\n" \
+  "$CRENEAU2" "$ADMIN" "$ADMIN" >&8
+sleep 2
+
+attente="$(sql "select count(*) from pg_stat_activity
+                 where datname = current_database()
+                   and wait_event_type = 'Lock'
+                   and query ilike '%reassign_shift%'")"
+verifier "la seconde réattribution attend la première" "1" "$attente"
+
+printf "commit;\n" >&7
+sleep 1
+printf "commit;\n" >&8
+sleep 1
+
+exec 7>&-
+exec 8>&-
+wait "$pid_c" "$pid_d" 2>/dev/null || true
+
+verifier "la première réattribution aboutit" "true" \
+  "$(sql "select r ->> 'ok' from concurrence_resultats where qui = 'c'")"
+verifier "la seconde est refusée" "false" \
+  "$(sql "select r ->> 'ok' from concurrence_resultats where qui = 'd'")"
+verifier "et elle dit que le créneau est pourvu" "shift_already_filled" \
+  "$(sql "select r ->> 'code' from concurrence_resultats where qui = 'd'")"
+
+# **Le critère du ticket, sous concurrence** : une place, une attribution, une
+# notification.
+verifier "une seule attribution active sur le créneau" "1" \
+  "$(sql "select count(*) from assignments
+           where shift_id = '$CRENEAU2' and status in ('proposed', 'accepted')")"
+verifier "un seul téléphone sonne" "1" \
+  "$(sql "select count(*) from notification_outbox
+           where station_id = '$STATION' and type = 'assignment_proposed'")"
+verifier "le refus garde le fil vers l'attribution qui l'a comblé" "t" \
+  "$(sql "select replaced_by is not null from assignments where id = '$A3'")"
 
 if [ "$echecs" -eq 0 ]; then
   echo "Concurrence : $total tests, tous verts"

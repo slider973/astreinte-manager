@@ -3,6 +3,7 @@ import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
+import 'package:astreinte_sp/features/planning/data/planning_repository.dart';
 import 'package:astreinte_sp/features/planning/domain/candidat.dart';
 import 'package:astreinte_sp/features/planning/domain/creneau_planning.dart';
 import 'package:astreinte_sp/features/planning/domain/ligne_matrice.dart';
@@ -396,6 +397,32 @@ void main() {
       expect(demande.ancienneId, 'a-refus');
     });
 
+    // **Le refus se dit avec ses mots.** Le créneau plein est le cas que la base
+    // refuse pour tenir « aucune notification en trop » ; l'écran doit nommer la
+    // sortie — augmenter l'effectif requis — et non servir un « ça n'a pas
+    // abouti » qui n'apprend rien.
+    testWidgets('un créneau déjà pourvu le dit, et dit comment le renforcer', (
+      tester,
+    ) async {
+      final planning = FauxPlanningRepository(
+        planning: planningPublie(),
+        creneaux: _creneaux(),
+        attributions: const <Attribution>[
+          Attribution(id: 'a-acceptee', creneauId: 'c-1-n', userId: 'lefebvre'),
+        ],
+        disponibles: <String>{'girard@c-1-j', 'bernard@c-1-j'},
+        erreurEcriture: ErreurPlanning.creneauPourvu,
+      );
+
+      await _ouvrir(tester, depotPlanning: planning);
+      await _toucher(tester, find.text(AppStrings.reattribuerAction));
+      await _toucher(tester, _bouton('Camille G.'));
+      await _toucher(tester, find.text(AppStrings.reattribuerConfirmer));
+
+      expect(find.text(AppStrings.reattribuerCreneauPourvu), findsOneWidget);
+      expect(find.text(AppStrings.reattribuerErreur), findsNothing);
+    });
+
     testWidgets('renoncer à la confirmation ne notifie personne', (
       tester,
     ) async {
@@ -635,6 +662,44 @@ void main() {
       expect(c.aReparer, isTrue);
       expect(c.porteUnRefus, isTrue);
       expect(c.aRemplacer?.id, 'a1');
+    });
+
+    // **L'écran et la base désignent la même ligne.** La base trie par
+    // `responded_at nulls last, created_at` ; l'écran doit faire pareil, sinon
+    // le bandeau nomme un pompier et le lien en relie un autre le jour où
+    // l'écran cesse de fournir l'identifiant.
+    test('le trou désigné est le plus ancien, comme en base', () {
+      final c = creneauAvec(<AttributionSuivi>[
+        attributionSuivi(
+          id: 'recent',
+          creneauId: 'c-1-j',
+          userId: 'u2',
+          nom: 'B',
+          etat: AttributionEtat.refuse,
+          proposeeLe: DateTime(2026, 10, 2),
+          repondueLe: DateTime(2026, 10, 5),
+        ),
+        attributionSuivi(
+          id: 'ancien',
+          creneauId: 'c-1-j',
+          userId: 'u1',
+          nom: 'A',
+          etat: AttributionEtat.refuse,
+          proposeeLe: DateTime(2026, 10, 3),
+          repondueLe: DateTime(2026, 10, 2),
+        ),
+        // Sans réponse : en queue, comme `nulls last`.
+        attributionSuivi(
+          id: 'sans-reponse',
+          creneauId: 'c-1-j',
+          userId: 'u3',
+          nom: 'C',
+          etat: AttributionEtat.annule,
+          proposeeLe: DateTime(2026, 9, 5),
+        ),
+      ]);
+
+      expect(c.aRemplacer?.id, 'ancien');
     });
 
     test('un refus déjà couvert ne se répare pas deux fois', () {
