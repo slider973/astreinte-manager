@@ -4,6 +4,7 @@
 - **Priorité** : P0 — bloquant en production
 - **Dépend de** : 032
 - **Branche** : `feat/046-strategie-url-sans-diese`
+- **Statut** : en cours depuis 2026-09-21
 
 ## Contexte
 Découvert à la première connexion réelle sur le site déployé. L'application sert ses routes après
