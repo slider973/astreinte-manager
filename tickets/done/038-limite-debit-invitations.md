@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 006
 - **Branche** : `feat/038-limite-debit-invitations`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/39
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
