@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 019
 - **Branche** : `feat/044-archivage-plannings`
-- **Statut** : en cours depuis 2026-09-21
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
 Relevé au ticket 035. `docs/WORKFLOWS.md` section 7 annonce qu'un planning est archivé le premier
