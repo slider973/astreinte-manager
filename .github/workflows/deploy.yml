@@ -1,4 +1,4 @@
-# Mise en ligne de la PWA sur Vercel.
+# Mise en ligne d'Astreinte SP : la base, les fonctions, puis la PWA.
 #
 # **Ce workflow ne vérifie rien.** Il part de `workflow_run` : il ne démarre
 # qu'après une exécution *réussie* de « CI » sur `main` — analyse, tests, build
@@ -6,12 +6,49 @@
 # ce que `ci.yml` dit déjà doublerait le temps d'attente et, le jour où les deux
 # copies divergeraient, ferait passer en production ce que la CI refuse.
 #
-# La construction se fait **sur l'exécuteur**, pas chez Vercel : la
-# configuration de l'application (`SUPABASE_URL`, les cinq `FIREBASE_*`) est
-# lue par `String.fromEnvironment`, donc résolue à la **compilation**. Une
-# variable posée dans le tableau de bord Vercel n'atteindrait jamais le binaire.
-# C'est pourquoi les valeurs de production sont des *secrets GitHub* et non des
-# variables d'environnement Vercel — voir `docs/DEPLOIEMENT.md § 3`.
+# ## L'ordre, et pourquoi il est celui-là (ticket 049)
+#
+#   base → fonctions → configuration ─┐
+#                   ↘ PWA (Vercel) ───┴→ vérification d'écart
+#
+# Une Edge Function qui appelle une procédure que la base n'a pas encore ne rend
+# pas un message clair, elle rend une erreur de serveur ; et une PWA qui appelle
+# une fonction pas encore déployée rend un 404 que l'utilisateur lit « Impossible
+# de joindre le serveur ». L'ordre inverse casse la production quelques minutes à
+# chaque déploiement. La base d'abord, donc, puis les fonctions, puis la PWA.
+#
+# Jusqu'au 21 septembre 2026, ce fichier ne connaissait **que** la PWA. Onze Edge
+# Functions n'avaient jamais été déployées et cinq migrations manquaient, depuis
+# le premier jour, sans que rien ne le signale : le défaut s'est découvert quand
+# le propriétaire a voulu inviter son premier pompier.
+#
+# ## Le garde-fou de la base : exécution à blanc, pas approbation humaine
+#
+# Les deux étaient sur la table (ticket 049). L'approbation a perdu sur un point
+# précis : le critère d'acceptation du ticket demande qu'une PR fusionnée voie sa
+# migration appliquée **sans intervention manuelle**. Un environnement protégé
+# exigerait un clic à chaque fusion, y compris pour les neuf PR sur dix qui ne
+# touchent pas la base, et la file de tickets s'arrêterait à la première nuit.
+#
+# À la place : `supabase db push --dry-run`, qui nomme les migrations qu'il
+# appliquerait, **immédiatement avant** de les appliquer pour de bon, dans le même
+# travail et sur le même commit. Le résultat est écrit dans le résumé de
+# l'exécution : « ce qui est parti en production, et quand » se lit après coup,
+# sans ouvrir de journal.
+#
+# Ce choix reste réversible sans toucher à ce fichier : le travail « base »
+# déclare `environment: production`. Le jour où une migration demandera un regard
+# humain, il suffit d'ajouter un relecteur requis à cet environnement dans
+# Settings → Environments, et la mise en ligne attendra.
+#
+# ## La construction de la PWA
+#
+# Elle se fait **sur l'exécuteur**, pas chez Vercel : la configuration de
+# l'application (`SUPABASE_URL`, les cinq `FIREBASE_*`) est lue par
+# `String.fromEnvironment`, donc résolue à la **compilation**. Une variable posée
+# dans le tableau de bord Vercel n'atteindrait jamais le binaire. C'est pourquoi
+# les valeurs de production sont des *secrets GitHub* et non des variables
+# d'environnement Vercel — voir `docs/DEPLOIEMENT.md § 3`.
 #
 # Aucune de ces valeurs n'est obligatoire. Sans elles, l'application se déploie,
 # s'ouvre, et dit « Application non configurée » ou « notifications
@@ -29,7 +66,8 @@ on:
 
 # Une seule mise en ligne à la fois, et c'est la dernière qui gagne. Elle n'est
 # **pas** annulable en vol : couper `vercel deploy` au milieu laisserait un
-# déploiement à moitié téléversé.
+# déploiement à moitié téléversé, et couper `db push` au milieu laisserait la
+# base entre deux migrations.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -39,20 +77,27 @@ permissions:
 
 env:
   FLUTTER_VERSION: 3.38.10
+  # La même que la tâche « base-donnees » de la CI : ce qui a rejoué les
+  # migrations en intégration les applique en production.
+  SUPABASE_CLI_VERSION: 2.117.0
 
 jobs:
-  vercel:
-    name: Construire et mettre en ligne
+  # ---------------------------------------------------------------------------
+  # 1. La base. Tout le reste en dépend.
+  # ---------------------------------------------------------------------------
+  base:
+    name: Base — migrations et secrets Vault
     # Une CI rouge ne se déploie pas. `workflow_dispatch` n'a pas de
-    # `workflow_run`, d'où la seconde branche.
+    # `workflow_run`, d'où la seconde branche. Les travaux suivants héritent de
+    # cette condition par `needs` : un travail sauté saute ses dépendants.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment:
-      name: production
-      url: ${{ steps.mise_en_ligne.outputs.url }}
+    timeout-minutes: 15
+    # Déclaré exprès : c'est ici qu'un relecteur requis se branche si l'exécution
+    # à blanc ne suffit plus (voir l'en-tête).
+    environment: production
     steps:
       # Le commit exact que la CI a validé, jamais « la tête de main » : entre
       # les deux, `main` a pu avancer.
@@ -61,6 +106,224 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
+      - name: Installer le CLI Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      # Le jeton d'accès et la référence du projet sont des secrets : aucune des
+      # deux valeurs n'est dans le dépôt. Sans elles, mieux vaut s'arrêter en
+      # nommant ce qui manque que d'échouer trois étapes plus loin sur une erreur
+      # d'authentification.
+      - name: Vérifier les secrets Supabase
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          manquants=""
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || manquants="$manquants SUPABASE_ACCESS_TOKEN"
+          [ -n "$SUPABASE_PROJECT_REF" ]  || manquants="$manquants SUPABASE_PROJECT_REF"
+          if [ -n "$manquants" ]; then
+            echo "::error::Secrets absents :$manquants. Les poser dans Settings → Secrets and variables → Actions (voir docs/DEPLOIEMENT.md § 3). Sans eux, la base et les fonctions restent en retard sur le dépôt."
+            exit 1
+          fi
+
+      # **Le garde-fou.** Aucune écriture : `--dry-run` liste, `--skip-vault`
+      # empêche même la mise à jour des secrets déclarés dans config.toml. Ce que
+      # cette étape imprime est exactement ce que la suivante applique.
+      #
+      # Pas de mot de passe de base : `--project-ref` avec le jeton d'accès
+      # suffit, le CLI ouvre un rôle de connexion temporaire par l'API de gestion.
+      # Vérifié le 21 septembre 2026 contre le projet de production.
+      - name: Exécution à blanc — ce qui va être appliqué
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -o pipefail
+          supabase db push \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --include-all --dry-run --skip-vault \
+            --output-format text 2>&1 | tee /tmp/a-blanc.txt
+          {
+            echo "### Base — exécution à blanc"
+            echo ""
+            echo '```'
+            cat /tmp/a-blanc.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # `--include-all` : une migration antérieure à la dernière appliquée mais
+      # absente de l'historique distant est un trou, pas un passé. C'est ce trou
+      # qui avait avalé 0030 à 0034.
+      #
+      # Sans `--skip-vault` cette fois : `db push` pose d'abord les secrets Vault
+      # déclarés dans `[remotes.production.db.vault]`, dont l'adresse où la base
+      # joint `send-notification`. Posée à chaque mise en ligne, sans effet quand
+      # elle est déjà bonne.
+      - name: Appliquer les migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -o pipefail
+          supabase db push \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --include-all --yes \
+            --output-format text 2>&1 | tee /tmp/applique.txt
+          {
+            echo "### Base — appliqué"
+            echo ""
+            echo '```'
+            cat /tmp/applique.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # 2. Les Edge Functions. Après la base dont elles dépendent, avant la PWA qui
+  #    les appelle.
+  # ---------------------------------------------------------------------------
+  fonctions:
+    name: Edge Functions — mise en ligne
+    needs: base
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Installer le CLI Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      # **Les onze, à chaque fois.** Ne déployer que ce qui a changé demanderait
+      # de comparer des empreintes au projet distant ; se tromper là-dessus, c'est
+      # laisser une fonction en retard sur la base, et c'est précisément le défaut
+      # que ce ticket répare. Onze fonctions coûtent moins de deux minutes avec
+      # `--use-api` (empaquetage côté serveur, aucune image Docker à télécharger)
+      # et quatre déploiements de front.
+      #
+      # `verify_jwt` n'est pas passé en option : le CLI lit `supabase/config.toml`,
+      # seul endroit où le portier de chaque fonction est décidé — et raisonné.
+      #
+      # Pas de `--prune` : une fonction déployée que le dépôt ne connaît plus est
+      # signalée par la vérification d'écart, pas supprimée sans qu'on l'ait lu.
+      - name: Déployer les Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -o pipefail
+          supabase functions deploy \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            --use-api --jobs 4 2>&1 | tee /tmp/fonctions.txt
+          {
+            echo "### Edge Functions"
+            echo ""
+            echo '```'
+            cat /tmp/fonctions.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # 3. La configuration d'authentification.
+  #
+  #    Quatre réglages — gabarit de courriel, serveur d'envoi, plafond horaire,
+  #    adresses de redirection — n'étaient reproductibles nulle part. Résultat le
+  #    21 septembre 2026 : la production servait le gabarit anglais par défaut de
+  #    Supabase, qui envoie un lien là où l'application attend six chiffres.
+  #    Ouvrir le lien change de page, le jeton d'invitation ne vit qu'en mémoire,
+  #    et l'invitation ne peut plus être acceptée.
+  #
+  #    Ce travail ne bloque pas la PWA : une configuration d'authentification en
+  #    retard mérite d'être rouge, pas d'empêcher un correctif d'écran de partir.
+  # ---------------------------------------------------------------------------
+  configuration:
+    name: Authentification — configuration du projet
+    needs: fonctions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Installer le CLI Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      # Le mot de passe SMTP est la clé d'API Resend : elle ne peut pas vivre dans
+      # le dépôt. Sans elle, `config push` écrirait un mot de passe **vide** sur un
+      # serveur d'envoi déclaré actif, et plus aucun courriel ne partirait — donc
+      # plus personne ne se connecterait. On s'arrête avant, en le disant.
+      - name: Vérifier le secret du serveur d'envoi
+        env:
+          SUPABASE_AUTH_SMTP_PASSWORD: ${{ secrets.SUPABASE_AUTH_SMTP_PASSWORD }}
+        run: |
+          if [ -z "$SUPABASE_AUTH_SMTP_PASSWORD" ]; then
+            echo "::error::Secret SUPABASE_AUTH_SMTP_PASSWORD absent : c'est la clé d'API Resend (re_…). Sans elle, pousser la configuration couperait l'envoi des courriels de connexion. La poser dans Settings → Secrets and variables → Actions (docs/DEPLOIEMENT.md § 3)."
+            exit 1
+          fi
+
+      # `config diff` avant `config push`, et ce n'est pas de la prudence
+      # décorative : le CLI le demande lui-même pour un usage non interactif, où
+      # les confirmations par ressource sont répondues « oui » d'office. Le diff
+      # part dans le résumé ; on y lit ce que la poussée a changé.
+      - name: Comparer la configuration au projet
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_AUTH_SMTP_PASSWORD: ${{ secrets.SUPABASE_AUTH_SMTP_PASSWORD }}
+        run: |
+          set -o pipefail
+          supabase config diff --project-ref "$SUPABASE_PROJECT_REF" 2>&1 | tee /tmp/config-diff.txt
+          {
+            echo "### Configuration — écarts avant poussée"
+            echo ""
+            echo '```'
+            cat /tmp/config-diff.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # `config push` ne pousse que ce que `supabase/config.toml` déclare, et la
+      # section `[remotes.production]` y remplace les valeurs de la pile locale :
+      # sans elle, la production repartirait sur `http://127.0.0.1:3000` et plus
+      # aucun lien de connexion ne fonctionnerait.
+      - name: Pousser la configuration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_AUTH_SMTP_PASSWORD: ${{ secrets.SUPABASE_AUTH_SMTP_PASSWORD }}
+        run: supabase config push --project-ref "$SUPABASE_PROJECT_REF" --yes
+
+  # ---------------------------------------------------------------------------
+  # 4. La PWA, en dernier : elle appelle tout le reste.
+  # ---------------------------------------------------------------------------
+  vercel:
+    name: PWA — construire et mettre en ligne
+    needs: fonctions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ steps.mise_en_ligne.outputs.url }}
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      # Le jeton doit être un jeton **de compte** (réglages personnels Vercel),
+      # pas un jeton lié au projet : ce dernier fait répondre « User not found »
+      # à la ligne de commande, et la mise en ligne échoue ici, exprès et tout de
+      # suite (docs/DEPLOIEMENT.md § 2).
       - name: Vérifier les jetons de l'hébergeur
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -197,3 +460,19 @@ jobs:
             echo "::error::flutter_service_worker.js est mis en cache : les téléphones déjà installés ne verront plus aucune mise à jour."
             exit 1
           }
+
+  # ---------------------------------------------------------------------------
+  # 5. Le dernier mot : le dépôt et la production disent-ils la même chose ?
+  #
+  #    `!cancelled()` et non `success()` : c'est quand une étape précédente a
+  #    échoué que la question devient intéressante. Le compte rendu nomme ce qui
+  #    est resté en arrière plutôt que de se taire avec elle.
+  # ---------------------------------------------------------------------------
+  verification:
+    name: Vérification d'écart
+    needs: [base, fonctions, configuration, vercel]
+    if: ${{ !cancelled() && needs.base.result != 'skipped' }}
+    uses: ./.github/workflows/verifier-production.yml
+    with:
+      ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+    secrets: inherit
