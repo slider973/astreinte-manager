@@ -47,11 +47,13 @@ void main() {
         'trial_ends_at': '2026-11-20T00:00:00Z',
         'current_period_end': '2027-09-21T00:00:00Z',
         'has_customer': true,
+        'has_subscription': true,
       });
 
       expect(abonnement.statut, StatutAbonnement.actif);
       expect(abonnement.formule, FormuleAbonnement.annuelle);
       expect(abonnement.possedeClient, isTrue);
+      expect(abonnement.possedeAbonnement, isTrue);
       expect(abonnement.finPeriode, isNotNull);
     });
 
@@ -64,6 +66,7 @@ void main() {
       expect(abonnement.formule, isNull);
       expect(abonnement.dateCle, isNull);
       expect(abonnement.possedeClient, isFalse);
+      expect(abonnement.possedeAbonnement, isFalse);
     });
 
     test('compte les jours d\'essai restants, arrondis au jour supérieur', () {
@@ -113,6 +116,29 @@ void main() {
         finPeriode: DateTime(2026, 11, 20),
       );
       expect(abonnement.bascule, isNull);
+    });
+
+    test('abonnementVivant ne se laisse pas avoir par le statut seul', () {
+      // Même règle que `create-checkout/acces.ts`. Le serveur reste l'autorité :
+      // l'écran ne fait que retirer un bouton qu'il refuserait.
+      const sansRien = Abonnement.sansLigne;
+      const retard = Abonnement(
+        statut: StatutAbonnement.retardPaiement,
+        possedeAbonnement: true,
+      );
+      const suspendue = Abonnement(
+        statut: StatutAbonnement.suspendu,
+        possedeAbonnement: true,
+      );
+      const resiliee = Abonnement(
+        statut: StatutAbonnement.resilie,
+        possedeAbonnement: true,
+      );
+
+      expect(sansRien.abonnementVivant, isFalse);
+      expect(retard.abonnementVivant, isTrue);
+      expect(suspendue.abonnementVivant, isTrue);
+      expect(resiliee.abonnementVivant, isFalse);
     });
 
     test('la date qui compte dépend de l\'état', () {
@@ -176,7 +202,10 @@ void main() {
 
     test('une caserne abonnée ne voit plus les formules', () {
       const etat = EtatAbonnement(
-        abonnement: Abonnement(statut: StatutAbonnement.actif),
+        abonnement: Abonnement(
+          statut: StatutAbonnement.actif,
+          possedeAbonnement: true,
+        ),
         tarifs: TarifsAbonnement.parDefaut,
         configure: true,
         portailDisponible: true,
@@ -204,6 +233,7 @@ void main() {
           'plan': 'monthly',
           'current_period_end': '2026-11-20T00:00:00Z',
           'has_customer': true,
+          'has_subscription': true,
         },
       });
 
@@ -211,7 +241,10 @@ void main() {
       expect(etat.portailDisponible, isTrue);
       expect(etat.tarifs.mensuelCentimes, 1500);
       expect(etat.abonnement.statut, StatutAbonnement.retardPaiement);
-      expect(etat.peutSouscrire, isTrue);
+      expect(etat.abonnement.possedeAbonnement, isTrue);
+      // Elle a déjà un abonnement vivant : lui reproposer « S'abonner » la
+      // ferait prélever deux fois.
+      expect(etat.peutSouscrire, isFalse);
     });
 
     test('une caserne sans ligne d\'abonnement est lue comme en essai', () {

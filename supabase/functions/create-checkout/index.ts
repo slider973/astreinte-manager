@@ -33,7 +33,7 @@
 // qui n'est pas la sienne, et surtout ouvrirait son **portail**, où l'on peut
 // résilier.
 
-import { errorResponse, jsonResponse, preflight, readJsonBody } from "../_shared/http.ts";
+import { errorResponse, estUuid, jsonResponse, preflight, readJsonBody } from "../_shared/http.ts";
 import {
   appelStripe,
   configuration,
@@ -43,6 +43,13 @@ import {
   tarifs,
 } from "../_shared/stripe.ts";
 import { type AdminClient, adminClient, caller } from "../_shared/supabase.ts";
+import {
+  type AbonnementCaserne,
+  type Action,
+  actionValide,
+  autoriser,
+  portailOuvrable,
+} from "./acces.ts";
 
 /** Où Stripe renvoie le navigateur. Le chemin suit la stratégie de hash de
  * go_router, en vigueur dans l'application (même choix qu'`APP_INVITE_PATH`). */
@@ -55,19 +62,20 @@ function lienRetour(resultat: "ok" | "annule"): string {
   return `${base}${chemin}${separateur}paiement=${resultat}`;
 }
 
-/** Un uuid lisible dans le corps, ou `null`. Aucune validation de forme : la
- * base a des types et des clés étrangères, et elle les fait respecter mieux
- * qu'une expression régulière recopiée. */
+/** Un uuid lisible dans le corps, ou `null`.
+ *
+ * La forme est vérifiée ici — contrairement aux autres fonctions du projet, où
+ * l'identifiant part vers une RPC qui le type. Ici il part dans un `.eq()`
+ * PostgREST, et un uuid mal formé y devient une erreur de requête que la
+ * fonction traduisait en `500 internal_error` : un incident serveur annoncé pour
+ * une faute de frappe. Un refus honnête vaut mieux. */
 function identifiant(valeur: unknown): string | null {
   if (typeof valeur !== "string") return null;
   const propre = valeur.trim();
-  return propre === "" ? null : propre;
+  return estUuid(propre) ? propre : null;
 }
 
-type Abonnement = {
-  status: string;
-  stripe_customer_id: string | null;
-  stripe_subscription_id: string | null;
+type Abonnement = AbonnementCaserne & {
   plan: string | null;
   trial_ends_at: string | null;
   current_period_end: string | null;
@@ -101,11 +109,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const stationId = identifiant(body.station_id);
   if (stationId === null) {
-    return errorResponse(400, "invalid_body", "Le champ station_id est obligatoire.");
+    return errorResponse(
+      400,
+      "invalid_body",
+      "Le champ station_id est obligatoire et doit être un identifiant de caserne.",
+    );
   }
 
-  const action = body.action ?? "state";
-  if (action !== "state" && action !== "checkout" && action !== "portal") {
+  const action: Action | null = actionValide(body.action ?? "state");
+  if (action === null) {
     return errorResponse(400, "invalid_body", "Action inconnue.");
   }
 
@@ -122,15 +134,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (echecRole) {
     console.error("memberships", echecRole.message);
     return errorResponse(500, "internal_error", "Lecture des droits en échec.");
-  }
-  if (!appartenance) {
-    // Le même message que la caserne existe ou non : dire « caserne inconnue »
-    // à qui n'y a pas droit lui apprendrait qu'elle existe.
-    return errorResponse(
-      403,
-      "not_admin",
-      "Il faut être administrateur de cette caserne pour gérer son abonnement.",
-    );
   }
 
   const { data: ligne, error: echecLecture } = await admin
@@ -149,6 +152,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const abonnement = (ligne ?? null) as Abonnement | null;
   const config = configuration();
   const montants = tarifs();
+  const formule = formuleValide(body.plan);
+
+  // **Toute la décision de droits tient ici**, dans une fonction pure testée à
+  // chaque PR (`acces.ts`). Le reste du fichier ne fait que rassembler les faits
+  // et exécuter. Le message d'un refus ne dit jamais si la caserne existe : le
+  // dire à qui n'y a pas droit le lui apprendrait.
+  const verdict = autoriser({
+    action,
+    estAdminActif: appartenance !== null,
+    configure: config !== null,
+    abonnement,
+    formule,
+  });
+  if (!verdict.ok) {
+    return errorResponse(verdict.statut, verdict.code, verdict.message);
+  }
 
   // --- `state` : ce que l'écran affiche -----------------------------------
   // **Répond toujours**, configuration ou pas. C'est la règle du ticket 024
@@ -166,39 +185,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
       /** Vrai quand un portail de gestion est ouvrable : il faut un compte
        * configuré **et** un client déjà créé. */
-      portal_available: config !== null && (abonnement?.stripe_customer_id ?? null) !== null,
+      portal_available: portailOuvrable(abonnement, config !== null),
       subscription: abonnement === null ? null : {
         status: abonnement.status,
         plan: abonnement.plan,
         trial_ends_at: abonnement.trial_ends_at,
         current_period_end: abonnement.current_period_end,
         has_customer: abonnement.stripe_customer_id !== null,
+        /** **Ce que l'écran doit savoir pour ne pas proposer un second
+         * abonnement.** Le statut ne suffit pas : une caserne en retard de
+         * paiement n'est pas `active` et a pourtant déjà tout ce qu'il faut. */
+        has_subscription: abonnement.stripe_subscription_id !== null,
       },
     });
   }
 
-  if (config === null) {
-    // 503 et non 500 : rien n'est en panne, le service n'est pas encore ouvert.
-    return errorResponse(
-      503,
-      "stripe_not_configured",
-      "L'abonnement n'est pas encore ouvert sur ce projet.",
-    );
-  }
+  // `autoriser` a déjà garanti les deux : la configuration est complète pour
+  // `checkout` et `portal`, et la formule est valide pour `checkout`.
+  const stripe = config!;
 
   try {
     if (action === "portal") {
-      const client = abonnement?.stripe_customer_id ?? null;
-      if (client === null) {
-        return errorResponse(
-          409,
-          "no_customer",
-          "Cette caserne n'a pas encore d'abonnement à gérer.",
-        );
-      }
-
-      const session = await appelStripe("/billing_portal/sessions", config.cleSecrete, {
-        customer: client,
+      const session = await appelStripe("/billing_portal/sessions", stripe.cleSecrete, {
+        customer: abonnement!.stripe_customer_id,
         return_url: lienRetour("ok"),
       });
 
@@ -206,33 +215,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // --- `checkout` -------------------------------------------------------
-    const formule = formuleValide(body.plan);
-    if (formule === null) {
-      return errorResponse(
-        400,
-        "invalid_plan",
-        "Choisis la formule mensuelle ou annuelle.",
-      );
-    }
-
-    // Déjà abonnée : ouvrir une seconde session de paiement créerait un second
-    // abonnement et ferait payer deux fois la même caserne. Le changement de
-    // formule se fait dans le portail (`design/029 § 2`).
-    if (abonnement?.status === "active" && abonnement.stripe_subscription_id !== null) {
-      return errorResponse(
-        409,
-        "already_subscribed",
-        "Cette caserne est déjà abonnée. Passe par « Gérer mon abonnement ».",
-      );
-    }
-
     const client = abonnement?.stripe_customer_id ??
-      await creerClient(admin, config.cleSecrete, stationId, utilisateur.email);
+      await creerClient(admin, stripe.cleSecrete, stationId, utilisateur.email);
 
-    const session = await appelStripe("/checkout/sessions", config.cleSecrete, {
+    const session = await appelStripe("/checkout/sessions", stripe.cleSecrete, {
       mode: "subscription",
       customer: client,
-      line_items: [{ price: prix(config, formule), quantity: 1 }],
+      line_items: [{ price: prix(stripe, formule!), quantity: 1 }],
       // **La caserne voyage avec la session.** C'est ce champ que le webhook
       // relit dans `checkout.session.completed` : sans lui, le premier
       // événement d'une caserne ne saurait pas à qui il appartient.
@@ -252,7 +241,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse({
       ok: true,
       action,
-      plan: formule,
+      plan: formule!,
       session_id: session.id,
       url: session.url,
     });

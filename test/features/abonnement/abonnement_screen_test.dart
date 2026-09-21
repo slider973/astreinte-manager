@@ -132,6 +132,31 @@ void main() {
       );
     });
 
+    testWidgets(
+      'retard de paiement : **aucun bouton « S\'abonner »**, seulement le portail',
+      (tester) async {
+        // Le bloquant : une carte qui expire ne met pas la caserne en « actif ».
+        // Lui proposer « S'abonner » l'enverrait vers un **second** abonnement,
+        // prélevé en parallèle du premier, pendant que le premier continue ses
+        // relances. La carte se change dans le portail, et nulle part ailleurs.
+        await _ouvrir(tester, depot: FauxAbonnementRepository(etat: etatRetard));
+
+        expect(find.text(AppStrings.abonnementSouscrire), findsNothing);
+        expect(find.text(AppStrings.abonnementSectionFormules), findsNothing);
+        expect(find.text(AppStrings.abonnementGerer), findsOneWidget);
+      },
+    );
+
+    testWidgets('résilié : la souscription redevient possible', (tester) async {
+      // Un client qui revient : l'abonnement d'avant est mort chez le
+      // prestataire, rien ne se dédouble.
+      await _ouvrir(tester, depot: FauxAbonnementRepository(etat: etatResilie));
+
+      expect(find.text(AppStrings.abonnementEtatResilie), findsOneWidget);
+      expect(find.text(AppStrings.abonnementSouscrire), findsNWidgets(2));
+      expect(find.text(AppStrings.abonnementGerer), findsOneWidget);
+    });
+
     testWidgets('suspendue : « rien n\'a été supprimé » est écrit', (
       tester,
     ) async {

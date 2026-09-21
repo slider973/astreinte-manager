@@ -37,26 +37,32 @@ final EtatAbonnement etatActif = EtatAbonnement(
     finEssai: finEssaiSeed,
     finPeriode: DateTime(2026, 12, 20),
     possedeClient: true,
+    possedeAbonnement: true,
   ),
   tarifs: TarifsAbonnement.parDefaut,
   configure: true,
   portailDisponible: true,
 );
 
-/// Un paiement en retard : le seul état rouge de l'écran.
+/// Un paiement en retard : le seul état rouge de l'écran, et **le cas où une
+/// seconde souscription ferait payer deux fois**. La carte a expiré ; elle se
+/// change dans le portail.
 final EtatAbonnement etatRetard = EtatAbonnement(
   abonnement: Abonnement(
     statut: StatutAbonnement.retardPaiement,
     formule: FormuleAbonnement.mensuelle,
     finPeriode: DateTime(2026, 11, 20),
     possedeClient: true,
+    possedeAbonnement: true,
   ),
   tarifs: TarifsAbonnement.parDefaut,
   configure: true,
   portailDisponible: true,
 );
 
-/// Une caserne suspendue : gris, jamais rouge, et rien de supprimé.
+/// Une caserne suspendue : gris, jamais rouge, et rien de supprimé. Elle a été
+/// suspendue pour essai expiré — elle n'a donc **jamais** souscrit, et peut
+/// encore le faire.
 final EtatAbonnement etatSuspendu = EtatAbonnement(
   abonnement: Abonnement(
     statut: StatutAbonnement.suspendu,
@@ -77,6 +83,21 @@ final EtatAbonnement etatEssaiExpire = EtatAbonnement(
   tarifs: TarifsAbonnement.parDefaut,
   configure: true,
   portailDisponible: false,
+);
+
+/// Une caserne qui a résilié : son abonnement est mort chez le prestataire, et
+/// elle peut donc en reprendre un — rien ne se dédouble.
+final EtatAbonnement etatResilie = EtatAbonnement(
+  abonnement: Abonnement(
+    statut: StatutAbonnement.resilie,
+    formule: FormuleAbonnement.mensuelle,
+    finPeriode: DateTime(2026, 8, 20),
+    possedeClient: true,
+    possedeAbonnement: true,
+  ),
+  tarifs: TarifsAbonnement.parDefaut,
+  configure: true,
+  portailDisponible: true,
 );
 
 /// Un [AbonnementRepository] sans réseau : il rend ce qu'on lui a donné et

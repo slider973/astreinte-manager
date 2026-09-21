@@ -114,6 +114,7 @@ class Abonnement {
     this.finEssai,
     this.finPeriode,
     this.possedeClient = false,
+    this.possedeAbonnement = false,
   });
 
   /// L'état d'une caserne dont la ligne d'abonnement n'existe pas encore.
@@ -131,6 +132,9 @@ class Abonnement {
     possedeClient:
         (json['has_customer'] as bool?) ??
         (json['stripe_customer_id'] as String?) != null,
+    possedeAbonnement:
+        (json['has_subscription'] as bool?) ??
+        (json['stripe_subscription_id'] as String?) != null,
   );
 
   static DateTime? _instant(Object? valeur) =>
@@ -150,6 +154,26 @@ class Abonnement {
   /// Vrai quand un client existe chez le prestataire : le portail de gestion a
   /// alors une destination.
   final bool possedeClient;
+
+  /// Vrai quand un **abonnement** existe chez le prestataire.
+  ///
+  /// Distinct de [possedeClient] : `create-checkout` crée le client avant même
+  /// d'ouvrir la session de paiement, donc une caserne peut avoir un client
+  /// sans avoir jamais rien souscrit.
+  final bool possedeAbonnement;
+
+  /// Vrai quand la caserne a un abonnement qui **vit encore** chez le
+  /// prestataire, et qu'en souscrire un second la ferait payer deux fois.
+  ///
+  /// Le statut ne suffit pas, et c'est tout le piège : une caserne dont la
+  /// carte a expiré n'est pas `active`, et elle a pourtant déjà tout ce qu'il
+  /// faut. Une carte se change dans le portail ; ré-souscrire ne répare rien.
+  /// Une résiliation, elle, se reprend — rien ne se dédouble.
+  ///
+  /// Même règle que `create-checkout/acces.ts`, et le serveur reste l'autorité :
+  /// cette propriété ne fait que retirer de l'écran un bouton qu'il refuserait.
+  bool get abonnementVivant =>
+      possedeAbonnement && statut != StatutAbonnement.resilie;
 
   /// La date qui compte pour cet état : fin d'essai en essai, fin de période
   /// sinon. `null` quand elle manque — l'écran fait alors disparaître la ligne
@@ -191,11 +215,18 @@ class Abonnement {
       other.formule == formule &&
       other.finEssai == finEssai &&
       other.finPeriode == finPeriode &&
-      other.possedeClient == possedeClient;
+      other.possedeClient == possedeClient &&
+      other.possedeAbonnement == possedeAbonnement;
 
   @override
-  int get hashCode =>
-      Object.hash(statut, formule, finEssai, finPeriode, possedeClient);
+  int get hashCode => Object.hash(
+    statut,
+    formule,
+    finEssai,
+    finPeriode,
+    possedeClient,
+    possedeAbonnement,
+  );
 }
 
 /// Ce que l'Edge Function `create-checkout` rend à l'action `state` : l'état de
@@ -245,21 +276,22 @@ class EtatAbonnement {
   /// Vrai quand « Gérer mon abonnement » a une destination.
   final bool portailDisponible;
 
-  /// Vrai quand souscrire est possible : configuré, et pas déjà abonné.
-  bool get peutSouscrire =>
-      configure && abonnement.statut != StatutAbonnement.actif;
+  /// Vrai quand souscrire est possible : configuré, et sans abonnement vivant.
+  bool get peutSouscrire => configure && !abonnement.abonnementVivant;
 
-  /// Le bloc des formules disparaît une fois la caserne abonnée : il n'y a plus
-  /// rien à souscrire, et le changement de formule se fait dans le portail
+  /// Le bloc des formules disparaît dès qu'un abonnement vit : il n'y a plus
+  /// rien à souscrire, et la carte comme la formule se changent dans le portail
   /// (`design/029 § 2`).
-  bool get montreFormules => abonnement.statut != StatutAbonnement.actif;
+  ///
+  /// **Le critère est l'abonnement, pas le statut.** Une caserne en retard de
+  /// paiement n'est pas `active` ; lui montrer « S'abonner » l'enverrait vers
+  /// un second prélèvement au lieu de la page où elle met sa carte à jour.
+  bool get montreFormules => !abonnement.abonnementVivant;
 
   /// La raison affichée à côté d'un bouton inerte. `DESIGN.md § Buttons` : un
   /// bouton grisé sans explication est un défaut.
   String? get raisonSouscriptionImpossible {
-    if (abonnement.statut == StatutAbonnement.actif) {
-      return AppStrings.abonnementDejaAbonne;
-    }
+    if (abonnement.abonnementVivant) return AppStrings.abonnementDejaAbonne;
     return configure ? null : AppStrings.abonnementBientotDisponible;
   }
 }

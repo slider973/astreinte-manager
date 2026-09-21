@@ -2642,8 +2642,11 @@ abstract final class AppStrings {
 
   static const String abonnementBientotDisponible = 'Bientôt disponible.';
 
+  /// Nomme la sortie, et la bonne : une carte qui a expiré se change dans le
+  /// portail. Ré-souscrire ferait payer deux fois la même caserne.
   static const String abonnementDejaAbonne =
-      'Cette caserne est déjà abonnée. Passe par « Gérer mon abonnement ».';
+      'Cette caserne a déjà un abonnement. Passe par « Gérer mon abonnement » '
+      'pour changer de carte ou de formule.';
 
   static const String abonnementSansClient =
       'Cette caserne n\'a pas encore d\'abonnement à gérer.';
