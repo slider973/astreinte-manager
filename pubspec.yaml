@@ -58,3 +58,28 @@ flutter:
           weight: 600
         - asset: assets/fonts/AtkinsonHyperlegibleMono-Bold.ttf
           weight: 700
+
+    # --- Le repli de dernier recours du moteur (ticket 037) ---------------
+    #
+    # CanvasKit exige une police de dernier recours, sans quoi il plante en
+    # mettant en page du texte dont la famille n'est pas enregistrée. Il l'a
+    # choisie pour nous : Roboto. Et **tant qu'aucune famille de ce nom n'est
+    # déclarée ici**, il la télécharge sans condition depuis
+    # `fonts.gstatic.com` à chaque démarrage — 63 Ko chez un tiers, mesurés au
+    # ticket 032, pour une police qu'on n'affiche jamais.
+    #
+    # Le moteur ne compare que le nom (`loadAssetFonts`, engine/canvaskit/
+    # fonts.dart) : une famille `Roboto` dans le manifeste suffit à supprimer
+    # le téléchargement. Elle pointe sur un sous-ensemble minuscule de
+    # l'Atkinson régulière — si ce dernier recours doit servir un jour, autant
+    # qu'il ressemble au produit plutôt qu'à une police d'Android.
+    #
+    # Pourquoi un sixième fichier plutôt qu'un renvoi vers la régulière déjà
+    # embarquée : le moteur télécharge **une fois par famille**, pas une fois
+    # par fichier. Deux familles sur la même adresse font deux requêtes
+    # simultanées, donc 18 Ko de plus (mesuré). Le sous-ensemble, lui, en pèse
+    # 6 — et aucun écran ne l'affiche jamais. Voir `assets/fonts/README.md`.
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/AtkinsonHyperlegibleNext-Repli.ttf
+          weight: 400
