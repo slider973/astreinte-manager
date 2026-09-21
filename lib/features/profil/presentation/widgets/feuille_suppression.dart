@@ -41,6 +41,8 @@ class _Corps extends ConsumerWidget {
     final theme = Theme.of(context);
     final etat = ref.watch(suppressionCompteControllerProvider);
 
+    // La feuille ne ferme **que** la feuille : la session est fermée par
+    // l'appelant, une fois cette route retirée de la pile (`BlocCompte`).
     Future<void> supprimer() async {
       final ok = await ref
           .read(suppressionCompteControllerProvider.notifier)

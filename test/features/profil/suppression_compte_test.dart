@@ -10,6 +10,7 @@ import 'package:astreinte_sp/features/auth/presentation/connexion_screen.dart';
 import 'package:astreinte_sp/features/dispos/data/file_locale.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/profil/domain/profil.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -161,6 +162,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(decor.profils.suppressions, 1);
+
+      // **La feuille est refermée avant que la session tombe.** Une route
+      // impérative laissée au sommet pendant que `go_router` remplace ses
+      // pages laisse un écran blanc jusqu'au rechargement — vu dans Chrome,
+      // PWA, après une vraie suppression (`design/007-profil.md § 8`).
+      expect(find.text(AppStrings.suppressionTitre), findsNothing);
+      expect(find.byType(BottomSheet), findsNothing);
 
       // La session est fermée et le routeur a suivi : l'appareil ne reste pas
       // ouvert sur un compte qui n'existe plus.

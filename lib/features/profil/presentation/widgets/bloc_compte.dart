@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +8,7 @@ import '../../../../core/session/deconnexion.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_divider.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../domain/suppression_providers.dart';
 import 'bloc_regle.dart';
 import 'feuille_suppression.dart';
 
@@ -21,6 +24,21 @@ import 'feuille_suppression.dart';
 class BlocCompte extends ConsumerWidget {
   const BlocCompte({super.key});
 
+  /// **La feuille se referme avant que la session tombe.**
+  ///
+  /// `showModalBottomSheet` pousse une route que `go_router` ne connaît pas :
+  /// fermer la session pendant qu'elle est ouverte remplace toutes les pages du
+  /// routeur en laissant la feuille seule au sommet de la pile, et l'écran reste
+  /// **blanc** jusqu'au rechargement. Vu dans Chrome, PWA, après une vraie
+  /// suppression (`design/007-profil.md § 8`).
+  Future<void> _supprimer(BuildContext context, WidgetRef ref) async {
+    final supprime = await demanderSuppressionCompte(context);
+    if (!supprime) return;
+    await ref
+        .read(suppressionCompteControllerProvider.notifier)
+        .fermerSession();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return BlocRegle(
@@ -34,7 +52,7 @@ class BlocCompte extends ConsumerWidget {
           libelle: AppStrings.profilSupprimerCompte,
           variante: PrimaryButtonVariante.danger,
           icone: Icons.delete_outline,
-          onPressed: () => demanderSuppressionCompte(context),
+          onPressed: () => unawaited(_supprimer(context, ref)),
         ),
       ],
     );

@@ -186,6 +186,14 @@ planning, et personne ne s'en aperçoit avant le mois suivant.
    une donnée de personne mais une donnée d'appareil : son rôle est justement de survivre à un
    changement d'utilisateur pour ne pas laisser de ligne morte dans `push_tokens`. Les lignes
    `push_tokens`, elles, sont supprimées côté serveur.
-4. **Le profil n'a pas de route à lui.** Il reste l'onglet 3 de la coquille d'accueil, comme les
+4. **Une route impérative fermée après la session laisse un écran blanc.** La feuille de
+   suppression est poussée par `showModalBottomSheet` ; `go_router` ne la connaît pas. Fermer la
+   session pendant qu'elle est ouverte remplace toutes les pages du routeur et laisse la feuille
+   **seule** au sommet de la pile : l'écran devient blanc et le reste jusqu'au rechargement.
+   Constaté dans Chrome, PWA, après une vraie suppression — le compte était bien anonymisé en base,
+   mais la personne restait devant un écran vide. Le geste est donc coupé en deux :
+   `SuppressionCompteController.supprimer` fait le serveur et le ménage local, la feuille se
+   referme, **puis** `fermerSession` laisse le routeur faire son travail.
+5. **Le profil n'a pas de route à lui.** Il reste l'onglet 3 de la coquille d'accueil, comme les
    autres destinations de premier niveau, en attendant que `DESIGN.md § Navigation` soit honoré
    par un éclatement en routes (`/mois`, `/profil`, …). Même écart que les tickets 011 et 027.
