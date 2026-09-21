@@ -3,17 +3,18 @@
 Deno / TypeScript, une fonction par dossier, la liste de référence est la section 7 de
 [`docs/SCHEMA.md`](../../docs/SCHEMA.md). Le code partagé est dans `_shared/`.
 
-| Fonction            | Ticket | Rôle                                                                                                                                                  |
-| ------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation |
-| `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                   |
-| `publish-schedule`  | 019    | Publie un planning : statut, `proposed_at` de chaque attribution, puis **une** notification par membre                                                |
-| `reassign-shift`    | 020    | Réattribue un créneau d'un planning publié : nouvelle attribution proposée, ancienne remplacée, **une** notification au nouveau membre                |
-| `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                  |
-| `create-checkout`   | 029    | État de l'abonnement d'une caserne, ouverture d'une session de paiement, ouverture du portail de gestion — réservé aux administrateurs de la caserne  |
-| `stripe-webhook`    | 029    | Reçoit les événements du prestataire de paiement, **vérifie leur signature**, met à jour `subscriptions`                                              |
-| `delete-account`    | 007    | Le membre supprime son compte : profil anonymisé en « Membre supprimé », appartenances désactivées, attributions passées conservées                   |
-| `export-user-data`  | 034    | Le membre récupère en JSON tout ce que l'application sait de lui, et rien de ce qu'elle sait des autres                                               |
+| Fonction            | Ticket | Rôle                                                                                                                                                                      |
+| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation                     |
+| `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                                       |
+| `publish-schedule`  | 019    | Publie un planning : statut, `proposed_at` de chaque attribution, puis **une** notification par membre                                                                    |
+| `reassign-shift`    | 020    | Réattribue un créneau d'un planning publié : nouvelle attribution proposée, ancienne remplacée, **une** notification au nouveau membre                                    |
+| `auto-propose`      | 018    | Applique un remplissage automatique du brouillon : le plan vient de l'application (tri du ticket 017), la base revérifie chaque ligne et écarte celles qui ne passent pas |
+| `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                                      |
+| `create-checkout`   | 029    | État de l'abonnement d'une caserne, ouverture d'une session de paiement, ouverture du portail de gestion — réservé aux administrateurs de la caserne                      |
+| `stripe-webhook`    | 029    | Reçoit les événements du prestataire de paiement, **vérifie leur signature**, met à jour `subscriptions`                                                                  |
+| `delete-account`    | 007    | Le membre supprime son compte : profil anonymisé en « Membre supprimé », appartenances désactivées, attributions passées conservées                                       |
+| `export-user-data`  | 034    | Le membre récupère en JSON tout ce que l'application sait de lui, et rien de ce qu'elle sait des autres                                                                   |
 
 ## Règles qui ne se négocient pas
 
