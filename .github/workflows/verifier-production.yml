@@ -1,0 +1,93 @@
+# « Est-ce que la production est à jour ? »
+#
+# Le 21 septembre 2026, la réponse était non depuis le premier jour, et personne
+# ne pouvait le savoir : onze Edge Functions jamais déployées, cinq migrations en
+# retard, le répartiteur de notifications qui visait une adresse Docker, et une
+# configuration d'authentification restée aux valeurs par défaut de Supabase. Tout
+# cela se découvrait à l'usage, par un 404 ou un pompier resté à la porte.
+#
+# Ce workflow pose la question et **échoue bruyamment** quand la réponse est non.
+# Il ne corrige rien, il ne déploie rien : quatre lectures et un compte rendu.
+#
+# Deux façons de l'appeler :
+#   - à la demande, onglet Actions → « Vérification de la production » → Run
+#     workflow, quand on veut simplement savoir ;
+#   - appelé par « Déploiement » après chaque mise en ligne, où il a le dernier
+#     mot (`.github/workflows/deploy.yml`).
+#
+# Le détail des quatre vérifications est dans `scripts/verifier_production.sh`,
+# qui tourne aussi depuis un poste — docs/DEPLOIEMENT.md § 8.
+name: Vérification de la production
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Le commit à comparer à la production.
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  # La même valeur que `.github/workflows/deploy.yml`, et pour la même raison :
+  # ce qui a rejoué les migrations en intégration doit être ce qui les compare à
+  # la production. Deux versions figées à deux endroits finissent par diverger,
+  # et c'est alors le comparateur qui ment.
+  SUPABASE_CLI_VERSION: 2.117.0
+
+jobs:
+  ecart:
+    name: Le dépôt contre la production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Appelé par « Déploiement », c'est le commit qui vient d'être mis en
+      # ligne ; lancé à la main, la tête de la branche.
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Installer le CLI Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      - name: Vérifier les secrets Supabase
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          manquants=""
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || manquants="$manquants SUPABASE_ACCESS_TOKEN"
+          [ -n "$SUPABASE_PROJECT_REF" ]  || manquants="$manquants SUPABASE_PROJECT_REF"
+          if [ -n "$manquants" ]; then
+            echo "::error::Secrets absents :$manquants. Sans eux, impossible de dire si la production est à jour (docs/DEPLOIEMENT.md § 3)."
+            exit 1
+          fi
+
+      # Le compte rendu part dans le résumé de l'exécution : la réponse se lit
+      # sans ouvrir un journal, et elle reste lisible des semaines après.
+      - name: Comparer le dépôt et la production
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -o pipefail
+          code=0
+          scripts/verifier_production.sh 2>&1 | tee /tmp/ecart.txt || code=$?
+          {
+            echo "### Production — dépôt contre projet hébergé"
+            echo ""
+            echo '```'
+            # Le script colore son compte rendu pour un terminal ; le résumé,
+            # lui, rendrait les séquences telles quelles.
+            sed $'s/\x1b\\[[0-9;]*m//g' /tmp/ecart.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code

@@ -430,6 +430,21 @@ verify_jwt = true
 enabled = true
 verify_jwt = true
 
+# Edge Function du ticket 020. Réattribution d'un créneau publié, appelée par
+# l'administrateur connecté : `verify_jwt = true`, et le rôle est revérifié en base.
+# Déclarée explicitement depuis le ticket 049 : c'était déjà la valeur par défaut,
+# mais la mise en ligne et la vérification d'écart lisent ce fichier, et un défaut
+# implicite ne se vérifie pas.
+[functions.reassign-shift]
+enabled = true
+verify_jwt = true
+
+# Edge Function du ticket 018. Même cas que `reassign-shift` : l'administrateur
+# connecté propose un remplissage, la base revérifie chaque ligne (migration 0028).
+[functions.auto-propose]
+enabled = true
+verify_jwt = true
+
 # Edge Function du ticket 025. `verify_jwt = false`, et c'est raisonné : cette
 # fonction n'est jamais appelée par un client, mais par pg_net (migration 0014) et
 # par d'autres Edge Functions. pg_net ne porte aucun JWT, et lui en donner un
@@ -520,3 +535,134 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# ---------------------------------------------------------------------------
+# Le projet hébergé — ticket 049
+# ---------------------------------------------------------------------------
+#
+# Tout ce qui précède décrit la **pile locale**. `supabase config push` pousse
+# vers le projet hébergé ce que ce fichier déclare, et laisse intact ce qu'il ne
+# déclare pas. Poussé tel quel, il ramènerait donc la production sur
+# `http://127.0.0.1:3000` : plus aucun lien de connexion ne fonctionnerait.
+#
+# D'où ce bloc. Un `[remotes.<nom>]` dont le `project_id` correspond à la cible
+# **remplace** les valeurs du bloc de base, et seulement celles-là. Vérifié le
+# 21 septembre 2026 : `supabase config diff --project-ref …` annonce
+# « using [remotes.production] » et tombe de dix-huit écarts à deux.
+#
+# **Pourquoi la référence du projet est écrite ici**, alors que le ticket 049 la
+# voulait en secret GitHub seulement : le CLI sélectionne le remote en comparant
+# `project_id` à la cible, **avant** toute substitution `env(…)`. Essayé, mesuré :
+# `project_id = "env(SUPABASE_PROJECT_REF)"` laisse le CLI sur le bloc de base,
+# c'est-à-dire sur la configuration locale, c'est-à-dire sur la panne qu'on répare.
+# La référence n'est pas un secret — c'est le sous-domaine public de l'API, présent
+# dans chaque requête de la PWA. Le jeton d'accès, lui, reste un secret GitHub et
+# n'apparaît nulle part ici. `SUPABASE_PROJECT_REF` reste le secret utilisé par le
+# workflow pour viser le projet ; ce `project_id` ne fait que désigner *quel* bloc
+# s'applique quand c'est cette cible.
+[remotes.production]
+project_id = "axvflcgwsmrjrnjheoly"
+
+# Les quatre réglages qui manquaient le 21 septembre 2026 et qui ont laissé un
+# pompier à la porte : adresses de redirection, serveur d'envoi, plafond, gabarit.
+# Le gabarit et son sujet sont déclarés dans le bloc de base
+# (`[auth.email.template.magic_link]`) et suivent d'eux-mêmes.
+[remotes.production.auth]
+# L'origine servie par Vercel. Sans elle, le lien du courriel renvoie sur
+# `localhost` et le code à six chiffres arrive dans un gabarit anglais.
+site_url = "https://astreinte.staticflow.ch"
+# Le domaine propre **et** l'adresse Vercel, chacun avec son joker de chemin :
+# le lien d'invitation ramène sur `/invite/<jeton>`, pas sur la racine (ticket 046).
+additional_redirect_urls = [
+  "https://astreinte.staticflow.ch",
+  "https://astreinte.staticflow.ch/**",
+  "https://astreinte-manager.vercel.app",
+  "https://astreinte-manager.vercel.app/**",
+]
+
+# Le plafond du plan gratuit — deux courriels par heure — suffit à bloquer une
+# soirée d'invitations. 60, comme le tableau de bord le porte depuis le
+# 21 septembre 2026. Déclarer cette section suffit à la faire gérer par
+# `config push` : sans elle, le CLI la range dans « non comparé ».
+[remotes.production.auth.rate_limit]
+email_sent = 60
+
+# Une seconde entre deux envois est bon pour Mailpit, pas pour de vraies boîtes.
+[remotes.production.auth.email]
+max_frequency = "60s"
+# **Confirmation d'adresse : la production reste comme elle est.** Le bloc de
+# base la met à faux parce que Mailpit avale tout et qu'un aller-retour de plus
+# ralentit chaque test ; cette valeur vient du gabarit `supabase init`, pas d'une
+# décision. La pousser à faux ouvrirait l'inscription directe à n'importe quelle
+# adresse non vérifiée — le formulaire de connexion crée le compte au premier
+# code demandé. Sur l'invitation, elle n'a aucun effet : `invite-member` crée le
+# compte par l'API d'administration avec `email_confirm: true`, l'adresse est
+# donc déjà confirmée quand le pompier reçoit son courriel. Vrai, donc : ce que
+# la production porte déjà, et ce qu'elle doit porter.
+enable_confirmations = true
+
+# **Le serveur d'envoi.** Resté celui de Supabase, il interdit tout gabarit
+# personnalisé : c'est la cause directe du courriel anglais. Le mot de passe est
+# la clé d'API Resend ; elle ne peut pas vivre dans le dépôt, elle vient du secret
+# GitHub `SUPABASE_AUTH_SMTP_PASSWORD`. Le workflow **refuse de pousser** la
+# configuration tant que ce secret est absent, plutôt que d'écrire un mot de passe
+# vide et de couper tous les courriels (docs/DEPLOIEMENT.md § 3).
+[remotes.production.auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(SUPABASE_AUTH_SMTP_PASSWORD)"
+admin_email = "invitations@staticflow.ch"
+sender_name = "Astreinte SP"
+
+# **`auth.sms.twilio.enabled` n'est pas déclarée ici, et c'est délibéré.**
+# `config diff` la rend en écart — dépôt `false`, production `true` — sans qu'une
+# décision produit soit derrière : le bloc de base porte la valeur du gabarit
+# `supabase init`, et le `true` d'en face n'est pas un branchement. L'API hébergée
+# rend toujours un `sms_provider`, le sien vaut « twilio » par défaut ;
+# `external_phone_enabled` est à faux, aucun compte Twilio n'est renseigné, aucun
+# SMS ne part et aucun ne partira — le MVP n'authentifie que par courriel.
+#
+# Les deux valeurs ne se rejoindront jamais, et les deux façons de les rapprocher
+# échouent :
+#   - écrire `[remotes.production.auth.sms.twilio] enabled = true` est refusé par
+#     le CLI, qui exige alors `account_sid` et `message_service_sid` — mesuré le
+#     21 septembre 2026 : « Missing required field in config:
+#     auth.sms.twilio.account_sid ». Les inventer écrirait un faux en production ;
+#   - la pousser à `false` ne tient pas : l'API renormalise et la redonne `true`
+#     au passage suivant, donc elle clignoterait à chaque déploiement.
+# Elle est donc **non poussée et non comparée** : `scripts/verifier_production.sh`
+# la range dans les propriétés qui ne peuvent pas converger, en le disant.
+# Le jour où une caserne voudra de vrais SMS, ce sont les identifiants Twilio qui
+# manqueront, pas cette ligne.
+
+# Les trois blocs qui suivent ne changent rien : ils **empêchent** `config push`
+# de ramener la production sur des valeurs de développement. Sans eux, la mise en
+# ligne réduirait le pool de connexions, désactiverait des services du plan
+# hébergé, et personne ne ferait le lien entre le déploiement et la lenteur.
+[remotes.production.auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[remotes.production.db.pooler]
+default_pool_size = 15
+max_client_conn = 200
+
+[remotes.production.storage.analytics]
+enabled = true
+max_namespaces = 10
+
+# **L'adresse du répartiteur de notifications.** Créée par la migration 0014 avec
+# l'adresse Docker de la pile locale, jamais remplacée en production : pendant des
+# semaines, `cron_dispatch_notifications` a poussé toutes les minutes vers un hôte
+# inexistant, la file s'est remplie, et rien ne l'a dit.
+#
+# `supabase db push` met à jour les secrets Vault déclarés ici **avant** de jouer
+# les migrations. La mise en ligne la pose donc à chaque passage, sans effet quand
+# elle est déjà bonne, et `scripts/verifier_production.sh` la contrôle ensuite.
+# Ce n'est pas un secret : c'est l'adresse publique de la fonction. Le secret qui
+# l'accompagne (`notify_internal_secret`) est engendré au hasard par la migration et
+# n'est recopié nulle part — voir supabase/functions/README.md.
+[remotes.production.db.vault]
+notify_function_url = "https://axvflcgwsmrjrnjheoly.supabase.co/functions/v1/send-notification"
