@@ -35,7 +35,9 @@ create type notification_type as enum (
   'assignment_cancelled',
   'schedule_validated',
   'schedule_all_accepted',
-  'late_responders'
+  'late_responders',
+  'subscription_trial_ending',
+  'subscription_suspended'
 );
 create type subscription_status as enum ('trialing', 'active', 'past_due', 'suspended', 'cancelled');
 ```
@@ -553,7 +555,34 @@ language sql stable security definer set search_path = public, pg_temp as $$
     true
   );
 $$;
+
+-- Ce qu'un membre — pas seulement un admin — a le droit de savoir de
+-- l'abonnement de sa caserne (migration `0024`, ticket 030).
+create function station_access(p_station uuid) returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $$
+  select case
+    when not is_member(p_station) then null
+    else jsonb_build_object(
+           'station_id', p_station,
+           'writable',   station_writable(p_station))
+         || coalesce(
+              (select jsonb_build_object(
+                        'status',        s.status,
+                        'trial_ends_at', s.trial_ends_at,
+                        'suspended_at',  s.suspended_at)
+                 from subscriptions s
+                where s.station_id = p_station),
+              '{"status": null, "trial_ends_at": null, "suspended_at": null}'::jsonb)
+  end;
+$$;
 ```
+
+`subscriptions` reste réservée aux administrateurs (`subscriptions_select_admin`) : un simple
+membre ne pouvait donc pas savoir **pourquoi** sa grille refusait ses cases. `station_access`
+lève ce mystère sans ouvrir la table — quatre faits, et rien du prestataire de paiement. Son
+`writable` est calculé par `station_writable()` elle-même : une seule définition du droit
+d'écrire, que l'interface ne peut pas contredire. Ouverte à `authenticated`, elle rend `NULL`
+à qui n'est pas membre actif.
 
 ### Fonctions des paramètres de caserne (migration `0011`, ticket 010)
 
@@ -1237,7 +1266,8 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `availability_reminders` | tous les jours 09:00 | `select public.cron_availability_reminders();` — push J-3 et email J-1 aux membres actifs sans aucune ligne `availabilities` sur le mois d'une période ouverte *(migration `0016`)* |
 | `assignment_reminders` | toutes les heures (:15) | `select public.cron_assignment_reminders();` — rappel push à `response_reminder_hours`, courriel à `response_email_hours`, aux membres actifs dont l'attribution est restée sans réponse *(migration `0021`)* |
 | `late_responders_report` | toutes les heures (:45) | `select public.cron_late_responders_report();` — notifie les admins des attributions en attente depuis plus de `late_report_hours`, une fois par jour et par planning, entre 08:00 et 20:59 heure de la caserne *(migration `0021`)* |
-| `suspend_subscriptions` | tous les jours 03:30 | `select public.cron_suspend_subscriptions();` — passe en `suspended` les essais expirés sans abonnement et les `past_due` dont la dernière période payée remonte à plus de 14 jours. **Rien n'est supprimé** : la caserne passe en lecture seule via `station_writable()` *(migration `0023`)* |
+| `suspend_subscriptions` | tous les jours 03:30 | `select public.cron_suspend_subscriptions();` — passe en `suspended` les essais expirés sans abonnement et les `past_due` dont la dernière période payée remonte à plus de 14 jours. **Rien n'est supprimé** : la caserne passe en lecture seule via `station_writable()`, et les administrateurs sont prévenus par courriel *(migrations `0023` et `0024`)* |
+| `subscription_reminders` | tous les jours 03:20 | `select public.cron_subscription_reminders();` — courriel + notification interne aux administrateurs quand l'essai se termine dans sept jours et qu'aucun abonnement n'a été souscrit *(migration `0024`)* |
 | `archive_schedules` | 1er du mois | Archive les plannings des mois passés |
 | `prune_notifications` | hebdomadaire | Supprime les notifications lues de plus de 90 jours |
 

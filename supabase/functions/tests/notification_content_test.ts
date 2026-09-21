@@ -317,7 +317,7 @@ Deno.test("sans nom de caserne, le texte reste lisible", () => {
 // Liens profonds — la forme exacte du ticket 024
 // ---------------------------------------------------------------------------
 
-Deno.test("chaque type porte une des quatre destinations de docs/WORKFLOWS.md § 8", () => {
+Deno.test("chaque type porte une des cinq destinations de docs/WORKFLOWS.md § 8", () => {
   const charge = { period: "2026-10" };
   assertEquals(routePour("availability_reminder", charge), "/availability/2026-10");
   assertEquals(routePour("assignment_proposed", charge), "/proposals");
@@ -328,6 +328,9 @@ Deno.test("chaque type porte une des quatre destinations de docs/WORKFLOWS.md §
   assertEquals(routePour("assignment_declined", charge), "/admin/schedule/2026-10");
   assertEquals(routePour("schedule_all_accepted", charge), "/admin/schedule/2026-10");
   assertEquals(routePour("late_responders", charge), "/admin/schedule/2026-10");
+  // La cinquième, ticket 030 : elle ignore le mois, un abonnement n'en a pas.
+  assertEquals(routePour("subscription_trial_ending", charge), "/admin/subscription");
+  assertEquals(routePour("subscription_suspended", charge), "/admin/subscription");
 });
 
 Deno.test("la période se déduit des créneaux quand l'appelant l'a oubliée", () => {
@@ -440,5 +443,49 @@ Deno.test("l'invitation ne part que par courriel", () => {
   for (const type of TOUS_LES_TYPES) {
     if (type === "invitation") continue;
     assert(CANAUX_PAR_DEFAUT[type].includes("inapp"), `${type} doit alimenter le centre`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Abonnement — ticket 030
+// ---------------------------------------------------------------------------
+
+Deno.test("fin d'essai : l'objet nomme la caserne, le corps nomme la date et la conséquence", () => {
+  const contenu = construireContenu(
+    "subscription_trial_ending",
+    { trial_ends_at: "2026-11-20T02:36:11Z", days_left: 7 },
+    CASERNE,
+  );
+  assertEquals(contenu.titre, "Essai de CIS Saint-Martin bientôt terminé");
+  assert(contenu.corps.includes("20 novembre"), contenu.corps);
+  assert(contenu.corps.includes("lecture seule"), contenu.corps);
+  assert(contenu.corps.includes("rien ne sera supprimé"), contenu.corps);
+  assertEquals(contenu.route, "/admin/subscription");
+});
+
+Deno.test("fin d'essai sans date : le corps retombe sur le nombre de jours", () => {
+  const contenu = construireContenu("subscription_trial_ending", { days_left: 7 }, CASERNE);
+  assert(contenu.corps.includes("dans 7 jours"), contenu.corps);
+});
+
+Deno.test("suspension : « rien n'a été supprimé » est dans le corps", () => {
+  const contenu = construireContenu(
+    "subscription_suspended",
+    { suspended_at: "2026-12-04T03:30:00Z", reason: "trial_expired" },
+    CASERNE,
+  );
+  assertEquals(contenu.titre, "CIS Saint-Martin est en lecture seule");
+  assert(contenu.corps.includes("4 décembre"), contenu.corps);
+  assert(contenu.corps.includes("Rien n'a été supprimé"), contenu.corps);
+  // Le motif ne se reproche pas : il mène au même écran et au même geste.
+  assert(!contenu.corps.includes("trial_expired"), contenu.corps);
+  assertEquals(contenu.route, "/admin/subscription");
+});
+
+Deno.test("les deux types d'abonnement partent par courriel, pas en push", () => {
+  for (const type of ["subscription_trial_ending", "subscription_suspended"] as const) {
+    assertEquals(CANAUX_PAR_DEFAUT[type], ["email", "inapp"]);
+    assert(!CANAUX_PAR_DEFAUT[type].includes("push"), `${type} ne part pas en push`);
+    assert(!TYPES_REGROUPES.has(type), `${type} décrit un fait unique`);
   }
 });
