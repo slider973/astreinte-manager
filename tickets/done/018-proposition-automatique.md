@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 017
 - **Branche** : `feat/018-proposition-automatique`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/33
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
