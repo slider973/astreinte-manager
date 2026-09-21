@@ -7,6 +7,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 052 | [Le centre de notifications n'a pas de retour](in-progress/052-centre-notifications-sans-retour.md) | P1 | 026 | — |
+| 054 | [Le déploiement automatique des fonctions ignore la carte d'imports](in-progress/054-deploiement-fonctions-carte-imports.md) | P0 | 049 | — |
 
 ## À faire
 
@@ -17,7 +18,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 050 | [L'écran super-admin annonce un envoi sans preuve](backlog/050-envoi-annonce-sans-preuve-superadmin.md) | P2 | 048 | — |
 | 051 | [Une invitation en attente reste invisible pour qui vient de se connecter](backlog/051-invitation-en-attente-ignoree.md) | P1 | 006 | — |
 | 053 | [L'écran super-admin n'offre aucune déconnexion](backlog/053-superadmin-sans-deconnexion.md) | P2 | 031 | — |
-| 054 | [Le déploiement automatique des fonctions ignore la carte d'imports](backlog/054-deploiement-fonctions-carte-imports.md) | P0 | 049 | — |
 
 ## Terminés
 
