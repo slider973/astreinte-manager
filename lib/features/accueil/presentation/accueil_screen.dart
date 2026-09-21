@@ -4,16 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
-import '../../../core/session/appartenance.dart';
-import '../../../core/session/deconnexion.dart';
 import '../../../core/session/session_providers.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../astreintes/presentation/astreintes_screen.dart';
 import '../../dispos/presentation/mois_screen.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
-import '../../notifications/presentation/widgets/reglage_notifications.dart';
+import '../../profil/presentation/profil_screen.dart';
 import '../../propositions/domain/propositions_providers.dart';
 import '../../propositions/presentation/propositions_screen.dart';
 
@@ -21,9 +18,9 @@ import '../../propositions/presentation/propositions_screen.dart';
 ///
 /// Depuis le ticket 011, l'onglet 0 **est** l'écran « Mon mois » : il porte
 /// sa propre bannière, sa barre de compteurs et son panneau latéral, donc
-/// c'est lui qui construit l'`AppScaffold`. La coquille ne garde que le choix
-/// de destination et l'identité, reportée sur l'onglet « Profil » jusqu'à ce
-/// qu'il ait son propre écran.
+/// c'est lui qui construit l'`AppScaffold`. Chaque destination a fini par faire
+/// de même — propositions (021), astreintes (027), profil (007) — et la
+/// coquille ne garde plus que le choix de destination.
 class AccueilScreen extends ConsumerStatefulWidget {
   const AccueilScreen({super.key, this.ongletInitial = 0, this.mois});
 
@@ -45,7 +42,8 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
   /// La destination « Admin » n'est pas un onglet local : c'est une route.
   static const String _routeAdmin = 'admin';
 
-  /// L'onglet qui porte l'identité et la sortie, en attendant son écran.
+  /// L'onglet du profil (ticket 007) : identité, caserne, notifications,
+  /// langue, et les deux sorties du produit.
   static const String _routeProfil = 'profil';
 
   /// L'onglet des propositions (ticket 021). C'est là que mène le lien public
@@ -138,132 +136,26 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
       );
     }
 
+    if (route == _routeProfil) {
+      return ProfilScreen(
+        destinations: destinations,
+        indexSelectionne: index,
+        onDestination: (nouvelle) => _choisir(nouvelle, destinations),
+      );
+    }
+
     return AppScaffold(
       titre: AppStrings.appTitle,
       destinations: destinations,
       indexSelectionne: index,
       onDestination: (nouvelle) => _choisir(nouvelle, destinations),
       actions: const <Widget>[BoutonNotifications()],
-      child: route == _routeProfil
-          ? _Contenu(appartenance: appartenance)
-          : EmptyState(
-              titre: AppStrings.accueilAVenirTitre,
-              texte: AppStrings.accueilAVenirTexte,
-              icone: Icons.construction_outlined,
-              libelleAction: AppStrings.accueilRetour,
-              onAction: () => setState(() => _destination = 0),
-            ),
-    );
-  }
-}
-
-class _Contenu extends StatelessWidget {
-  const _Contenu({required this.appartenance});
-
-  final Appartenance? appartenance;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      children: <Widget>[
-        Semantics(
-          header: true,
-          child: Text(
-            AppStrings.accueilTitre,
-            style: theme.textTheme.headlineMedium,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sousTitre),
-        Text(
-          AppStrings.accueilTexte,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.auDessusTitre),
-        _BlocIdentite(appartenance: appartenance),
-        const SizedBox(height: AppSpacing.auDessusTitre),
-        // Le réglage des notifications se pose ici en attendant l'écran de
-        // profil du ticket 007, où il déménagera tel quel (ticket 024).
-        const ReglageNotifications(),
-        const SizedBox(height: AppSpacing.auDessusTitre),
-        const BoutonDeconnexion(),
-      ],
-    );
-  }
-}
-
-/// Un bloc réglé (`DESIGN.md § Cards / Containers`) : filet 1 dp, rayon 8,
-/// aucune ombre. La caserne et le rôle, chacun avec son libellé.
-class _BlocIdentite extends StatelessWidget {
-  const _BlocIdentite({required this.appartenance});
-
-  final Appartenance? appartenance;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final courante = appartenance;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: AppRadius.controleRadius,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _Ligne(
-              libelle: AppStrings.accueilCaserneLabel,
-              valeur: courante?.nomCaserne ?? AppStrings.valueUndefined,
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _Ligne(
-              libelle: AppStrings.accueilRoleLabel,
-              valeur: courante?.role.libelle ?? AppStrings.valueUndefined,
-              style: theme.textTheme.bodyLarge,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Ligne extends StatelessWidget {
-  const _Ligne({required this.libelle, required this.valeur, this.style});
-
-  final String libelle;
-  final String valeur;
-  final TextStyle? style;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Semantics(
-      label: libelle,
-      value: valeur,
-      excludeSemantics: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            libelle,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(valeur, style: style),
-        ],
+      child: EmptyState(
+        titre: AppStrings.accueilAVenirTitre,
+        texte: AppStrings.accueilAVenirTexte,
+        icone: Icons.construction_outlined,
+        libelleAction: AppStrings.accueilRetour,
+        onAction: () => setState(() => _destination = 0),
       ),
     );
   }

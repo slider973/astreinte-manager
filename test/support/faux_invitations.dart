@@ -4,7 +4,6 @@ import 'package:astreinte_sp/features/invitation/domain/acceptation.dart';
 import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
 import 'package:astreinte_sp/features/membres/domain/membre_caserne.dart';
-import 'package:astreinte_sp/features/onboarding/data/profil_repository.dart';
 
 const String stationTest = 'aaaaaaaa-0000-4000-8000-000000000001';
 
@@ -245,44 +244,5 @@ class FauxInvitationRepository implements InvitationRepository {
           caserne: CaserneInvitation(nom: 'CIS Saint-Martin'),
           inviteur: InviteurInvitation(libelle: 'Jean Dupont'),
         );
-  }
-}
-
-/// Un [ProfilRepository] sans réseau.
-class FauxProfilRepository implements ProfilRepository {
-  FauxProfilRepository({this.echoue = false});
-
-  bool echoue;
-
-  final List<({String prenom, String nom, String? telephone})> ecritures =
-      <({String prenom, String nom, String? telephone})>[];
-
-  /// `profiles.push_enabled`, avec la valeur par défaut du schéma.
-  bool pushNonCritiquesActifs = true;
-
-  @override
-  Future<void> completer({
-    required String userId,
-    required String prenom,
-    required String nom,
-    String? telephone,
-  }) async {
-    if (echoue) throw const FormatException('écriture refusée');
-    ecritures.add((prenom: prenom, nom: nom, telephone: telephone));
-  }
-
-  @override
-  Future<bool> pushNonCritiques(String userId) async {
-    if (echoue) throw const FormatException('lecture refusée');
-    return pushNonCritiquesActifs;
-  }
-
-  @override
-  Future<void> definirPushNonCritiques({
-    required String userId,
-    required bool actif,
-  }) async {
-    if (echoue) throw const FormatException('écriture refusée');
-    pushNonCritiquesActifs = actif;
   }
 }

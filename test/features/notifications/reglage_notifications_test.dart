@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
-import '../../support/faux_invitations.dart';
+import '../../support/faux_profil.dart';
 import '../../support/faux_push.dart';
 
 const String _safariIphone =
@@ -43,11 +43,7 @@ Future<AppMontee> _ouvrirProfil(
   );
   await tester.tap(find.text(AppStrings.navProfil));
   await tester.pumpAndSettle();
-  await tester.scrollUntilVisible(
-    find.text(AppStrings.notifReglageToujours),
-    200,
-  );
-  await tester.pumpAndSettle();
+  await defilerJusqua(tester, find.text(AppStrings.notifReglageToujours));
   return faux;
 }
 

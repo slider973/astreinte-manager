@@ -26,10 +26,8 @@ Future<void> ouvrirProfil(WidgetTester tester) async {
 
 /// L'onglet « Profil » défile depuis que le réglage des notifications s'y est
 /// posé (ticket 024) : la sortie est sous la ligne de flottaison.
-Future<void> faireDefilerJusqua(WidgetTester tester, Finder cible) async {
-  await tester.scrollUntilVisible(cible, 200);
-  await tester.pumpAndSettle();
-}
+Future<void> faireDefilerJusqua(WidgetTester tester, Finder cible) =>
+    defilerJusqua(tester, cible);
 
 void main() {
   group('AccueilScreen', () {

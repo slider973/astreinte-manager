@@ -14,6 +14,7 @@ import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/session/appartenances_locales.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/core/session/auth_repository.dart';
+import 'package:astreinte_sp/core/session/caserne_choisie.dart';
 import 'package:astreinte_sp/core/session/membership_repository.dart';
 import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/session/session_utilisateur.dart';
@@ -37,8 +38,6 @@ import 'package:astreinte_sp/features/notifications/data/jeton_local.dart';
 import 'package:astreinte_sp/features/notifications/data/notifications_repository.dart';
 import 'package:astreinte_sp/features/notifications/domain/centre_providers.dart';
 import 'package:astreinte_sp/features/notifications/domain/notifications_providers.dart';
-import 'package:astreinte_sp/features/onboarding/data/profil_repository.dart';
-import 'package:astreinte_sp/features/onboarding/domain/profil_providers.dart';
 import 'package:astreinte_sp/features/parametres/data/parametres_repository.dart';
 import 'package:astreinte_sp/features/parametres/domain/parametres_providers.dart';
 import 'package:astreinte_sp/features/periodes/data/periodes_repository.dart';
@@ -49,6 +48,8 @@ import 'package:astreinte_sp/features/planning/data/suivi_repository.dart';
 import 'package:astreinte_sp/features/planning/domain/matrice_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/planning_providers.dart';
 import 'package:astreinte_sp/features/planning/domain/suivi_providers.dart';
+import 'package:astreinte_sp/features/profil/data/profil_repository.dart';
+import 'package:astreinte_sp/features/profil/domain/profil_providers.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/propositions_providers.dart';
 import 'package:astreinte_sp/features/superadmin/data/superadmin_repository.dart';
@@ -61,10 +62,10 @@ import 'faux_abonnement.dart';
 import 'faux_astreintes.dart';
 import 'faux_caserne.dart';
 import 'faux_dispos.dart';
-import 'faux_invitations.dart';
 import 'faux_notifications.dart';
 import 'faux_planning.dart';
 import 'faux_planning_caserne.dart';
+import 'faux_profil.dart';
 import 'faux_propositions.dart';
 import 'faux_push.dart';
 import 'faux_suivi.dart';
@@ -266,6 +267,7 @@ Future<AppMontee> monterApp(
   Connectivite? reseau,
   ReperesLocaux? reperes,
   AppartenancesLocales? appartenancesLocales,
+  CaserneChoisieLocale? caserneChoisie,
   ContextePlateforme? plateforme,
   FirebaseDemarrage firebase = FirebaseDemarrage.configurationAbsente,
   FauxMessageriePush? messagerie,
@@ -403,6 +405,12 @@ Future<AppMontee> monterApp(
         appartenancesLocalesProvider.overrideWithValue(
           appartenancesLocales ?? AppartenancesLocalesMemoire(),
         ),
+        // La caserne choisie (ticket 007) passe par `shared_preferences` :
+        // sans faux, chaque test attendrait un canal de plateforme qui ne
+        // répond jamais.
+        caserneChoisieLocaleProvider.overrideWithValue(
+          caserneChoisie ?? CaserneChoisieLocaleMemoire(),
+        ),
         contextePlateformeProvider.overrideWithValue(
           plateforme ?? ContextePlateforme.natif,
         ),
@@ -468,6 +476,29 @@ Future<void> ouvrirRoute(
     await tester.pump();
     await tester.pump();
   }
+}
+
+/// Fait défiler jusqu'à [cible], **dans la liste de l'écran**.
+///
+/// `scrollUntilVisible` cherche un `Scrollable` unique quand on ne lui en
+/// désigne aucun — et un écran qui porte un champ de saisie en a plusieurs :
+/// `EditableText` en range un dans chaque `TextField`. L'écran de profil du
+/// ticket 007 en a trois, et tous les tests qui défilaient sur cet onglet se
+/// sont mis à échouer sur « Bad state: Too many elements ».
+///
+/// `.first` est la liste de l'écran : elle précède ses champs dans l'ordre de
+/// l'arbre.
+Future<void> defilerJusqua(
+  WidgetTester tester,
+  Finder cible, {
+  double pas = 200,
+}) async {
+  await tester.scrollUntilVisible(
+    cible,
+    pas,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
 }
 
 /// Démonte l'arbre pour libérer les minuteries des contrôleurs.

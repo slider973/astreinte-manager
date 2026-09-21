@@ -8,7 +8,7 @@ import '../../../core/firebase/firebase_bootstrap.dart';
 import '../../../core/plateforme/contexte_plateforme.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
-import '../../onboarding/domain/profil_providers.dart';
+import '../../profil/domain/profil_providers.dart';
 import '../data/jeton_local.dart';
 import '../data/messagerie_push.dart';
 import '../data/pont_service_worker.dart';
