@@ -353,7 +353,22 @@ enum ErreurInvitation {
   /// [MotifEchecInvitation.debitAtteint] : la phrase vient du serveur.
   debitAtteint(AppStrings.inviteDebitAtteint, messageDuServeur: true),
 
+  /// Une réponse est arrivée, mais elle ne se lit pas : fonction absente,
+  /// passerelle qui refuse, corps vide. **Ce n'est pas le réseau** — quelque
+  /// chose a répondu —, et réessayer dans la minute ne changera rien tant que
+  /// le serveur n'est pas réparé.
+  serveurIndisponible(AppStrings.inviteServeurIndisponible),
+
+  /// Rien n'est revenu, et le navigateur ne se dit pas hors ligne. On ne sait
+  /// donc pas ce qui s'est passé, et surtout pas si la demande est arrivée :
+  /// la phrase ne promet aucune cause.
+  sansReponse(AppStrings.inviteSansReponse),
+
+  /// La seule erreur qui a le droit de parler de connexion : le navigateur
+  /// affirme être hors ligne, et un « non » de sa part est sûr
+  /// (`lib/core/reseau/connectivite.dart`).
   reseau(AppStrings.erreurReseauTexte),
+
   inconnue(AppStrings.erreurTexteGenerique);
 
   const ErreurInvitation(this.message, {this.messageDuServeur = false});

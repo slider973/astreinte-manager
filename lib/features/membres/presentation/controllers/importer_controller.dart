@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/plateforme/selection_fichier.dart';
 import '../../../../core/plateforme/telechargement.dart';
+import '../../../../core/reseau/connectivite.dart';
 import '../../../../core/session/session_providers.dart';
 import '../../domain/fichier_membres.dart';
 import '../../domain/import_membres.dart';
@@ -44,7 +45,12 @@ class EtatImport {
 
   final bool envoiEnCours;
 
-  /// Combien d'adresses ont reçu un verdict du serveur, pour l'avancement.
+  /// Combien d'invitations sont **parties**, pour l'avancement.
+  ///
+  /// Le compte des verdicts rendus par le serveur n'est pas celui-là : une
+  /// adresse refusée reçoit un verdict sans que personne ne soit invité. Les
+  /// mêler faisait annoncer « 60 invitations sur 60 envoyées » pendant
+  /// l'envoi, puis « 57 envoyées, 3 échecs » à l'écran suivant.
   final int envoyees;
 
   final RapportInvitations? rapport;
@@ -56,13 +62,6 @@ class EtatImport {
 
   /// Le moment où l'import pourra reprendre, quand le plafond l'a coupé.
   final DateTime? reprendreApres;
-
-  /// Combien d'invitations restent à envoyer pour finir ce fichier.
-  int get restantAEnvoyer {
-    final total = apercu?.nombreAInviter ?? 0;
-    final reste = total - envoyees;
-    return reste < 0 ? 0 : reste;
-  }
 }
 
 /// Lit un fichier de membres, le montre, puis l'envoie par lots de vingt.
@@ -106,7 +105,9 @@ class ImporterController extends Notifier<EtatImport> {
   Future<void> _preparer(String nomFichier, Uint8List octets) async {
     final lecture = lireFichierMembres(nomFichier: nomFichier, octets: octets);
     if (!lecture.lisible) {
-      state = EtatImport(erreurLecture: _phraseDeLecture(lecture));
+      state = EtatImport(
+        erreurLecture: _phraseDeLecture(lecture, octets.length),
+      );
       return;
     }
 
@@ -144,13 +145,25 @@ class ImporterController extends Notifier<EtatImport> {
         ),
       );
     } on Object {
-      state = const EtatImport(
-        erreurRequete: EchecInvitation(ErreurInvitation.reseau),
+      // Ce qui a échoué est une **lecture** de la caserne. On ne sait pas
+      // pourquoi : seul un navigateur qui se dit hors ligne autorise à parler
+      // de connexion, un « oui » de sa part ne prouvant rien
+      // (`lib/core/reseau/connectivite.dart`). Sinon, on s'en tient à ce qu'on
+      // sait, et relire garde du sens.
+      state = EtatImport(
+        erreurRequete: EchecInvitation(
+          ref.read(connectiviteProvider).enLigne
+              ? ErreurInvitation.inconnue
+              : ErreurInvitation.reseau,
+        ),
       );
     }
   }
 
-  static String _phraseDeLecture(LectureFichier lecture) =>
+  /// La phrase d'un fichier qu'on ne peut pas lire. [octets] est la taille
+  /// **réelle** du fichier déposé : l'annoncer à la place de la limite faisait
+  /// dire au message « Ce fichier fait 512 Ko. La limite est de 512 Ko. »
+  static String _phraseDeLecture(LectureFichier lecture, int octets) =>
       switch (lecture.erreur!) {
         ErreurFichier.vide => AppStrings.importFichierVide,
         ErreurFichier.colonneAdresseAbsente =>
@@ -160,7 +173,7 @@ class ImporterController extends Notifier<EtatImport> {
           maxLignesFichier,
         ),
         ErreurFichier.tropGros => AppStrings.importTropGros(
-          tailleLisible(maxOctetsFichier),
+          tailleLisible(octets),
           tailleLisible(maxOctetsFichier),
         ),
         ErreurFichier.illisible => AppStrings.importFichierIllisible,
@@ -215,7 +228,7 @@ class ImporterController extends Notifier<EtatImport> {
           etape: EtapeImport.apercu,
           apercu: apercu,
           envoiEnCours: true,
-          envoyees: resultats.length,
+          envoyees: _parties(resultats),
         );
 
         final coupe = rapport.resultats.firstWhere(
@@ -264,27 +277,24 @@ class ImporterController extends Notifier<EtatImport> {
     state = EtatImport(
       etape: EtapeImport.rapport,
       apercu: apercu,
-      envoyees: resultats.length,
+      envoyees: rapport.envoyees,
       rapport: rapport,
       erreurRequete: echecGlobal,
       reprendreApres: reprendreApres,
     );
   }
 
+  /// Le seul compte qui vaille pour l'avancement : les adresses que le serveur
+  /// a acceptées. Un refus est un verdict, pas un envoi.
+  static int _parties(List<ResultatInvitation> resultats) =>
+      resultats.where((ResultatInvitation r) => !r.enEchec).length;
+
   /// Revient au choix d'un fichier, tout effacé.
   void recommencer() => state = const EtatImport();
 
-  /// Efface la seule bannière, en gardant l'aperçu sous les yeux.
-  void effacerErreur() {
-    if (state.erreurLecture == null && state.erreurRequete == null) return;
-    state = EtatImport(
-      etape: state.etape,
-      apercu: state.apercu,
-      envoyees: state.envoyees,
-      rapport: state.rapport,
-      reprendreApres: state.reprendreApres,
-    );
-  }
+  // Pas de `effacerErreur` : l'écran a choisi de ne pas mettre de croix sur
+  // ses bannières — « une bannière qui décrit un état persistant ne se ferme
+  // pas » (`_banniere`) —, et le refus disparaît en déposant un autre fichier.
 
   /// Remet un fichier d'exemple à la personne. Vrai si le navigateur l'a rangé.
   Future<bool> telechargerExemple() async {

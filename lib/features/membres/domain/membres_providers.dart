@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/reseau/connectivite.dart';
 import '../../../core/session/appartenance.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
@@ -11,9 +12,16 @@ import 'invitation.dart';
 import 'membre_caserne.dart';
 
 /// Le dépôt des membres. Surchargé par un faux dans les tests.
+///
+/// La connectivité n'est pas là pour décider d'un envoi — elle ne bloque
+/// rien — mais pour savoir si l'on a le droit de parler de connexion quand
+/// une invitation ne revient pas (voir [traduireEchecFonction]).
 final Provider<MembresRepository> membresRepositoryProvider =
     Provider<MembresRepository>(
-      (ref) => SupabaseMembresRepository(ref.watch(supabaseClientProvider)),
+      (ref) => SupabaseMembresRepository(
+        ref.watch(supabaseClientProvider),
+        ref.watch(connectiviteProvider),
+      ),
     );
 
 /// Ce que l'écran « Membres » affiche : deux listes, lues ensemble.

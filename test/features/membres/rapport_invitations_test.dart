@@ -1,8 +1,10 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
 import 'package:astreinte_sp/features/membres/domain/membre_caserne.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Les corps de réponse viennent de `supabase/functions/README.md`.
 void main() {
@@ -337,6 +339,84 @@ void main() {
         },
       });
       expect(sansNom.libelle, 'nouveau@caserne-a.test');
+    });
+  });
+
+  // Le défaut du 21 septembre 2026 : les Edge Functions n'étaient pas
+  // déployées, et l'écran envoyait vérifier une connexion qui marchait.
+  group('Ce que le serveur répond, et ce que l\'écran en dit', () {
+    test('une réponse illisible n\'est jamais une panne de réseau', () {
+      // Fonction absente : la passerelle répond 404, sans le corps `error`
+      // que composent nos fonctions.
+      final absente = traduireEchecFonction(
+        const FunctionsHttpException(
+          status: 404,
+          details: <String, dynamic>{'message': 'Function not found'},
+        ),
+        enLigne: true,
+      );
+
+      expect(absente.erreur, ErreurInvitation.serveurIndisponible);
+      expect(absente.message, isNot(AppStrings.erreurReseauTexte));
+      expect(absente.message, isNot(contains('connexion, puis réessaie')));
+
+      // Un corps qui n'est même pas une table : même verdict.
+      expect(
+        traduireEchecFonction(
+          const FunctionsHttpException(status: 403, details: 'Forbidden'),
+          enLigne: true,
+        ).erreur,
+        ErreurInvitation.serveurIndisponible,
+      );
+
+      // Un incident interne, lui, peut passer tout seul : on garde « réessaie
+      // dans un instant », qui ne promet toujours pas de cause.
+      expect(
+        traduireEchecFonction(
+          const FunctionsHttpException(status: 502, details: 'Bad gateway'),
+          enLigne: true,
+        ).erreur,
+        ErreurInvitation.inconnue,
+      );
+    });
+
+    test('le corps typé des fonctions garde la main', () {
+      final refus = traduireEchecFonction(
+        const FunctionsHttpException(
+          status: 403,
+          details: <String, dynamic>{
+            'error': <String, dynamic>{
+              'code': 'station_suspended',
+              'message': 'Station suspended',
+            },
+          },
+        ),
+        enLigne: true,
+      );
+
+      expect(refus.erreur, ErreurInvitation.caserneSuspendue);
+    });
+
+    test('sans réponse, on ne parle de connexion que si le navigateur l\'a '
+        'affirmé', () {
+      // Hors ligne : le « non » du navigateur est sûr, la phrase peut nommer
+      // la connexion.
+      expect(
+        traduireEchecFonction(
+          const FunctionsFetchException(details: 'Failed to fetch'),
+          enLigne: false,
+        ).erreur,
+        ErreurInvitation.reseau,
+      );
+
+      // En ligne et pourtant rien : c'est ce que voit le navigateur quand il
+      // bloque la réponse d'une fonction absente. On ne sait pas, on le dit.
+      final muet = traduireEchecFonction(
+        const FunctionsFetchException(details: 'Failed to fetch'),
+        enLigne: true,
+      );
+      expect(muet.erreur, ErreurInvitation.sansReponse);
+      expect(muet.message, isNot(AppStrings.erreurReseauTexte));
     });
   });
 }

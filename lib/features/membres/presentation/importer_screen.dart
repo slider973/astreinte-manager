@@ -357,26 +357,20 @@ class _Rapport extends StatelessWidget {
   static String? _phraseDesEcartees(ApercuImport? apercu) {
     if (apercu == null || apercu.nombreEcartees == 0) return null;
 
+    // Le motif est celui du verdict, et un verdict qui part n'en a pas : la
+    // traduction vit sur l'énumération, où l'absence de motif est dite par
+    // `null` plutôt que par une phrase prise au hasard.
     final motifs = <String>[
       for (final MapEntry<VerdictApercu, int> entree
           in apercu.ecarteesParMotif.entries)
-        AppStrings.importEcarteesMotif(entree.value, _motif(entree.key)),
+        if (entree.key.motifEcartee case final String motif)
+          AppStrings.importEcarteesMotif(entree.value, motif),
     ];
     return AppStrings.importEcarteesResume(
       apercu.nombreEcartees,
       motifs.join(', '),
     );
   }
-
-  static String _motif(VerdictApercu verdict) => switch (verdict) {
-    VerdictApercu.dejaMembre => AppStrings.importMotifDejaMembre,
-    VerdictApercu.dejaInvitee => AppStrings.importMotifDejaInvitee,
-    VerdictApercu.doublon => AppStrings.importMotifDoublon,
-    VerdictApercu.adresseInvalide => AppStrings.importMotifAdresseInvalide,
-    VerdictApercu.adresseAbsente => AppStrings.importMotifAdresseAbsente,
-    VerdictApercu.aInviter ||
-    VerdictApercu.aInviterSansNom => AppStrings.importMotifDejaMembre,
-  };
 }
 
 /// Les sorties du bas, différentes à chacun des trois temps.
@@ -414,10 +408,16 @@ class _Actions extends ConsumerWidget {
                 : null,
           ),
           const SizedBox(height: AppSpacing.entreCibles),
+          // Inerte pendant l'envoi, et il dit pourquoi. La raison n'est pas
+          // écrite sous le bouton : la ligne d'avancement, juste au-dessus,
+          // porte déjà l'information à l'écran. Elle reste annoncée aux
+          // lecteurs d'écran, qui n'ont pas cette ligne sous les yeux.
           PrimaryButton(
             libelle: AppStrings.importChoisirAutre,
             variante: PrimaryButtonVariante.secondaire,
             icone: Icons.upload_file_outlined,
+            raisonDesactivation: AppStrings.importEnvoiEnCours,
+            raisonVisible: false,
             onPressed: etat.envoiEnCours ? null : controleur.recommencer,
           ),
         ],

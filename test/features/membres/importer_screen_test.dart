@@ -34,15 +34,18 @@ const MembreCaserne _membreMarie = MembreCaserne(
   email: 'marie@exemple.fr',
 );
 
-/// Un fichier de soixante pompiers, comme celui du premier jour d'une caserne.
-String fichierDeSoixante() {
+/// Un fichier de [nombre] pompiers, comme celui du premier jour d'une caserne.
+String fichierDe(int nombre) {
   final tampon = StringBuffer('prenom;nom;email;role\r\n');
-  for (var i = 1; i <= 60; i++) {
+  for (var i = 1; i <= nombre; i++) {
     final role = i == 1 ? 'admin' : '';
     tampon.write('Pompier$i;Dupont$i;pompier$i@exemple.fr;$role\r\n');
   }
   return tampon.toString();
 }
+
+/// Soixante lignes : trois lots pleins de vingt.
+String fichierDeSoixante() => fichierDe(60);
 
 typedef Harnais = ({
   FauxMembresRepository depot,
@@ -432,6 +435,82 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(MembresScreen), findsOneWidget);
+    });
+  });
+
+  group('L\'avancement pendant l\'envoi', () {
+    /// Un premier lot dont cinq adresses sont refusées : elles ont reçu un
+    /// verdict du serveur, mais personne n'a été invité.
+    RapportInvitations premierLotAvecRefus() => RapportInvitations(
+      resultats: <ResultatInvitation>[
+        for (var i = 1; i <= 15; i++)
+          ResultatInvitation(
+            email: 'pompier$i@exemple.fr',
+            statut: StatutResultatInvitation.invitee,
+          ),
+        for (var i = 16; i <= 20; i++)
+          ResultatInvitation(
+            email: 'pompier$i@exemple.fr',
+            statut: StatutResultatInvitation.erreur,
+            motif: MotifEchecInvitation.adresseInvalide,
+          ),
+      ],
+    );
+
+    testWidgets('le compteur ne compte que les invitations parties', (
+      tester,
+    ) async {
+      final depot = FauxMembresRepository()
+        ..delaiParLot = const Duration(milliseconds: 40)
+        ..rapportsParLot = <RapportInvitations>[premierLotAvecRefus()];
+      final selecteur = FauxSelecteurFichier()..posera(fichierDe(40));
+      await _ouvrirImport(tester, depot: depot, selecteur: selecteur);
+
+      await _choisir(tester);
+      await tester.tap(find.text(AppStrings.importEnvoyer(40)));
+      await tester.pump();
+
+      // Entre les deux lots : vingt verdicts rendus, quinze invitations
+      // parties. C'est quinze qui s'affiche.
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump();
+      expect(
+        find.text(AppStrings.importAvancement(faites: 15, total: 40)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(AppStrings.importAvancement(faites: 20, total: 40)),
+        findsNothing,
+      );
+
+      // Et le compte rendu dit le même nombre que le compteur : les deux
+      // écrans ne se contredisent plus.
+      await tester.pumpAndSettle();
+      expect(
+        find.text(AppStrings.inviterResume(envoyees: 35, echecs: 5)),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('Quand le serveur ne répond pas comme prévu', () {
+    testWidgets('une lecture qui échoue n\'accuse pas la connexion', (
+      tester,
+    ) async {
+      final selecteur = FauxSelecteurFichier()
+        ..posera('email\nanne@exemple.fr\n');
+      await _ouvrirImport(
+        tester,
+        depot: FauxMembresRepository(erreurLecture: true),
+        selecteur: selecteur,
+      );
+
+      await _choisir(tester);
+
+      // Le navigateur ne se dit pas hors ligne : rien n'autorise à envoyer
+      // vérifier un wifi qui marche (ticket 048).
+      expect(find.text(AppStrings.erreurReseauTexte), findsNothing);
+      expect(find.text(AppStrings.erreurTexteGenerique), findsOneWidget);
     });
   });
 

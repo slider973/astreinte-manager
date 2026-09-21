@@ -525,6 +525,28 @@ abstract final class AppStrings {
   static const String inviteCaserneInconnue =
       'Cette caserne est introuvable. Reconnecte-toi, puis réessaie.';
 
+  // Les deux phrases qui suivent existent parce que « Impossible de joindre
+  // le serveur. Vérifie ta connexion » a été affiché le 21 septembre 2026
+  // pendant que le réseau allait très bien : les Edge Functions n'étaient pas
+  // déployées. On ne nomme donc une cause que lorsqu'on la connaît, et on ne
+  // propose pas un geste qui ne répare rien.
+
+  /// Le serveur a répondu, mais l'application ne sait pas lire sa réponse :
+  /// fonction absente, passerelle qui refuse, corps vide. Une réponse est
+  /// arrivée — la connexion n'est donc pas en cause, et le dire évite de
+  /// chercher une panne là où il n'y en a pas.
+  static const String inviteServeurIndisponible =
+      'Les invitations sont indisponibles : le serveur a refusé la demande '
+      'sans dire pourquoi. Ce n\'est pas ta connexion, et rien n\'est parti. '
+      'Réessaie plus tard.';
+
+  /// Rien n'est revenu, et le navigateur ne se dit pas hors ligne : on ne sait
+  /// pas si la demande est arrivée jusqu'au serveur. Aucune cause n'est donc
+  /// promise, et la sortie proposée est la seule qui apprenne quelque chose.
+  static const String inviteSansReponse =
+      'Le serveur n\'a pas répondu. On ne sait pas si l\'envoi est parti : '
+      'vérifie les invitations en attente avant de relancer.';
+
   // -------------------------------------------------------------------
   // Import de membres depuis un fichier (ticket 047)
   // -------------------------------------------------------------------
@@ -611,8 +633,23 @@ abstract final class AppStrings {
       'Aucune ligne de ce fichier ne peut être invitée. Corrige-le, puis '
       'redépose-le.';
 
+  /// Pourquoi « Choisir un autre fichier » est inerte pendant l'envoi. La
+  /// ligne d'avancement le dit déjà à l'écran : cette phrase est celle que le
+  /// lecteur d'écran annonce, et non un doublon visuel.
+  static const String importEnvoiEnCours =
+      'Envoi en cours : attends la fin pour déposer un autre fichier.';
+
+  /// « 15 invitations sur 40 envoyées… » — **envoyées, donc parties**.
+  ///
+  /// [faites] ne compte que les adresses acceptées par le serveur. Y ajouter
+  /// les refus ferait dire à ce compteur le contraire du compte rendu affiché
+  /// l'instant d'après, et ferait passer pour invitée une personne qui ne
+  /// recevra jamais rien. Les échecs ne sont pas annoncés ici : pendant
+  /// l'envoi, on n'en peut rien faire ; le compte rendu, lui, les nomme.
   static String importAvancement({required int faites, required int total}) =>
-      '$faites invitations sur $total envoyées…';
+      faites <= 1
+      ? '$faites invitation sur $total envoyée…'
+      : '$faites invitations sur $total envoyées…';
 
   /// Le numéro d'une ligne dépourvue d'adresse : c'est le seul repère qui
   /// permette de la retrouver dans le tableur.
