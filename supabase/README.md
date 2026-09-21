@@ -89,12 +89,31 @@ Une migration poussée sur `main` n'est jamais modifiée : on en crée une nouve
 | `0016_cron_rappels_saisie.sql` | ticket 015 : `cron_availability_reminders` et la tâche `availability_reminders` (push J-3, courriel J-1) |
 | `0017_matrice_admin.sql` | ticket 016 : calendrier français calculé (`paques_gregorien`, `jours_feries_fr`, `est_jour_ferie`, `unite_weekend`), vue `v_member_load`, fonction `availability_matrix` |
 | `0018_planning_brouillon.sql` | ticket 017 : `station_required_count`, `create_schedule`, triggers `assignments_trace_disponibilite` et `assignments_audit_hors_dispo`, suppression d'attribution réservée au brouillon, vue `v_schedule_progress`, `assignments` inscrite dans `supabase_realtime` |
+| `0019_publication_suivi.sql` | ticket 019 : `schedules_guard_transition` (la machine à états du § 2 de `docs/WORKFLOWS.md`), `schedules_guard_suppression` et `shifts_guard_suppression`, suppression d'un planning et d'un créneau réservée au brouillon, `publish_schedule`, `schedule_complet`, `schedule_reevaluer`, `schedule_auto_validate`, `shifts_effectif_revalide`, `remind_schedule`, `schedules` inscrite dans `supabase_realtime` |
+| `0020_reattribution.sql` | ticket 020 : `assignments_guard_reattribution` (statuts terminaux et `replaced_by` hors de portée d'un client), `reassign_shift`, `cancel_assignment`, clause `when` de `schedule_auto_validate` élargie aux acceptations qui disparaissent |
+| `0021_cron_relances.sql` | ticket 022 : `assignment_reminder_targets`, `cron_assignment_reminders`, `cron_late_responders_report`, tâches `assignment_reminders` et `late_responders_report` |
+| `0022_notification_echec_definitif.sql` | ticket 040 : `notify_trace_echec`, `cron_dispatch_notifications` trace désormais ses abandons |
+| `0023_abonnement_stripe.sql` | ticket 029 : `subscriptions` et `stripe_events`, `subscription_bootstrap` et son déclencheur, `subscription_sync`, `subscription_set_customer`, `cron_suspend_subscriptions` et la tâche `suspend_subscriptions` |
+| `0024_gating_suspension.sql` | ticket 030 : `station_access`, deux `notification_type` de plus, `cron_subscription_reminders` et la tâche `subscription_reminders`, `cron_suspend_subscriptions` qui prévient les administrateurs |
+| `0025_super_admin.sql` | ticket 031 : `is_super_admin()` retiré des trois politiques de `stations`, `station_slug`, `super_admin_stations`, `super_admin_create_station`, `super_admin_set_station_suspended`, `super_admin_support_schedules`, branche super-admin de `create_invitation` |
+| `0026_suppression_compte.sql` | ticket 007 : contrainte `profiles.id → auth.users` retirée pour que le profil anonymisé survive à son compte d'authentification, `delete_own_account`, exécution réservée à `service_role` |
+| `0027_export_rgpd.sql` | ticket 034 : `export_own_data`, exécution réservée à `service_role` |
+| `0028_proposition_automatique.sql` | ticket 018 : `apply_auto_proposal`, exécution réservée à `service_role` |
+| `0029_export_ics.sql` | ticket 028 : colonne `profiles.ics_token` et son index unique, `select`/`insert`/`update` de `profiles` re-donnés colonne par colonne, `my_ics_token`, `rotate_ics_token`, `ics_feed_events` réservée à `service_role` |
+| `0030_purges_conservation.sql` | ticket 043 : `cron_prune_notifications` et la tâche `prune_notifications`, `prune_audit_log`, `prune_invitations`, `prune_notification_outbox`, `prune_push_tokens`, `prune_stripe_events` et la tâche `prune_retention` |
+| `0031_archivage_plannings.sql` | ticket 044 : `cron_archive_schedules` et la tâche `archive_schedules`, lecture d'un planning archivé ouverte aux membres (créneaux, ses propres attributions, les `accepted` des autres), `insert`/`update` de `shifts` et d'`assignments` refusés sur un planning archivé, `ics_feed_events` élargie aux plannings archivés |
 
 RLS est activé sur chaque table dès sa création et toutes les tables ont au moins une
 politique depuis `0007`. Les politiques sont posées `to authenticated` : `anon` ne lit rien,
-`service_role` et `postgres` ont `bypassrls`. La numérotation a glissé d'un ticket à l'autre
-(`0009` a pris au ticket 006 le numéro prévu pour les vues) : `docs/SCHEMA.md` section 10 fait
-foi, et le prochain numéro libre est toujours celui qui suit le dernier fichier de ce tableau.
+`service_role` et `postgres` ont `bypassrls`.
+
+**La numérotation ne suit pas l'ordre des tickets, et le rang `0015` reste vide** : `0009` a
+pris au ticket 006 le numéro que la section 10 de `docs/SCHEMA.md` réservait aux vues, et les
+rangs suivants ont glissé d'un cran au ticket 025. `docs/SCHEMA.md` section 10 fait foi. Le
+prochain numéro libre est **le successeur du plus grand numéro présent dans
+`supabase/migrations/`**, et non « celui qui suit le dernier fichier de ce tableau » : une
+migration poussée sur `main` n'est jamais renumérotée, et un numéro en retard serait refusé par
+la CLI sur un projet hébergé.
 
 Deux pièges à ne pas rouvrir, documentés dans `docs/SCHEMA.md` section 3 :
 
@@ -177,6 +196,23 @@ double attribution refusée par la contrainte d'unicité, le retrait qui supprim
 et n'emporte rien après publication, `v_schedule_progress`, l'inscription d'`assignments`
 dans `supabase_realtime` avec son identité de réplique, et l'invisibilité du brouillon pour
 les membres.
+
+`supabase/tests/archivage_plannings_test.sql` couvre l'archivage (`0031`, ticket 044) :
+`cron_archive_schedules` appelée avec un instant de référence, le **fuseau** de chaque caserne
+(une caserne de Polynésie n'est pas archivée avec un jour d'avance, et l'est au passage du
+lendemain), le mois en cours et le mois à venir épargnés, le brouillon oublié qui reste un
+brouillon, l'idempotence, **ce qu'un membre lit d'un planning archivé** (créneaux, ses propres
+attributions refus compris, les gardes tenues par les autres, et rien de leurs refus ni de
+leurs propositions sans réponse), le cloisonnement entre casernes, les **dix chemins
+d'écriture** vers un planning archivé, et le flux calendrier qui garde ses quatre-vingt-dix
+jours par-dessus l'archivage.
+
+Les fichiers plus récents — `publication_test.sql`, `reattribution_test.sql`,
+`assignment_reminders_test.sql`, `abonnement_test.sql`, `gating_suspension_test.sql`,
+`super_admin_test.sql`, `suppression_compte_test.sql`, `export_rgpd_test.sql`,
+`export_ics_test.sql`, `proposition_automatique_test.sql`, `purges_conservation_test.sql`,
+`parcours_complet_test.sql` — suivent la même méthode et portent leur inventaire en tête de
+fichier : c'est là qu'il faut le lire, ce document ne le recopie pas.
 
 `deno test supabase/functions/tests/` couvre la logique pure des Edge Functions — libellés
 français par type, regroupement, liens profonds, classement des erreurs FCM, enchaînement
@@ -305,16 +341,32 @@ from cron.job
 order by jobname;
 ```
 
-Attendu, aujourd'hui : deux lignes `active = true`, `create_periods` (`0 2 1 * *`) et
-`lock_periods` (`0 * * * *`), toutes deux sur la base `postgres`. Les autres tâches de
-`docs/SCHEMA.md` § 8 s'y ajouteront ; la liste de ce document fait foi.
+Attendu, aujourd'hui : **onze** lignes `active = true`, toutes sur la base `postgres`. Le
+tableau de `docs/SCHEMA.md` § 8 fait foi ; les voici avec leur planification :
+
+| `jobname` | `schedule` | Migration |
+|---|---|---|
+| `create_periods` | `0 2 1 * *` | `0012` |
+| `lock_periods` | `0 * * * *` | `0012` |
+| `dispatch_notifications` | `* * * * *` | `0014` |
+| `availability_reminders` | `0 9 * * *` | `0016` |
+| `assignment_reminders` | `15 * * * *` | `0021` |
+| `late_responders_report` | `45 * * * *` | `0021` |
+| `subscription_reminders` | `20 3 * * *` | `0024` |
+| `suspend_subscriptions` | `30 3 * * *` | `0023` |
+| `archive_schedules` | `30 2 * * *` | `0031` |
+| `prune_notifications` | `0 4 * * 0` | `0030` |
+| `prune_retention` | `20 4 * * 0` | `0030` |
 
 S'il en manque une, la replanifier à la main — l'appel est un upsert par nom, il est sans
-risque de doublon :
+risque de doublon. La commande est toujours un `select public.<fonction>();` qualifié et sans
+argument ; le nom de la fonction est celui de la colonne `command` du tableau de
+`docs/SCHEMA.md` § 8. Exemple :
 
 ```sql
-select cron.schedule('create_periods', '0 2 1 * *', $$select public.cron_create_periods();$$);
-select cron.schedule('lock_periods',   '0 * * * *', $$select public.cron_lock_periods();$$);
+select cron.schedule('create_periods',    '0 2 1 * *', $$select public.cron_create_periods();$$);
+select cron.schedule('lock_periods',      '0 * * * *', $$select public.cron_lock_periods();$$);
+select cron.schedule('archive_schedules', '30 2 * * *', $$select public.cron_archive_schedules();$$);
 ```
 
 Et pour vérifier qu'elles tournent vraiment, quelques heures après :
