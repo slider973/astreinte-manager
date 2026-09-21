@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 004, 032
 - **Branche** : `feat/037-canvaskit-autoheberge`
-- **Statut** : en cours depuis 2026-09-21
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
 Découvert pendant le ticket 004 : même avec les polices Atkinson correctement embarquées, le build
