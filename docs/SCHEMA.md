@@ -1400,7 +1400,15 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `suspend_subscriptions` | tous les jours 03:30 | `select public.cron_suspend_subscriptions();` — passe en `suspended` les essais expirés sans abonnement et les `past_due` dont la dernière période payée remonte à plus de 14 jours. **Rien n'est supprimé** : la caserne passe en lecture seule via `station_writable()`, et les administrateurs sont prévenus par courriel *(migrations `0023` et `0024`)* |
 | `subscription_reminders` | tous les jours 03:20 | `select public.cron_subscription_reminders();` — courriel + notification interne aux administrateurs quand l'essai se termine dans sept jours et qu'aucun abonnement n'a été souscrit *(migration `0024`)* |
 | `archive_schedules` | 1er du mois | Archive les plannings des mois passés |
-| `prune_notifications` | hebdomadaire | Supprime les notifications lues de plus de 90 jours |
+| `prune_notifications` | dimanche 04:00 | `select public.cron_prune_notifications();` — supprime les notifications **lues** il y a plus de 90 jours et celles **jamais lues** créées il y a plus de 365 jours *(migration `0030`)* |
+| `prune_retention` | dimanche 04:20 | `select public.cron_prune_retention();` — applique les autres durées de conservation de `docs/RGPD.md` : `audit_log` 3 ans, `invitations` 30 jours après expiration et 3 ans après acceptation, `notification_outbox` 30 jours après traitement (jamais une demande `pending` ou `sending`), `push_tokens` 365 jours sans usage, `stripe_events` 90 jours pour les `processed`/`skipped` (jamais un `failed`). Rend le compte par table *(migration `0030`)* |
+
+Les deux purges sont détaillées dans la migration `0030` : chaque durée y est justifiée, et
+chacune est un **paramètre** de sa fonction (`p_days`, `p_read_days`…) pour que le test pose une
+frontière à la journée près sans fabriquer des lignes vieilles de trois ans, et pour qu'une
+caserne qui doit changer un chiffre change un chiffre. Le contrat qui les tient :
+**une durée annoncée dans `docs/RGPD.md` est une durée appliquée par une de ces tâches** — le
+tableau du § 2 de ce document nomme, pour chaque table, le mécanisme qui la borne.
 
 Chaque tâche est un appel **qualifié** (`public.…`) et **sans argument** d'une fonction
 `security definer` dont le `search_path` est figé : rien n'est interpolé dans la commande, et
@@ -1520,8 +1528,10 @@ Ordre proposé :
 27. `0027_export_rgpd.sql` (ticket 034 : `export_own_data`, exécution réservée à `service_role`)
 28. `0028_proposition_automatique.sql` (ticket 018 : `apply_auto_proposal`, exécution réservée à `service_role`)
 29. `0029_export_ics.sql` (ticket 028 : colonne `profiles.ics_token` et son index unique, `select`/`insert`/`update` de `profiles` retirés de la table puis re-donnés colonne par colonne, `my_ics_token`, `rotate_ics_token`, `ics_feed_events` réservée à `service_role`)
-30. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
-    `prune_notifications`
+30. `0030_purges_conservation.sql` (ticket 043 : `cron_prune_notifications` et la tâche
+    `prune_notifications`, `prune_audit_log`, `prune_invitations`, `prune_notification_outbox`,
+    `prune_push_tokens`, `prune_stripe_events` et la tâche `prune_retention`)
+31. la dernière tâche d'entretien du § 8 : `archive_schedules`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà

@@ -4,7 +4,8 @@
 - **Priorité** : P0
 - **Dépend de** : 034
 - **Branche** : `feat/043-purge-notifications`
-- **Statut** : en cours depuis 2026-09-21
+- **PR** : https://github.com/slider973/astreinte-manager/pull/36
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
 Relevé en écrivant le registre des traitements du ticket 034. La tâche de purge des notifications

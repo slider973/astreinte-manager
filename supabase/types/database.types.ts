@@ -1127,6 +1127,15 @@ export type Database = {
         Returns: number
       }
       cron_lock_periods: { Args: { p_reference?: string }; Returns: number }
+      cron_prune_notifications: {
+        Args: {
+          p_read_days?: number
+          p_reference?: string
+          p_unread_days?: number
+        }
+        Returns: number
+      }
+      cron_prune_retention: { Args: { p_reference?: string }; Returns: Json }
       cron_subscription_reminders: {
         Args: { p_reference?: string }
         Returns: number
@@ -1211,6 +1220,30 @@ export type Database = {
           p_year: number
         }
         Returns: string
+      }
+      prune_audit_log: {
+        Args: { p_days?: number; p_reference?: string }
+        Returns: number
+      }
+      prune_invitations: {
+        Args: {
+          p_accepted_days?: number
+          p_expired_days?: number
+          p_reference?: string
+        }
+        Returns: number
+      }
+      prune_notification_outbox: {
+        Args: { p_days?: number; p_reference?: string }
+        Returns: number
+      }
+      prune_push_tokens: {
+        Args: { p_days?: number; p_reference?: string }
+        Returns: number
+      }
+      prune_stripe_events: {
+        Args: { p_days?: number; p_reference?: string }
+        Returns: number
       }
       publish_schedule: {
         Args: { p_actor: string; p_schedule: string }

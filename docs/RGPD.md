@@ -9,7 +9,9 @@ Ce que le propriétaire doit compléter est marqué `[À COMPLÉTER : …]`. Ces
 une mention inventée se croirait, une mention trouée se corrige. Les deux pages publiques de
 l'application (`/legal/confidentialite`, `/legal/mentions`) portent les mêmes.
 
-- **Version** : 1 — ticket 034, 21 septembre 2026.
+- **Version** : 2 — ticket 043, 21 septembre 2026. La version 1 (ticket 034) signalait trois
+  durées annoncées sans mécanisme qui les applique ; le § 2 bis les remplace par un inventaire
+  table par table, et la migration `0030` les applique.
 - **Portée** : l'application Astreinte SP (PWA), sa base Supabase, ses Edge Functions et ses
   sous-traitants listés au § 5.
 
@@ -51,7 +53,7 @@ conditions d'utilisation. Sans lui, la répartition ci-dessus n'existe que dans 
 | **Tables** | `profiles`, `memberships`, `invitations`, `super_admins`, et `auth.users` (schéma d'authentification Supabase) |
 | **Base légale** | Exécution du contrat qui lie la caserne à ses membres, et intérêt légitime de la caserne à organiser ses gardes (art. 6.1.b et 6.1.f) |
 | **Destinataires** | La personne elle-même ; les membres actifs de sa caserne (prénom, nom, surnom) ; les administrateurs de sa caserne (y compris téléphone et adresse) ; l'éditeur, pour l'exploitation |
-| **Conservation** | Tant que l'appartenance existe. Après suppression de compte : le profil est **anonymisé** (« Membre supprimé », adresse non routable, téléphone effacé) et conservé sans limite, parce que les astreintes passées y pendent (§ 3) |
+| **Conservation** | Tant que l'appartenance existe. Après suppression de compte : le profil est **anonymisé** (« Membre supprimé », adresse non routable, téléphone effacé) et conservé sans limite, parce que les astreintes passées y pendent (§ 3). Les **invitations** ont leur propre durée : trente jours après l'expiration quand personne ne les a acceptées — l'adresse est alors celle de quelqu'un qui n'est jamais entré dans la caserne —, trois ans après l'acceptation, comme la trace d'administration qu'elles sont devenues (tâche `prune_retention`) |
 | **Mesures** | Connexion par code à usage unique envoyé par courriel — aucun mot de passe stocké. Cloisonnement par caserne en Row Level Security sur chaque table (`docs/SCHEMA.md § 4`). Le jeton d'invitation n'est jamais rendu à un client |
 
 ### 2.2 Recueillir les disponibilités et construire les plannings
@@ -77,7 +79,7 @@ conditions d'utilisation. Sans lui, la répartition ci-dessus n'existe que dans 
 | **Tables** | `notifications`, `push_tokens`, `notification_outbox` |
 | **Base légale** | Exécution du contrat (art. 6.1.b). Les notifications **non critiques** — rappels de saisie, rapports — se coupent depuis le profil ; les propositions d'astreinte, elles, partent toujours : sans elles le produit ne rend pas son service |
 | **Destinataires** | Le destinataire seul. Aucun administrateur ne lit les notifications d'un membre |
-| **Conservation** | Aujourd'hui **sans limite**. La tâche `prune_notifications` (suppression des notifications lues de plus de 90 jours) est décrite au `docs/SCHEMA.md § 8` mais **n'est pas encore en service** : elle n'apparaît pas dans `cron.job`. Tout est effacé à la suppression du compte. `[À COMPLÉTER : mettre la tâche en service, ou retenir une autre durée]` |
+| **Conservation** | **Notifications** : 90 jours après la lecture, 365 jours après la création quand elles n'ont jamais été lues (tâche `prune_notifications`, migration `0030`). **Appareils** : 365 jours sans usage — `last_seen_at` est réécrit à chaque ouverture de l'application, et un jeton supprimé par erreur est réinscrit à la suivante. **File d'attente** : 30 jours après traitement ; une demande qui n'est pas encore partie (`pending`, `sending`) n'est **jamais** purgée par l'âge. Tout est effacé à la suppression du compte |
 | **Mesures** | Un identifiant d'appareil définitivement rejeté par Firebase est supprimé par l'Edge Function d'envoi. La file d'attente `notification_outbox` n'est lisible par aucun client |
 
 ### 2.4 Tracer les actes d'administration
@@ -90,7 +92,7 @@ conditions d'utilisation. Sans lui, la répartition ci-dessus n'existe que dans 
 | **Tables** | `audit_log` |
 | **Base légale** | Intérêt légitime : sans trace, un désaccord sur « qui a coché cette case » ne se tranche pas (art. 6.1.f) |
 | **Destinataires** | Les administrateurs de la caserne concernée. Le membre lui-même, pour les actes qui le visent, par l'export du § 4 |
-| **Conservation** | Sans limite. La trace survit à la suppression du compte : `actor_id` désigne alors un profil anonyme. `[À COMPLÉTER : durée de conservation du journal d'audit — trois ans est l'ordre de grandeur usuel pour une trace administrative]` |
+| **Conservation** | **Trois ans** (tâche `prune_retention`, migration `0030`). La trace survit à la suppression du compte pendant ce délai : `actor_id` désigne alors un profil anonyme. Le raisonnement est au § 2 bis |
 
 ### 2.5 Facturer l'abonnement de la caserne
 
@@ -102,7 +104,58 @@ conditions d'utilisation. Sans lui, la répartition ci-dessus n'existe que dans 
 | **Tables** | `subscriptions`, `stripe_events` |
 | **Base légale** | Exécution du contrat d'abonnement, et obligation légale de conservation comptable (art. 6.1.b et 6.1.c) |
 | **Destinataires** | Les administrateurs de la caserne, l'éditeur, le prestataire de paiement |
-| **Conservation** | Durée de l'abonnement, puis la durée légale de conservation des pièces comptables. `[À COMPLÉTER : dix ans est la durée applicable en France aux livres et pièces comptables — à confirmer avec le comptable de l'éditeur]` |
+| **Conservation** | `subscriptions` : tant que la caserne existe — la ligne est créée avec elle et disparaît avec elle. `stripe_events` : **90 jours** pour les événements appliqués ou ignorés, sans limite pour ceux qui ont échoué (tâche `prune_retention`). **La durée légale comptable ne s'applique pas ici** : les pièces comptables — factures, reçus, moyens de paiement — sont chez le prestataire de paiement et relèvent de ses durées, pas des nôtres. La version 1 de ce document l'écrivait à tort ; `stripe_events` est un journal d'idempotence dont le rôle cesse quand le prestataire cesse de rejouer, c'est-à-dire au bout de trois jours. `[À COMPLÉTER : durée de conservation des factures chez le prestataire de paiement, et la manière dont l'éditeur en garde copie pour sa comptabilité — dix ans est la durée applicable en France aux livres et pièces comptables]` |
+
+---
+
+## 2 bis. Les durées de conservation, et ce qui les applique
+
+Une durée affichée dans un registre et appliquée par rien est un manquement, pas un retard : le
+document affirme quelque chose de faux. Ce tableau existe pour que la question se pose table par
+table, et il se relit à chaque migration qui ajoute une table.
+
+| Table | Durée | Ce qui l'applique |
+|---|---|---|
+| `profiles`, `memberships` | tant que l'appartenance existe, puis **anonymisé sans limite** | `delete_own_account` (migration `0026`) |
+| `availabilities`, `availability_preferences` | effacées à la suppression du compte | `delete_own_account` (migration `0026`) |
+| `periods`, `schedules`, `shifts`, `assignments` | **sans limite**, et c'est assumé : une garde tenue est un fait de service (`docs/PRD.md § 7` règle 6) | — |
+| `subscriptions` | tant que la caserne existe | suppression en cascade avec `stations` |
+| `notifications` | 90 jours après lecture, 365 jours sans lecture | tâche `prune_notifications` (migration `0030`) |
+| `push_tokens` | 365 jours sans usage | tâche `prune_retention` (migration `0030`) |
+| `notification_outbox` | 30 jours après traitement ; jamais une demande non partie | tâche `prune_retention` |
+| `invitations` | 30 jours après expiration ; 3 ans après acceptation | tâche `prune_retention` |
+| `audit_log` | **3 ans** | tâche `prune_retention` |
+| `stripe_events` | 90 jours pour `processed` et `skipped` ; sans limite pour `failed` | tâche `prune_retention` |
+
+Les durées sont des paramètres des fonctions de purge, pas des constantes : une caserne qui doit
+en changer une change un chiffre (migration `0030`, et `supabase/tests/purges_conservation_test.sql`
+qui vérifie chaque frontière à la journée près).
+
+### Pourquoi trois ans pour le journal d'audit
+
+La version 1 laissait la question ouverte en notant que « trois ans est l'ordre de grandeur
+usuel ». Le chiffre est retenu, et voici sur quoi il repose plutôt que sur l'usage :
+
+1. **À quoi sert la trace.** À expliquer *a posteriori* une décision d'administration sur les
+   données d'un membre : qui a coché cette disponibilité à ma place, qui m'a attribué cette garde
+   hors disponibilité, qui a réouvert ce mois (`docs/PRD.md § 7` règle 7). C'est un journal
+   **métier**, pas un journal technique de sécurité : la recommandation de la CNIL de six mois à
+   un an sur les journaux de connexion ne s'y applique pas.
+2. **Sur quelle durée la question peut encore se poser.** Un désaccord sur une garde naît dans
+   les jours qui suivent. Mais l'acte tracé sous-tend une indemnité de vacation horaire, et une
+   réclamation sur une somme due se prescrit par trois ans (art. L3245-1 du code du travail,
+   durée usuelle des créances salariales).
+3. **Pourquoi pas davantage.** Au-delà, plus personne ne conteste, et le journal ne serait plus
+   qu'un historique nominatif des gestes d'un chef de centre sur toute une carrière : conservé
+   sans finalité, donc conservé sans base légale.
+4. **Ce que la purge ne fait pas perdre.** Le fait reste : l'attribution, le créneau et la
+   mention « attribué hors disponibilité » vivent dans `assignments`, conservés sans limite
+   (§ 2.2). Ce qui expire au bout de trois ans, c'est le **nom de celui qui a posé le geste**,
+   pas la garde.
+
+`[À COMPLÉTER : une caserne publique dont le SDIS applique la déchéance quadriennale (loi du
+31 décembre 1968) voudra quatre ans. C'est un seul chiffre — le paramètre p_days de
+prune_audit_log — mais c'est une décision du responsable de traitement, pas de l'éditeur.]`
 
 ---
 
@@ -122,6 +175,14 @@ est la raison d'être de la migration `0026` :
   (`audit_log.actor_id`, `assignments.created_by`, `schedules.created_by`,
   `invitations.invited_by`, `availabilities.set_by`). Elles pointent désormais vers un profil
   anonyme — c'est exactement l'effet recherché.
+
+**Un reste connu, désormais borné.** L'invitation **déjà acceptée** garde l'adresse électronique
+à laquelle elle a été envoyée : elle n'est pas dans « ce qui part », et l'anonymisation du profil
+ne la touche pas. C'était, jusqu'au ticket 043, une adresse conservée sans limite malgré une
+suppression de compte. Elle disparaît maintenant trois ans après l'acceptation (§ 2 bis). Ce n'est
+pas un effacement immédiat, et ce document ne le présente pas comme tel — c'est une borne là où il
+n'y en avait aucune. `[À COMPLÉTER : décision du propriétaire — effacer aussi cette adresse à la
+suppression du compte, ce qui priverait la caserne de la trace de l'entrée de ce membre.]`
 
 Une caserne qui perdrait son dernier administrateur actif n'aurait plus personne pour publier un
 planning : la suppression est alors **refusée**, avec la sortie (« nomme d'abord quelqu'un »).
