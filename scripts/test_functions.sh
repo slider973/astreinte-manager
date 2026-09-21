@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Tests de bout en bout des Edge Functions : invitations (ticket 006), envoi de
 # notifications (ticket 025), publication d'un planning (ticket 019),
-# réattribution d'un créneau refusé (ticket 020), ligne interne d'un envoi
-# définitivement abandonné (ticket 040) et abonnement par caserne (ticket 029).
+# réattribution d'un créneau refusé (ticket 020), remplissage automatique d'un
+# brouillon (ticket 018), ligne interne d'un envoi définitivement abandonné
+# (ticket 040) et abonnement par caserne (ticket 029).
 #
 #   supabase start
 #   supabase functions serve          # dans un autre terminal
@@ -112,6 +113,10 @@ MEMBRE3_A="aaaaaaaa-0000-4000-8000-000000000103"
 # le seed le crée et rien d'autre ne s'en sert.
 PERIODE_A="aaaaaaaa-0000-4000-8000-000000000202"
 
+# Le mois M+1 de la caserne B, celui sur lequel la proposition automatique du
+# ticket 018 travaille : le seed le crée et rien d'autre ne s'en sert.
+PERIODE_B="bbbbbbbb-0000-4000-8000-000000000201"
+
 nettoyer() {
   sql "delete from audit_log where action like 'invitation.%';
        delete from notifications where type = 'invitation';
@@ -144,6 +149,11 @@ nettoyer() {
   sql "alter table schedules disable trigger schedules_guard_suppression;
        delete from schedules where period_id = '$PERIODE_A';
        alter table schedules enable trigger schedules_guard_suppression;" >/dev/null
+
+  # Le brouillon de la proposition automatique (section 26). Un brouillon se
+  # supprime sans écarter quoi que ce soit : c'est justement ce que la migration
+  # 0019 autorise, et ses attributions partent avec lui.
+  sql "delete from schedules where period_id = '$PERIODE_B';" >/dev/null
 }
 
 nettoyer
@@ -1339,6 +1349,90 @@ verifier "la RPC directe est refusée à authenticated : 403" "403" "$STATUT_RPC
 
 sql "delete from invitations where token = 'jeton-test-export-invitation';
      delete from push_tokens where token like 'jeton-test-export-%';" >/dev/null
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 26. auto-propose : appliquer un remplissage de brouillon (ticket 018)'
+# ---------------------------------------------------------------------------
+# **Ce que cette section couvre, et ce qu'elle ne couvre pas.** La couche HTTP :
+# jeton, rôle, corps de requête, codes de statut, et une application réelle
+# vérifiée en base. Le **choix** des pompiers, lui, est calculé dans
+# l'application avec le tri du ticket 017 et éprouvé par
+# `test/features/planning/proposition_automatique_test.dart` : ici, le plan est
+# écrit à la main, et c'est tout l'intérêt — on vérifie que la base tient ses
+# limites même quand on lui envoie un plan qu'aucun tri n'aurait produit.
+#
+# La caserne B et son mois M+1 : rien d'autre dans ce script ne s'en sert.
+
+appeler auto-propose - "{\"schedule_id\": \"$STATION_INCONNUE\", \"picks\": []}"
+verifier "sans jeton : 401" "401" "$STATUT"
+
+appeler auto-propose "$ADMIN_B" "{\"picks\": []}"
+verifier "sans schedule_id : 400" "400" "$STATUT"
+
+appeler auto-propose "$ADMIN_B" "{\"schedule_id\": \"$STATION_INCONNUE\"}"
+verifier "sans picks : 400" "400" "$STATUT"
+
+appeler auto-propose "$ADMIN_B" "{\"schedule_id\": \"$STATION_INCONNUE\", \"picks\": []}"
+verifier "planning inconnu : 404" "404" "$STATUT"
+verifier "et le code le dit" "schedule_not_found" "$(jq -r '.error.code' <<<"$CORPS")"
+
+# Le brouillon du mois M+1 de la caserne B, créé **comme l'écran le crée** :
+# `create_schedule` exige un `auth.uid()` d'administrateur, que psql n'a pas.
+PLANNING_B="$(curl -s -X POST "$API_URL/rest/v1/rpc/create_schedule" \
+  -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ADMIN_B" \
+  -H 'content-type: application/json' \
+  -d "{\"p_station\": \"bbbbbbbb-0000-4000-8000-000000000001\",
+       \"p_period\": \"$PERIODE_B\"}" | jq -r '.id // empty')"
+verifier "le brouillon de la caserne B existe" "true" \
+  "$([ -n "$PLANNING_B" ] && echo true || echo false)"
+
+appeler auto-propose "$ADMIN_A" "{\"schedule_id\": \"$PLANNING_B\", \"picks\": []}"
+verifier "l'admin de la caserne voisine ne remplit pas : 403" "403" "$STATUT"
+verifier "et le code le dit" "not_admin" "$(jq -r '.error.code' <<<"$CORPS")"
+
+# Trois lignes écrites à la main, prises dans les disponibilités réelles du
+# seed : les deux premiers créneaux qui ont un candidat, chacun avec **un seul**
+# pompier, puis une répétition de la première — que la base doit écarter.
+PICKS_B="$(sql "select jsonb_agg(p order by rang)::text from (
+  select row_number() over (order by sh.date, sh.slot) as rang,
+         jsonb_build_object('shift_id', sh.id, 'user_id', av.user_id) as p
+    from shifts sh
+    join lateral (
+      select a.user_id from availabilities a
+       where a.station_id = sh.station_id
+         and a.date = sh.date and a.slot = sh.slot
+         and a.status = 'available'
+       order by a.user_id
+       limit 1
+    ) av on true
+   where sh.schedule_id = '$PLANNING_B'
+   order by sh.date, sh.slot
+   limit 2
+) t")"
+PICKS_B="$(jq -c '. + [.[0]]' <<<"$PICKS_B")"
+
+OUTBOX_AVANT="$(sql "select count(*) from notification_outbox")"
+
+appeler auto-propose "$ADMIN_B" "{\"schedule_id\": \"$PLANNING_B\", \"picks\": $PICKS_B}"
+verifier "l'admin remplit son brouillon : 200" "200" "$STATUT"
+verifier "deux attributions posées" "2" "$(jq -r '.applied' <<<"$CORPS")"
+verifier "la ligne en double est écartée" "already_assigned" \
+  "$(jq -r '[.skipped[].code] | join(",")' <<<"$CORPS")"
+verifier "les attributions sont bien en base" "2" \
+  "$(sql "select count(*) from assignments a
+           join shifts sh on sh.id = a.shift_id
+          where sh.schedule_id = '$PLANNING_B'")"
+verifier "aucune n'est hors disponibilité" "0" \
+  "$(sql "select count(*) from assignments a
+           join shifts sh on sh.id = a.shift_id
+          where sh.schedule_id = '$PLANNING_B' and a.was_available is false")"
+verifier "rien n'est parti : proposed_at reste nul" "0" \
+  "$(sql "select count(*) from assignments a
+           join shifts sh on sh.id = a.shift_id
+          where sh.schedule_id = '$PLANNING_B' and a.proposed_at is not null")"
+verifier "et personne n'a été notifié" "$OUTBOX_AVANT" \
+  "$(sql "select count(*) from notification_outbox")"
 
 # ---------------------------------------------------------------------------
 echo ''

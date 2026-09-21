@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/l10n/app_strings.dart';
@@ -39,6 +40,11 @@ enum ErreurPlanning {
   /// `assignment_not_replaceable` : l'adjoint a réattribué le premier.
   dejaRemplacee(AppStrings.reattribuerDejaRemplacee),
 
+  /// `invalid_picks`, `too_many_picks` : le plan de remplissage envoyé n'a pas
+  /// la forme attendue. Ce n'est pas une panne du réseau, c'est un défaut de
+  /// l'appel, et il se dit avec la phrase de la proposition.
+  propositionRefusee(AppStrings.proposerErreur),
+
   /// `shift_already_filled` : toutes les places du créneau sont tenues. Ajouter
   /// quelqu'un ferait sonner un téléphone pour une garde déjà couverte.
   creneauPourvu(AppStrings.reattribuerCreneauPourvu),
@@ -64,6 +70,11 @@ enum ErreurPlanning {
     'assignment_not_active' => ErreurPlanning.dejaRemplacee,
     'shift_not_found' => ErreurPlanning.moisIntrouvable,
     'assignment_not_found' => ErreurPlanning.dejaRemplacee,
+    // `auto-propose` : le planning a été publié pendant qu'on regardait, ou il
+    // a disparu, ou le plan envoyé n'avait pas la forme attendue.
+    'schedule_not_draft' => ErreurPlanning.planningPublie,
+    'schedule_not_found' => ErreurPlanning.moisIntrouvable,
+    'invalid_picks' || 'too_many_picks' => ErreurPlanning.propositionRefusee,
     _ => ErreurPlanning.inconnue,
   };
 }
@@ -90,6 +101,30 @@ class ResultatReattribution {
   /// acceptation vient de disparaître, et l'écran doit cesser de dire
   /// « Validé ».
   final bool planningPublie;
+}
+
+/// Ce que `auto-propose` a réellement fait.
+///
+/// **Les trois nombres viennent du serveur, jamais du plan qu'on lui a envoyé.**
+/// L'adjoint a pu remplir un créneau entre la lecture et l'appui : annoncer
+/// « 48 posées » quand la base en a écarté deux serait annoncer un chiffre faux
+/// sur un écran dont c'est tout le métier d'être juste.
+@immutable
+class ResultatProposition {
+  const ResultatProposition({
+    required this.posees,
+    required this.ecartees,
+    required this.decouverts,
+  });
+
+  /// Attributions réellement créées.
+  final int posees;
+
+  /// Lignes du plan que la base a refusées, motifs confondus.
+  final int ecartees;
+
+  /// Créneaux encore à découvert après coup, comptés en base.
+  final int decouverts;
 }
 
 /// Un accès au planning refusé, avec sa phrase déjà en français.
@@ -175,6 +210,18 @@ abstract interface class PlanningRepository {
   Future<bool> definirEffectif({
     required String creneauId,
     required int effectif,
+  });
+
+  /// Applique un remplissage automatique : Edge Function `auto-propose`.
+  ///
+  /// [picks] est le plan **dans l'ordre du mois**, tel que
+  /// `PropositionAutomatique` l'a composé. L'ordre part tel quel : c'est lui
+  /// qui décide qui prend la dernière place d'un quota. La base revérifie
+  /// chaque ligne et écarte celles qui ne passent plus, sans refuser les
+  /// autres (migration 0028).
+  Future<ResultatProposition> appliquerProposition({
+    required String planningId,
+    required List<Map<String, String>> picks,
   });
 
   /// Réattribue un créneau d'un planning **publié** : Edge Function
@@ -337,6 +384,38 @@ class SupabasePlanningRepository implements PlanningRepository {
           .select('id');
 
       return rendues.isNotEmpty;
+    } on Object catch (echec) {
+      throw EchecPlanning(_traduire(echec));
+    }
+  }
+
+  @override
+  Future<ResultatProposition> appliquerProposition({
+    required String planningId,
+    required List<Map<String, String>> picks,
+  }) async {
+    try {
+      final reponse = await _client.functions.invoke(
+        'auto-propose',
+        body: <String, dynamic>{
+          'schedule_id': planningId,
+          'picks': picks,
+        },
+      );
+
+      final corps = reponse.data;
+      if (corps is! Map<String, dynamic>) {
+        throw const EchecPlanning(ErreurPlanning.inconnue);
+      }
+
+      final ecartees = corps['skipped'];
+      return ResultatProposition(
+        posees: (corps['applied'] as int?) ?? 0,
+        ecartees: ecartees is List ? ecartees.length : 0,
+        decouverts: (corps['shifts_short'] as int?) ?? 0,
+      );
+    } on FunctionException catch (echec) {
+      throw EchecPlanning(_traduireFonction(echec));
     } on Object catch (echec) {
       throw EchecPlanning(_traduire(echec));
     }

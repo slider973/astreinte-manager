@@ -1867,6 +1867,74 @@ abstract final class AppStrings {
       'Ouvre un créneau depuis la vue par jour pour l\'attribuer.';
 
   // -------------------------------------------------------------------
+  // Proposition automatique de remplissage (ticket 018)
+  // -------------------------------------------------------------------
+
+  static const String proposerAction = 'Proposer automatiquement';
+
+  static String proposerTitre(String mois) =>
+      'Proposition pour ${moisAvecDe(mois)}';
+
+  static const String proposerFermer = 'Fermer la proposition';
+  static const String proposerAnnuler = 'Annuler';
+
+  /// Le bouton porte le compte : appliquer 48 attributions n'est pas en
+  /// appliquer 3.
+  static String proposerConfirmer(int attributions) => attributions == 1
+      ? 'Appliquer 1 attribution'
+      : 'Appliquer $attributions attributions';
+
+  static const String proposerCreneauxRemplis = 'créneaux remplis';
+  static const String proposerAstreintes = 'astreintes posées';
+  static const String proposerDecouverts = 'sans candidat';
+
+  /// Ce que la machine s'interdit, dit une fois, à l'endroit où on le croit.
+  static const String proposerPromesse =
+      'Les créneaux que tu as remplis toi-même ne sont pas touchés. Personne '
+      'n\'est désigné hors de ses disponibilités, et personne ne dépasse le '
+      'nombre d\'astreintes qu\'il a accepté.';
+
+  static String proposerSansCandidat(int n) => n == 1
+      ? '1 créneau reste sans candidat'
+      : '$n créneaux restent sans candidat';
+
+  /// Ce n'est pas une panne : c'est l'état des disponibilités de la caserne.
+  static const String proposerSansCandidatDetail =
+      'Personne ne s\'est déclaré disponible, ou tous ceux qui l\'étaient ont '
+      'fait leur compte d\'astreintes. Ces créneaux se remplissent à la main.';
+
+  static const String proposerRienATrouver =
+      'Aucun créneau à pourvoir ne trouve de candidat disponible.';
+
+  /// Ce qui s'est réellement passé, pas ce qui était prévu.
+  static String proposerFait(int posees, int decouverts) {
+    final creneaux = decouverts == 0
+        ? ''
+        : decouverts == 1
+        ? ', 1 créneau reste sans candidat'
+        : ', $decouverts créneaux restent sans candidat';
+    return posees == 1
+        ? '1 astreinte posée$creneaux.'
+        : '$posees astreintes posées$creneaux.';
+  }
+
+  /// Des lignes ont été écartées par la base : l'autre administrateur est passé
+  /// avant. Le dire vaut mieux que d'annoncer un chiffre faux.
+  static String proposerFaitPartiel(int posees, int ecartees) =>
+      '$posees astreintes posées. '
+      '${ecartees == 1 ? '1 créneau a été pris' : '$ecartees créneaux ont été pris'} '
+      'entre-temps.';
+
+  static const String proposerRienFait =
+      'Aucune attribution n\'a été posée : tout avait déjà été repris.';
+
+  static const String proposerErreur =
+      'La proposition n\'a pas abouti. Le planning n\'a pas bougé.';
+
+  static const String proposerHorsLigne =
+      'Hors ligne : la proposition a besoin du réseau pour s\'appliquer.';
+
+  // -------------------------------------------------------------------
   // Publication et suivi des réponses (ticket 019)
   // -------------------------------------------------------------------
 

@@ -161,8 +161,7 @@ class RecapitulatifPublication {
 
     // Un seul parcours des créneaux, dans l'ordre du mois : la liste rendue est
     // celle que le chef lira, sans tri supplémentaire.
-    final tries = <CreneauPlanning>[...planning.creneaux]
-      ..sort(_ordreDuMois);
+    final tries = <CreneauPlanning>[...planning.creneaux]..sort(ordreDuMois);
 
     for (final creneau in tries) {
       final posees = planning.attributionsDe(creneau.id);
@@ -249,11 +248,17 @@ class RecapitulatifPublication {
   static bool _depasse(LigneMatrice ligne) =>
       (ligne.maxAstreintes != null && ligne.astreintes > ligne.maxAstreintes!) ||
       (ligne.maxWeekends != null && ligne.unitesWeekend > ligne.maxWeekends!);
+}
 
-  static int _ordreDuMois(CreneauPlanning a, CreneauPlanning b) {
-    final jours = a.jour.compareTo(b.jour);
-    if (jours != 0) return jours;
-    // Le jour passe avant la nuit, comme partout ailleurs dans le produit.
-    return a.creneau.index.compareTo(b.creneau.index);
-  }
+/// L'ordre du mois : le jour croissant, puis le créneau de jour avant celui de
+/// nuit, comme partout ailleurs dans le produit.
+///
+/// C'est **l'ordre chronologique** dont parle le ticket 018, et il est ici plutôt
+/// que dupliqué là-bas : le bordereau de publication et le remplissage
+/// automatique parcourent le même mois, ils n'ont pas à le parcourir
+/// différemment.
+int ordreDuMois(CreneauPlanning a, CreneauPlanning b) {
+  final jours = a.jour.compareTo(b.jour);
+  if (jours != 0) return jours;
+  return a.creneau.index.compareTo(b.creneau.index);
 }

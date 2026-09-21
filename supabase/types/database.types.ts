@@ -1022,6 +1022,10 @@ export type Database = {
         Args: { p_email: string; p_token: string; p_user_id: string }
         Returns: Json
       }
+      apply_auto_proposal: {
+        Args: { p_actor: string; p_picks: Json; p_schedule: string }
+        Returns: Json
+      }
       assignment_reminder_targets: {
         Args: { p_instant?: string; p_palier: string; p_schedule: string }
         Returns: string[]

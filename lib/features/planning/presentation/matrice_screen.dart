@@ -33,6 +33,7 @@ import '../domain/matrice_filtres.dart';
 import '../domain/matrice_providers.dart';
 import '../domain/planning_mois.dart';
 import '../domain/planning_providers.dart';
+import '../domain/proposition_automatique.dart';
 import '../domain/recapitulatif_publication.dart';
 import '../domain/suivi_providers.dart';
 import 'widgets/barre_commande_matrice.dart';
@@ -40,6 +41,7 @@ import 'widgets/confirmation_hors_dispo.dart';
 import 'widgets/confirmation_saisie_admin.dart';
 import 'widgets/grille_matrice.dart';
 import 'widgets/panneau_creneau.dart';
+import 'widgets/recapitulatif_proposition.dart';
 import 'widgets/recapitulatif_publication.dart';
 import 'widgets/squelette_matrice.dart';
 import 'widgets/vue_jour.dart';
@@ -291,6 +293,71 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
         ),
       ),
     );
+  }
+
+  // -------------------------------------------------------------------
+  // Proposer automatiquement — la partie du travail qu'une machine fait bien
+  // -------------------------------------------------------------------
+
+  /// Calcule le remplissage, montre le récapitulatif, applique si le chef
+  /// confirme.
+  ///
+  /// **Le plan est calculé une fois, ici, et il part tel quel.** Le recalculer
+  /// au moment d'appliquer en donnerait un second, et le récapitulatif que le
+  /// chef vient de valider n'engagerait plus rien (`design/018 § 4`).
+  Future<void> _proposer(EtatPlanning etat) async {
+    final proposition = PropositionAutomatique.construire(
+      planning: etat.planning,
+      lignes: ref.read(lignesAvecChargeProvider),
+      annee: etat.periode.annee,
+      mois: etat.periode.mois,
+    );
+
+    // Rien à proposer : le dire d'une phrase vaut mieux qu'ouvrir une feuille
+    // vide. Ce n'est pas une panne — personne n'est disponible, ou tous ceux
+    // qui l'étaient ont fait leur compte.
+    if (proposition.vide) {
+      _annoncer(AppStrings.proposerRienATrouver);
+      return;
+    }
+
+    await ouvrirProposition(
+      context,
+      proposition: proposition,
+      mois: AppStrings.moisLongs[etat.periode.mois - 1],
+      onAppliquer: () => _appliquer(proposition),
+    );
+  }
+
+  /// L'application proprement dite. Rend `true` quand la base a répondu : la
+  /// feuille ne se ferme qu'à ce moment-là.
+  Future<bool> _appliquer(PropositionAutomatique proposition) async {
+    final (:fait, :erreur) = await _planning.appliquerProposition(
+      proposition.picks,
+    );
+    if (fait == null || !mounted) return false;
+
+    // **Ce qui s'est réellement passé, pas ce qui était prévu.** L'adjoint a pu
+    // remplir un créneau entre la lecture et l'appui : annoncer le chiffre du
+    // plan serait annoncer un chiffre faux.
+    _annoncer(switch (fait) {
+      _ when fait.posees == 0 => AppStrings.proposerRienFait,
+      _ when fait.ecartees > 0 => AppStrings.proposerFaitPartiel(
+        fait.posees,
+        fait.ecartees,
+      ),
+      _ => AppStrings.proposerFait(fait.posees, fait.decouverts),
+    });
+    return erreur == null;
+  }
+
+  /// Pourquoi la proposition automatique est impossible, ou `null`.
+  String? _raisonProposition(EtatPlanning etat) {
+    if (etat.lectureSeule) return AppStrings.matriceSaisieIndisponibleSuspendue;
+    if (!(ref.watch(enLigneProvider).value ?? true)) {
+      return AppStrings.proposerHorsLigne;
+    }
+    return null;
   }
 
   // -------------------------------------------------------------------
@@ -611,6 +678,12 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
                   ? null
                   : () => unawaited(_creer()),
               raisonCreation: _raisonCreation(etatPlanning),
+              resteAPourvoir: ref.watch(resteAPourvoirProvider),
+              proposition: etatPlanning.proposition,
+              onProposer: _raisonProposition(etatPlanning) != null
+                  ? null
+                  : () => unawaited(_proposer(etatPlanning)),
+              raisonProposition: _raisonProposition(etatPlanning),
             ),
     );
 

@@ -50,15 +50,22 @@ class Candidat {
 /// Les candidats d'un créneau, dans l'ordre du PRD § 5.3.
 ///
 /// **Quota d'astreintes restant décroissant, puis astreintes acceptées sur les
-/// trois mois précédents croissant, puis nom.** C'est exactement l'ordre du
-/// tri « Astreintes restantes » de la matrice (ticket 016) : le chef retrouve
-/// le classement qu'il connaît déjà.
+/// trois mois précédents croissant, puis astreintes déjà posées sur le mois en
+/// construction croissant, puis nom.** Les deux premiers critères sont ceux du
+/// PRD, et ce sont exactement ceux du tri « Astreintes restantes » de la
+/// matrice (ticket 016) : le chef retrouve le classement qu'il connaît déjà.
 ///
-/// Deux règles que le tri naïf raterait :
+/// Trois règles qu'un tri naïf raterait :
 /// - **`null` passe en tête** : un illimité est la plus grande capacité
 ///   disponible, pas l'absence de capacité ;
 /// - **un reste négatif passe en queue**, après les zéros : celui qui est déjà
-///   au-delà de ce qu'il acceptait est le dernier qu'on dérange.
+///   au-delà de ce qu'il acceptait est le dernier qu'on dérange ;
+/// - **la charge du mois départage avant le nom**. Sans elle, deux pompiers
+///   sans plafond déclaré resteraient éternellement à égalité — leur reste est
+///   nul des deux côtés et ne bouge jamais — et l'ordre alphabétique désignerait
+///   toujours le même. C'est la clause « puis aléatoire » du ticket 018, rendue
+///   reproductible : même intention, mais un récapitulatif qui engage ce qu'il
+///   annonce (`design/018 § 3`).
 int comparerCandidats(Candidat a, Candidat b) {
   final resteA = a.astreintesRestantes;
   final resteB = b.astreintesRestantes;
@@ -69,10 +76,13 @@ int comparerCandidats(Candidat a, Candidat b) {
     return resteB.compareTo(resteA);
   }
 
-  final charge = a.membre.accepteesPrecedentes.compareTo(
+  final histoire = a.membre.accepteesPrecedentes.compareTo(
     b.membre.accepteesPrecedentes,
   );
-  if (charge != 0) return charge;
+  if (histoire != 0) return histoire;
+
+  final mois = a.membre.astreintes.compareTo(b.membre.astreintes);
+  if (mois != 0) return mois;
 
   return a.membre.nomAffiche.toLowerCase().compareTo(
     b.membre.nomAffiche.toLowerCase(),
