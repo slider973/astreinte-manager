@@ -3,18 +3,18 @@
 Deno / TypeScript, une fonction par dossier, la liste de référence est la section 7 de
 [`docs/SCHEMA.md`](../../docs/SCHEMA.md). Le code partagé est dans `_shared/`.
 
-| Fonction            | Ticket | Rôle                                                                                                                                                                      |
-| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation                     |
-| `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                                       |
-| `publish-schedule`  | 019    | Publie un planning : statut, `proposed_at` de chaque attribution, puis **une** notification par membre                                                                    |
-| `reassign-shift`    | 020    | Réattribue un créneau d'un planning publié : nouvelle attribution proposée, ancienne remplacée, **une** notification au nouveau membre                                    |
-| `auto-propose`      | 018    | Applique un remplissage automatique du brouillon : le plan vient de l'application (tri du ticket 017), la base revérifie chaque ligne et écarte celles qui ne passent pas |
-| `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                                      |
-| `create-checkout`   | 029    | État de l'abonnement d'une caserne, ouverture d'une session de paiement, ouverture du portail de gestion — réservé aux administrateurs de la caserne                      |
-| `stripe-webhook`    | 029    | Reçoit les événements du prestataire de paiement, **vérifie leur signature**, met à jour `subscriptions`                                                                  |
-| `delete-account`    | 007    | Le membre supprime son compte : profil anonymisé en « Membre supprimé », appartenances désactivées, attributions passées conservées                                       |
-| `export-user-data`  | 034    | Le membre récupère en JSON tout ce que l'application sait de lui, et rien de ce qu'elle sait des autres                                                                   |
+| Fonction            | Ticket | Rôle                                                                                                                                                                             |
+| ------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation, **plafond horaire** (038) |
+| `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                                              |
+| `publish-schedule`  | 019    | Publie un planning : statut, `proposed_at` de chaque attribution, puis **une** notification par membre                                                                           |
+| `reassign-shift`    | 020    | Réattribue un créneau d'un planning publié : nouvelle attribution proposée, ancienne remplacée, **une** notification au nouveau membre                                           |
+| `auto-propose`      | 018    | Applique un remplissage automatique du brouillon : le plan vient de l'application (tri du ticket 017), la base revérifie chaque ligne et écarte celles qui ne passent pas        |
+| `send-notification` | 025    | Écrit la ligne interne, envoie le push FCM et le courriel d'une notification, pour un ou plusieurs membres à la fois                                                             |
+| `create-checkout`   | 029    | État de l'abonnement d'une caserne, ouverture d'une session de paiement, ouverture du portail de gestion — réservé aux administrateurs de la caserne                             |
+| `stripe-webhook`    | 029    | Reçoit les événements du prestataire de paiement, **vérifie leur signature**, met à jour `subscriptions`                                                                         |
+| `delete-account`    | 007    | Le membre supprime son compte : profil anonymisé en « Membre supprimé », appartenances désactivées, attributions passées conservées                                              |
+| `export-user-data`  | 034    | Le membre récupère en JSON tout ce que l'application sait de lui, et rien de ce qu'elle sait des autres                                                                          |
 
 ## Règles qui ne se négocient pas
 
@@ -216,7 +216,70 @@ Réponse `200` — sémantique de lot : chaque adresse a son sort.
 ```
 
 Codes par adresse (`results[].code`) : `already_member`, `invalid_email`, `conflict`,
-`account_failed`, `internal_error`.
+`account_failed`, `rate_limited`, `internal_error`.
+
+### Le plafond de débit _(ticket 038)_
+
+Vingt adresses par appel bornaient un appel, pas leur nombre : un administrateur — ou un jeton
+d'administrateur volé — envoyait autant de courriels qu'il voulait, à des adresses qu'il
+choisissait, depuis le domaine d'envoi du produit. `create_invitation` (migration `0032`) compte
+désormais les courriels **réellement partis**, création et renvoi confondus, par caserne et par
+heure. Le plafond se règle dans `stations.settings.invitation_hourly_limit` (1 à 500, **60** par
+défaut) ; le super-administrateur a le sien, **200 par heure et par compte**, toutes casernes
+confondues.
+
+Une adresse refusée porte le code `rate_limited`, une **phrase affichable qui dit quand réessayer**,
+et les faits :
+
+```jsonc
+{
+  "email": "recrue@exemple.fr",
+  "status": "error",
+  "code": "rate_limited",
+  "message": "Limite d'invitations atteinte (60 par heure pour cette caserne). Réessaie dans 13 minutes.",
+  "rate_limit": {
+    "scope": "station", // "station" | "actor" (super-administrateur)
+    "limit": 60,
+    "used": 60,
+    "remaining": 0,
+    "window_minutes": 60,
+    "retry_at": "2026-09-21T15:12:00+00:00",
+    "retry_after_seconds": 730
+  }
+}
+```
+
+Deux comportements de lot à connaître côté client :
+
+- **Vingt adresses comptent pour vingt.** Le compteur est par adresse, pas par appel.
+- Dès qu'une adresse est refusée pour cette raison, **les suivantes ne sont pas tentées** : le
+  budget est épuisé pour toute la caserne, et vingt allers-retours pour s'entendre dire vingt fois
+  la même chose ne servent personne. Elles portent le même code et le même message.
+
+Quand **aucune** adresse n'est passée, la réponse est un refus global `429` plutôt qu'une liste ; un
+lot à moitié envoyé garde sa liste, sinon l'administrateur réessaierait des adresses déjà invitées.
+Le corps est la forme d'erreur habituelle, enrichie des mêmes faits :
+
+```jsonc
+{
+  "error": {
+    "code": "rate_limited",
+    "message": "Limite d'invitations atteinte (60 par heure pour cette caserne). Réessaie dans 13 minutes.",
+    "scope": "station",
+    "limit": 60,
+    "used": 60,
+    "remaining": 0,
+    "window_minutes": 60,
+    "retry_at": "…",
+    "retry_after_seconds": 730
+  }
+}
+```
+
+Le message est composé côté serveur (`_shared/invitation_rate_limit.ts`) parce que le délai change à
+chaque seconde : **affiche `message` tel quel** plutôt qu'un texte constant associé au code. Le
+dépassement est inscrit dans `audit_log` sous `invitation.rate_limited`, une fois par caserne et par
+fenêtre.
 
 Erreurs de requête, forme `{"error": {"code", "message"}}` :
 
@@ -226,6 +289,7 @@ Erreurs de requête, forme `{"error": {"code", "message"}}` :
 | 401    | `unauthenticated`    | Pas de jeton porteur, ou jeton qui n'identifie pas un utilisateur                     |
 | 403    | `not_admin`          | L'appelant n'est pas admin **actif** de `station_id`                                  |
 | 403    | `station_suspended`  | Abonnement suspendu : la caserne est en lecture seule                                 |
+| 429    | `rate_limited`       | Plafond horaire d'invitations atteint, et aucune adresse du lot n'est passée          |
 | 404    | `station_not_found`  | Caserne inconnue                                                                      |
 | 405    | `method_not_allowed` | Autre verbe que POST                                                                  |
 | 500    | `internal_error`     | Incident serveur                                                                      |

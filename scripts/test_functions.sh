@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests de bout en bout des Edge Functions : invitations (ticket 006), envoi de
 # notifications (ticket 025), publication d'un planning (ticket 019),
+# plafond de débit des invitations (ticket 038),
 # réattribution d'un créneau refusé (ticket 020), remplissage automatique d'un
 # brouillon (ticket 018), ligne interne d'un envoi définitivement abandonné
 # (ticket 040), abonnement par caserne (ticket 029) et flux calendrier (ticket 028).
@@ -135,6 +136,13 @@ nettoyer() {
   sql "delete from audit_log where action like 'invitation.%';
        delete from notifications where type = 'invitation';
        delete from invitations;
+       -- Le compteur du plafond de débit (ticket 038) et le réglage que la
+       -- section 3 bis abaisse : sans ce retour à l'état du seed, une exécution
+       -- interrompue laisserait la caserne A à une invitation par heure.
+       delete from invitation_rate_events;
+       update stations set settings = settings - 'invitation_hourly_limit'
+        where settings ? 'invitation_hourly_limit';
+       delete from audit_log where action = 'station.settings_updated';
        delete from memberships where left(user_id::text, 4) <> left(station_id::text, 4);
        delete from auth.users where email like 'invite-test-%';
        -- Le profil ne part plus avec le compte depuis la migration 0026 :
@@ -287,6 +295,64 @@ verifier "codes par adresse" "invalid_email already_member" \
   "$(jq -r '[.results[] | select(.status == "error") | .code] | join(" ")' <<<"$CORPS")"
 verifier "rôle admin transmis à l'invitation" "admin" \
   "$(sql "select role from invitations where email = 'invite-test-2@caserne-a.test'")"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 3 bis. invite-member : le plafond de débit (ticket 038)'
+# ---------------------------------------------------------------------------
+# Vingt adresses par appel bornaient un appel, pas leur nombre. Le plafond est
+# tenu en base (migration 0032) ; ce qui se vérifie ici est la couche HTTP :
+# le statut, le code, et **la phrase** — celle qui doit dire quand réessayer.
+sql "delete from invitation_rate_events;
+     update stations set settings = settings || '{\"invitation_hourly_limit\": 1}'::jsonb
+      where id = '$STATION_A';" >/dev/null
+
+appeler invite-member "$ADMIN_A" \
+  "{\"station_id\":\"$STATION_A\",\"emails\":[\"invite-test-3@caserne-a.test\",\"invite-test-4@caserne-a.test\",\"invite-test-5@caserne-a.test\"]}"
+verifier "lot partiellement passé : 200 et la liste par adresse" "200" "$STATUT"
+verifier "une seule adresse invitée" "1" "$(jq -r '.invited' <<<"$CORPS")"
+verifier "les deux suivantes refusées" "2" "$(jq -r '.failed' <<<"$CORPS")"
+verifier "code rate_limited par adresse" "rate_limited rate_limited" \
+  "$(jq -r '[.results[] | select(.status == "error") | .code] | join(" ")' <<<"$CORPS")"
+verifier "le message dit quand réessayer" "oui" \
+  "$(jq -r '[.results[] | select(.code == "rate_limited") | .message] | first' <<<"$CORPS" \
+    | grep -q 'Réessaie dans ' && echo oui || echo non)"
+verifier "le message dit le plafond en vigueur" "oui" \
+  "$(jq -r '[.results[] | select(.code == "rate_limited") | .message] | first' <<<"$CORPS" \
+    | grep -q '1 par heure pour cette caserne' && echo oui || echo non)"
+verifier "le délai est joint en secondes" "oui" \
+  "$(jq -r '[.results[] | select(.code == "rate_limited") | .rate_limit.retry_after_seconds] | first' <<<"$CORPS" \
+    | grep -Eq '^[0-9]+$' && echo oui || echo non)"
+verifier "aucun compte créé pour les adresses refusées" "0" \
+  "$(sql "select count(*) from auth.users
+          where email in ('invite-test-4@caserne-a.test', 'invite-test-5@caserne-a.test')")"
+verifier "aucune invitation pour les adresses refusées" "0" \
+  "$(sql "select count(*) from invitations
+          where email in ('invite-test-4@caserne-a.test', 'invite-test-5@caserne-a.test')")"
+
+# Le refus qui vaut pour toute la requête : aucune adresse ne passe, donc 429.
+appeler invite-member "$ADMIN_A" \
+  "{\"station_id\":\"$STATION_A\",\"email\":\"invite-test-6@caserne-a.test\"}"
+verifier "plus rien ne passe : 429" "429" "$STATUT"
+verifier "code rate_limited" "rate_limited" "$(jq -r '.error.code' <<<"$CORPS")"
+verifier "la phrase du refus global dit le délai" "oui" \
+  "$(jq -r '.error.message' <<<"$CORPS" | grep -q 'Réessaie dans ' && echo oui || echo non)"
+verifier "le refus global porte la date de réessai" "oui" \
+  "$(jq -r '.error.retry_at' <<<"$CORPS" | grep -Eq '^[0-9]{4}-' && echo oui || echo non)"
+verifier "dépassement journalisé une seule fois" "1" \
+  "$(sql "select count(*) from audit_log
+          where station_id = '$STATION_A' and action = 'invitation.rate_limited'")"
+
+# La caserne voisine n'est pas plafonnée par celle-ci.
+appeler invite-member "$ADMIN_B" \
+  "{\"station_id\":\"$STATION_B\",\"email\":\"invite-test-7@caserne-b.test\"}"
+verifier "la caserne B invite malgré le plafond de la caserne A : 200" "200" "$STATUT"
+verifier "et son invitation est bien créée" "invited" "$(jq -r '.results[0].status' <<<"$CORPS")"
+
+sql "update stations set settings = settings - 'invitation_hourly_limit'
+      where id = '$STATION_A';
+     delete from invitation_rate_events;
+     delete from audit_log where action = 'invitation.rate_limited';" >/dev/null
 
 # ---------------------------------------------------------------------------
 echo ''

@@ -15,8 +15,20 @@
 //
 // Le token d'invitation ne sort jamais de cette fonction : il part uniquement dans
 // le lien du courriel, vers l'adresse invitée.
+//
+// Plafond de débit (ticket 038) : vingt adresses par appel bornaient un appel, pas
+// leur nombre. `create_invitation` compte désormais les courriels réellement partis,
+// par caserne et par heure (migration 0032), et refuse avec le code `rate_limited`.
+// Dès qu'une adresse du lot est refusée pour cette raison, **les suivantes ne sont
+// même pas tentées** : le budget est épuisé pour tout le monde, et vingt allers-retours
+// pour s'entendre dire vingt fois la même chose ne servent personne.
 
 import { errorResponse, jsonResponse, preflight, readJsonBody } from "../_shared/http.ts";
+import {
+  type DetailDebit,
+  lireDetailDebit,
+  messageDebitDepasse,
+} from "../_shared/invitation_rate_limit.ts";
 import { type AdminClient, adminClient, caller } from "../_shared/supabase.ts";
 import { sendMail } from "../_shared/mailer.ts";
 import { invitationUrl, renderInvitationEmail } from "../_shared/invitation_email.ts";
@@ -29,6 +41,14 @@ type CreateInvitationResult = {
   ok: boolean;
   code?: string;
   resent?: boolean;
+  // Joints au code `rate_limited` (migration 0032).
+  scope?: string;
+  limit?: number;
+  used?: number;
+  remaining?: number;
+  window_minutes?: number;
+  retry_at?: string;
+  retry_after_seconds?: number;
   token?: string;
   account_exists?: boolean;
   invitee_id?: string | null;
@@ -59,6 +79,8 @@ type ResultatAdresse = {
   expires_at?: string;
   email_sent?: boolean;
   email_provider?: string;
+  /** Renseigné pour le seul code `rate_limited` : de quoi afficher le délai. */
+  rate_limit?: DetailDebit;
 };
 
 /** Messages rendus au client, en français, jamais de détail technique. */
@@ -70,6 +92,8 @@ const MESSAGES: Record<string, string> = {
   station_not_found: "Cette caserne n'existe pas.",
   not_admin: "Il faut être administrateur de cette caserne pour inviter.",
   station_suspended: "L'abonnement de la caserne est suspendu : les invitations sont bloquées.",
+  // `rate_limited` n'est pas ici : sa phrase porte le délai avant de pouvoir
+  // réessayer, elle se compose à partir des faits (voir messageDebitDepasse).
 };
 
 function message(code: string): string {
@@ -126,6 +150,22 @@ async function tracerNotification(
   if (error) console.error("notification invitation non tracée", error.message);
 }
 
+/**
+ * Le refus de débit d'une adresse, avec sa phrase et ses faits.
+ *
+ * Le message est composé ici plutôt que pris dans MESSAGES : il porte le délai
+ * avant de pouvoir réessayer, et ce délai change à chaque seconde.
+ */
+function refusDebit(email: string, detail: DetailDebit): ResultatAdresse {
+  return {
+    email,
+    status: "error",
+    code: "rate_limited",
+    message: messageDebitDepasse(detail),
+    rate_limit: detail,
+  };
+}
+
 async function inviterUneAdresse(
   admin: AdminClient,
   stationId: string,
@@ -153,6 +193,12 @@ async function inviterUneAdresse(
   const resultat = data as unknown as CreateInvitationResult;
   if (!resultat.ok) {
     const code = resultat.code ?? "internal_error";
+    if (code === "rate_limited") {
+      return refusDebit(
+        email,
+        lireDetailDebit(resultat as unknown as Record<string, unknown>),
+      );
+    }
     return { email, status: "error", code, message: message(code) };
   }
 
@@ -327,20 +373,43 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   const resultats: ResultatAdresse[] = [];
+  let debitEpuise: DetailDebit | null = null;
   for (const adresse of adresses) {
-    resultats.push(
-      await inviterUneAdresse(admin, stationId, adresse, role, utilisateur.id),
+    if (debitEpuise !== null) {
+      resultats.push(refusDebit(adresse, debitEpuise));
+      continue;
+    }
+
+    const resultat = await inviterUneAdresse(
+      admin,
+      stationId,
+      adresse,
+      role,
+      utilisateur.id,
     );
+    resultats.push(resultat);
+    // Le plafond vaut pour la caserne entière : la place ne reviendra pas d'une
+    // adresse à l'autre du même lot.
+    if (resultat.code === "rate_limited") debitEpuise = resultat.rate_limit ?? {};
   }
 
   // Un refus qui vaut pour toute la requête (caserne suspendue, droit perdu entre
-  // deux appels) est rendu comme tel plutôt que noyé dans la liste.
+  // deux appels, plafond de débit) est rendu comme tel plutôt que noyé dans la
+  // liste. Le plafond n'est global que si **aucune** adresse n'est passée : un lot
+  // à moitié envoyé garde sa liste, sinon l'administrateur réessaierait des
+  // adresses déjà invitées.
   const global = resultats.find(
     (r) =>
       r.status === "error" &&
-      (r.code === "station_suspended" || r.code === "not_admin"),
+      (r.code === "station_suspended" || r.code === "not_admin" ||
+        r.code === "rate_limited"),
   );
   if (global && resultats.every((r) => r.code === global.code)) {
+    if (global.code === "rate_limited") {
+      return errorResponse(429, "rate_limited", global.message!, {
+        ...(global.rate_limit ?? {}),
+      });
+    }
     return errorResponse(403, global.code!, message(global.code!));
   }
 
