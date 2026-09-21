@@ -741,9 +741,7 @@ export function construireContenu(
       return {
         titre: `${caserne ?? "La caserne"} est en lecture seule`,
         corps: [
-          quand
-            ? `L'abonnement est suspendu depuis le ${quand}.`
-            : "L'abonnement est suspendu.",
+          quand ? `L'abonnement est suspendu depuis le ${quand}.` : "L'abonnement est suspendu.",
           "Rien n'a été supprimé : les plannings, les disponibilités et",
           "l'historique restent consultables. La saisie rouvrira dès la reprise",
           "de l'abonnement.",

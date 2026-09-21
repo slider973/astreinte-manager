@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:astreinte_sp/app.dart';
+import 'package:astreinte_sp/core/caserne/caserne_providers.dart';
+import 'package:astreinte_sp/core/caserne/caserne_repository.dart';
 import 'package:astreinte_sp/core/env.dart';
 import 'package:astreinte_sp/core/firebase/firebase_bootstrap.dart';
 import 'package:astreinte_sp/core/plateforme/contexte_plateforme.dart';
@@ -55,6 +57,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'faux_abonnement.dart';
 import 'faux_astreintes.dart';
+import 'faux_caserne.dart';
 import 'faux_dispos.dart';
 import 'faux_invitations.dart';
 import 'faux_notifications.dart';
@@ -243,6 +246,7 @@ Future<AppMontee> monterApp(
   ProfilRepository? profils,
   ParametresRepository? parametres,
   AbonnementRepository? abonnement,
+  CaserneRepository? caserne,
   FauxOuvertureExterne? ouverture,
   PeriodesRepository? periodes,
   MatriceRepository? matrice,
@@ -311,6 +315,18 @@ Future<AppMontee> monterApp(
         // en a pas — et l'application doit tourner ainsi.
         abonnementRepositoryProvider.overrideWithValue(
           abonnement ?? FauxAbonnementRepository(),
+        ),
+        // L'état d'abonnement vu par **tous** les écrans qui écrivent
+        // (ticket 030). Par défaut : une caserne en essai qui écrit, comme le
+        // seed. Sans faux, chaque test toucherait un client Supabase qui
+        // n'existe pas en test.
+        caserneRepositoryProvider.overrideWithValue(
+          caserne ?? FauxCaserneRepository(),
+        ),
+        // Les deux paliers du bandeau d'essai se comptent en jours : sans
+        // horloge figée, « il reste 3 jours » dépendrait du jour du test.
+        horlogeCaserneProvider.overrideWithValue(
+          horloge ?? () => maintenantTest,
         ),
         ouvertureExterneProvider.overrideWithValue(
           (ouverture ?? FauxOuvertureExterne()).call,
