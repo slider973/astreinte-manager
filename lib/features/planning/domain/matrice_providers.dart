@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -75,29 +77,61 @@ PeriodeSaisie? periodeParDefautAdmin(
   return triees.last;
 }
 
-/// Le mois que l'écran d'administration travaille, résolu **une seule fois**.
+/// Le mois que l'écran d'administration travaille : celui de l'URL s'il existe
+/// dans la caserne, le défaut sinon.
 ///
-/// La matrice et le planning en dépendent tous les deux, et il n'y a qu'une
-/// bonne façon de le faire : un provider à part. Le faire résoudre par le
-/// contrôleur de la matrice ferait recharger le planning à chaque case saisie.
+/// Une clé de mois inconnue de la caserne — un lien partagé, une URL bricolée
+/// — retombe sur le défaut plutôt que de rendre un écran vide.
+PeriodeSaisie? periodeAdminParmi(List<PeriodeSaisie> periodes, String? cle) {
+  if (periodes.isEmpty) return null;
+  for (final periode in periodes) {
+    if (periode.cle == cle) return periode;
+  }
+  return periodeParDefautAdmin(periodes, DateTime.now());
+}
+
+/// Le mois que les trois écrans d'administration travaillent — matrice,
+/// planning, suivi — résolu **sans attendre quand la liste des mois est déjà
+/// lue**, ce qui est le cas courant.
 ///
 /// `null` signifie « rien à afficher » : pas d'administrateur, pas de période.
-final FutureProvider<PeriodeSaisie?> periodeAdminProvider =
-    FutureProvider<PeriodeSaisie?>((ref) async {
-      final appartenance = ref.watch(appartenanceCouranteProvider);
-      if (appartenance == null || !appartenance.estAdmin) return null;
+///
+/// Pourquoi une fonction et non un `FutureProvider` de plus : `await` sur un
+/// provider asynchrone ne coûte pas une micro-tâche, il coûte **une image
+/// entière**. Riverpod ne publie la valeur d'un provider asynchrone qu'au
+/// terme de l'image en cours, et sur le web cette image contient toute la
+/// construction, la mise en page et la peinture du nouvel écran : la requête de
+/// la matrice partait donc systématiquement après elle. Mesuré au ticket 042,
+/// en mode profil dans Chrome : 75 ms de retard avec le processeur bridé ×4,
+/// 117 ms bridé ×6, et c'est l'écran le plus lourd du produit qui est peint
+/// pendant ce temps — pour ne montrer qu'un squelette.
+///
+/// Les trois contrôleurs déclarent ainsi les mêmes dépendances qu'avant, dans
+/// le `ref` de chacun : l'appartenance, le mois choisi, la liste des mois.
+FutureOr<PeriodeSaisie?> periodeAdmin(Ref ref) {
+  final appartenance = ref.watch(appartenanceCouranteProvider);
+  if (appartenance == null || !appartenance.estAdmin) return null;
 
-      final periodes = await ref.watch(periodesProvider.future);
-      if (periodes.isEmpty) return null;
+  final cle = ref.watch(moisMatriceProvider);
 
-      final cle = ref.watch(moisMatriceProvider);
-      for (final periode in periodes) {
-        if (periode.cle == cle) return periode;
-      }
-      // Une clé de mois inconnue de la caserne — un lien partagé, une URL
-      // bricolée — retombe sur le défaut plutôt que de rendre un écran vide.
-      return periodeParDefautAdmin(periodes, DateTime.now());
-    });
+  // La dépendance déclarée reste le **futur** de la liste, comme avant : en
+  // observer l'état ferait reconstruire le contrôleur quand la liste passe de
+  // « en cours » à « lue », donc partir deux fois la requête de l'écran. Vu au
+  // journal réseau d'un chargement à froid (ticket 042).
+  final futur = ref.watch(periodesProvider.future);
+
+  // Ce qu'on a déjà sous la main, sans en dépendre. `AsyncData` et rien
+  // d'autre : une relecture en cours porte encore la valeur précédente, et
+  // c'est la nouvelle qu'il faut attendre.
+  final deja = ref.read(periodesProvider);
+  if (deja is AsyncData<List<PeriodeSaisie>>) {
+    return periodeAdminParmi(deja.value, cle);
+  }
+
+  return futur.then(
+    (List<PeriodeSaisie> liste) => periodeAdminParmi(liste, cle),
+  );
+}
 
 /// Ce que l'écran « Planning du mois » affiche.
 @immutable
@@ -163,7 +197,7 @@ class MatriceController extends AsyncNotifier<EtatMatrice?> {
     final appartenance = ref.watch(appartenanceCouranteProvider);
     if (appartenance == null || !appartenance.estAdmin) return null;
 
-    final periode = await ref.watch(periodeAdminProvider.future);
+    final periode = await periodeAdmin(ref);
     if (periode == null) return null;
 
     return _lire(appartenance.stationId, periode);

@@ -151,7 +151,7 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
     final appartenance = ref.watch(appartenanceCouranteProvider);
     if (appartenance == null || !appartenance.estAdmin) return null;
 
-    final periode = await ref.watch(periodeAdminProvider.future);
+    final periode = await periodeAdmin(ref);
     if (periode == null) return null;
 
     ref.onDispose(() => _apaisement?.cancel());

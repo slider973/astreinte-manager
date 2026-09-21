@@ -182,7 +182,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
     final appartenance = ref.watch(appartenanceCouranteProvider);
     if (appartenance == null || !appartenance.estAdmin) return null;
 
-    final periode = await ref.watch(periodeAdminProvider.future);
+    final periode = await periodeAdmin(ref);
     if (periode == null) return null;
 
     _brancher(appartenance.stationId);

@@ -36,6 +36,7 @@ import '../session/session_providers.dart';
 import '../supabase/supabase_bootstrap.dart';
 import 'auth_redirection.dart';
 import 'destination_initiale.dart';
+import 'prechargement_route.dart';
 
 /// Chemins et noms de routes de l'application.
 ///
@@ -257,6 +258,9 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
   final rafraichissement = _RafraichissementRouteur(ref);
   ref.onDispose(rafraichissement.dispose);
 
+  final prechargement = PrechargementRoutes();
+  ref.onDispose(prechargement.relacher);
+
   final destinationInitiale = ref.watch(destinationInitialeProvider);
 
   final routeur = GoRouter(
@@ -341,6 +345,13 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         }
       }
 
+      // **La destination est acceptée : ses données partent maintenant.**
+      //
+      // Cette fonction s'exécute dans la tâche du geste, avant l'image de la
+      // transition ; l'écran, lui, ne demanderait ses données qu'une fois
+      // cette image construite, mise en page et peinte
+      // (`prechargement_route.dart`).
+      prechargement.versLaRoute(ref, state.matchedLocation);
       return null;
     },
     routes: <RouteBase>[
