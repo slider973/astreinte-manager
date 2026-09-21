@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/caserne/etat_caserne.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/superadmin/data/superadmin_repository.dart';
@@ -76,6 +78,7 @@ class FauxSuperAdminRepository implements SuperAdminRepository {
   FauxSuperAdminRepository({
     this.autorise = true,
     List<CaserneSupervisee>? casernes,
+    this.porte,
     this.plannings_ = const <PlanningSupervise>[],
     this.echecCreation,
     this.echecSuspension,
@@ -84,6 +87,12 @@ class FauxSuperAdminRepository implements SuperAdminRepository {
 
   /// Le droit de l'éditeur, tel que `is_super_admin()` le rend.
   bool autorise;
+
+  /// Retient la réponse de `is_super_admin()` jusqu'à ce que le test la
+  /// libère. Le routeur écoute ce droit **et** l'état d'authentification : les
+  /// tenir tous les deux permet de les faire arriver dans la même image, ce
+  /// qui est exactement le démarrage à froid du ticket 045.
+  final Completer<void>? porte;
 
   List<CaserneSupervisee> _casernes;
 
@@ -110,7 +119,10 @@ class FauxSuperAdminRepository implements SuperAdminRepository {
       <({String stationId, String raison})>[];
 
   @override
-  Future<bool> estSuperAdmin() async => autorise;
+  Future<bool> estSuperAdmin() async {
+    await porte?.future;
+    return autorise;
+  }
 
   @override
   Future<List<CaserneSupervisee>> casernes() async {
