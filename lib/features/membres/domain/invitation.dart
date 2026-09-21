@@ -3,6 +3,24 @@ import 'package:flutter/foundation.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/appartenance.dart';
 
+/// Ce que la caserne sait de l'envoi du courriel d'une invitation.
+///
+/// Trois états, lus dans les deux colonnes `email_sent_at` / `email_error`
+/// de la migration `0035` (`docs/SCHEMA.md § 2.4`). Le troisième n'est pas un
+/// quatrième nom pour [nonParti] : une invitation créée avant la migration ne
+/// porte aucune trace, et la déclarer en échec serait inventer un fait.
+enum EnvoiCourriel {
+  /// Un motif d'échec, et aucune date : personne n'a été prévenu.
+  nonParti,
+
+  /// Une date : le courriel est parti, à cette date.
+  parti,
+
+  /// Les deux colonnes vides. **On ne sait pas**, et surtout pas « non
+  /// envoyé ».
+  inconnu,
+}
+
 /// Une invitation en attente (`docs/SCHEMA.md § 2.4`).
 ///
 /// **Le jeton n'est pas là, et c'est voulu** : la colonne `token` est hors du
@@ -18,6 +36,8 @@ class Invitation {
     required this.creeLe,
     this.prenom,
     this.nom,
+    this.courrielEnvoyeLe,
+    this.courrielEnEchec = false,
   });
 
   factory Invitation.depuisJson(Map<String, dynamic> ligne) => Invitation(
@@ -28,10 +48,18 @@ class Invitation {
     creeLe: DateTime.parse(ligne['created_at']! as String).toLocal(),
     prenom: _texte(ligne['first_name']),
     nom: _texte(ligne['last_name']),
+    courrielEnvoyeLe: _date(ligne['email_sent_at']),
+    // Le motif lui-même ne monte pas : « aucun fournisseur de courriel
+    // configuré » se diagnostique dans les journaux, il ne se lit pas dans un
+    // écran d'administration de caserne. Seul le fait qu'il existe compte.
+    courrielEnEchec: _texte(ligne['email_error']) != null,
   );
 
   static String? _texte(Object? valeur) =>
       valeur is String && valeur.trim().isNotEmpty ? valeur.trim() : null;
+
+  static DateTime? _date(Object? valeur) =>
+      valeur is String ? DateTime.tryParse(valeur)?.toLocal() : null;
 
   final String id;
   final String email;
@@ -43,6 +71,26 @@ class Invitation {
   /// invitations créées à la main : le formulaire ne demande que des adresses.
   final String? prenom;
   final String? nom;
+
+  /// L'horodatage du dernier envoi **réussi** du courriel, s'il y en a eu un.
+  final DateTime? courrielEnvoyeLe;
+
+  /// Vrai quand le dernier envoi a échoué. Le motif reste côté base : il est
+  /// technique, et le chef de centre n'en fait rien.
+  final bool courrielEnEchec;
+
+  /// Ce qu'on peut affirmer de l'envoi, et rien de plus.
+  ///
+  /// L'ordre de lecture est celui de `docs/SCHEMA.md § 2.4` : un motif sans
+  /// date dit que personne n'a été prévenu ; une date dit que c'est parti,
+  /// même si un renvoi a échoué depuis ; deux colonnes vides ne disent rien.
+  EnvoiCourriel get envoiCourriel {
+    if (courrielEnEchec && courrielEnvoyeLe == null) {
+      return EnvoiCourriel.nonParti;
+    }
+    if (courrielEnvoyeLe != null) return EnvoiCourriel.parti;
+    return EnvoiCourriel.inconnu;
+  }
 
   /// « Marie Lefèbvre », ou `null` quand l'invitation n'a pas de nom.
   ///
@@ -65,11 +113,22 @@ class Invitation {
       other.expireLe == expireLe &&
       other.creeLe == creeLe &&
       other.prenom == prenom &&
-      other.nom == nom;
+      other.nom == nom &&
+      other.courrielEnvoyeLe == courrielEnvoyeLe &&
+      other.courrielEnEchec == courrielEnEchec;
 
   @override
-  int get hashCode =>
-      Object.hash(id, email, role, expireLe, creeLe, prenom, nom);
+  int get hashCode => Object.hash(
+    id,
+    email,
+    role,
+    expireLe,
+    creeLe,
+    prenom,
+    nom,
+    courrielEnvoyeLe,
+    courrielEnEchec,
+  );
 }
 
 /// Le sort d'une adresse dans un envoi de lot (`supabase/functions/README.md`).
@@ -331,6 +390,23 @@ class RapportInvitations {
       resultats.where((ResultatInvitation r) => !r.enEchec).length;
 
   int get echecs => resultats.where((ResultatInvitation r) => r.enEchec).length;
+
+  /// Les refus, dans l'ordre où le serveur les a rendus.
+  ///
+  /// Ce sont les seules lignes qu'un compte rendu a besoin de **nommer** :
+  /// une réussite se compte, un refus se lit.
+  List<ResultatInvitation> get refus => resultats
+      .where((ResultatInvitation r) => r.enEchec)
+      .toList(growable: false);
+
+  /// Les invitations créées dont le courriel n'est jamais parti.
+  ///
+  /// Ce n'est pas un échec d'invitation — la ligne existe, le renvoi la
+  /// relance —, et c'est un **nombre** plutôt qu'une liste : quand aucun
+  /// fournisseur de courriel n'est configuré, tout l'envoi est dans ce cas.
+  int get courrielsNonPartis => resultats
+      .where((ResultatInvitation r) => !r.enEchec && !r.courrielEnvoye)
+      .length;
 
   /// Les adresses en échec, pour proposer de les réessayer seules.
   List<String> get adressesEnEchec => resultats

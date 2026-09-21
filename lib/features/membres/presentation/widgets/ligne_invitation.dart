@@ -17,6 +17,13 @@ import '../../domain/invitation.dart';
 ///
 /// L'état est porté par un badge (marque + icône + libellé) et non par la
 /// seule couleur : une invitation périmée se lit en niveaux de gris.
+///
+/// **Ce que la caserne sait de l'envoi du courriel** (ticket 048) se dit sur
+/// la même ligne, en trois états et jamais deux (voir [_Envoi]). Sans lui,
+/// une invitation dont le courriel n'est jamais parti affiche « En attente »
+/// et sa date d'expiration, exactement comme une invitation partie que le
+/// destinataire tarde à accepter : l'administrateur attend alors une réponse
+/// que personne ne peut lui donner.
 class LigneInvitation extends StatelessWidget {
   const LigneInvitation({
     required this.invitation,
@@ -51,6 +58,8 @@ class LigneInvitation extends StatelessWidget {
     final echeance = expiree
         ? AppStrings.invitationExpireeDepuis(date)
         : AppStrings.invitationExpireLe(date);
+    final envoye = invitation.courrielEnvoyeLe;
+    final envoi = envoye == null ? null : formaterDateLongue(envoye);
 
     return Semantics(
       container: true,
@@ -101,6 +110,7 @@ class LigneInvitation extends StatelessWidget {
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
+                        _Envoi(etat: invitation.envoiCourriel, date: envoi),
                       ],
                     ),
                   ],
@@ -126,6 +136,65 @@ class LigneInvitation extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Ce que la caserne sait de l'envoi du courriel (ticket 048).
+///
+/// **Trois états, et un gris pour les trois.** En production aucun
+/// fournisseur de courriel n'est configuré : toute la liste est alors dans
+/// l'état [EnvoiCourriel.nonParti], et une liste entièrement rouge ne dirait
+/// plus rien. C'est un fait de la maison, pas une faute — `DESIGN.md § Do`
+/// range « verrouillé », « suspendu », « annulé » du même côté, et l'aperçu
+/// d'import applique déjà cette distinction. Ce qui sépare les trois états
+/// est donc l'icône et le libellé, jamais la teinte.
+///
+/// Le geste utile est juste à droite : « Renvoyer », sur la même ligne. Le
+/// lien, lui, n'est pas affichable — `token` est hors du grant de select
+/// (migration `0008`), un écran admin ne voit jamais le lien qu'il a envoyé.
+class _Envoi extends StatelessWidget {
+  const _Envoi({required this.etat, this.date});
+
+  final EnvoiCourriel etat;
+
+  /// La date du dernier envoi réussi, déjà formatée. Nulle hors de
+  /// [EnvoiCourriel.parti].
+  final String? date;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final encre = theme.colorScheme.onSurfaceVariant;
+
+    // La date fait partie de la phrase : « parti » sans date ne se dit pas à
+    // moitié, il retombe sur « on ne sait pas », qui reste vrai.
+    final (IconData icone, String libelle) = switch ((etat, date)) {
+      (EnvoiCourriel.nonParti, _) => (
+        Icons.schedule_send_outlined,
+        AppStrings.invitationCourrielNonParti,
+      ),
+      (EnvoiCourriel.parti, final String quand) => (
+        Icons.mark_email_read_outlined,
+        AppStrings.invitationCourrielEnvoyeLe(quand),
+      ),
+      _ => (Icons.help_outline, AppStrings.invitationCourrielInconnu),
+    };
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(icone, size: AppTouch.icone, color: encre),
+        const SizedBox(width: AppSpacing.xs),
+        // Souple : à grande taille de police ou sur un petit écran, la phrase
+        // se replie plutôt que de déborder de la ligne.
+        Flexible(
+          child: Text(
+            libelle,
+            style: theme.textTheme.bodyMedium?.copyWith(color: encre),
+          ),
+        ),
+      ],
     );
   }
 }

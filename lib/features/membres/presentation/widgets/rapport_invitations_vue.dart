@@ -10,6 +10,13 @@ import '../../domain/invitation.dart';
 /// Un envoi de lot n'a pas de résultat unique : il en a autant que d'adresses.
 /// L'écran ne dit donc jamais « envoyé » ni « échec » globalement — il nomme
 /// chaque adresse, son statut et, s'il y a lieu, le motif en français.
+///
+/// **Ceci est le compte rendu du formulaire d'invitation, et de lui seul.**
+/// Vingt adresses au plus, tapées à la main, et cette énumération est la
+/// seule trace de ce qui vient d'être demandé : elle vaut le défilement.
+/// L'import a le sien ([RapportImportVue]) : soixante lignes que l'aperçu a
+/// déjà montrées une par une ne se réénumèrent pas, et les gens y ont des
+/// noms.
 class RapportInvitationsVue extends StatelessWidget {
   const RapportInvitationsVue({required this.rapport, super.key});
 

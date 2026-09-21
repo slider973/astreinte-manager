@@ -308,6 +308,49 @@ void main() {
         invitation.expiree(DateTime.parse('2026-10-01T00:00:00Z')),
         isFalse,
       );
+      // Sans les colonnes de la migration 0035 : on ne sait pas, et surtout
+      // pas « non envoyé ».
+      expect(invitation.envoiCourriel, EnvoiCourriel.inconnu);
+    });
+
+    // Ticket 048 : `email_sent_at` et `email_error` se lisent ensemble
+    // (`docs/SCHEMA.md § 2.4`).
+    test('la trace de l\'envoi dit trois choses, jamais deux', () {
+      Invitation lire(Object? envoye, Object? motif) =>
+          Invitation.depuisJson(<String, dynamic>{
+            'id': 'i-1',
+            'email': 'recrue@exemple.fr',
+            'role': 'member',
+            'expires_at': '2026-10-04T13:27:19Z',
+            'created_at': '2026-09-20T13:27:19Z',
+            'email_sent_at': envoye,
+            'email_error': motif,
+          });
+
+      // Un motif sans date : personne n'a été prévenu.
+      expect(
+        lire(null, 'no email provider configured').envoiCourriel,
+        EnvoiCourriel.nonParti,
+      );
+
+      // Une date : c'est parti, à cette date.
+      final partie = lire('2026-09-20T13:27:20Z', null);
+      expect(partie.envoiCourriel, EnvoiCourriel.parti);
+      expect(
+        partie.courrielEnvoyeLe,
+        DateTime.parse('2026-09-20T13:27:20Z').toLocal(),
+      );
+
+      // Les deux : un courriel est parti, le dernier renvoi non. La date fait
+      // foi — quelqu'un a bien été prévenu.
+      expect(
+        lire('2026-09-20T13:27:20Z', 'smtp refused').envoiCourriel,
+        EnvoiCourriel.parti,
+      );
+
+      // Les deux nuls, et une chaîne vide qui ne vaut pas un motif.
+      expect(lire(null, null).envoiCourriel, EnvoiCourriel.inconnu);
+      expect(lire(null, '  ').envoiCourriel, EnvoiCourriel.inconnu);
     });
   });
 

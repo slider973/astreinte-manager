@@ -129,8 +129,13 @@ class SupabaseMembresRepository implements MembresRepository {
   /// **Jamais `select *`** : `invitations.token` est hors du grant de select
   /// du rôle `authenticated`, et une étoile ferait échouer la requête entière
   /// (`docs/SCHEMA.md § 4`, migration `0008`).
+  /// **Énumérées, jamais `select *`** : `token` est un porteur de droits et
+  /// reste hors du grant de select d'`authenticated` (migration `0008`). Une
+  /// colonne ajoutée n'entre donc pas toute seule ici — `email_sent_at` et
+  /// `email_error` viennent de la migration `0035` (ticket 048).
   static const String _colonnesInvitations =
-      'id, email, role, first_name, last_name, expires_at, created_at';
+      'id, email, role, first_name, last_name, expires_at, created_at, '
+      'email_sent_at, email_error';
 
   @override
   Future<List<MembreCaserne>> membres(String stationId) async {

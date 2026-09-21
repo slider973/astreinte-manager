@@ -434,6 +434,26 @@ abstract final class AppStrings {
   static String invitationRenvoyerSemantique(String email) =>
       'Renvoyer l\'invitation à $email';
 
+  // --- L'envoi du courriel d'invitation (ticket 048) -----------------
+  //
+  // Trois états, et **jamais deux**. « Le courriel n'est pas parti » et « on
+  // ne sait pas s'il est parti » ne se disent pas de la même façon : la
+  // seconde phrase est celle des invitations créées avant la migration
+  // `0035`, et leur coller la première serait exactement le mensonge que ce
+  // ticket corrige (`docs/SCHEMA.md § 2.4`).
+  //
+  // Elles sont courtes parce qu'en production, aucun fournisseur de courriel
+  // n'est configuré : toute la liste porte la première, et une phrase de
+  // trois lignes répétée soixante fois rendrait l'écran illisible. Le motif
+  // technique de l'échec (`email_error`) ne s'affiche nulle part : il sert au
+  // diagnostic, pas au chef de centre.
+
+  static const String invitationCourrielNonParti = 'Courriel non parti';
+  static const String invitationCourrielInconnu = 'Envoi du courriel inconnu';
+
+  static String invitationCourrielEnvoyeLe(String date) =>
+      'Courriel envoyé le $date';
+
   // --- Formulaire d'invitation ---------------------------------------
 
   static const String inviterTitre = 'Inviter des pompiers';
@@ -698,6 +718,25 @@ abstract final class AppStrings {
   static const String importMotifDoublon = 'en double';
   static const String importMotifAdresseInvalide = 'adresse invalide';
   static const String importMotifAdresseAbsente = 'sans adresse';
+
+  /// Le titre de la seule liste que le compte rendu déroule.
+  ///
+  /// Ce qui est passé ne descend pas ici : [inviterResume] l'a déjà compté,
+  /// et soixante coches identiques enterrent les trois lignes qui demandent
+  /// quelque chose — c'est la règle que l'aperçu applique déjà à sa marque.
+  static const String importEchecsTitre = 'À reprendre';
+
+  /// Les invitations qui existent, mais dont personne n'a été prévenu.
+  ///
+  /// Elles ne sont pas énumérées : en production aucun fournisseur de
+  /// courriel n'est configuré, et c'est alors **tout** l'import qui est dans
+  /// ce cas. Le geste utile est le renvoi, et il se pose dans la liste des
+  /// invitations en attente, où chaque ligne le porte (ticket 048).
+  static String importCourrielsNonPartis(int nombre) => nombre <= 1
+      ? '1 invitation est créée, mais son courriel n\'est pas parti. '
+            'Renvoie-la depuis la liste des invitations en attente.'
+      : '$nombre invitations sont créées, mais leur courriel n\'est pas '
+            'parti. Renvoie-les depuis la liste des invitations en attente.';
 
   static String importReprendreApres(String heure) =>
       'Reprends l\'import après $heure avec le même fichier : les personnes '

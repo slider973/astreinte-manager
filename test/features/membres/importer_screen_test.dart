@@ -377,12 +377,97 @@ void main() {
       expect(premier.role, RoleMembre.admin);
       expect(harnais.depot.lotsImportes.first[1].role, RoleMembre.membre);
 
-      // Le vocabulaire du ticket 006, sans un mot de plus.
-      expect(find.text(AppStrings.inviterResultatsTitre), findsOneWidget);
+      // Tout est passé : le compte rendu le dit en un chiffre et s'arrête là.
+      // Soixante lignes identiques sous un résumé qui dit déjà « 0 échec »
+      // n'ajoutent rien et enterrent ce qui compterait.
       expect(
         find.text(AppStrings.inviterResume(envoyees: 60, echecs: 0)),
         findsOneWidget,
       );
+      expect(find.text(AppStrings.importEchecsTitre), findsNothing);
+      expect(find.text(AppStrings.resultatInvitee), findsNothing);
+      expect(find.text('pompier1@exemple.fr'), findsNothing);
+      expect(find.text('Pompier1 Dupont1'), findsNothing);
+    });
+
+    testWidgets('un échec est nommé, ligne par ligne, avec son nom', (
+      tester,
+    ) async {
+      final selecteur = FauxSelecteurFichier()..posera(fichierDe(3));
+      final depot = FauxMembresRepository()
+        ..rapportsParLot = const <RapportInvitations>[
+          RapportInvitations(
+            resultats: <ResultatInvitation>[
+              ResultatInvitation(
+                email: 'pompier1@exemple.fr',
+                statut: StatutResultatInvitation.invitee,
+              ),
+              ResultatInvitation(
+                email: 'pompier2@exemple.fr',
+                statut: StatutResultatInvitation.erreur,
+                motif: MotifEchecInvitation.adresseInvalide,
+              ),
+              ResultatInvitation(
+                email: 'pompier3@exemple.fr',
+                statut: StatutResultatInvitation.invitee,
+              ),
+            ],
+          ),
+        ];
+      await _ouvrirImport(tester, depot: depot, selecteur: selecteur);
+
+      await _choisir(tester);
+      await tester.tap(find.text(AppStrings.importEnvoyer(3)));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.importEchecsTitre), findsOneWidget);
+      // Le nom, comme dans l'aperçu une minute plus tôt : c'est lui qui
+      // permet de reconnaître le pompier et de retrouver sa ligne.
+      expect(find.text('Pompier2 Dupont2'), findsOneWidget);
+      expect(find.text('pompier2@exemple.fr'), findsOneWidget);
+      expect(find.text(AppStrings.inviteAdresseInvalide), findsOneWidget);
+      // Les deux qui sont passées restent des chiffres.
+      expect(find.text('Pompier1 Dupont1'), findsNothing);
+      expect(find.text('Pompier3 Dupont3'), findsNothing);
+    });
+
+    testWidgets('les courriels qui ne partent pas se comptent, pas un par un', (
+      tester,
+    ) async {
+      final selecteur = FauxSelecteurFichier()..posera(fichierDe(3));
+      final depot = FauxMembresRepository()
+        ..rapportsParLot = const <RapportInvitations>[
+          RapportInvitations(
+            resultats: <ResultatInvitation>[
+              ResultatInvitation(
+                email: 'pompier1@exemple.fr',
+                statut: StatutResultatInvitation.invitee,
+                courrielEnvoye: false,
+              ),
+              ResultatInvitation(
+                email: 'pompier2@exemple.fr',
+                statut: StatutResultatInvitation.invitee,
+                courrielEnvoye: false,
+              ),
+              ResultatInvitation(
+                email: 'pompier3@exemple.fr',
+                statut: StatutResultatInvitation.invitee,
+                courrielEnvoye: false,
+              ),
+            ],
+          ),
+        ];
+      await _ouvrirImport(tester, depot: depot, selecteur: selecteur);
+
+      await _choisir(tester);
+      await tester.tap(find.text(AppStrings.importEnvoyer(3)));
+      await tester.pumpAndSettle();
+
+      // Sans fournisseur de courriel configuré, c'est tout l'import qui est
+      // dans ce cas : une phrase et un nombre, pas soixante lignes.
+      expect(find.text(AppStrings.importCourrielsNonPartis(3)), findsOneWidget);
+      expect(find.text(AppStrings.resultatCourrielNonParti), findsNothing);
+      expect(find.text(AppStrings.importEchecsTitre), findsNothing);
     });
 
     testWidgets('les lignes écartées sont résumées, pas noyées dans le rapport', (
@@ -417,10 +502,14 @@ void main() {
         ),
         findsOneWidget,
       );
-      // Elles ne descendent pas dans « Résultat par adresse » : on n'y met que
-      // ce qui a été tenté.
+      // Ni les écartées — on ne met dans le détail que ce qui a été tenté —
+      // ni la ligne qui est passée : celle-là est comptée par le résumé.
       expect(find.text('marie@exemple.fr'), findsNothing);
-      expect(find.text('anne@exemple.fr'), findsOneWidget);
+      expect(find.text('anne@exemple.fr'), findsNothing);
+      expect(
+        find.text(AppStrings.inviterResume(envoyees: 1, echecs: 0)),
+        findsOneWidget,
+      );
     });
 
     testWidgets('« Revenir aux membres » ramène à la liste', (tester) async {

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/session/email.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
@@ -19,7 +20,7 @@ import '../domain/invitation.dart';
 import 'controllers/importer_controller.dart';
 import 'widgets/bloc_format_fichier.dart';
 import 'widgets/ligne_apercu_import.dart';
-import 'widgets/rapport_invitations_vue.dart';
+import 'widgets/rapport_import_vue.dart';
 
 /// Importer des membres depuis un fichier tableur.
 ///
@@ -314,7 +315,10 @@ class _BanniereBudget extends StatelessWidget {
   }
 }
 
-/// Temps 3 — le compte rendu, dans le vocabulaire du ticket 006.
+/// Temps 3 — le compte rendu.
+///
+/// Ce qui vient du fichier se dit ici — les lignes écartées, qui n'ont jamais
+/// été tentées —, et ce qui vient du serveur se dit dans [RapportImportVue].
 class _Rapport extends StatelessWidget {
   const _Rapport({required this.etat, required this.marge});
 
@@ -343,7 +347,10 @@ class _Rapport extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],
-              RapportInvitationsVue(rapport: etat.rapport!),
+              RapportImportVue(
+                rapport: etat.rapport!,
+                nomsParAdresse: _nomsParAdresse(etat.apercu),
+              ),
             ],
           ),
         ),
@@ -351,9 +358,21 @@ class _Rapport extends StatelessWidget {
     );
   }
 
+  /// Le nom du fichier, retrouvé par l'adresse.
+  ///
+  /// Le serveur ne rend que des adresses : c'est l'aperçu qui sait qui est
+  /// « pompier1@exemple.fr ». Sans cette table, le compte rendu perdrait le
+  /// nom que l'écran précédent affichait une minute plus tôt.
+  static Map<String, String> _nomsParAdresse(ApercuImport? apercu) =>
+      <String, String>{
+        for (final LigneApercu ligne in apercu?.lignes ?? const <LigneApercu>[])
+          if (ligne.ligne.nomComplet.isNotEmpty)
+            normaliserEmail(ligne.ligne.email): ligne.ligne.nomComplet,
+      };
+
   /// « 2 lignes du fichier n'ont rien reçu : 1 déjà membre, 1 adresse
-  /// invalide. » Elles ne descendent pas dans « Résultat par adresse » : on n'y
-  /// met que ce qui a été tenté.
+  /// invalide. » Elles ne descendent pas dans le détail du compte rendu : on
+  /// n'y met que ce qui a été tenté.
   static String? _phraseDesEcartees(ApercuImport? apercu) {
     if (apercu == null || apercu.nombreEcartees == 0) return null;
 

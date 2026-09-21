@@ -38,17 +38,24 @@ const MembreCaserne membreJean = MembreCaserne(
 );
 
 /// Une invitation qui court encore.
+///
+/// Sans [courrielEnvoyeLe] ni [courrielEnEchec], elle est dans l'état « on ne
+/// sait pas » : c'est celui des invitations créées avant la migration `0035`.
 Invitation invitationEnAttente({
   String id = 'i-1',
   String email = 'recrue@exemple.fr',
   RoleMembre role = RoleMembre.membre,
   Duration restant = const Duration(days: 10),
+  DateTime? courrielEnvoyeLe,
+  bool courrielEnEchec = false,
 }) => Invitation(
   id: id,
   email: email,
   role: role,
   expireLe: DateTime.now().add(restant),
   creeLe: DateTime.now().subtract(const Duration(days: 4)),
+  courrielEnvoyeLe: courrielEnvoyeLe,
+  courrielEnEchec: courrielEnEchec,
 );
 
 /// Un [MembresRepository] sans réseau, qui compte ce qu'on lui demande.
