@@ -4,6 +4,7 @@
 - **Priorité** : P0 — bloquant en production
 - **Dépend de** : 032
 - **Branche** : `feat/046-strategie-url-sans-diese`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/42
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
