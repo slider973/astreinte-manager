@@ -275,10 +275,70 @@ void main() {
       },
     );
 
+    test('les clés que l\'écran ne connaît pas font l\'aller-retour', () {
+      final parametres = ParametresCaserne.depuisJson(<String, dynamic>{
+        'id': 'station-1',
+        'name': 'CIS Saint-Martin',
+        'settings': <String, dynamic>{
+          ...parametresSeed.settingsJson,
+          // Le plafond horaire d'invitations (ticket 038) : réglé en base,
+          // jamais montré par cet écran.
+          'invitation_hourly_limit': 120,
+          'cle_inconnue': 'valeur',
+        },
+      });
+
+      expect(parametres.autresReglages, <String, dynamic>{
+        'invitation_hourly_limit': 120,
+        'cle_inconnue': 'valeur',
+      });
+      expect(parametres.settingsJson['invitation_hourly_limit'], 120);
+      expect(parametres.settingsJson['cle_inconnue'], 'valeur');
+
+      // Modifier un champ de l'écran n'en efface aucune.
+      final modifie = parametres.copyWith(effectifJour: 4);
+      expect(modifie.settingsJson['invitation_hourly_limit'], 120);
+      expect(modifie.settingsJson['required_day'], 4);
+    });
+
+    test('une clé inconnue ne peut pas écraser un réglage de l\'écran', () {
+      final parametres = ParametresCaserne.depuisJson(const <String, dynamic>{
+        'id': 'station-1',
+        'name': 'CIS Saint-Martin',
+        'settings': <String, dynamic>{'required_day': 2, 'day_start': '06:00'},
+      });
+
+      expect(parametres.autresReglages, isEmpty);
+      expect(parametres.settingsJson['required_day'], 2);
+      expect(parametres.settingsJson['day_start'], '06:00');
+    });
+
+    test('deux documents ne diffèrent pas que par ce qu\'ils montrent', () {
+      final avec = ParametresCaserne.depuisJson(<String, dynamic>{
+        'id': parametresSeed.stationId,
+        'name': parametresSeed.nom,
+        'settings': <String, dynamic>{
+          ...parametresSeed.settingsJson,
+          'invitation_hourly_limit': 120,
+        },
+      });
+
+      expect(avec == parametresSeed, isFalse);
+      expect(avec.copyWith(), avec);
+    });
+
     test('l\'aller-retour JSON conserve tout', () {
-      final origine = parametresSeed
-          .copyWith(effectifJour: 3, jourLimite: 20)
-          .avecSurcharge(const SurchargeEffectif(cle: 'sun', effectifNuit: 2));
+      final origine = ParametresCaserne.depuisJson(<String, dynamic>{
+        'id': parametresSeed.stationId,
+        'name': parametresSeed.nom,
+        'timezone': parametresSeed.fuseau,
+        'settings': <String, dynamic>{
+          ...parametresSeed.settingsJson,
+          'invitation_hourly_limit': 120,
+        },
+      }).copyWith(effectifJour: 3, jourLimite: 20).avecSurcharge(
+        const SurchargeEffectif(cle: 'sun', effectifNuit: 2),
+      );
 
       final relu = ParametresCaserne.depuisJson(<String, dynamic>{
         'id': origine.stationId,
