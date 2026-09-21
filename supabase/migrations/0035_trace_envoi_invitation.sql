@@ -100,25 +100,44 @@ grant select (email_sent_at, email_error) on invitations to authenticated;
 --     `tracerNotification` ;
 --   - notification postérieure à la création de l'invitation, pour ne pas
 --     attribuer à celle-ci l'envoi d'une invitation précédente, supprimée puis
---     recréée pour la même adresse ;
---   - la plus récente de ces lignes, parce qu'un renvoi en écrit une de plus et
---     que c'est le dernier envoi qui fait foi.
+--     recréée pour la même adresse.
+--
+-- Et les deux colonnes se calculent **séparément**, exactement comme
+-- `_shared/invitation_trace.ts` les écrit, sinon le rattrapage démentirait la
+-- fonction qu'il est censé amorcer :
+--
+--   - `email_sent_at` = le dernier envoi **réussi** parmi toutes les lignes
+--     appariées, soit `max(sent_at)` — `sent_at` est nul sur un échec
+--     (`notification_send.ts`), le maximum ignore donc les échecs de lui-même ;
+--   - `email_error` = le motif de la ligne **la plus récente**, donc nul quand
+--     cette dernière est un succès. C'est l'effacement que fait la fonction :
+--     un succès efface le motif, un échec pose le motif sans toucher à la date.
+--
+-- Prendre les deux colonnes sur la même « dernière ligne » serait le mensonge que
+-- ce ticket corrige : une invitation partie le 12 dont le renvoi du 21 a échoué
+-- recevrait `(nul, motif)`, c'est-à-dire « personne n'a été prévenu », affiché à
+-- quelqu'un qui a bel et bien reçu son invitation. Les quatre états du tableau
+-- ci-dessus ne tiennent que si la date et le motif sont calculés chacun de leur
+-- côté.
 --
 -- Seules les invitations **en attente** sont rattrapées : ce sont les seules que
 -- l'écran affiche, et une invitation acceptée prouve à elle seule que quelqu'un a
 -- été prévenu. Les lignes sans notification correspondante restent à nul des deux
--- côtés, c'est-à-dire à « on ne sait pas ».
+-- côtés, c'est-à-dire à « on ne sait pas » — d'où la dernière clause du `where`.
 --
 -- Le compte part dans le journal de déploiement : sur une base vierge c'est zéro,
 -- sur la production c'est le nombre d'invitations qui cessent d'être muettes.
+--
+-- L'`update` ci-dessous est rejoué tel quel par le § 5 de
+-- supabase/tests/trace_envoi_invitation_test.sql, sur un scénario posé à la main :
+-- toute retouche ici se recopie là-bas.
 do $$
 declare v_rattrapees integer;
 begin
-  with derniere_trace as (
-    select distinct on (i.id)
-           i.id      as invitation_id,
-           n.sent_at as sent_at,
-           n.error   as error
+  with trace_connue as (
+    select i.id                                                            as invitation_id,
+           max(n.sent_at)                                                  as sent_at,
+           (array_agg(n.error order by n.created_at desc, n.id desc))[1]   as error
       from invitations i
       join profiles p on lower(p.email) = lower(i.email)
       join notifications n
@@ -128,12 +147,12 @@ begin
        and n.channel    = 'email'
        and n.created_at >= i.created_at
      where i.accepted_at is null
-     order by i.id, n.created_at desc
+     group by i.id
   )
   update invitations i
      set email_sent_at = t.sent_at,
          email_error   = left(t.error, 300)
-    from derniere_trace t
+    from trace_connue t
    where t.invitation_id = i.id
      and (t.sent_at is not null or t.error is not null);
 

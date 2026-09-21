@@ -234,9 +234,14 @@ qu'il lit déjà. Les deux colonnes se lisent ensemble :
 « On ne sait pas » et « pas envoyé » **ne sont pas la même chose**, et afficher le second à la
 place du premier serait le même mensonge que celui qu'on corrige. D'où la première ligne, et
 d'où le rattrapage joué par la migration : les invitations antérieures ne sont pas déclarées en
-échec d'office, elles reçoivent ce que `notifications` sait déjà d'elles — la dernière ligne
-`invitation` / `email` de la même personne dans la même caserne, postérieure à la création de
-l'invitation — et rien du tout quand elle ne sait rien.
+échec d'office, elles reçoivent ce que `notifications` sait déjà d'elles — les lignes
+`invitation` / `email` de la même personne dans la même caserne, postérieures à la création de
+l'invitation — et rien du tout quand elle ne sait rien. Les deux colonnes s'y calculent
+**séparément**, comme l'Edge Function les écrit : la date est celle du dernier envoi **réussi**
+(`max(sent_at)`), le motif est celui de la ligne **la plus récente**, donc nul si cette dernière
+est un succès. Les prendre toutes deux sur la même dernière ligne ferait afficher « courriel non
+parti » à une invitation partie dont seul le renvoi a échoué, soit la quatrième ligne du tableau
+transformée en deuxième.
 
 Écrites par l'Edge Function `invite-member`, en création comme en renvoi, à partir de ce que
 rend `sendMail` : un succès pose la date **et efface le motif précédent**, un échec pose le

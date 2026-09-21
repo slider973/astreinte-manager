@@ -9,11 +9,12 @@
 --      pas de sa caserne ni de son cercle d'administrateurs ;
 --   3. la sémantique des deux colonnes, et surtout la différence entre « on ne
 --      sait pas » (les deux nulles) et « personne n'a été prévenu » (un motif sans
---      date). Confondre les deux serait le mensonge que ce ticket corrige.
---
--- Ce que ces cas ne couvrent pas : le rattrapage du § 3 de la migration, qui est
--- une instruction unique jouée au déploiement. Sur une base remise à zéro,
--- `invitations` est vide quand elle passe : il n'y a rien à observer après coup.
+--      date). Confondre les deux serait le mensonge que ce ticket corrige ;
+--   4. le rattrapage du § 3 de la migration (cas 5 ci-dessous). Il ne s'observe
+--      pas après coup — sur une base remise à zéro, `invitations` est vide quand
+--      il passe —, alors on pose le scénario dans un `savepoint` et on **rejoue
+--      l'instruction**. C'est une copie littérale de la migration : elle doit être
+--      recopiée à chaque retouche du rattrapage, et c'est dit des deux côtés.
 --
 -- Même méthode que rls_test.sql : pas de pgTAP, une exception fait échouer psql
 -- (`ON_ERROR_STOP`). Tout tourne dans une transaction annulée à la fin.
@@ -243,5 +244,174 @@ select tests_trace.check(
   'un membre simple ne lit aucune invitation, ni sa trace d''envoi');
 
 rollback to savepoint s6;
+
+-- ===========================================================================
+-- 5. Le rattrapage du § 3 de la migration
+-- ===========================================================================
+-- On pose ce que la production avait au moment du déploiement — des invitations
+-- en attente, et les `notifications` qui gardent la trace de leurs envois — puis
+-- on **rejoue l'instruction de la migration, à la lettre**, et on relit.
+--
+-- Le cas qui compte est le a) : un envoi réussi, puis un renvoi qui échoue. Une
+-- version du rattrapage qui prend les deux colonnes sur la même dernière ligne
+-- écrit `(nul, motif)`, c'est-à-dire « personne n'a été prévenu », à une personne
+-- qui a reçu son invitation neuf jours plus tôt. Les deux colonnes se calculent
+-- séparément : la date est le dernier envoi **réussi**, le motif est celui de la
+-- ligne la plus récente — ce que fait `_shared/invitation_trace.ts`.
+\echo ''
+\echo '--- 5. Le rattrapage des invitations antérieures'
+savepoint s7;
+
+create function tests_trace.poser_invitation(
+  p_station uuid, p_email text, p_invited_by uuid, p_age interval,
+  p_acceptee boolean default false) returns uuid
+language plpgsql as $$
+declare v_id uuid;
+begin
+  insert into invitations (station_id, email, role, invited_by, created_at, expires_at, accepted_at)
+  values (p_station, p_email, 'member', p_invited_by, now() - p_age,
+          now() + interval '14 days',
+          case when p_acceptee then now() - interval '1 hour' end)
+  returning id into v_id;
+  return v_id;
+end $$;
+
+-- Une ligne de `notifications` telle que `tracerNotification` l'écrit : un succès
+-- porte `sent_at`, un échec porte `error` et laisse `sent_at` nul.
+create function tests_trace.poser_notification(
+  p_station uuid, p_user uuid, p_age interval, p_reussi boolean,
+  p_error text default null) returns void
+language plpgsql as $$
+begin
+  insert into notifications (station_id, user_id, type, channel, title, body, sent_at, error, created_at)
+  values (p_station, p_user, 'invitation', 'email', 'Invitation', 'Rejoignez la caserne',
+          case when p_reussi then now() - p_age end,
+          case when p_reussi then null else coalesce(p_error, 'envoi impossible') end,
+          now() - p_age);
+end $$;
+
+do $$
+declare
+  v_a       uuid := 'aaaaaaaa-0000-4000-8000-000000000001';
+  v_b       uuid := 'bbbbbbbb-0000-4000-8000-000000000001';
+  v_admin_a uuid := 'aaaaaaaa-0000-4000-8000-000000000100';
+begin
+  -- a) Parti il y a 9 jours, renvoi échoué il y a 1 jour. Le cas du bloquant.
+  perform tests_trace.poser_invitation(v_a, 'membre7@caserne-a.test', v_admin_a, interval '20 days');
+  perform tests_trace.poser_notification(v_a, 'aaaaaaaa-0000-4000-8000-000000000107', interval '9 days', true);
+  perform tests_trace.poser_notification(v_a, 'aaaaaaaa-0000-4000-8000-000000000107', interval '1 day', false,
+                                         'resend 422 domaine non vérifié');
+
+  -- b) Un seul envoi, réussi.
+  perform tests_trace.poser_invitation(v_a, 'membre6@caserne-a.test', v_admin_a, interval '20 days');
+  perform tests_trace.poser_notification(v_a, 'aaaaaaaa-0000-4000-8000-000000000106', interval '3 days', true);
+
+  -- c) Un seul envoi, échoué : personne n'a été prévenu.
+  perform tests_trace.poser_invitation(v_a, 'membre5@caserne-a.test', v_admin_a, interval '20 days');
+  perform tests_trace.poser_notification(v_a, 'aaaaaaaa-0000-4000-8000-000000000105', interval '2 days', false,
+                                         'aucun fournisseur de courriel configuré');
+
+  -- d) Échoué il y a 5 jours, puis parti il y a 1 jour : le succès efface le motif.
+  perform tests_trace.poser_invitation(v_a, 'membre4@caserne-a.test', v_admin_a, interval '20 days');
+  perform tests_trace.poser_notification(v_a, 'aaaaaaaa-0000-4000-8000-000000000104', interval '5 days', false,
+                                         'smtp 421 service indisponible');
+  perform tests_trace.poser_notification(v_a, 'aaaaaaaa-0000-4000-8000-000000000104', interval '1 day', true);
+
+  -- e) Aucune notification : on ne sait pas, et on n'invente rien.
+  perform tests_trace.poser_invitation(v_a, 'membre3@caserne-a.test', v_admin_a, interval '20 days');
+
+  -- f) Une notification antérieure à l'invitation : c'est l'envoi d'une invitation
+  --    précédente, supprimée puis recréée. Elle ne compte pas.
+  perform tests_trace.poser_invitation(v_a, 'membre2@caserne-a.test', v_admin_a, interval '2 days');
+  perform tests_trace.poser_notification(v_a, 'aaaaaaaa-0000-4000-8000-000000000102', interval '10 days', true);
+
+  -- g) Une notification de l'autre caserne pour la même personne : elle non plus.
+  perform tests_trace.poser_invitation(v_a, 'membre1@caserne-b.test', v_admin_a, interval '20 days');
+  perform tests_trace.poser_notification(v_b, 'bbbbbbbb-0000-4000-8000-000000000101', interval '4 days', true);
+
+  -- h) Une invitation déjà acceptée : hors du rattrapage, l'écran ne l'affiche pas.
+  perform tests_trace.poser_invitation(v_a, 'membre1@caserne-a.test', v_admin_a, interval '20 days', true);
+  perform tests_trace.poser_notification(v_a, 'aaaaaaaa-0000-4000-8000-000000000101', interval '6 days', false,
+                                         'aucun fournisseur de courriel configuré');
+end $$;
+
+-- >>> Copie littérale du § 3 de supabase/migrations/0035_trace_envoi_invitation.sql.
+with trace_connue as (
+  select i.id                                                            as invitation_id,
+         max(n.sent_at)                                                  as sent_at,
+         (array_agg(n.error order by n.created_at desc, n.id desc))[1]   as error
+    from invitations i
+    join profiles p on lower(p.email) = lower(i.email)
+    join notifications n
+      on n.user_id    = p.id
+     and n.station_id = i.station_id
+     and n.type       = 'invitation'
+     and n.channel    = 'email'
+     and n.created_at >= i.created_at
+   where i.accepted_at is null
+   group by i.id
+)
+update invitations i
+   set email_sent_at = t.sent_at,
+       email_error   = left(t.error, 300)
+  from trace_connue t
+ where t.invitation_id = i.id
+   and (t.sent_at is not null or t.error is not null);
+-- <<< Fin de la copie.
+
+do $$
+declare r record;
+begin
+  -- a) Les deux faits tiennent ensemble, et la date est celle du succès.
+  select * into r from invitations where email = 'membre7@caserne-a.test';
+  perform tests_trace.check(
+    r.email_sent_at is not null and r.email_error = 'resend 422 domaine non vérifié',
+    'un envoi réussi puis un renvoi échoué : la ligne garde la date **et** dit le dernier échec');
+  perform tests_trace.check(
+    r.email_sent_at between now() - interval '9 days' - interval '1 minute'
+                        and now() - interval '9 days' + interval '1 minute',
+    'la date rattrapée est celle du dernier envoi réussi, pas celle du renvoi raté');
+
+  -- b) Le succès seul.
+  select * into r from invitations where email = 'membre6@caserne-a.test';
+  perform tests_trace.check(
+    r.email_sent_at is not null and r.email_error is null,
+    'un envoi réussi rattrape la date, sans motif d''échec');
+
+  -- c) L'échec seul : personne n'a été prévenu, et on sait pourquoi.
+  select * into r from invitations where email = 'membre5@caserne-a.test';
+  perform tests_trace.check(
+    r.email_sent_at is null and r.email_error = 'aucun fournisseur de courriel configuré',
+    'un envoi échoué rattrape le motif, sans date');
+
+  -- d) L'effacement, comme le fait invitation_trace.ts.
+  select * into r from invitations where email = 'membre4@caserne-a.test';
+  perform tests_trace.check(
+    r.email_sent_at is not null and r.email_error is null,
+    'un échec suivi d''un succès : le succès efface le motif');
+
+  -- e), f), g), h) Les silences restent des silences.
+  select * into r from invitations where email = 'membre3@caserne-a.test';
+  perform tests_trace.check(
+    r.email_sent_at is null and r.email_error is null,
+    'sans notification appariée, l''invitation reste à « on ne sait pas »');
+
+  select * into r from invitations where email = 'membre2@caserne-a.test';
+  perform tests_trace.check(
+    r.email_sent_at is null and r.email_error is null,
+    'une notification antérieure à l''invitation ne lui est pas attribuée');
+
+  select * into r from invitations where email = 'membre1@caserne-b.test';
+  perform tests_trace.check(
+    r.email_sent_at is null and r.email_error is null,
+    'une notification de l''autre caserne ne rattrape rien');
+
+  select * into r from invitations where email = 'membre1@caserne-a.test';
+  perform tests_trace.check(
+    r.email_sent_at is null and r.email_error is null,
+    'une invitation déjà acceptée reste hors du rattrapage');
+end $$;
+
+rollback to savepoint s7;
 
 rollback;
