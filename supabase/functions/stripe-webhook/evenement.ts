@@ -5,6 +5,7 @@
 //
 // Référence : docs/SCHEMA.md § 2.13, docs/STRIPE.md, ticket 029.
 
+import { estUuid } from "../_shared/http.ts";
 import { type Formule, formuleValide } from "../_shared/stripe.ts";
 
 /** Les statuts de `subscription_status` (docs/SCHEMA.md § 1). */
@@ -40,6 +41,22 @@ export const TYPES_TRAITES: readonly string[] = [
   "customer.subscription.updated",
   "customer.subscription.deleted",
 ];
+
+/**
+ * La caserne nommée par l'événement, **si elle a la forme d'un identifiant**.
+ *
+ * `client_reference_id` et les métadonnées viennent du dehors : un lien de
+ * paiement public accepte le premier en paramètre d'URL. Une valeur mal formée
+ * partirait telle quelle dans une RPC typée `uuid`, où PostgREST lèverait une
+ * erreur de requête que la fonction traduirait en `500` — et Stripe rejouerait
+ * trois jours durant un événement qui ne passera jamais. Une valeur illisible
+ * est donc traitée comme **absente** : la caserne se retrouve par le client,
+ * qui est le chemin normal de tous les événements sauf le premier.
+ */
+function caserne(valeur: unknown): string | null {
+  const brut = texte(valeur);
+  return brut !== null && estUuid(brut) ? brut : null;
+}
 
 function objet(valeur: unknown): Record<string, unknown> {
   return valeur !== null && typeof valeur === "object" && !Array.isArray(valeur)
@@ -131,7 +148,7 @@ function traduire(type: string, donnees: Record<string, unknown>): Consequence {
     case "checkout.session.completed": {
       const metadonnees = objet(donnees.metadata);
       return {
-        station: texte(donnees.client_reference_id) ?? texte(metadonnees.station_id),
+        station: caserne(donnees.client_reference_id) ?? caserne(metadonnees.station_id),
         customer: texte(donnees.customer),
         subscription: texte(donnees.subscription),
         // `payment_status` vaut `paid` quand l'argent est passé. Un paiement
@@ -149,7 +166,7 @@ function traduire(type: string, donnees: Record<string, unknown>): Consequence {
     // `active` : c'est lui qui répare un `past_due`.
     case "invoice.paid": {
       return {
-        station: texte(objet(donnees.metadata).station_id),
+        station: caserne(objet(donnees.metadata).station_id),
         customer: texte(donnees.customer),
         subscription: texte(donnees.subscription) ??
           texte(objet(objet(donnees.parent).subscription_details).subscription),
@@ -168,7 +185,7 @@ function traduire(type: string, donnees: Record<string, unknown>): Consequence {
     // suspendra, quatorze jours plus tard, si rien n'est réglé.
     case "invoice.payment_failed": {
       return {
-        station: texte(objet(donnees.metadata).station_id),
+        station: caserne(objet(donnees.metadata).station_id),
         customer: texte(donnees.customer),
         subscription: texte(donnees.subscription) ??
           texte(objet(objet(donnees.parent).subscription_details).subscription),
@@ -183,7 +200,7 @@ function traduire(type: string, donnees: Record<string, unknown>): Consequence {
     case "customer.subscription.deleted": {
       const supprime = type === "customer.subscription.deleted";
       return {
-        station: texte(objet(donnees.metadata).station_id),
+        station: caserne(objet(donnees.metadata).station_id),
         customer: texte(donnees.customer),
         subscription: texte(donnees.id),
         statut: supprime ? "cancelled" : statutDepuisStripe(donnees.status),

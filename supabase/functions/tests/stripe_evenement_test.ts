@@ -215,6 +215,37 @@ Deno.test("une facture sans client ni caserne ne concerne pas ce produit", () =>
   assertEquals(lu.traite ? "" : lu.raison, "sans_client");
 });
 
+Deno.test("une caserne nommée avec un identifiant mal formé est traitée comme absente", () => {
+  // `client_reference_id` vient du dehors : un lien de paiement public l'accepte
+  // en paramètre d'URL. Une valeur illisible partirait telle quelle dans une RPC
+  // typée `uuid`, où elle deviendrait une erreur de requête traduite en 500 — et
+  // Stripe rejouerait trois jours durant un événement qui ne passera jamais.
+  for (const brut of ["pas-un-uuid", "", "  ", "aaaaaaaa-0000-4000-8000", 42]) {
+    const lu = interpreter(evenement("checkout.session.completed", {
+      client_reference_id: brut,
+      customer: "cus_A",
+      payment_status: "paid",
+    }));
+
+    assert(lu.traite, `« ${brut} » ne doit pas faire échouer l'événement`);
+    // La caserne se retrouvera par le client, chemin normal de tous les
+    // événements sauf le premier.
+    assertEquals(lu.consequence.station, null);
+    assertEquals(lu.consequence.customer, "cus_A");
+  }
+});
+
+Deno.test("un identifiant de caserne bien formé est conservé", () => {
+  const lu = interpreter(evenement("checkout.session.completed", {
+    client_reference_id: CASERNE,
+    customer: "cus_A",
+    payment_status: "paid",
+  }));
+
+  assert(lu.traite);
+  assertEquals(lu.consequence.station, CASERNE);
+});
+
 Deno.test("un événement sans type ni données ne fait pas tomber la fonction", () => {
   assertFalse(interpreter({}).traite);
   assertFalse(interpreter({ type: "invoice.paid" }).traite);

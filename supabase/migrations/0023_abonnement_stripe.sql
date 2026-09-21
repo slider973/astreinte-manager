@@ -23,9 +23,16 @@
 --   2. `subscription_sync(...)` : le seul chemin d'écriture de la table. Appelée
 --      par l'Edge Function `stripe-webhook` avec la clé de service, une fois la
 --      signature de l'événement vérifiée.
---   3. `cron_suspend_subscriptions(instant)` : corps de la tâche
+--   3. `stripe_events` : le journal des événements reçus. Il sert deux fois —
+--      **dédoublonnage** (un événement réémis dans la fenêtre de tolérance ne
+--      s'applique pas deux fois) et **trace durable** d'un traitement en échec,
+--      que les rejeux du prestataire abandonnent au bout de trois jours.
+--   4. `stripe_event_fail(...)` : pose cette trace depuis l'Edge Function,
+--      **hors de la transaction annulée**, sans quoi elle disparaîtrait avec
+--      elle.
+--   5. `cron_suspend_subscriptions(instant)` : corps de la tâche
 --      `suspend_subscriptions` de docs/SCHEMA.md § 8.
---   4. La tâche `pg_cron`, quotidienne.
+--   6. La tâche `pg_cron`, quotidienne.
 --
 -- Comme 0012, 0014, 0016 et 0021, la tâche est paramétrée par un **instant de
 -- référence** : c'est la seule façon de vérifier en quelques millisecondes un
@@ -78,7 +85,106 @@ from stations s
 where not exists (select 1 from subscriptions a where a.station_id = s.id);
 
 -- ===========================================================================
--- 2. `subscription_sync` — le seul chemin d'écriture
+-- 2. `stripe_events` — ce qu'on a déjà traité, et ce qui a échoué
+-- ===========================================================================
+-- **La signature ne dit pas qu'un événement est neuf.** Elle dit qu'il vient
+-- bien du prestataire. Un même événement authentique réémis dans la fenêtre de
+-- cinq minutes — un rejeu manuel depuis le tableau de bord, une double livraison
+-- réseau, un attaquant qui a capté la requête — repasserait la vérification et
+-- serait appliqué une seconde fois. Sur `invoice.payment_failed`, cela ramène en
+-- impayé une caserne qui vient de régulariser.
+--
+-- Cette table est donc **la** garantie de « une fois et une seule », et
+-- l'identifiant du prestataire (`evt_…`) en est la clé primaire : c'est lui qui
+-- porte l'unicité, pas nous.
+--
+-- Elle sert aussi de trace : les rejeux du prestataire s'arrêtent au bout de
+-- trois jours, après quoi un événement dont le traitement a échoué ne laissait
+-- qu'une ligne dans des journaux à rétention courte. `select * from stripe_events
+-- where status = 'failed'` le montre, avec son motif et son compte de tentatives
+-- — même rôle que `notification_outbox` pour les notifications.
+create table stripe_events (
+  id            text primary key,          -- `evt_…`, l'identifiant du prestataire
+  type          text not null,             -- `invoice.paid`, …
+  station_id    uuid references stations(id) on delete set null,
+  status        text not null default 'processing',
+  result        jsonb not null default '{}'::jsonb,
+  error         text,
+  attempts      integer not null default 1,
+  received_at   timestamptz not null default now(),
+  processed_at  timestamptz,
+  constraint stripe_events_status_valide
+    check (status in ('processing', 'processed', 'skipped', 'failed'))
+);
+
+create index on stripe_events (status, received_at desc) where status <> 'processed';
+
+comment on table stripe_events is
+  'Événements du prestataire de paiement déjà reçus. Clé primaire = l''identifiant du prestataire : c''est ce qui rend le traitement « une fois et une seule ». Les lignes status = ''failed'' survivent aux trois jours de rejeu et disent ce qui n''est jamais passé.';
+
+alter table stripe_events enable row level security;
+
+-- Aucune politique, et **aucun privilège client** : ni `anon` ni `authenticated`
+-- n'en lisent une ligne. Seuls `service_role` et `postgres` y accèdent, et ils
+-- ont `bypassrls`. Même traitement que `notification_outbox` (migration 0014) :
+-- une table de plomberie n'a pas de politique à maintenir, elle a une porte
+-- fermée. `rls_test.sql § 9` vérifie que les deux vont toujours ensemble.
+revoke all on stripe_events from anon, authenticated;
+
+-- Clôt une ligne de `stripe_events` sur un refus, et rend le refus.
+--
+-- Un refus **consomme** l'événement : une caserne inconnue ne le deviendra pas,
+-- une formule inconnue non plus, et un client qui ne correspond pas à sa caserne
+-- ne se corrigera pas tout seul. Les rejouer trois jours durant n'aboutirait à
+-- rien ; la ligne `skipped` les garde visibles.
+create function stripe_event_close(p_event_id text, p_station uuid, p_code text)
+returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if p_event_id is not null then
+    update stripe_events
+       set station_id = p_station, status = 'skipped', error = p_code,
+           processed_at = now()
+     where id = p_event_id;
+  end if;
+  return jsonb_build_object('ok', false, 'code', p_code);
+end $$;
+
+comment on function stripe_event_close(text, uuid, text) is
+  'Marque un événement comme écarté (caserne inconnue, formule inconnue, client incohérent) et rend le refus. Un refus consomme l''événement : le rejouer n''y changerait rien.';
+
+revoke execute on function stripe_event_close(text, uuid, text) from public, anon, authenticated;
+
+-- ===========================================================================
+-- Trace d'un traitement qui a échoué
+-- ===========================================================================
+-- Appelée par l'Edge Function **après** que la transaction de `subscription_sync`
+-- a été annulée : la ligne posée à l'intérieur est partie avec elle, et c'est
+-- justement pour ça qu'il en faut une seconde, dans sa propre transaction.
+--
+-- Le prestataire rejouera — c'est ce qu'on veut, l'événement reste valable — et
+-- la reprise est permise par le statut `failed`, seul cas que le dédoublonnage
+-- de `subscription_sync` ne traite pas comme un rejeu. Au bout de trois jours,
+-- il abandonne : il reste alors cette ligne, et elle est la seule.
+create function stripe_event_fail(p_event_id text, p_type text, p_error text)
+returns void
+language sql security definer set search_path = public, pg_temp as $$
+  insert into stripe_events (id, type, status, error, processed_at)
+  values (p_event_id, coalesce(p_type, 'inconnu'), 'failed', left(p_error, 500), now())
+  on conflict (id) do update
+    set status       = 'failed',
+        error        = excluded.error,
+        attempts     = stripe_events.attempts + 1,
+        processed_at = now();
+$$;
+
+comment on function stripe_event_fail(text, text, text) is
+  'Trace durable d''un événement reçu et signé dont le traitement a échoué. Posée hors de la transaction annulée. « select * from stripe_events where status = ''failed'' » liste ce qui n''est jamais passé.';
+
+revoke execute on function stripe_event_fail(text, text, text) from public, anon, authenticated;
+
+-- ===========================================================================
+-- 3. `subscription_sync` — le seul chemin d'écriture
 -- ===========================================================================
 -- Appelée par `stripe-webhook` (Edge Function, clé de service) **après**
 -- vérification de la signature de l'événement. Elle ne vérifie donc pas la
@@ -112,6 +218,7 @@ create function subscription_sync(
   p_plan        text                default null,
   p_period_end  timestamptz         default null,
   p_event       text                default null,
+  p_event_id    text                default null,
   p_reference   timestamptz         default now()
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -119,9 +226,40 @@ declare
   v_station uuid;
   v_avant   subscriptions%rowtype;
   v_apres   subscriptions%rowtype;
+  v_etat    text;
+  v_refus   jsonb;
 begin
+  -- 0. **Une fois et une seule.** L'identifiant du prestataire est la clé
+  -- primaire de `stripe_events` : c'est l'insertion qui tranche, pas un test
+  -- suivi d'une écriture — deux livraisons simultanées ne peuvent pas passer
+  -- toutes les deux.
+  if p_event_id is not null then
+    insert into stripe_events (id, type, status)
+    values (p_event_id, coalesce(p_event, 'inconnu'), 'processing')
+    on conflict (id) do nothing;
+
+    if not found then
+      -- La ligne existait déjà. `for update` attend que la transaction qui la
+      -- tient peut-être encore ait fini : sans cette attente, deux livraisons
+      -- parallèles se croiseraient toutes deux en « rien de fait ».
+      select status into v_etat from stripe_events where id = p_event_id for update;
+
+      -- Un traitement **en échec** se reprend : c'est tout l'intérêt des rejeux
+      -- du prestataire. Tout le reste est un rejeu, et ne s'applique pas.
+      if v_etat is distinct from 'failed' then
+        return jsonb_build_object(
+          'ok', true, 'duplicate', true,
+          'code', 'duplicate_event', 'event_id', p_event_id, 'state', v_etat);
+      end if;
+
+      update stripe_events
+         set attempts = attempts + 1, status = 'processing', error = null
+       where id = p_event_id;
+    end if;
+  end if;
+
   if p_plan is not null and p_plan not in ('monthly', 'yearly') then
-    return jsonb_build_object('ok', false, 'code', 'invalid_plan');
+    return stripe_event_close(p_event_id, null, 'invalid_plan');
   end if;
 
   -- 1. Retrouver la caserne : l'identifiant transmis, sinon le client.
@@ -144,10 +282,37 @@ begin
   end if;
 
   if v_station is null then
-    return jsonb_build_object('ok', false, 'code', 'station_not_found');
+    return stripe_event_close(p_event_id, null, 'station_not_found');
   end if;
 
-  -- 2. Verrou de ligne : deux événements livrés en parallèle par le prestataire
+  -- 2. **Le client et la caserne doivent déjà aller ensemble.**
+  --
+  -- La signature dit que l'appel vient du prestataire. Elle ne dit rien de la
+  -- caserne nommée : `client_reference_id` est un champ que l'on peut poser
+  -- depuis une URL (un lien de paiement public l'accepte en paramètre). Sans ces
+  -- deux contrôles, un événement qui nomme la caserne B avec le client de A fait
+  -- basculer B en `active` **et lui recolle le client de A** — après quoi
+  -- l'administrateur de B ouvre le portail de A : sa carte, ses factures, sa
+  -- résiliation.
+  --
+  -- Les deux contrôles ne font pas double emploi : le premier couvre une caserne
+  -- qui a déjà son client, le second un client déjà pris ailleurs.
+  if p_customer is not null then
+    if exists (select 1 from subscriptions
+                where station_id = v_station
+                  and stripe_customer_id is not null
+                  and stripe_customer_id <> p_customer) then
+      return stripe_event_close(p_event_id, v_station, 'customer_mismatch');
+    end if;
+
+    if exists (select 1 from subscriptions
+                where stripe_customer_id = p_customer
+                  and station_id <> v_station) then
+      return stripe_event_close(p_event_id, v_station, 'customer_mismatch');
+    end if;
+  end if;
+
+  -- 3. Verrou de ligne : deux événements livrés en parallèle par le prestataire
   -- ne doivent pas s'écraser à moitié. Le verrou sérialise, et le second lit
   -- l'état écrit par le premier.
   select * into v_avant from subscriptions where station_id = v_station for update;
@@ -169,7 +334,7 @@ begin
   where station_id = v_station
   returning * into v_apres;
 
-  -- 3. Journal. `actor_id` reste nul : l'acteur est le prestataire, pas une
+  -- 4. Journal. `actor_id` reste nul : l'acteur est le prestataire, pas une
   -- personne de la caserne.
   insert into audit_log (station_id, actor_id, action, entity, entity_id, data)
   values (
@@ -181,13 +346,14 @@ begin
       'to',                 v_apres.status,
       'plan',               v_apres.plan,
       'current_period_end', v_apres.current_period_end,
+      'event_id',           p_event_id,
       -- L'identifiant d'abonnement est utile au diagnostic ; celui du client
       -- l'est aussi, et **aucun des deux n'est un secret** : ce sont des
       -- références opaques, sans pouvoir propre.
       'subscription',       v_apres.stripe_subscription_id))
   );
 
-  return jsonb_build_object(
+  v_refus := jsonb_build_object(
     'ok',                 true,
     'station_id',         v_station,
     'previous_status',    v_avant.status,
@@ -198,16 +364,26 @@ begin
     'current_period_end', v_apres.current_period_end,
     'trial_ends_at',      v_apres.trial_ends_at,
     'suspended_at',       v_apres.suspended_at);
+
+  if p_event_id is not null then
+    update stripe_events
+       set station_id = v_station, status = 'processed',
+           result = v_refus, processed_at = p_reference, error = null
+     where id = p_event_id;
+  end if;
+
+  return v_refus;
 end $$;
 
-comment on function subscription_sync(uuid, text, text, subscription_status, text, timestamptz, text, timestamptz) is
-  'Applique un événement du prestataire de paiement à subscriptions (docs/SCHEMA.md § 2.13). Caserne désignée par p_station (client_reference_id de la session) ou retrouvée par p_customer. Les paramètres nuls ne remplacent rien : les quatre événements s''appliquent dans n''importe quel ordre. Journalise dans audit_log. Réservée au rôle de service : appelée par l''Edge Function stripe-webhook, signature déjà vérifiée.';
+comment on function subscription_sync(uuid, text, text, subscription_status, text, timestamptz, text, text, timestamptz) is
+  'Applique un événement du prestataire de paiement à subscriptions (docs/SCHEMA.md § 2.13). Dédoublonné sur p_event_id via stripe_events : un rejeu ne s''applique pas deux fois, un échec se reprend. Caserne désignée par p_station (client_reference_id de la session) ou retrouvée par p_customer, et refusée (customer_mismatch) si les deux ne vont pas déjà ensemble. Les paramètres nuls ne remplacent rien : les cinq événements s''appliquent dans n''importe quel ordre. Journalise dans audit_log. Réservée au rôle de service : appelée par l''Edge Function stripe-webhook, signature déjà vérifiée.';
 
-revoke execute on function subscription_sync(uuid, text, text, subscription_status, text, timestamptz, text, timestamptz)
+revoke execute on function subscription_sync(uuid, text, text, subscription_status, text, timestamptz, text, text, timestamptz)
   from public, anon, authenticated;
 
+
 -- ===========================================================================
--- 3. `subscription_customer` — poser le client sans rien changer d'autre
+-- 4. `subscription_customer` — poser le client sans rien changer d'autre
 -- ===========================================================================
 -- `create-checkout` crée le client chez le prestataire avant d'ouvrir la
 -- session de paiement, et doit le retenir : sans ça, chaque tentative de
@@ -230,7 +406,7 @@ comment on function subscription_set_customer(uuid, text) is
 revoke execute on function subscription_set_customer(uuid, text) from public, anon, authenticated;
 
 -- ===========================================================================
--- 4. `cron_suspend_subscriptions` — la tâche
+-- 6. `cron_suspend_subscriptions` — la tâche
 -- ===========================================================================
 -- Deux populations, une seule conséquence : `suspended`, donc lecture seule via
 -- `station_writable()`. **Rien n'est supprimé** — c'est une promesse du produit
@@ -309,7 +485,7 @@ comment on function cron_suspend_subscriptions(timestamptz) is
 revoke execute on function cron_suspend_subscriptions(timestamptz) from public, anon, authenticated;
 
 -- ===========================================================================
--- 5. La tâche planifiée (docs/SCHEMA.md § 8)
+-- 7. La tâche planifiée (docs/SCHEMA.md § 8)
 -- ===========================================================================
 -- Même forme que 0012, 0014, 0016 et 0021 : `cron.schedule` est un upsert depuis
 -- pg_cron 1.4, la commande est qualifiée et sans argument, et le garde-fou

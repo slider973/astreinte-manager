@@ -11,6 +11,10 @@
 -- 3. Ce que `subscription_sync` refuse ou ignore : caserne introuvable, formule
 --    inconnue, paramètres nuls qui n'effacent rien, désignation par le seul
 --    identifiant client, ordre d'arrivée quelconque.
+-- 3 bis. **Un client qui ne va pas avec la caserne nommée n'écrit rien.**
+--    `client_reference_id` se pose depuis une URL : la signature dit que
+--    l'appel vient du prestataire, pas que la caserne nommée est la bonne.
+-- 3 ter. **Un rejeu ne s'applique pas deux fois**, et un échec se reprend.
 -- 4. `cron_suspend_subscriptions` dans ses **deux cas** — essai expiré sans
 --    abonnement, impayé de plus de quatorze jours — et tout ce qu'elle ne doit
 --    pas toucher. Idempotence comprise.
@@ -300,6 +304,224 @@ select tests_abo.check(
       and stripe_subscription_id is null
      from subscriptions where station_id = :caserne_b::uuid),
   'poser le client ne fait pas croire que c''est payé');
+
+\echo ''
+\echo '== 3 bis. Un client qui ne va pas avec sa caserne n''écrit rien'
+
+-- Le décor : la caserne A porte cus_A (posé en section 2), la caserne B porte
+-- cus_B (section 3). Ce que l'on rejoue ici, c'est un événement **authentique**,
+-- correctement signé, dont le `client_reference_id` a été posé depuis une URL.
+
+-- a. La caserne nommée porte déjà un **autre** client.
+select tests_abo.check(
+  subscription_sync(
+    p_station  => :caserne_b::uuid,
+    p_customer => 'cus_A',
+    p_status   => 'active',
+    p_event    => 'checkout.session.completed') ->> 'code' = 'customer_mismatch',
+  'un événement qui nomme B avec le client de A est refusé');
+
+select tests_abo.check(
+  (select status = 'trialing' and stripe_customer_id = 'cus_B'
+     from subscriptions where station_id = :caserne_b::uuid),
+  'et B n''a ni changé de statut, ni récupéré le client de A');
+
+select tests_abo.check(
+  (select stripe_customer_id = 'cus_A' from subscriptions where station_id = :caserne_a::uuid),
+  'A garde son client : personne ne le lui a pris');
+
+-- **La conséquence évitée**, dite explicitement : sans ce refus, l'administrateur
+-- de B ouvrirait le portail de A — sa carte, ses factures, sa résiliation.
+select tests_abo.check(
+  (select stripe_customer_id <> (select stripe_customer_id from subscriptions
+                                  where station_id = :caserne_a::uuid)
+     from subscriptions where station_id = :caserne_b::uuid),
+  'les deux casernes ne partagent pas un client, donc pas un portail');
+
+-- b. Le client est déjà rattaché à une **autre** caserne, et la caserne nommée
+-- n'en a encore aucun. C'est le cas que le premier contrôle ne voit pas.
+update subscriptions set stripe_customer_id = null where station_id = :caserne_b::uuid;
+
+select tests_abo.check(
+  subscription_sync(
+    p_station  => :caserne_b::uuid,
+    p_customer => 'cus_A',
+    p_status   => 'active',
+    p_event    => 'checkout.session.completed') ->> 'code' = 'customer_mismatch',
+  'une caserne sans client ne récupère pas celui d''une autre');
+
+select tests_abo.check(
+  (select stripe_customer_id is null and status = 'trialing'
+     from subscriptions where station_id = :caserne_b::uuid),
+  'et elle reste telle qu''elle était');
+
+-- c. Ce qui doit continuer de passer : la caserne et son propre client.
+select tests_abo.check(
+  (subscription_sync(
+     p_station  => :caserne_a::uuid,
+     p_customer => 'cus_A',
+     p_status   => 'active',
+     p_event    => 'invoice.paid') ->> 'ok')::boolean,
+  'la caserne et **son** client passent toujours');
+
+-- d. Un premier rattachement reste possible : ni la caserne ni le client ne
+-- sont pris.
+select tests_abo.check(
+  (subscription_sync(
+     p_station  => :caserne_b::uuid,
+     p_customer => 'cus_B',
+     p_status   => 'active',
+     p_event    => 'checkout.session.completed') ->> 'ok')::boolean,
+  'une première souscription rattache bien le client à sa caserne');
+
+-- Remise du décor pour la suite.
+update subscriptions set status = 'trialing', stripe_subscription_id = null
+ where station_id = :caserne_b::uuid;
+
+\echo ''
+\echo '== 3 ter. Un rejeu ne s''applique pas deux fois'
+
+delete from stripe_events;
+
+-- Une caserne à jour, qui vient de payer.
+select tests_abo.check(
+  (subscription_sync(
+     p_customer   => 'cus_A',
+     p_status     => 'active',
+     p_period_end => '2027-08-15T00:00:00Z',
+     p_event      => 'invoice.paid',
+     p_event_id   => 'evt_paye') ->> 'ok')::boolean,
+  'un premier événement identifié s''applique');
+
+select tests_abo.check(
+  (select status = 'processed' and station_id = :caserne_a::uuid and attempts = 1
+     from stripe_events where id = 'evt_paye'),
+  'et il laisse sa ligne dans stripe_events');
+
+-- **Le scénario du rejeu.** Un échec de paiement capté, puis réémis dans la
+-- fenêtre de tolérance juste après un paiement réussi : sans dédoublonnage, il
+-- ramène en impayé une caserne parfaitement à jour.
+select tests_abo.check(
+  (subscription_sync(
+     p_customer => 'cus_A',
+     p_status   => 'past_due',
+     p_event    => 'invoice.payment_failed',
+     p_event_id => 'evt_echec') ->> 'ok')::boolean,
+  'un échec de paiement s''applique une première fois');
+
+select tests_abo.check(
+  (select status = 'past_due' from subscriptions where station_id = :caserne_a::uuid),
+  'la caserne passe en retard de paiement');
+
+-- La caserne régularise.
+select tests_abo.check(
+  (subscription_sync(
+     p_customer   => 'cus_A',
+     p_status     => 'active',
+     p_period_end => '2027-09-15T00:00:00Z',
+     p_event      => 'invoice.paid',
+     p_event_id   => 'evt_paye_2') ->> 'ok')::boolean,
+  'elle régularise');
+
+-- Le même événement d'échec, rejoué.
+select tests_abo.check(
+  (subscription_sync(
+     p_customer => 'cus_A',
+     p_status   => 'past_due',
+     p_event    => 'invoice.payment_failed',
+     p_event_id => 'evt_echec') ->> 'duplicate')::boolean,
+  'le rejeu est reconnu comme un doublon');
+
+select tests_abo.check(
+  (select status = 'active' from subscriptions where station_id = :caserne_a::uuid),
+  '**et la caserne reste à jour** : le rejeu n''a rien réappliqué');
+
+-- La section 2.c a déjà journalisé un échec de paiement sans identifiant : on
+-- ne compte donc que les lignes portant **cet** événement.
+select tests_abo.check(
+  (select count(*) = 1 from audit_log
+    where action = 'subscription.invoice.payment_failed'
+      and data ->> 'event_id' = 'evt_echec'),
+  'une seule ligne d''audit pour l''événement d''échec, pas deux');
+
+-- Un doublon rend `ok` : c'est un succès pour l'appelant, il n'a rien à rejouer.
+select tests_abo.check(
+  (subscription_sync(
+     p_customer => 'cus_A',
+     p_status   => 'past_due',
+     p_event    => 'invoice.payment_failed',
+     p_event_id => 'evt_echec') ->> 'ok')::boolean,
+  'et le doublon répond « ok » : le prestataire n''a pas à insister');
+
+-- Deux événements différents ne se gênent pas.
+select tests_abo.check(
+  (select count(*) = 3 from stripe_events where status = 'processed'),
+  'trois événements distincts, trois lignes traitées');
+
+\echo ''
+\echo '== 3 quater. Un traitement en échec laisse une trace, et se reprend'
+
+-- Le prestataire abandonne ses rejeux au bout de trois jours : sans cette ligne,
+-- un événement valide dont le traitement a échoué ne laisserait qu'un journal à
+-- rétention courte.
+select stripe_event_fail('evt_casse', 'invoice.paid', 'base indisponible');
+
+select tests_abo.check(
+  (select status = 'failed' and error = 'base indisponible' and attempts = 1
+     from stripe_events where id = 'evt_casse'),
+  'un échec laisse une ligne « failed », avec son motif');
+
+-- **Le statut `failed` est le seul que le dédoublonnage laisse reprendre** :
+-- sans ça, la trace de l'échec empêcherait le rejeu de réussir.
+select tests_abo.check(
+  (subscription_sync(
+     p_customer   => 'cus_A',
+     p_status     => 'active',
+     p_period_end => '2027-10-15T00:00:00Z',
+     p_event      => 'invoice.paid',
+     p_event_id   => 'evt_casse') ->> 'ok')::boolean,
+  'le rejeu d''un événement en échec est bien retraité');
+
+select tests_abo.check(
+  (select status = 'processed' and attempts = 2 and error is null
+     from stripe_events where id = 'evt_casse'),
+  'la ligne passe en « processed » et compte sa seconde tentative');
+
+-- Un refus métier consomme l'événement : le rejouer n'y changerait rien.
+select tests_abo.check(
+  subscription_sync(
+    p_customer => 'cus_inconnu',
+    p_status   => 'active',
+    p_event    => 'invoice.paid',
+    p_event_id => 'evt_orphelin') ->> 'code' = 'station_not_found',
+  'un événement sans caserne est écarté');
+
+select tests_abo.check(
+  (select status = 'skipped' and error = 'station_not_found'
+     from stripe_events where id = 'evt_orphelin'),
+  'et sa ligne dit pourquoi');
+
+-- Les droits : personne ne lit ni n'écrit cette table depuis l'application.
+set local role authenticated;
+set local request.jwt.claims to '{"sub": "aaaaaaaa-0000-4000-8000-000000000100", "role": "authenticated"}';
+
+select tests_abo.denied(
+  $$select * from stripe_events$$,
+  'un admin ne lit pas le journal des événements de paiement');
+
+select tests_abo.refuse(
+  $$select stripe_event_fail('evt_pirate', 'invoice.paid', 'forge')$$,
+  'un admin ne pose pas de trace d''échec');
+
+select tests_abo.refuse(
+  $$select stripe_event_close('evt_pirate', null, 'forge')$$,
+  'ni ne clôt un événement');
+
+reset role;
+
+-- Remise du décor pour la suite : la caserne A repart de son état de section 2.
+update subscriptions set status = 'active', suspended_at = null
+ where station_id = :caserne_a::uuid;
 
 \echo ''
 \echo '== 4. cron_suspend_subscriptions, dans ses deux cas'

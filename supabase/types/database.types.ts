@@ -782,6 +782,50 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_events: {
+        Row: {
+          attempts: number
+          error: string | null
+          id: string
+          processed_at: string | null
+          received_at: string
+          result: Json
+          station_id: string | null
+          status: string
+          type: string
+        }
+        Insert: {
+          attempts?: number
+          error?: string | null
+          id: string
+          processed_at?: string | null
+          received_at?: string
+          result?: Json
+          station_id?: string | null
+          status?: string
+          type: string
+        }
+        Update: {
+          attempts?: number
+          error?: string | null
+          id?: string
+          processed_at?: string | null
+          received_at?: string
+          result?: Json
+          station_id?: string | null
+          status?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stripe_events_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           created_at: string
@@ -1191,6 +1235,14 @@ export type Database = {
       }
       station_settings_valid: { Args: { p_settings: Json }; Returns: boolean }
       station_writable: { Args: { p_station: string }; Returns: boolean }
+      stripe_event_close: {
+        Args: { p_code: string; p_event_id: string; p_station: string }
+        Returns: Json
+      }
+      stripe_event_fail: {
+        Args: { p_error: string; p_event_id: string; p_type: string }
+        Returns: undefined
+      }
       subscription_set_customer: {
         Args: { p_customer: string; p_station: string }
         Returns: Json
@@ -1199,6 +1251,7 @@ export type Database = {
         Args: {
           p_customer?: string
           p_event?: string
+          p_event_id?: string
           p_period_end?: string
           p_plan?: string
           p_reference?: string
