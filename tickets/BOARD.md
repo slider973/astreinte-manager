@@ -15,6 +15,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 045 | [Destination perdue au chargement à froid d'un écran d'administration](backlog/045-destination-perdue-a-froid.md) | P1 | 024 031 |  |
+| 047 | [Importer les membres d'une caserne depuis un fichier](backlog/047-import-membres.md) | P0 | 006 009 038 |  |
 
 ## Terminés
 
