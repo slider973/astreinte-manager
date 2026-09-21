@@ -8,12 +8,16 @@ import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/session/appartenances_locales.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/core/session/auth_repository.dart';
 import 'package:astreinte_sp/core/session/membership_repository.dart';
 import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/session/session_utilisateur.dart';
 import 'package:astreinte_sp/core/supabase/supabase_bootstrap.dart';
+import 'package:astreinte_sp/features/astreintes/data/astreintes_repository.dart';
+import 'package:astreinte_sp/features/astreintes/data/cache_astreintes.dart';
+import 'package:astreinte_sp/features/astreintes/domain/astreintes_providers.dart';
 import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
 import 'package:astreinte_sp/features/dispos/data/file_locale.dart';
 import 'package:astreinte_sp/features/dispos/domain/dispos_providers.dart';
@@ -43,6 +47,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'faux_astreintes.dart';
 import 'faux_dispos.dart';
 import 'faux_invitations.dart';
 import 'faux_notifications.dart';
@@ -222,10 +227,14 @@ Future<AppMontee> monterApp(
   PlanningRepository? planning,
   SuiviRepository? suivi,
   PropositionsRepository? propositions,
+  AstreintesRepository? astreintes,
+  CacheAstreintes? cacheAstreintes,
+  DateTime Function()? horloge,
   DisposRepository? dispos,
   FileLocale? fileLocale,
   Connectivite? reseau,
   ReperesLocaux? reperes,
+  AppartenancesLocales? appartenancesLocales,
   ContextePlateforme? plateforme,
   FirebaseDemarrage firebase = FirebaseDemarrage.configurationAbsente,
   FauxMessageriePush? messagerie,
@@ -293,6 +302,19 @@ Future<AppMontee> monterApp(
         propositionsRepositoryProvider.overrideWithValue(
           propositions ?? FauxPropositionsRepository(),
         ),
+        // « Mes astreintes » (ticket 027) vit sur l'onglet 2, et son
+        // contrôleur n'est pas auto-disposé : sans faux, tout test qui passe
+        // par la coquille toucherait un client Supabase qui n'existe pas.
+        astreintesRepositoryProvider.overrideWithValue(
+          astreintes ?? FauxAstreintesRepository(),
+        ),
+        // Le cache local passe par `shared_preferences` : sans faux, chaque
+        // test attendrait un canal de plateforme qui ne répond jamais.
+        cacheAstreintesProvider.overrideWithValue(
+          cacheAstreintes ?? CacheAstreintesMemoire(),
+        ),
+        if (horloge != null)
+          horlogeAstreintesProvider.overrideWithValue(horloge),
         // L'onglet 0 est désormais « Mon mois » : sans faux dépôt, il
         // toucherait un client Supabase qui n'existe pas en test.
         disposRepositoryProvider.overrideWithValue(
@@ -305,6 +327,12 @@ Future<AppMontee> monterApp(
         if (reseau != null) connectiviteProvider.overrideWithValue(reseau),
         reperesLocauxProvider.overrideWithValue(
           reperes ?? ReperesLocauxMemoire(),
+        ),
+        // La caserne gardée sur l'appareil (ticket 027) passe par
+        // `shared_preferences` : sans faux, chaque test attendrait un canal de
+        // plateforme qui ne répond jamais.
+        appartenancesLocalesProvider.overrideWithValue(
+          appartenancesLocales ?? AppartenancesLocalesMemoire(),
         ),
         contextePlateformeProvider.overrideWithValue(
           plateforme ?? ContextePlateforme.natif,

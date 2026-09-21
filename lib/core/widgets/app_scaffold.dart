@@ -54,11 +54,17 @@ class AppDestination {
       route: 'propositions',
       pastille: propositionsEnAttente,
     ),
+    // **La destination de consultation** (ticket 027). Elle portait
+    // « Planning » et l'icône `groups` au ticket 004 ; `groups` disait « les
+    // autres » sur un écran qui, tant qu'un planning reste `published`, ne
+    // montre que soi. Le ticket 023 y ajoutera la vue de la caserne derrière
+    // un sélecteur à deux segments — d'où le mot « Astreintes », qui couvre
+    // les deux (`design/027 § 4`).
     const AppDestination(
-      libelle: AppStrings.navPlanning,
-      icone: Icons.groups_outlined,
-      iconeSelectionnee: Icons.groups,
-      route: 'planning',
+      libelle: AppStrings.navAstreintes,
+      icone: Icons.event_available_outlined,
+      iconeSelectionnee: Icons.event_available,
+      route: 'astreintes',
     ),
     const AppDestination(
       libelle: AppStrings.navProfil,

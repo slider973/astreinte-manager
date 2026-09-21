@@ -36,7 +36,22 @@ class SupabaseMembershipRepository implements MembershipRepository {
 
       return lignes.map(Appartenance.depuisJson).toList(growable: false);
     } on Object catch (erreur) {
-      throw AuthEchec(traduireErreurAuth(erreur, etape: AuthEtape.envoi));
+      throw AuthEchec(_traduire(erreur));
     }
+  }
+
+  /// **Distingue le transport du refus**, parce que `appartenancesProvider`
+  /// n'a le droit de retomber sur son cache que pour le premier : masquer une
+  /// révocation derrière un instantané périmé ferait croire à quelqu'un qu'il
+  /// appartient encore à une caserne qui l'a retiré.
+  ///
+  /// PostgREST enveloppe parfois une requête qui n'est jamais partie dans une
+  /// `PostgrestException` **sans code** — c'est la même règle que
+  /// `SupabaseAstreintesRepository`. Le reste part à `traduireErreurAuth`.
+  static AuthErreur _traduire(Object erreur) {
+    if (erreur is PostgrestException && erreur.code == null) {
+      return AuthErreur.reseau;
+    }
+    return traduireErreurAuth(erreur, etape: AuthEtape.envoi);
   }
 }

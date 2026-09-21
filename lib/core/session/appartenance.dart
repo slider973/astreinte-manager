@@ -77,6 +77,24 @@ class Appartenance {
 
   bool get estAdmin => role == RoleMembre.admin;
 
+  /// La même appartenance, **sans privilège**.
+  ///
+  /// Sert à tout ce qui ne vient pas d'une lecture confirmée par la base —
+  /// aujourd'hui l'instantané gardé sur l'appareil (ticket 027). Un rôle qu'on
+  /// n'a pas pu revérifier n'accorde rien : c'est la règle déjà écrite dans
+  /// [RoleMembre.depuisSql], appliquée à une valeur qu'on ne peut pas
+  /// confirmer plutôt qu'à une valeur qu'on ne comprend pas.
+  Appartenance get commeMembre => role == RoleMembre.membre
+      ? this
+      : Appartenance(
+          id: id,
+          stationId: stationId,
+          nomCaserne: nomCaserne,
+          role: RoleMembre.membre,
+          statut: statut,
+          nomAffiche: nomAffiche,
+        );
+
   @override
   bool operator ==(Object other) =>
       other is Appartenance &&

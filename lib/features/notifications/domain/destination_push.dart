@@ -21,7 +21,7 @@ import '../../../core/router/app_router.dart';
 /// Les onglets de la coquille d'accueil (`AppDestination.pour`).
 const int _ongletMonMois = 0;
 const int _ongletPropositions = 1;
-const int _ongletPlanning = 2;
+const int _ongletAstreintes = 2;
 
 /// Une période de saisie, `AAAA-MM`. Rien d'autre n'est accepté : un lien
 /// forgé ne doit pas se promener dans l'URL de l'application.
@@ -55,10 +55,13 @@ String? destinationInterne(String? lien, {required bool admin}) {
     final periode = segments[1];
     if (!periodeValide(periode)) return null;
 
-    // `/schedule/<period>` — le planning de la caserne. L'écran du ticket 023
-    // n'existe pas encore : on ouvre l'onglet, pas un mois.
+    // `/schedule/<period>` — le planning de la caserne. La destination
+    // « Astreintes » porte depuis le ticket 027 « Mes astreintes », et le
+    // ticket 023 y ajoutera la vue de la caserne : le lien mène donc enfin à
+    // un écran. Il n'ouvre toujours pas un mois — le sélecteur de mois est du
+    // ressort du 023.
     if (segments.first == 'schedule') {
-      return _accueil(onglet: _ongletPlanning);
+      return _accueil(onglet: _ongletAstreintes);
     }
 
     // `/availability/<period>` — la saisie du mois. La seule des quatre qui

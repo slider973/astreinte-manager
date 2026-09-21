@@ -3,9 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+// Le cache d'astreintes appartient à sa fonctionnalité, mais **c'est ici que
+// s'écrit la règle** « rien de cette personne ne reste sur l'appareil ». Le
+// lien est donc direct, comme celui du routeur vers les écrans : une liste que
+// les fonctionnalités viendraient garnir d'elles-mêmes serait une liste qu'on
+// oublie de garnir, et c'est exactement le défaut qu'on corrige.
+import '../../features/astreintes/data/cache_astreintes.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/primary_button.dart';
+import 'appartenances_locales.dart';
 import 'auth_erreur.dart';
 import 'session_providers.dart';
 
@@ -34,6 +41,7 @@ class DeconnexionController extends Notifier<EtatDeconnexion> {
 
     state = const EtatDeconnexion(enCours: true);
     try {
+      await _oublierLesCaches();
       await ref.read(authRepositoryProvider).seDeconnecter();
       // Le routeur emmène vers la connexion dès que la session tombe : ce
       // contrôleur n'a personne à pousser.
@@ -43,6 +51,36 @@ class DeconnexionController extends Notifier<EtatDeconnexion> {
         erreur: traduireErreurAuth(erreur, etape: AuthEtape.envoi),
       );
     }
+  }
+
+  /// Oublie tout ce que l'appareil garde de cette personne.
+  ///
+  /// **Avant la fermeture de session**, parce qu'après, ni l'identifiant du
+  /// membre ni celui de sa caserne ne sont plus lisibles : les deux caches
+  /// rangent par clé, et une clé qu'on ne sait plus composer ne s'efface pas.
+  ///
+  /// Ce qui part : le nom de la caserne (`session.appartenances.…`) et
+  /// l'instantané des astreintes (`astreintes.cache.…`), qui porte en plus
+  /// **les noms des autres membres du créneau**. Sur un téléphone prêté ou
+  /// dans un véhicule partagé, ce sont des données de tiers qui n'ont rien à
+  /// faire là pour la personne suivante — même règle que la destination en
+  /// attente, oubliée elle aussi à la déconnexion (`DESIGN.md § Écarts,
+  /// ticket 024`).
+  ///
+  /// Aucune panne de stockage ne remonte : elles sont déjà avalées par les
+  /// deux dépôts. Un effacement qui échoue ne doit pas retenir quelqu'un dans
+  /// une session qu'il veut quitter.
+  Future<void> _oublierLesCaches() async {
+    final userId = ref.read(sessionProvider).value?.userId;
+    if (userId == null) return;
+
+    await ref.read(appartenancesLocalesProvider).effacer(userId);
+
+    final stationId = ref.read(appartenanceCouranteProvider)?.stationId;
+    if (stationId == null) return;
+    await ref
+        .read(cacheAstreintesProvider)
+        .effacer(stationId: stationId, userId: userId);
   }
 }
 

@@ -10,6 +10,7 @@ import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../astreintes/presentation/astreintes_screen.dart';
 import '../../dispos/presentation/mois_screen.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../notifications/presentation/widgets/reglage_notifications.dart';
@@ -50,6 +51,11 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
   /// L'onglet des propositions (ticket 021). C'est là que mène le lien public
   /// `/proposals` d'une notification, traduit par `destinationInterne`.
   static const String _routePropositions = 'propositions';
+
+  /// L'onglet de consultation (ticket 027) : « Mes astreintes ». C'est là que
+  /// mène le lien public `/schedule/<période>`, et c'est là que le ticket 023
+  /// ajoutera la vue de la caserne.
+  static const String _routeAstreintes = 'astreintes';
 
   /// **L'onglet demandé par l'URL gagne sur l'onglet affiché.**
   ///
@@ -118,6 +124,17 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen> {
         indexSelectionne: index,
         onDestination: (nouvelle) => _choisir(nouvelle, destinations),
         onVersMonMois: () => setState(() => _destination = 0),
+      );
+    }
+
+    if (route == _routeAstreintes) {
+      return AstreintesScreen(
+        destinations: destinations,
+        indexSelectionne: index,
+        onDestination: (nouvelle) => _choisir(nouvelle, destinations),
+        // Rien à consulter veut dire : il y a peut-être quelque chose à
+        // répondre. L'état vide mène là où se trouve la suite.
+        onVersPropositions: () => setState(() => _destination = 1),
       );
     }
 
