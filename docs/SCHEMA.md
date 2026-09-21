@@ -82,12 +82,23 @@ Clés, types et bornes — **la liste est une liste blanche, une clé inconnue e
 | `availability_deadline_day` | entier | 1–28 (le jour doit exister en février) | jour du mois précédent où la saisie se verrouille |
 | `response_reminder_hours`, `response_email_hours`, `late_report_hours` | entier | 1–336 (deux semaines) | délais de relance, en heures |
 | `invitation_hourly_limit` | entier, **optionnel** | 1–500 | plafond d'invitations par heure (§ 2.18, migration `0032`). Absente, la valeur est **60** |
+| `notification_hour` | entier, **optionnel** | 6–20 | heure **locale** à partir de laquelle les tâches du § 8 écrivent aux membres (migration `0033`). Absente, la valeur est **9** |
 
 `required_overrides` : `{"sat": {"day": 2}, "2026-12-31": {"night": 3}}`. Les clés sont soit
 `mon`…`sun`, soit une date ISO **réelle** (le 30 février est refusé) ; les valeurs sont des
 objets non vides dont les seules sous-clés sont `day` et `night`, entiers 0–50.
 
-`invitation_hourly_limit` est **optionnelle, et doit le rester** *(migration `0032`, ticket 038)*.
+`notification_hour` est un **entier d'horloge**, pas une chaîne `"HH:MM"` *(migration `0033`,
+ticket 041)*. Les tâches du § 8 qui écrivent aux membres sont horaires et raisonnent sur l'heure
+pleine : une minute n'aurait aucun effet, et l'écrire laisserait croire à une précision qui
+n'existe pas. Les fuseaux à la demi-heure (Marquises UTC-09:30) et au quart d'heure
+(Chatham UTC+12:45) sont couverts sans cas particulier. La borne haute de la fenêtre d'envoi,
+**20 incluse**, n'est pas réglable : elle ne dit pas une préférence de caserne mais une limite de
+politesse — on n'écrit à personne après 21:00 locales. Une caserne qui veut son rappel tard règle
+`notification_hour` à 20 ; la fenêtre vaut alors cette seule heure.
+
+`invitation_hourly_limit` et `notification_hour` sont **optionnelles, et doivent le rester**
+*(migrations `0032` et `0033`, tickets 038 et 041)*.
 La contrainte `stations_settings_valide` est rejouée à chaque écriture d'une ligne `stations` :
 une clé rendue obligatoire après coup ne casserait rien à la migration, mais condamnerait toute
 caserne écrite avant elle à ne plus jamais pouvoir changer un réglage. La règle vaut pour toute
@@ -1513,9 +1524,9 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `create_periods` | 1er du mois, 02:00 | `select public.cron_create_periods();` — crée les périodes M+1 et M+2 manquantes pour chaque caserne *(migration `0012`)* |
 | `lock_periods` | toutes les heures | `select public.cron_lock_periods();` — passe en `locked` les périodes dont `deadline_at < now()` *(migration `0012`)* |
 | `dispatch_notifications` | chaque minute | `select public.cron_dispatch_notifications();` — repose les demandes de `notification_outbox` restées en attente, abandonne au bout de cinq tentatives et met en file la ligne interne de chaque abandon *(migrations `0014` et `0022`)* |
-| `availability_reminders` | tous les jours 09:00 | `select public.cron_availability_reminders();` — push J-3 et email J-1 aux membres actifs sans aucune ligne `availabilities` sur le mois d'une période ouverte *(migration `0016`)* |
-| `assignment_reminders` | toutes les heures (:15) | `select public.cron_assignment_reminders();` — rappel push à `response_reminder_hours`, courriel à `response_email_hours`, aux membres actifs dont l'attribution est restée sans réponse *(migration `0021`)* |
-| `late_responders_report` | toutes les heures (:45) | `select public.cron_late_responders_report();` — notifie les admins des attributions en attente depuis plus de `late_report_hours`, une fois par jour et par planning, entre 08:00 et 20:59 heure de la caserne *(migration `0021`)* |
+| `availability_reminders` | toutes les heures (:30) | `select public.cron_availability_reminders();` — push J-3 et email J-1 aux membres actifs sans aucune ligne `availabilities` sur le mois d'une période ouverte, **dans la fenêtre horaire locale de chaque caserne** *(migrations `0016` et `0033`)* |
+| `assignment_reminders` | toutes les heures (:15) | `select public.cron_assignment_reminders();` — rappel push à `response_reminder_hours`, courriel à `response_email_hours`, aux membres actifs dont l'attribution est restée sans réponse, **dans la fenêtre horaire locale de chaque caserne** *(migrations `0021` et `0033`)* |
+| `late_responders_report` | toutes les heures (:45) | `select public.cron_late_responders_report();` — notifie les admins des attributions en attente depuis plus de `late_report_hours`, une fois par jour et par planning, **dans la fenêtre horaire locale de la caserne** *(migrations `0021` et `0033`)* |
 | `suspend_subscriptions` | tous les jours 03:30 | `select public.cron_suspend_subscriptions();` — passe en `suspended` les essais expirés sans abonnement et les `past_due` dont la dernière période payée remonte à plus de 14 jours. **Rien n'est supprimé** : la caserne passe en lecture seule via `station_writable()`, et les administrateurs sont prévenus par courriel *(migrations `0023` et `0024`)* |
 | `subscription_reminders` | tous les jours 03:20 | `select public.cron_subscription_reminders();` — courriel + notification interne aux administrateurs quand l'essai se termine dans sept jours et qu'aucun abonnement n'a été souscrit *(migration `0024`)* |
 | `archive_schedules` | tous les jours 02:30 | `select public.cron_archive_schedules();` — passe en `archived` les plannings `published` ou `validated` dont le mois est **strictement antérieur au mois courant de leur caserne**, calculé dans son fuseau. Un `draft` n'est jamais archivé. Idempotente, rend le nombre de plannings archivés *(migration `0031`)* |
@@ -1537,6 +1548,31 @@ serait archiver un jour à l'avance, sous les yeux de pompiers encore d'astreint
 tâche ne repasserait que le mois suivant, ce planning resterait `published` trente jours de plus,
 avec les relances de `assignment_reminders` qui continuent de partir. Une exécution quotidienne
 archive chaque caserne dans les vingt-quatre heures de son propre 1er du mois, jamais avant.
+
+### La fenêtre horaire locale — `station_notification_window` *(migration `0033`, ticket 041)*
+
+**Les trois tâches qui écrivent aux membres n'envoient que dans la fenêtre horaire locale de
+chaque caserne** : de `settings.notification_hour` (9 par défaut, § 2.1) à **20 incluse**. Elles
+sont toutes horaires, et c'est la **clé de dédoublonnage** de `notification_outbox` qui garantit
+qu'un seul tir de la fenêtre envoie réellement. Le comportement nominal est donc « à l'heure
+visée pile » ; le comportement dégradé, quand l'ordonnanceur a manqué ce tir-là, est « au premier
+tir suivant » — jamais avant l'heure visée, jamais après 21:00 locales.
+
+Avant le ticket 041, `availability_reminders` tirait une fois par jour à 09:00 **heure du
+serveur** : le jour était juste dans chaque fuseau, l'heure ne l'était qu'en métropole — 05:00 en
+Guadeloupe, 21:00 à Wallis, 23:00 la veille à Papeete. `late_responders_report` portait déjà une
+fenêtre locale, mais écrite en dur dans la tâche (`between 8 and 20`) : elle a été remplacée par
+le mécanisme commun, et son heure d'ouverture par défaut passe donc de 08:00 à 09:00. Une caserne
+matinale écrit `"notification_hour": 8`.
+
+**Les autres tâches ne sont pas concernées, et c'est vérifié** (`supabase/tests/heure_locale_notifications_test.sql § 6`) :
+`create_periods`, `lock_periods`, `archive_schedules`, `prune_notifications` et `prune_retention`
+n'appellent jamais `notify` — elles n'écrivent à personne et la nuit est leur meilleure heure.
+`dispatch_notifications` ne décide rien, elle repose ce qui est déjà en file : lui poser une
+fenêtre retarderait aussi les notifications immédiates, qui répondent à un geste humain en cours.
+`subscription_reminders` et `suspend_subscriptions` écrivent aux administrateurs en `email` +
+`inapp`, **jamais en push** : un courriel ne réveille personne à 03:20, et la notification de
+suspension est mise en file dans la transaction qui suspend.
 
 Chaque tâche est un appel **qualifié** (`public.…`) et **sans argument** d'une fonction
 `security definer` dont le `search_path` est figé : rien n'est interpolé dans la commande, et
@@ -1671,6 +1707,12 @@ Ordre proposé :
     branche `rate_limited` de `create_invitation`, `prune_invitation_rate_events` ajoutée à
     `cron_prune_retention`)
 
+33. `0033_heure_locale_notifications.sql` (ticket 041 : clé `notification_hour` ajoutée à la
+    liste blanche de `station_settings_valid`, `station_notification_hour`,
+    `station_notification_window`, les trois tâches qui écrivent aux membres passées sous cette
+    fenêtre — `cron_availability_reminders`, `cron_assignment_reminders`,
+    `cron_late_responders_report` —, tâche `availability_reminders` replanifiée à l'heure)
+
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
 poussée sur `main` ne se renumérote pas.
@@ -1706,7 +1748,8 @@ et `0022` par `supabase/tests/notifications_test.sql`, les rappels de saisie de 
 `supabase/tests/suppression_compte_test.sql`, l'export RGPD de `0027` par
 `supabase/tests/export_rgpd_test.sql`, la proposition automatique de `0028` par
 `supabase/tests/proposition_automatique_test.sql` et le plafond de débit des invitations de
-`0032` par `supabase/tests/limite_debit_invitations_test.sql`, joués par le même script. La logique pure
+`0032` par `supabase/tests/limite_debit_invitations_test.sql` et l'heure locale d'envoi de `0033`
+par `supabase/tests/heure_locale_notifications_test.sql`, joués par le même script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge

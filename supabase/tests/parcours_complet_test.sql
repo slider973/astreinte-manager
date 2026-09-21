@@ -584,8 +584,15 @@ begin
       where type = 'assignment_reminder'),
     0, 'deux heures après : personne n''est en retard, rien ne part');
 
-  -- Vingt-cinq heures après la publication, le palier `push` est franchi.
-  envoyes := cron_assignment_reminders(now() + interval '25 hours');
+  -- Le palier `push` est franchi, et l'instant tombe à 10:00 ou 11:00 heure de
+  -- Paris : depuis le ticket 041 la tâche n'envoie que dans la fenêtre locale de
+  -- la caserne, et `now() + interval '25 hours'` aurait été tantôt dedans,
+  -- tantôt dehors selon l'heure à laquelle la CI est lancée. Le surlendemain à
+  -- 09:00 UTC est à plus de trente-trois heures de la publication, quelle que
+  -- soit cette heure. Seul le palier push part : le palier courriel se lit
+  -- avant lui et exige `reminder_count >= 1`, qui vaut encore zéro.
+  envoyes := cron_assignment_reminders(
+    date_trunc('day', now()) + interval '2 days' + interval '9 hours');
   perform tests_parc.check(envoyes >= 1, 'la tâche relance au moins une caserne');
 
   perform tests_parc.egal(
