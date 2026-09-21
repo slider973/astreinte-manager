@@ -5,7 +5,7 @@
 - **Dépend de** : 026
 - **Branche** : `feat/052-centre-notifications-sans-retour`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-21
 
 ## Contexte
 
