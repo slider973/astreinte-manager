@@ -25,6 +25,7 @@ class LignePeriode extends StatelessWidget {
     super.key,
     this.taux,
     this.occupee = false,
+    this.lectureSeule = false,
   });
 
   final PeriodeSaisie periode;
@@ -36,6 +37,10 @@ class LignePeriode extends StatelessWidget {
   /// Une écriture est en vol sur ce mois : le bouton garde sa place et son
   /// libellé, et porte l'indicateur.
   final bool occupee;
+
+  /// La caserne est suspendue : le bouton reste, grisé, avec sa raison
+  /// (ticket 030). Le retirer laisserait la ligne sans explication.
+  final bool lectureSeule;
 
   final VoidCallback onVerrouiller;
   final VoidCallback onRouvrir;
@@ -92,7 +97,10 @@ class LignePeriode extends StatelessWidget {
               icone: periode.ouverte ? Icons.lock_outline : Icons.lock_open,
               chargement: occupee,
               pleineLargeur: false,
-              onPressed: periode.ouverte ? onVerrouiller : onRouvrir,
+              onPressed: lectureSeule
+                  ? null
+                  : (periode.ouverte ? onVerrouiller : onRouvrir),
+              raisonDesactivation: AppStrings.periodeRefusSuspendue,
             ),
           ),
         ],

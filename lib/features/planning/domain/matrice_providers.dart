@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
@@ -179,6 +180,9 @@ class MatriceController extends AsyncNotifier<EtatMatrice?> {
         lignes: List<LigneMatrice>.unmodifiable(lignes),
         nombreDeJours: periode.nombreDeJours,
       ),
+      // Su **avant** le premier geste depuis le ticket 030, au lieu d'être
+      // déduit du refus d'une case déjà peinte.
+      lectureSeule: ref.watch(lectureSeuleCaserneProvider),
     );
   }
 

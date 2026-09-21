@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
@@ -114,6 +115,10 @@ class PropositionsController extends AsyncNotifier<EtatPropositions> {
         userId: session.userId,
         stationId: appartenance.stationId,
       ),
+      // Su **avant** la première réponse depuis le ticket 030 : les deux
+      // boutons de chaque ligne naissent grisés avec leur raison, au lieu de le
+      // devenir après un refus du serveur.
+      lectureSeule: ref.watch(lectureSeuleCaserneProvider),
     );
   }
 

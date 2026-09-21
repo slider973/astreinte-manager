@@ -23,7 +23,9 @@ export type TypeNotification =
   | "assignment_cancelled"
   | "schedule_validated"
   | "schedule_all_accepted"
-  | "late_responders";
+  | "late_responders"
+  | "subscription_trial_ending"
+  | "subscription_suspended";
 
 export type Canal = "push" | "email" | "inapp";
 
@@ -68,6 +70,8 @@ export const TOUS_LES_TYPES: readonly TypeNotification[] = [
   "schedule_validated",
   "schedule_all_accepted",
   "late_responders",
+  "subscription_trial_ending",
+  "subscription_suspended",
 ];
 
 export function estTypeNotification(valeur: unknown): valeur is TypeNotification {
@@ -92,6 +96,13 @@ export const CANAUX_PAR_DEFAUT: Record<TypeNotification, Canal[]> = {
   schedule_validated: ["push", "inapp"],
   schedule_all_accepted: ["push", "inapp"],
   late_responders: ["push", "inapp"],
+  // Courriel d'abord, et c'est la seule famille du produit où c'est le cas : un
+  // abonnement ne se règle pas depuis l'écran verrouillé d'un téléphone, et le
+  // courriel est le seul canal qui atteigne un chef de centre qui n'a pas ouvert
+  // l'application depuis trois semaines — le cas nominal d'une fin d'essai
+  // (ticket 030, migration 0024).
+  subscription_trial_ending: ["email", "inapp"],
+  subscription_suspended: ["email", "inapp"],
 };
 
 /**
@@ -268,6 +279,11 @@ export function routePour(type: TypeNotification, payload: ChargeUtile): string 
     case "schedule_all_accepted":
     case "late_responders":
       return periode ? `/admin/schedule/${periode}` : "/proposals";
+    // La cinquième destination publique (docs/WORKFLOWS.md § 8). Elle ne porte
+    // pas de mois : un abonnement n'a pas de période de saisie.
+    case "subscription_trial_ending":
+    case "subscription_suspended":
+      return "/admin/subscription";
   }
 }
 
@@ -354,6 +370,28 @@ export function enumerer(elements: readonly string[]): string {
   if (elements.length === 0) return "";
   if (elements.length === 1) return elements[0];
   return `${elements.slice(0, -1).join(", ")} et ${elements[elements.length - 1]}`;
+}
+
+/**
+ * « vendredi 20 novembre », dans le fuseau de la caserne.
+ *
+ * Une échéance d'abonnement n'a pas d'heure utile : personne ne règle un
+ * abonnement à la minute près, et « jusqu'au 20 novembre à 03:36 » ferait lire
+ * une précision que la tâche quotidienne n'a pas.
+ */
+export function jourInstant(iso: string, fuseau = "Europe/Paris"): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone: fuseau,
+    }).format(d);
+  } catch {
+    return null;
+  }
 }
 
 /** « mercredi 15 septembre à 23:59 », dans le fuseau de la caserne. */
@@ -672,6 +710,42 @@ export function construireContenu(
             : null,
           "Relance-les ou réattribue les créneaux.",
         ].filter((p): p is string => p !== null).join(" "),
+        route,
+      };
+    }
+
+    case "subscription_trial_ending": {
+      const fin = texte(payload, "trial_ends_at");
+      const quand = fin ? jourInstant(fin, fuseau) : null;
+      const jours = nombre(payload, "days_left") ?? 7;
+      return {
+        titre: `Essai ${caserne ? `de ${caserne} ` : ""}bientôt terminé`,
+        corps: [
+          quand
+            ? `La période d'essai se termine le ${quand}.`
+            : `La période d'essai se termine dans ${jours} jours.`,
+          "Sans abonnement, la caserne passera en lecture seule : tout restera",
+          "consultable, rien ne sera supprimé, mais plus personne ne pourra saisir",
+          "ses disponibilités ni publier un planning.",
+        ].join(" "),
+        route,
+      };
+    }
+
+    case "subscription_suspended": {
+      const depuis = texte(payload, "suspended_at");
+      const quand = depuis ? jourInstant(depuis, fuseau) : null;
+      // Le motif reste **hors du texte** : « essai expiré » et « impayé de plus
+      // de quatorze jours » mènent au même écran et au même geste. Le dire
+      // ajouterait un reproche sans ajouter une sortie.
+      return {
+        titre: `${caserne ?? "La caserne"} est en lecture seule`,
+        corps: [
+          quand ? `L'abonnement est suspendu depuis le ${quand}.` : "L'abonnement est suspendu.",
+          "Rien n'a été supprimé : les plannings, les disponibilités et",
+          "l'historique restent consultables. La saisie rouvrira dès la reprise",
+          "de l'abonnement.",
+        ].join(" "),
         route,
       };
     }

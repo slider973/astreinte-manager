@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_breakpoints.dart';
@@ -149,6 +151,8 @@ class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
     );
 
     final donnees = etat.value;
+    final fait = faitCaserneEcran(context, ref);
+    final lectureSeule = ref.watch(lectureSeuleCaserneProvider);
 
     return AppScaffold(
       titre: AppStrings.periodesTitre,
@@ -182,7 +186,8 @@ class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
       ],
       // Une erreur survenue alors que la liste est déjà affichée se dit en
       // bannière : vider l'écran pour annoncer un échec de relecture ferait
-      // perdre ce qui était juste.
+      // perdre ce qui était juste. Elle passe devant le fait d'abonnement —
+      // ordre de `DESIGN.md`, erreur > lecture-seule > attention.
       banniere: etat.hasError && donnees != null
           ? AppBanner(
               variante: AppBannerVariante.erreur,
@@ -190,16 +195,27 @@ class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
               libelleAction: AppStrings.actionReessayer,
               onAction: _relire,
             )
-          : null,
+          : fait?.banniere,
       filActions: admin && donnees != null
           ? PrimaryButton(
               libelle: AppStrings.periodesOuvrirUnMois,
               icone: Icons.event_available_outlined,
               chargement: _occupee == _creationEnCours,
-              onPressed: () => unawaited(_ouvrirUnMois(donnees)),
+              // Le bouton reste à l'écran, grisé, avec sa raison : le retirer
+              // laisserait un chef de centre sans réponse à « pourquoi je ne
+              // peux plus ouvrir un mois ? ».
+              onPressed: lectureSeule
+                  ? null
+                  : () => unawaited(_ouvrirUnMois(donnees)),
+              raisonDesactivation: AppStrings.periodeRefusSuspendue,
             )
           : null,
-      child: _corps(admin: admin, etat: etat, donnees: donnees),
+      child: _corps(
+        admin: admin,
+        etat: etat,
+        donnees: donnees,
+        lectureSeule: lectureSeule,
+      ),
     );
   }
 
@@ -207,6 +223,7 @@ class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
     required bool admin,
     required AsyncValue<EtatPeriodes> etat,
     required EtatPeriodes? donnees,
+    required bool lectureSeule,
   }) {
     if (!admin) {
       return const EmptyState(
@@ -236,6 +253,7 @@ class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
     return _ListePeriodes(
       donnees: donnees,
       occupee: _occupee,
+      lectureSeule: lectureSeule,
       onVerrouiller: (PeriodeSaisie p) => unawaited(_verrouiller(p)),
       onRouvrir: (PeriodeSaisie p) => unawaited(_rouvrir(p)),
     );
@@ -252,12 +270,14 @@ class _ListePeriodes extends StatelessWidget {
   const _ListePeriodes({
     required this.donnees,
     required this.occupee,
+    required this.lectureSeule,
     required this.onVerrouiller,
     required this.onRouvrir,
   });
 
   final EtatPeriodes donnees;
   final String? occupee;
+  final bool lectureSeule;
   final ValueChanged<PeriodeSaisie> onVerrouiller;
   final ValueChanged<PeriodeSaisie> onRouvrir;
 
@@ -363,6 +383,7 @@ class _ListePeriodes extends StatelessWidget {
                 periode: periode,
                 taux: donnees.tauxDe(periode),
                 occupee: occupee == periode.id,
+                lectureSeule: lectureSeule,
                 onVerrouiller: () => onVerrouiller(periode),
                 onRouvrir: () => onRouvrir(periode),
               ),

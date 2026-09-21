@@ -1,4 +1,4 @@
-/// Les quatre destinations qu'une notification sait ouvrir
+/// Les cinq destinations qu'une notification sait ouvrir
 /// (`docs/WORKFLOWS.md § 8`), et leur traduction en emplacement interne.
 ///
 /// Deux vocabulaires cohabitent, et c'est voulu :
@@ -49,6 +49,17 @@ String? destinationInterne(String? lien, {required bool admin}) {
   // `/proposals`
   if (segments.length == 1 && segments.first == 'proposals') {
     return _accueil(onglet: _ongletPropositions);
+  }
+
+  // `/admin/subscription` — l'abonnement de la caserne (ticket 030). Le lien
+  // des deux notifications de fin d'essai et de suspension. **Ignoré pour un
+  // membre ordinaire** : le routeur ferme `/admin` de toute façon, et rendre
+  // `null` ici le ramène à l'accueil sans message d'erreur, comme pour un lien
+  // qui daterait d'avant une rétrogradation.
+  if (segments.length == 2 &&
+      segments[0] == 'admin' &&
+      segments[1] == 'subscription') {
+    return admin ? AppRoutes.abonnement : null;
   }
 
   if (segments.length == 2) {

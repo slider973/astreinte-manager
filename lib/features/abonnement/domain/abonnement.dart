@@ -1,33 +1,13 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/caserne/etat_caserne.dart';
 import '../../../core/l10n/app_strings.dart';
 
-/// `subscription_status` (`docs/SCHEMA.md § 1`).
-enum StatutAbonnement {
-  essai('trialing'),
-  actif('active'),
-  retardPaiement('past_due'),
-  suspendu('suspended'),
-  resilie('cancelled');
-
-  const StatutAbonnement(this.valeurSql);
-
-  final String valeurSql;
-
-  /// Un statut inconnu est lu comme un **essai**, jamais comme une suspension :
-  /// une valeur qu'on ne comprend pas ne doit pas mettre une caserne en
-  /// lecture seule à l'écran. La base, elle, a déjà tranché de son côté
-  /// (`station_writable`, migration `0007`).
-  static StatutAbonnement depuisSql(String? valeur) => values.firstWhere(
-    (statut) => statut.valeurSql == valeur,
-    orElse: () => StatutAbonnement.essai,
-  );
-
-  /// Vrai quand la caserne est en lecture seule. Le bandeau qui le dit est le
-  /// ticket 030 ; ici, c'est l'écran d'abonnement qui l'annonce.
-  bool get lectureSeule =>
-      this == StatutAbonnement.suspendu || this == StatutAbonnement.resilie;
-}
+/// `StatutAbonnement` vit dans `core/caserne` depuis le ticket 030 : le bandeau
+/// de lecture seule le lit sur tous les écrans qui écrivent, et aucun d'eux n'a
+/// à dépendre de l'écran de paiement. Ré-exporté ici pour que les importations
+/// de cet écran restent celles de son propre domaine.
+export '../../../core/caserne/etat_caserne.dart' show StatutAbonnement;
 
 /// `subscriptions.plan` (`docs/SCHEMA.md § 2.13`) : `monthly` ou `yearly`.
 enum FormuleAbonnement {
@@ -181,25 +161,27 @@ class Abonnement {
   DateTime? get dateCle =>
       statut == StatutAbonnement.essai ? finEssai : finPeriode;
 
+  /// Le même abonnement, vu comme les autres écrans le voient.
+  ///
+  /// Une seule arithmétique de dates dans le produit : celle de `core`, que le
+  /// bandeau d'essai du ticket 030 partage avec cet écran. Deux calculs de
+  /// « jours restants » finiraient par se contredire d'un jour.
+  EtatCaserne get caserne => EtatCaserne(
+    statut: statut,
+    ecriture: !statut.lectureSeule,
+    finEssai: finEssai,
+  );
+
   /// Vrai quand l'essai est terminé mais que la tâche de suspension n'a pas
   /// encore tourné : elle passe une fois par jour, et cette fenêtre existe.
   ///
   /// [maintenant] n'existe que pour les tests.
-  bool essaiExpire({DateTime? maintenant}) {
-    final fin = finEssai;
-    if (statut != StatutAbonnement.essai || fin == null) return false;
-    return fin.isBefore(maintenant ?? DateTime.now());
-  }
+  bool essaiExpire({DateTime? maintenant}) =>
+      caserne.essaiExpire(maintenant: maintenant);
 
   /// Jours restants d'essai, arrondis au jour supérieur, ou `null` hors essai.
-  int? joursEssaiRestants({DateTime? maintenant}) {
-    final fin = finEssai;
-    if (statut != StatutAbonnement.essai || fin == null) return null;
-    final reste = fin.difference(maintenant ?? DateTime.now());
-    return reste.isNegative
-        ? 0
-        : reste.inHours ~/ 24 + (reste.inHours % 24 > 0 ? 1 : 0);
-  }
+  int? joursEssaiRestants({DateTime? maintenant}) =>
+      caserne.joursEssaiRestants(maintenant: maintenant);
 
   /// La date à laquelle un impayé fera basculer la caserne en lecture seule :
   /// quatorze jours après la fin de la dernière période payée

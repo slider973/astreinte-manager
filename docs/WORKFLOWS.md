@@ -210,9 +210,19 @@ Règles (migration `0021`, ticket 022) :
 | `schedule_validated` | tous les membres | push + inapp | oui |
 | `schedule_all_accepted` | admins | push + inapp | non |
 | `late_responders` | admins | inapp + push | un par jour et par planning |
+| `subscription_trial_ending` | admins | email + inapp | un par fin d'essai (J-7) |
+| `subscription_suspended` | admins | email + inapp | un par suspension |
+
+Les deux types d'abonnement sont les seuls, avec `invitation`, à partir par **courriel** : un
+abonnement ne se règle pas depuis l'écran verrouillé d'un téléphone, et le courriel est le seul
+canal qui atteigne un chef de centre qui n'a pas ouvert l'application depuis trois semaines —
+le cas nominal d'une fin d'essai. Aucun membre n'en reçoit : le canal sert à dire « tu es
+d'astreinte », pas « paie » *(ticket 030)*.
 
 Deep links (`notifications.data.route`) :
 - `/proposals` : écran des propositions en attente.
 - `/schedule/<period>` : planning de la caserne.
 - `/admin/schedule/<period>` : suivi admin.
 - `/availability/<period>` : saisie du mois.
+- `/admin/subscription` : l'abonnement de la caserne. Ignoré pour un membre ordinaire —
+  `destinationInterne` rend `null` et on retombe sur l'accueil, sans message d'erreur.

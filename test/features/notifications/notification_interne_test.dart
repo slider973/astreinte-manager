@@ -8,7 +8,7 @@ import '../../support/faux_notifications.dart';
 
 void main() {
   group('TypeNotification', () {
-    test('les dix types de docs/SCHEMA.md § 1 sont couverts', () {
+    test('les douze types de docs/SCHEMA.md § 1 sont couverts', () {
       const attendus = <String>{
         'invitation',
         'availability_reminder',
@@ -20,6 +20,8 @@ void main() {
         'schedule_validated',
         'schedule_all_accepted',
         'late_responders',
+        'subscription_trial_ending',
+        'subscription_suspended',
       };
 
       final connus = <String>{

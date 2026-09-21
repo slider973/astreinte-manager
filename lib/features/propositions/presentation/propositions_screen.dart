@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/reseau/connectivite.dart';
@@ -12,6 +14,7 @@ import '../../../core/theme/app_status.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_divider.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/banniere_caserne.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entete_section.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
@@ -174,7 +177,14 @@ class _PropositionsScreenState extends ConsumerState<PropositionsScreen>
 
     final etat = ref.watch(propositionsControllerProvider);
     final enLigne = ref.watch(enLigneProvider).value ?? true;
-    final lectureSeule = etat.value?.lectureSeule ?? false;
+    // Deux sources pour un même fait, et c'est voulu : `etatCaserneProvider` le
+    // sait **avant** le premier geste (ticket 030), `etat.lectureSeule` le
+    // déduit d'un refus du serveur. La seconde reste le filet — un écran ouvert
+    // depuis dix minutes peut avoir manqué une suspension.
+    final lectureSeule =
+        (etat.value?.lectureSeule ?? false) ||
+        ref.watch(lectureSeuleCaserneProvider);
+    final fait = faitCaserneEcran(context, ref);
 
     return AppScaffold(
       titre: AppStrings.propositionsTitre,
@@ -191,7 +201,11 @@ class _PropositionsScreenState extends ConsumerState<PropositionsScreen>
         ),
         const BoutonNotifications(),
       ],
-      banniere: _banniere(enLigne: enLigne, lectureSeule: lectureSeule),
+      banniere: _banniere(
+        enLigne: enLigne,
+        lectureSeule: lectureSeule,
+        fait: fait,
+      ),
       child: _corps(
         etat: etat,
         raisonBlocage: _raisonBlocage(
@@ -213,7 +227,11 @@ class _PropositionsScreenState extends ConsumerState<PropositionsScreen>
 
   /// **Une seule bannière à la fois**, par l'ordre de priorité du système :
   /// erreur > hors-ligne > lecture-seule > information.
-  AppBanner? _banniere({required bool enLigne, required bool lectureSeule}) {
+  AppBanner? _banniere({
+    required bool enLigne,
+    required bool lectureSeule,
+    required FaitCaserne? fait,
+  }) {
     final bandeau = _bandeau;
 
     if (bandeau case ReponseEchouee(:final message)) {
@@ -237,10 +255,15 @@ class _PropositionsScreenState extends ConsumerState<PropositionsScreen>
     }
 
     if (lectureSeule) {
-      return const AppBanner(
-        variante: AppBannerVariante.lectureSeule,
-        texte: AppStrings.propositionsLectureSeuleRaison,
-      );
+      // La bannière du système quand l'état est lu (elle porte la date et,
+      // pour un admin, la sortie) ; la phrase propre à l'écran sinon — c'est
+      // le cas d'un refus serveur essuyé avant que l'état n'arrive.
+      return fait?.variante == AppBannerVariante.lectureSeule
+          ? fait!.banniere
+          : const AppBanner(
+              variante: AppBannerVariante.lectureSeule,
+              texte: AppStrings.propositionsLectureSeuleRaison,
+            );
     }
 
     return switch (bandeau) {

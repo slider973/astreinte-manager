@@ -37,6 +37,19 @@ void main() {
       );
     });
 
+    test('/admin/subscription n\'ouvre que pour un admin', () {
+      // La cinquième destination, ticket 030. Un membre ordinaire retombe sur
+      // l'accueil sans message d'erreur : il n'a rien fait de mal.
+      expect(
+        destinationInterne('/admin/subscription', admin: true),
+        '/admin/abonnement',
+      );
+      expect(
+        destinationInterne('/admin/subscription', admin: false),
+        isNull,
+      );
+    });
+
     test('un mois mal formé ne devient jamais une URL', () {
       expect(destinationInterne('/availability/2026-13', admin: false), isNull);
       expect(destinationInterne('/availability/octobre', admin: false), isNull);

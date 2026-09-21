@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/caserne/caserne_providers.dart';
 import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/reseau/connectivite.dart';
 import '../../../../core/session/session_providers.dart';
@@ -473,6 +474,12 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       horsLigne: horsLigne,
       filePerimee: perimee,
       preferences: preferences,
+      // Su **avant** la première case peinte depuis le ticket 030 : la grille
+      // naît inerte et la bannière dit pourquoi, au lieu d'avaler quatorze
+      // cases avant de les rendre à un refus du serveur. `_lectureSeuleConnue`
+      // reste le filet pour une suspension survenue écran ouvert.
+      lectureSeule:
+          _lectureSeuleConnue || ref.watch(lectureSeuleCaserneProvider),
     );
   }
 
