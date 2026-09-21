@@ -52,6 +52,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Hébergement : `vercel pull` et `vercel build` écrivent ici
+.vercel/
+
 # Environnements : seuls dev.json et *.example sont versionnés
 env/*
 !env/dev.json

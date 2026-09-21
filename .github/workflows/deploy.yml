@@ -1,0 +1,183 @@
+# Mise en ligne de la PWA sur Vercel.
+#
+# **Ce workflow ne vérifie rien.** Il part de `workflow_run` : il ne démarre
+# qu'après une exécution *réussie* de « CI » sur `main` — analyse, tests, build
+# web, parcours complet, migrations, RLS et Edge Functions compris. Redire ici
+# ce que `ci.yml` dit déjà doublerait le temps d'attente et, le jour où les deux
+# copies divergeraient, ferait passer en production ce que la CI refuse.
+#
+# La construction se fait **sur l'exécuteur**, pas chez Vercel : la
+# configuration de l'application (`SUPABASE_URL`, les cinq `FIREBASE_*`) est
+# lue par `String.fromEnvironment`, donc résolue à la **compilation**. Une
+# variable posée dans le tableau de bord Vercel n'atteindrait jamais le binaire.
+# C'est pourquoi les valeurs de production sont des *secrets GitHub* et non des
+# variables d'environnement Vercel — voir `docs/DEPLOIEMENT.md § 3`.
+#
+# Aucune de ces valeurs n'est obligatoire. Sans elles, l'application se déploie,
+# s'ouvre, et dit « Application non configurée » ou « notifications
+# indisponibles » au lieu de planter : c'est l'état voulu tant que la base
+# distante, Firebase et Stripe ne sont pas branchés.
+name: Déploiement
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  # Rejouer une mise en ligne sans repasser par un commit.
+  workflow_dispatch:
+
+# Une seule mise en ligne à la fois, et c'est la dernière qui gagne. Elle n'est
+# **pas** annulable en vol : couper `vercel deploy` au milieu laisserait un
+# déploiement à moitié téléversé.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.38.10
+
+jobs:
+  vercel:
+    name: Construire et mettre en ligne
+    # Une CI rouge ne se déploie pas. `workflow_dispatch` n'a pas de
+    # `workflow_run`, d'où la seconde branche.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ steps.mise_en_ligne.outputs.url }}
+    steps:
+      # Le commit exact que la CI a validé, jamais « la tête de main » : entre
+      # les deux, `main` a pu avancer.
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - name: Vérifier les jetons de l'hébergeur
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          manquants=""
+          [ -n "$VERCEL_TOKEN" ]      || manquants="$manquants VERCEL_TOKEN"
+          [ -n "$VERCEL_ORG_ID" ]     || manquants="$manquants VERCEL_ORG_ID"
+          [ -n "$VERCEL_PROJECT_ID" ] || manquants="$manquants VERCEL_PROJECT_ID"
+          if [ -n "$manquants" ]; then
+            echo "::error::Secrets absents :$manquants. Les poser dans Settings → Secrets and variables → Actions (voir docs/DEPLOIEMENT.md § 3)."
+            exit 1
+          fi
+
+      - name: Installer Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Restaurer le cache pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-${{ env.FLUTTER_VERSION }}-
+
+      - name: Récupérer les dépendances
+        run: flutter pub get
+
+      # `env/prod.json` n'est pas versionné (`.gitignore`) : il est reconstruit
+      # ici à partir des secrets. `jq` échappe tout seul ce qui doit l'être.
+      # Un secret absent donne une chaîne vide, et c'est un cas prévu par
+      # `lib/core/env.dart`.
+      - name: Composer env/prod.json
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_VAPID_KEY: ${{ secrets.FIREBASE_VAPID_KEY }}
+        run: |
+          jq -n \
+            --arg supabaseUrl "$SUPABASE_URL" \
+            --arg supabaseAnonKey "$SUPABASE_ANON_KEY" \
+            --arg firebaseProjectId "$FIREBASE_PROJECT_ID" \
+            --arg firebaseApiKey "$FIREBASE_API_KEY" \
+            --arg firebaseAppId "$FIREBASE_APP_ID" \
+            --arg firebaseSenderId "$FIREBASE_MESSAGING_SENDER_ID" \
+            --arg firebaseVapidKey "$FIREBASE_VAPID_KEY" \
+            '{
+              APP_ENV: "prod",
+              SUPABASE_URL: $supabaseUrl,
+              SUPABASE_ANON_KEY: $supabaseAnonKey,
+              FIREBASE_PROJECT_ID: $firebaseProjectId,
+              FIREBASE_API_KEY: $firebaseApiKey,
+              FIREBASE_APP_ID: $firebaseAppId,
+              FIREBASE_MESSAGING_SENDER_ID: $firebaseSenderId,
+              FIREBASE_VAPID_KEY: $firebaseVapidKey
+            }' > env/prod.json
+
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::warning::SUPABASE_URL ou SUPABASE_ANON_KEY absent : l'application se déploiera et affichera « Application non configurée »."
+          fi
+          if [ -z "$FIREBASE_VAPID_KEY" ]; then
+            echo "::warning::Configuration Firebase incomplète : l'application se déploiera sans notifications, et le dira (docs/FIREBASE.md)."
+          fi
+
+      - name: Installer brotli
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq brotli
+
+      # Construction + compression des polices (184 Ko → ~83 Ko, ticket 037).
+      - name: Construire la PWA
+        run: scripts/build_web.sh env/prod.json
+
+      - name: Mettre en ligne sur Vercel
+        id: mise_en_ligne
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          # `vercel build` ne reconstruit rien : `vercel.json` porte un
+          # `buildCommand` qui ne fait qu'un `echo`. Il empaquette `build/web`
+          # dans `.vercel/output` avec les en-têtes et les réécritures, que
+          # `--prebuilt` téléverse tels quels.
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+          url="$(npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Mis en ligne : $url" >> "$GITHUB_STEP_SUMMARY"
+
+      # Le piège numéro un de ce déploiement : un CDN qui recompresserait les
+      # polices déjà compressées, ou qui oublierait l'en-tête. Dans les deux
+      # cas Flutter échoue au décodage **en silence** et retombe sur un Roboto
+      # téléchargé chez Google — ce que le ticket 037 cherche à supprimer.
+      # Mieux vaut une mise en ligne rouge qu'une PWA qui appelle gstatic.
+      - name: Vérifier les en-têtes servis
+        env:
+          URL: ${{ steps.mise_en_ligne.outputs.url }}
+        run: |
+          police="$URL/assets/assets/fonts/AtkinsonHyperlegibleNext-Regular.ttf"
+          entetes="$(curl -sSIL -H 'Accept-Encoding: br' "$police" | tr 'A-Z' 'a-z')"
+          echo "$entetes"
+          echo "$entetes" | grep -q 'content-encoding: br' || {
+            echo "::error::Les polices ne sont pas servies en brotli : Flutter retombera sur Roboto depuis fonts.gstatic.com."
+            exit 1
+          }
+
+          sw="$(curl -sSIL "$URL/flutter_service_worker.js" | tr 'A-Z' 'a-z')"
+          echo "$sw"
+          echo "$sw" | grep -q 'must-revalidate' || {
+            echo "::error::flutter_service_worker.js est mis en cache : les téléphones déjà installés ne verront plus aucune mise à jour."
+            exit 1
+          }

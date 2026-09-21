@@ -18,6 +18,7 @@ import '../../features/membres/presentation/membres_screen.dart';
 import '../../features/notifications/domain/destination_push.dart';
 import '../../features/notifications/presentation/activation_notifications_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/onboarding/presentation/aide_installation_screen.dart';
 import '../../features/onboarding/presentation/guide_screen.dart';
 import '../../features/onboarding/presentation/installation_screen.dart';
 import '../../features/onboarding/presentation/profil_accueil_screen.dart';
@@ -204,6 +205,16 @@ abstract final class AppRoutes {
   static const String lienSaisie = '/availability/:$parametrePeriode';
   static const String lienSaisieName = 'lienSaisie';
 
+  /// `/install` — l'aide à l'ajout à l'écran d'accueil (ticket 032).
+  ///
+  /// **Joignable sans compte, et même sans configuration Supabase.** C'est
+  /// l'adresse qu'un chef de centre donne au téléphone ou punaise dans la
+  /// salle de garde : elle doit rendre trois gestes à quelqu'un qui n'a encore
+  /// rien. Elle est courte exprès — `/bienvenue/installation` est l'étape du
+  /// parcours d'accueil, pas une adresse qu'on dicte.
+  static const String aideInstallation = '/install';
+  static const String aideInstallationName = 'aideInstallation';
+
   // --- Les deux pages légales (ticket 034) ---------------------------------
 
   /// Politique de confidentialité et mentions légales.
@@ -253,7 +264,12 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: rafraichissement,
     redirect: (context, state) {
       if (!demarrage.estPret) {
-        return state.matchedLocation == AppRoutes.configuration
+        // `/install` n'a besoin d'aucune donnée : elle explique un geste du
+        // navigateur. Elle reste donc joignable sur un déploiement dont la
+        // base n'est pas encore branchée — c'est même le premier moment où
+        // elle sert (ticket 032).
+        return state.matchedLocation == AppRoutes.configuration ||
+                state.matchedLocation == AppRoutes.aideInstallation
             ? null
             : AppRoutes.configuration;
       }
@@ -443,6 +459,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
               ) ??
               AppRoutes.accueil,
         ),
+      GoRoute(
+        path: AppRoutes.aideInstallation,
+        name: AppRoutes.aideInstallationName,
+        builder: (context, state) => const AideInstallationScreen(),
+      ),
       GoRoute(
         path: AppRoutes.confidentialite,
         name: AppRoutes.confidentialiteName,

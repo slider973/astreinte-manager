@@ -732,6 +732,32 @@ abstract final class AppStrings {
   static const String installTermine = 'C\'est fait';
 
   // -------------------------------------------------------------------
+  // Page publique d'aide à l'installation — /install (ticket 032)
+  // -------------------------------------------------------------------
+
+  /// Ce qui s'affiche quand on ne connaît pas la procédure du navigateur.
+  /// Pas de gestes numérotés : trois gestes faux coûtent plus qu'un aveu.
+  static const String installAutreIntro =
+      'Installée, Astreinte SP s\'ouvre en un geste, en plein écran, et peut '
+      't\'alerter d\'une proposition d\'astreinte.';
+  static const String installAutreTitre = 'Où chercher';
+  static const String installAutreOu =
+      'Ouvre le menu de ton navigateur, puis cherche « Installer '
+      'l\'application » ou « Ajouter à l\'écran d\'accueil ».';
+  static const String installAutreAveu =
+      'Selon le navigateur, cette entrée n\'existe pas. Astreinte SP marche '
+      'aussi dans un onglet : seules les notifications demandent une '
+      'application installée.';
+
+  /// Ouvrir la page depuis l'application déjà installée : rien à apprendre.
+  static const String installDejaFaitTitre = 'C\'est déjà fait';
+  static const String installDejaFaitTexte =
+      'Astreinte SP est installée sur cet appareil : tu la lis en ce moment '
+      'même depuis son icône.';
+
+  static const String installOuvrir = 'Ouvrir Astreinte SP';
+
+  // -------------------------------------------------------------------
   // Paramètres de la caserne (ticket 010)
   // -------------------------------------------------------------------
 
