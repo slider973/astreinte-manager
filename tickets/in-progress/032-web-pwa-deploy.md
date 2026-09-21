@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 001
 - **Branche** : `feat/032-web-pwa-deploy`
+- **Statut** : en cours depuis 2026-09-21
 
 ## Contexte
 La PWA est le canal principal : ce ticket se fait dès le jalon 2, juste après la connexion, pour

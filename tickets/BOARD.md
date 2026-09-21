@@ -6,12 +6,12 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 032 | [Build web PWA et déploiement](in-progress/032-web-pwa-deploy.md) | P0 | 001 |  |
 
 ## À faire
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 032 | [Build web PWA et déploiement](backlog/032-web-pwa-deploy.md) | P0 | 001 |  |
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 037 | [Supprimer la dépendance à fonts.gstatic.com au démarrage](backlog/037-canvaskit-autoheberge.md) | P1 | 004 032 |  |
