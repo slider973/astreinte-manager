@@ -476,6 +476,19 @@ verify_jwt = true
 enabled = true
 verify_jwt = true
 
+# Edge Function du ticket 028. `verify_jwt = false`, et c'est la nature même de
+# la fonction : ses appelants sont Google Agenda, iCloud et Outlook, qui vont
+# chercher l'adresse depuis leurs serveurs toutes les heures. Aucun ne sait
+# porter un jeton d'accès Supabase, aucun ne renouvelle une session. Ce qui
+# authentifie l'appelant est le **secret dans l'URL** (`profiles.ics_token`,
+# 192 bits, migration 0029) — même raisonnement que `stripe-webhook`, où c'est
+# la signature qui fait office de portier. Le contenu servi est décidé en base
+# par `ics_feed_events`, fermée à `anon` comme à `authenticated`.
+# Voir supabase/functions/README.md et design/028-export-ics.md.
+[functions.ics-feed]
+enabled = true
+verify_jwt = false
+
 # Désactivé en local : Logflare et Vector échouent leur bilan de santé sous Rancher Desktop
 # et ne servent qu'aux journaux dans Studio. Aucun effet sur le projet hébergé.
 [analytics]

@@ -439,6 +439,87 @@ Erreurs :
 
 ---
 
+## `ics-feed`
+
+Le flux calendrier d'un membre, pour Google Agenda, Apple Calendar et Outlook. Référence :
+`docs/PRD.md § 5.5`, `docs/SCHEMA.md § 7`, migration `0029`, `design/028-export-ics.md`, ticket 028.
+
+```
+GET /functions/v1/ics-feed/<jeton>.ics      ← forme canonique
+GET /functions/v1/ics-feed?token=<jeton>    ← acceptée aussi
+```
+
+**Aucun en-tête d'authentification, et c'est la nature de la fonction.** Ses appelants ne sont pas
+l'application : ce sont les serveurs de Google, d'Apple et de Microsoft, qui rechargent l'adresse
+toutes les heures. Aucun ne sait porter un jeton d'accès Supabase, aucun ne renouvelle une session.
+Le secret est donc dans l'URL, et `verify_jwt = false` — même raisonnement que `stripe-webhook`, où
+c'est la signature qui fait office de portier.
+
+`<jeton>` est `profiles.ics_token` (migration `0029`) : 24 octets tirés au sort, rendus en 48
+caractères hexadécimaux. Le suffixe `.ics` est optionnel pour le serveur mais recommandé dans le
+lien qu'on distribue — plusieurs clients, Outlook en tête, décident du type de contenu d'après
+l'URL avant de lire l'en-tête.
+
+Réponse `200` : `text/calendar; charset=utf-8`, `Cache-Control: no-store`,
+`Content-Disposition: inline; filename="astreintes.ics"`.
+
+```
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Astreinte SP//Flux calendrier//FR
+METHOD:PUBLISH
+X-WR-CALNAME:Mes astreintes
+REFRESH-INTERVAL;VALUE=DURATION:PT6H
+BEGIN:VEVENT
+UID:<id de l'attribution>@astreinte-sp
+DTSTART:20261114T060000Z
+DTEND:20261114T180000Z
+SUMMARY:Astreinte jour — CIS Saint-Martin
+DESCRIPTION:Créneau de jour\, de 07:00 à 19:00. Astreinte acceptée.
+LOCATION:CIS Saint-Martin
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
+```
+
+**Cette adresse voyage** — elle finit collée dans Google Agenda, donc recopiée sur des serveurs qui
+ne sont pas les nôtres. Ce qui la rend sûre n'est pas ici mais en base :
+
+- `ics_feed_events` ne rend que les astreintes **acceptées** de son porteur, sur un planning
+  publié ou validé, dans les casernes où il est **encore actif**. Aucune jointure ne mène à une
+  autre personne : ni le nom d'un équipier, ni une adresse, ni rien d'une autre caserne.
+- Un jeton **régénéré** (`rotate_ics_token`) ne désigne plus personne à la transaction suivante :
+  l'ancienne adresse répond `404`, sans délai ni liste de révocation.
+- Une appartenance **désactivée** vide le flux des astreintes de cette caserne. Le flux continue de
+  répondre `200` avec un calendrier sans événement : un agenda qui reçoit une erreur clignote, ce
+  qui n'est pas ce qu'on veut dire à quelqu'un dont la situation est parfaitement normale.
+- Une caserne **suspendue** continue, elle, d'alimenter le flux. `docs/PRD.md § 6.6` : « suspendu :
+  lecture seule pour tous », et un flux calendrier est une lecture. Le vider ferait croire à des
+  gardes annulées.
+- La fonction ne pose **aucun en-tête CORS** : un agenda lit depuis son serveur, il n'a pas
+  d'origine à faire valoir. (La passerelle ajoute le sien, comme devant toutes les fonctions.)
+
+**Les heures sont résolues en UTC**, dans le fuseau de la caserne, à la date de chaque garde
+(`ics-feed/calendrier.ts`) : le changement d'heure est compris sans qu'aucun bloc `VTIMEZONE` ait à
+être maintenu, et un `DTSTART` flottant ne glisse pas avec l'appareil qui l'affiche. La nuit est
+l'intervalle complémentaire du jour (`day_end → day_start` du lendemain), exactement comme
+`HeuresAffichage` côté application.
+
+L'`UID` est celui de l'attribution : le fichier unique téléchargé depuis le détail d'une astreinte
+(côté Dart, `lib/features/astreintes/domain/ics_astreinte.dart`) porte le même. Qui a fait les deux
+gestes n'a pas deux lignes dans son agenda.
+
+Erreurs — en **texte brut**, parce que personne ne les lira : l'appelant est un robot.
+
+| Statut | Corps                                    | Quand                                              |
+| ------ | ---------------------------------------- | -------------------------------------------------- |
+| 404    | `Lien d'abonnement invalide.`            | pas de jeton dans l'URL, ou forme invalide          |
+| 404    | `Lien d'abonnement invalide ou révoqué.` | jeton inconnu **ou** régénéré — indistinguables     |
+| 405    | `Méthode non autorisée.`                 | autre chose qu'un `GET` ou un `HEAD`                |
+| 500    | `Erreur serveur.`                        | la base n'a pas répondu                             |
+
+---
+
 ## `publish-schedule`
 
 Le geste qui fait sortir le planning du bureau du chef de centre. Référence :

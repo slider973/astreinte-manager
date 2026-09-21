@@ -204,6 +204,9 @@ jobs:
           deno check create-checkout/acces.ts
           deno check stripe-webhook/index.ts
           deno check stripe-webhook/evenement.ts
+          deno check ics-feed/index.ts
+          deno check ics-feed/calendrier.ts
+          deno check ics-feed/jeton.ts
 
       - name: Tester
         run: deno test tests/ --allow-env

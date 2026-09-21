@@ -755,11 +755,26 @@ set local role anon;
 do $$
 begin
   perform tests.check((select count(*) from stations) = 0, 'anon : aucune caserne');
-  perform tests.check((select count(*) from profiles) = 0, 'anon : aucun profil');
   perform tests.check((select count(*) from memberships) = 0, 'anon : aucune appartenance');
   perform tests.check((select count(*) from availabilities) = 0, 'anon : aucune disponibilité');
   perform tests.check((select count(*) from assignments) = 0, 'anon : aucune attribution');
   perform tests.check((select count(*) from notifications) = 0, 'anon : aucune notification');
+
+  -- `profiles` n'est plus filtré par la RLS pour `anon` : depuis la migration
+  -- `0029`, le privilège de lecture lui a été **retiré de la table**, comme à
+  -- `invitations` en `0008`. Le remaniement des grants était nécessaire pour
+  -- excepter `ics_token`, colonne que la RLS ne sait pas protéger — elle
+  -- raisonne par ligne. Le résultat est plus fort qu'avant : anon ne lit pas
+  -- zéro profil, il ne lit pas la table du tout.
+  begin
+    perform count(*) from profiles;
+    raise exception 'ECHEC : anon a lu la table profiles';
+  exception
+    when insufficient_privilege then null;
+    when raise_exception then
+      if sqlerrm like 'ECHEC%' then raise; end if;
+  end;
+  perform tests.check(true, 'anon : profiles n''est pas lisible du tout');
 end $$;
 
 rollback to savepoint s7;
