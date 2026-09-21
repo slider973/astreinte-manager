@@ -157,8 +157,8 @@ select vault.update_secret(
 
 Tant que ce n'est pas fait, les notifications déclenchées **depuis la base** restent en file :
 `select * from notification_outbox where status <> 'sent'` les montre, avec `last_error`. Rien n'est
-perdu — c'est tout l'intérêt de la file — mais rien ne part. C'est ce qui s'est passé jusqu'au
-21 septembre 2026 : `cron_dispatch_notifications` réussissait toutes les minutes en poussant vers
+perdu — c'est tout l'intérêt de la file — mais rien ne part. C'est ce qui s'est passé jusqu'au 21
+septembre 2026 : `cron_dispatch_notifications` réussissait toutes les minutes en poussant vers
 l'adresse Docker de la pile locale, et aucune notification ne partait.
 
 Aucun secret dans le dépôt : `supabase/functions/.env*` est ignoré par git (`.gitignore`, règles
