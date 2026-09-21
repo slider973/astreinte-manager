@@ -651,6 +651,49 @@ ici ni regroupement à faire ni compte rendu à montrer — et la file garantit 
 appelant meurt. Un pompier qui ignore qu'il est d'astreinte est le seul défaut que ce geste n'a pas
 le droit de produire.
 
+### Relances automatiques (migration `0021`, ticket 022)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `assignment_reminder_targets` | `(p_schedule uuid, p_palier text, p_instant timestamptz default null) returns uuid[]` `stable` | Les attributions dues à un palier, à un instant. `push` : `proposed`, jamais relancée, proposée depuis plus de `response_reminder_hours`. `email` : relancée une fois — ou plusieurs, mais aucune depuis `response_email_hours`. Membre **actif** et planning **publié** dans les deux cas. `NULL` quand personne n'est dû. |
+| `cron_assignment_reminders` | `(p_reference timestamptz default null) returns integer` | Corps de la tâche `assignment_reminders` (§ 8). Une notification **par membre** et par palier, ses gardes groupées dedans, canaux `push + inapp` puis `email + inapp`. Renvoie le nombre de notifications mises en file. |
+| `cron_late_responders_report` | `(p_reference timestamptz default null) returns integer` | Corps de la tâche `late_responders_report` (§ 8). Prévient les administrateurs actifs des attributions sans réponse depuis plus de `late_report_hours`, **une fois par jour et par planning**, entre 08:00 et 20:59 dans le fuseau de la caserne. Renvoie le nombre de rapports mis en file. |
+
+Les trois délais viennent des `settings` de **chaque caserne** (§ 2.1) : aucune constante
+d'heures n'est écrite dans la migration.
+
+**Le retard a une seule définition, et elle a désormais trois lecteurs** :
+`v_schedule_progress.assignments_late` (§ 6), `remind_schedule` (0019) et
+`cron_late_responders_report`. L'égalité des trois est vérifiée par
+`supabase/tests/assignment_reminders_test.sql § 7 bis`, au même instant et sur le même
+planning. Une seule différence, volontaire : les **relances** écartent les membres inactifs
+— une proposition laissée à un pompier désactivé n'a plus de destinataire —, le **rapport**
+les compte, parce qu'un trou dans le planning doit se voir chez l'administrateur.
+
+**La marque suit l'envoi.** `reminder_count` et `last_reminder_at` ne bougent que lorsqu'une
+demande est réellement mise en file : une demande écartée par la clé de dédoublonnage ne
+marque rien. C'est la règle posée en revue du ticket 019, et elle est ici la condition de
+justesse des paliers — marquer sans envoyer ferait passer un pompier au palier suivant sans
+qu'il ait rien reçu.
+
+**Cohabitation avec la relance manuelle.** `remind_schedule` incrémente le même compteur.
+Le comportement retenu : une relance manuelle **tient lieu de premier palier** (le push de
+`response_reminder_hours` est sauté, le pompier vient d'être relancé) mais **aucun nombre de
+clics ne fait sauter le courriel**. D'où la seconde branche de la condition du palier
+courriel : « plusieurs relances, mais aucune depuis l'échéance ». Elle couvre aussi la
+reprise après une panne longue de l'ordonnanceur, où le push part bien après l'échéance du
+courriel.
+
+**Le rapport quotidien ne tombe pas au milieu de la nuit locale.** La tâche est horaire et sa
+clé de dédoublonnage porte la **date locale de la caserne** ; sans fenêtre, la première
+exécution après minuit local aurait envoyé un push à 00:45. La fenêtre `08:00 – 20:59` locale
+règle le cas, et répond pour cette tâche à la question du ticket 041 — qui reste entier pour
+`availability_reminders` (0016), dont le tir quotidien unique est à une heure de serveur.
+
+Exécution révoquée de `public`, `anon` et `authenticated` pour les trois : une tâche qui
+tourne avec des droits élevés n'est pas un bouton de client. Le bouton, c'est
+`remind_schedule`.
+
 ### Fonctions d'invitation (migration `0009`, ticket 006)
 
 Deux fonctions `security definer` **réservées à `service_role`** : elles sont appelées par
@@ -1096,8 +1139,8 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `lock_periods` | toutes les heures | `select public.cron_lock_periods();` — passe en `locked` les périodes dont `deadline_at < now()` *(migration `0012`)* |
 | `dispatch_notifications` | chaque minute | `select public.cron_dispatch_notifications();` — repose les demandes de `notification_outbox` restées en attente, abandonne au bout de cinq tentatives *(migration `0014`)* |
 | `availability_reminders` | tous les jours 09:00 | `select public.cron_availability_reminders();` — push J-3 et email J-1 aux membres actifs sans aucune ligne `availabilities` sur le mois d'une période ouverte *(migration `0016`)* |
-| `assignment_reminders` | toutes les heures | Rappel push à `response_reminder_hours`, email à `response_email_hours` |
-| `late_responders_report` | toutes les heures | Notifie les admins des attributions en attente depuis `late_report_hours` |
+| `assignment_reminders` | toutes les heures (:15) | `select public.cron_assignment_reminders();` — rappel push à `response_reminder_hours`, courriel à `response_email_hours`, aux membres actifs dont l'attribution est restée sans réponse *(migration `0021`)* |
+| `late_responders_report` | toutes les heures (:45) | `select public.cron_late_responders_report();` — notifie les admins des attributions en attente depuis plus de `late_report_hours`, une fois par jour et par planning, entre 08:00 et 20:59 heure de la caserne *(migration `0021`)* |
 | `archive_schedules` | 1er du mois | Archive les plannings des mois passés |
 | `prune_notifications` | hebdomadaire | Supprime les notifications lues de plus de 90 jours |
 
@@ -1210,8 +1253,9 @@ Ordre proposé :
 18. `0018_planning_brouillon.sql` (ticket 017 : `station_required_count`, `create_schedule`, `assignments_trace_disponibilite`, `assignments_audit_hors_dispo`, suppression d'attribution réservée au brouillon, vue `v_schedule_progress`, inscription d'`assignments` dans `supabase_realtime`)
 19. `0019_publication_suivi.sql` (ticket 019 : `schedules_guard_transition`, `schedules_guard_suppression` et `shifts_guard_suppression`, suppression d'un planning et d'un créneau réservée au brouillon, `publish_schedule`, `schedule_complet`, `schedule_reevaluer`, `schedule_auto_validate`, `shifts_effectif_revalide`, `remind_schedule`, inscription de `schedules` dans `supabase_realtime`)
 20. `0020_reattribution.sql` (ticket 020 : `assignments_guard_reattribution`, `reassign_shift`, `cancel_assignment`, clause `when` de `schedule_auto_validate` élargie aux acceptations qui disparaissent)
-21. les tâches restantes du § 8, une migration par ticket : `assignment_reminders` et
-    `late_responders_report` (ticket 022), `archive_schedules` et `prune_notifications`
+21. `0021_cron_relances.sql` (ticket 022 : `assignment_reminder_targets`, `cron_assignment_reminders`, `cron_late_responders_report`, les deux tâches `pg_cron` des relances)
+22. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
+    `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
@@ -1242,8 +1286,9 @@ dès qu'une politique fuit). Les fonctions d'invitation de `0009` sont couvertes
 par `supabase/tests/notifications_test.sql`, les rappels de saisie de `0016` par
 `supabase/tests/availability_reminders_test.sql`, la matrice de `0017` par
 `supabase/tests/matrice_admin_test.sql`, la publication de `0019` par
-`supabase/tests/publication_test.sql` et la réattribution de `0020` par
-`supabase/tests/reattribution_test.sql`, joués par le même script. La logique pure
+`supabase/tests/publication_test.sql`, la réattribution de `0020` par
+`supabase/tests/reattribution_test.sql` et les relances automatiques de `0021` par
+`supabase/tests/assignment_reminders_test.sql`, joués par le même script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge

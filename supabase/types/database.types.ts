@@ -978,6 +978,10 @@ export type Database = {
         Args: { p_email: string; p_token: string; p_user_id: string }
         Returns: Json
       }
+      assignment_reminder_targets: {
+        Args: { p_instant?: string; p_palier: string; p_schedule: string }
+        Returns: string[]
+      }
       availability_matrix: {
         Args: { p_period: string; p_station: string }
         Returns: {
@@ -1050,6 +1054,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      cron_assignment_reminders: {
+        Args: { p_reference?: string }
+        Returns: number
+      }
       cron_availability_reminders: {
         Args: { p_reference?: string }
         Returns: number
@@ -1061,6 +1069,10 @@ export type Database = {
           p_max_attempts?: number
           p_reference?: string
         }
+        Returns: number
+      }
+      cron_late_responders_report: {
+        Args: { p_reference?: string }
         Returns: number
       }
       cron_lock_periods: { Args: { p_reference?: string }; Returns: number }
