@@ -54,12 +54,13 @@ String? redirectionAuth({
   final surLaConnexion = chemin.startsWith(AppRoutes.connexion);
   final surLEditeur = _sousSuperAdmin(chemin);
 
-  // L'écran de l'éditeur est fermé à tout le monde d'autre, quel que soit
-  // l'état — y compris à un compte parfaitement rattaché à sa caserne. Le
-  // statut inconnu (`null`) ne tranche pas : voir la documentation ci-dessus.
-  if (surLEditeur && estSuperAdmin == false) {
-    return etat == EtatAuth.connecte ? AppRoutes.accueil : null;
-  }
+  // Tant que le droit de l'éditeur n'est pas connu, la garde **attend** sur son
+  // écran plutôt que de trancher : rediriger sur une supposition perdrait
+  // l'URL tapée à froid, et l'écran ne peut rien montrer sans droits.
+  // `chargement` n'est pas concerné : une session en cours de restauration
+  // passe par l'écran d'attente comme pour n'importe quelle autre adresse,
+  // sans quoi la destination initiale n'est jamais mémorisée.
+  final editeurEnAttente = surLEditeur && estSuperAdmin == null;
 
   return switch (etat) {
     EtatAuth.chargement =>
@@ -68,15 +69,17 @@ String? redirectionAuth({
     // Le cas nominal de l'éditeur : connecté, membre d'aucune caserne. Sans
     // cette branche il serait renvoyé sur « Aucune caserne », un écran qui ne
     // propose que la déconnexion.
-    EtatAuth.sansCaserne when surLEditeur && estSuperAdmin == true => null,
+    EtatAuth.sansCaserne when surLEditeur && estSuperAdmin != false => null,
     EtatAuth.sansCaserne =>
       cheminInvitationEnAttente ??
           (chemin == AppRoutes.aucuneCaserne ? null : AppRoutes.aucuneCaserne),
+    EtatAuth.connecte when editeurEnAttente => null,
     EtatAuth.connecte =>
       surLaConnexion ||
               chemin == AppRoutes.demarrage ||
               chemin == AppRoutes.aucuneCaserne ||
-              (_sousAdministration(chemin) && !estAdmin)
+              (_sousAdministration(chemin) && !estAdmin) ||
+              (surLEditeur && !estSuperAdmin!)
           ? AppRoutes.accueil
           : null,
   };

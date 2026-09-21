@@ -55,6 +55,10 @@ class DestinationInitiale {
 
   void oublier() => _gardee = null;
 
+  /// Une destination gardée est **consommée même si l'appelant ne la rejoue
+  /// pas** : c'est [reprendre] qui vide la mémoire, et une destination que la
+  /// garde de navigation refuse ne doit pas revenir au tour suivant.
+
   /// Vrai si l'emplacement porte une intention : **une adresse interne**,
   /// autre chose que l'accueil nu et qu'une étape traversée.
   static bool vautLeDetour(String emplacement) {

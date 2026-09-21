@@ -12,19 +12,21 @@ void main() {
     });
 
     test('elle ne se reprend qu\'une fois', () {
-      final destination = DestinationInitiale()
-        ..memoriser('/proposals');
+      final destination = DestinationInitiale()..memoriser('/proposals');
 
       expect(destination.reprendre(AppRoutes.accueil), '/proposals');
       expect(destination.reprendre(AppRoutes.accueil), isNull);
     });
 
-    test('la première demandée gagne : les suivantes sont des conséquences', () {
-      final destination = DestinationInitiale()..memoriser('/proposals');
+    test(
+      'la première demandée gagne : les suivantes sont des conséquences',
+      () {
+        final destination = DestinationInitiale()..memoriser('/proposals');
 
-      expect(destination.memoriser('/schedule/2026-10'), isFalse);
-      expect(destination.reprendre(AppRoutes.accueil), '/proposals');
-    });
+        expect(destination.memoriser('/schedule/2026-10'), isFalse);
+        expect(destination.reprendre(AppRoutes.accueil), '/proposals');
+      },
+    );
 
     test('y être déjà rend la reprise inutile', () {
       final destination = DestinationInitiale()..memoriser('/proposals');
@@ -44,11 +46,7 @@ void main() {
         AppRoutes.cheminInvitation('jeton'),
         AppRoutes.accueil,
       ]) {
-        expect(
-          DestinationInitiale().memoriser(etape),
-          isFalse,
-          reason: etape,
-        );
+        expect(DestinationInitiale().memoriser(etape), isFalse, reason: etape);
       }
     });
 

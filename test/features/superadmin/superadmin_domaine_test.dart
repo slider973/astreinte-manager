@@ -101,6 +101,32 @@ void main() {
     });
   });
 
+  // La forme rendue par `super_admin_create_station` n'est **pas** celle d'une
+  // ligne de `super_admin_stations` : elle porte `id`, pas `station_id`.
+  // Confondre les deux annonçait un échec sur une caserne pourtant créée — vu
+  // dans Chrome, et c'est ce test qui l'aurait attrapé.
+  group('CaserneSupervisee.depuisCreation', () {
+    test('lit la caserne que la fonction de création vient de rendre', () {
+      final creee = CaserneSupervisee.depuisCreation(const <String, dynamic>{
+        'id': 'dddddddd-0000-4000-8000-000000000001',
+        'name': 'CIS Forêt-sur-Sèvre',
+        'slug': 'cis-foret-sur-sevre',
+        'timezone': 'Europe/Paris',
+        'created_at': '2026-09-21T04:38:54+00:00',
+      });
+
+      expect(creee.id, 'dddddddd-0000-4000-8000-000000000001');
+      expect(creee.nom, 'CIS Forêt-sur-Sèvre');
+      expect(creee.slug, 'cis-foret-sur-sevre');
+      // Ce qui se déduit : elle naît vide, en essai, et écrivable.
+      expect(creee.membresActifs, 0);
+      expect(creee.sansAdministrateur, isTrue);
+      expect(creee.statut, StatutAbonnement.essai);
+      expect(creee.ecriture, isTrue);
+      expect(creee.aUnPlanningPublie, isFalse);
+    });
+  });
+
   group('PlanningSupervise', () {
     test('lit l\'avancement d\'un mois', () {
       final planning = PlanningSupervise.depuisJson(const <String, dynamic>{
@@ -158,10 +184,7 @@ void main() {
 
   group('ErreurSuperAdmin', () {
     test('chaque code des fonctions SQL a sa phrase', () {
-      expect(
-        ErreurSuperAdmin.depuisCode('forbidden'),
-        ErreurSuperAdmin.droits,
-      );
+      expect(ErreurSuperAdmin.depuisCode('forbidden'), ErreurSuperAdmin.droits);
       expect(ErreurSuperAdmin.depuisCode('invalid_name'), ErreurSuperAdmin.nom);
       expect(
         ErreurSuperAdmin.depuisCode('invalid_timezone'),

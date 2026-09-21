@@ -544,10 +544,7 @@ void main() {
         bouton: AppStrings.superAdminSupportValider,
       );
 
-      expect(
-        find.text(AppStrings.superAdminSupportVideTexte),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.superAdminSupportVideTexte), findsOneWidget);
     });
 
     testWidgets('un refus du serveur reste lisible', (tester) async {

@@ -146,18 +146,7 @@ class SupabaseSuperAdminRepository implements SuperAdminRepository {
     if (creee is! Map<String, dynamic>) {
       throw const EchecSuperAdmin(ErreurSuperAdmin.inconnue);
     }
-
-    // La caserne vient de naître : aucun membre, aucun planning, un essai. On
-    // compose la ligne au lieu de relire la liste, pour que la feuille puisse
-    // enchaîner sur l'invitation sans attendre un aller-retour de plus.
-    return CaserneSupervisee.depuisJson(<String, dynamic>{
-      ...creee,
-      'active_members': 0,
-      'active_admins': 0,
-      'pending_invites': 0,
-      'status': 'trialing',
-      'writable': true,
-    });
+    return CaserneSupervisee.depuisCreation(creee);
   }
 
   @override

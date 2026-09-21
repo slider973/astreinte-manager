@@ -249,9 +249,12 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       // atterrirait sur l'écran que la précédente venait de quitter.
       if (etat == EtatAuth.deconnecte) destinationInitiale.oublier();
 
-      final redirection = redirectionAuth(
+      // La garde, pour un chemin donné. Elle sert deux fois : sur
+      // l'emplacement courant, et sur la destination qu'on s'apprête à
+      // rejouer — c'est la seconde qui compte, voir plus bas.
+      String? garde(String chemin) => redirectionAuth(
         etat: etat,
-        chemin: state.matchedLocation,
+        chemin: chemin,
         outilsDevAutorises: env.isDev,
         estAdmin: ref.read(appartenanceCouranteProvider)?.estAdmin ?? false,
         // `null` tant que la réponse n'est pas là : la garde attend plutôt que
@@ -261,6 +264,8 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             ? null
             : AppRoutes.cheminInvitation(jeton),
       );
+
+      final redirection = garde(state.matchedLocation);
       if (redirection != null) {
         // **Uniquement pendant la restauration à froid.** C'est le seul moment
         // où l'emplacement demandé vient du dehors — une URL ouverte, une
@@ -288,7 +293,19 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       // destination attendait, c'est le moment d'y aller.
       if (etat == EtatAuth.connecte) {
         final reprise = destinationInitiale.reprendre(state.uri.toString());
-        if (reprise != null) return reprise;
+        // **On ne rejoue que ce que la garde accepte.** Une destination
+        // refusée y mènerait, la garde en reviendrait aussitôt, et
+        // `go_router` verrait passer deux fois le même emplacement dans une
+        // même résolution : c'est une boucle de redirection, et elle laisse
+        // l'application sans écran du tout — écran blanc, pas écran d'accueil.
+        //
+        // Vu dans Chrome sur `/superadmin` ouvert à froid par un compte
+        // ordinaire (ticket 031). Le même piège attendait `/admin/membres`
+        // ouvert à froid par un simple membre : ce n'est pas un défaut de ce
+        // ticket, c'est un défaut qu'il a fait apparaître.
+        if (reprise != null && garde(Uri.parse(reprise).path) == null) {
+          return reprise;
+        }
       }
 
       return null;

@@ -271,7 +271,7 @@ void main() {
           chemin: AppRoutes.superAdmin,
           estSuperAdmin: false,
         ),
-        isNull,
+        AppRoutes.aucuneCaserne,
       );
       expect(
         redirectionAuth(
@@ -283,14 +283,40 @@ void main() {
       );
     });
 
+    // `chargement` n'est **pas** une attente de l'éditeur : une session en
+    // cours de restauration passe par l'écran d'attente comme pour n'importe
+    // quelle adresse. Sans ça, `destinationInitiale` ne mémorise jamais l'URL
+    // tapée à froid — et c'est ce chemin-là qui avait bouclé dans Chrome.
+    test('en chargement, /superadmin passe par l\'écran d\'attente', () {
+      for (final droit in <bool?>[null, true, false]) {
+        expect(
+          redirectionAuth(
+            etat: EtatAuth.chargement,
+            chemin: AppRoutes.superAdmin,
+            estSuperAdmin: droit,
+          ),
+          AppRoutes.demarrage,
+          reason: 'droit = $droit',
+        );
+      }
+    });
+
+    test('déconnecté, /superadmin mène à la connexion comme le reste', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.deconnecte,
+          chemin: AppRoutes.superAdmin,
+          estSuperAdmin: true,
+        ),
+        AppRoutes.connexion,
+      );
+    });
+
     // `null` veut dire « pas encore su » : la garde attend plutôt que de
     // rediriger sur une supposition, sinon une URL tapée à froid est perdue.
     test('tant que le droit est inconnu, la garde ne tranche pas', () {
       expect(
-        redirectionAuth(
-          etat: EtatAuth.connecte,
-          chemin: AppRoutes.superAdmin,
-        ),
+        redirectionAuth(etat: EtatAuth.connecte, chemin: AppRoutes.superAdmin),
         isNull,
       );
     });

@@ -57,6 +57,32 @@ class CaserneSupervisee {
         dernierPlanningMois: (ligne['last_published_month'] as num?)?.toInt(),
       );
 
+  /// La caserne que `super_admin_create_station` vient de rendre.
+  ///
+  /// **Sa forme n'est pas celle d'une ligne de `super_admin_stations`**, et
+  /// c'est le piège : elle porte `id`, pas `station_id`, et rien des effectifs.
+  /// Passer l'une pour l'autre coûte un `null` sur `station_id`, donc une
+  /// création annoncée en échec alors que la caserne existe — vu dans Chrome
+  /// avant que ce constructeur n'existe.
+  ///
+  /// Le reste se déduit : une caserne qui vient de naître n'a aucun membre,
+  /// aucun planning, et son essai de 60 jours vient d'être posé par
+  /// `subscription_bootstrap`. On la compose ici plutôt que de relire la liste,
+  /// pour que la feuille enchaîne sur l'invitation sans un aller-retour de plus.
+  factory CaserneSupervisee.depuisCreation(Map<String, dynamic> station) =>
+      CaserneSupervisee(
+        id: station['id']! as String,
+        nom: (station['name'] as String? ?? '').trim(),
+        slug: station['slug'] as String? ?? '',
+        fuseau: station['timezone'] as String? ?? 'Europe/Paris',
+        creeLe: _instant(station['created_at']) ?? DateTime.now(),
+        membresActifs: 0,
+        adminsActifs: 0,
+        invitationsEnAttente: 0,
+        statut: StatutAbonnement.essai,
+        ecriture: true,
+      );
+
   static DateTime? _instant(Object? valeur) =>
       valeur is String && valeur.isNotEmpty
       ? DateTime.parse(valeur).toLocal()
