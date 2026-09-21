@@ -3,13 +3,17 @@ import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/session/appartenances_locales.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/features/astreintes/data/cache_astreintes.dart';
+import 'package:astreinte_sp/features/astreintes/data/cache_planning_caserne.dart';
 import 'package:astreinte_sp/features/astreintes/domain/astreinte.dart';
+import 'package:astreinte_sp/features/astreintes/domain/planning_caserne.dart';
 import 'package:astreinte_sp/features/auth/presentation/connexion_screen.dart';
+import 'package:astreinte_sp/features/demarrage/presentation/demarrage_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/faux_astreintes.dart';
 import '../../support/faux_auth.dart';
+import '../../support/faux_planning_caserne.dart';
 
 /// Un second compte, sur la même caserne : il sert à prouver que rien ne
 /// traverse d'un membre à l'autre.
@@ -36,19 +40,68 @@ MesAstreintes _uneAstreinte() => MesAstreintes(
   luLe: DateTime(2026, 10, 15, 8),
 );
 
-/// Les clés que les deux dépôts posent dans le stockage partagé.
+/// Deux mois du planning de la caserne, **chargés de noms de tiers** : c'est le
+/// cache le plus exposé du produit.
+List<PlanningCaserne> _deuxMois() => <PlanningCaserne>[
+  for (final mois in <int>[10, 11])
+    planningCaserne(
+      mois: moisPlanning(annee: 2026, mois: mois),
+      journees: <int, List<CreneauCaserne>>{
+        3: <CreneauCaserne>[
+          creneauCaserne(
+            id: 'c-$mois-3',
+            noms: const <String>['Thomas M.', 'Camille G.'],
+          ),
+        ],
+      },
+    ),
+];
+
+/// Les clés que les trois dépôts posent dans le stockage partagé.
 Set<String> _clesDesCaches(SharedPreferences prefs) => prefs
     .getKeys()
     .where(
       (String cle) =>
           cle.startsWith(CacheAstreintesPartage.prefixe) ||
+          cle.startsWith(CachePlanningCasernePartage.prefixe) ||
           cle.startsWith(AppartenancesLocalesPartagees.prefixe),
     )
     .toSet();
 
+/// Écrit le décor commun : les trois caches, avec les vrais dépôts.
+Future<void> _remplirLesCaches({
+  required CacheAstreintes astreintes,
+  required AppartenancesLocales appartenances,
+  required CachePlanningCaserne planning,
+}) async {
+  await appartenances.ecrire(sessionMembre.userId, <Appartenance>[
+    appartenanceMembre,
+  ]);
+  await astreintes.ecrire(
+    stationId: appartenanceMembre.stationId,
+    userId: sessionMembre.userId,
+    donnees: _uneAstreinte(),
+  );
+  await planning.ecrireMois(
+    stationId: appartenanceMembre.stationId,
+    userId: sessionMembre.userId,
+    mois: <MoisPlanning>[
+      moisPlanning(annee: 2026, mois: 10),
+      moisPlanning(annee: 2026, mois: 11),
+    ],
+  );
+  for (final mois in _deuxMois()) {
+    await planning.ecrirePlanning(
+      stationId: appartenanceMembre.stationId,
+      userId: sessionMembre.userId,
+      planning: mois,
+    );
+  }
+}
+
 void main() {
   group('la déconnexion n\'oublie rien sur l\'appareil', () {
-    testWidgets('les deux caches partent avant la fermeture de session', (
+    testWidgets('les trois caches partent avant la fermeture de session', (
       WidgetTester tester,
     ) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -57,22 +110,22 @@ void main() {
       // vérifie, et c'est lui qui reste sur un téléphone prêté.
       const cacheAstreintes = CacheAstreintesPartage();
       const appartenancesLocales = AppartenancesLocalesPartagees();
+      const cachePlanning = CachePlanningCasernePartage();
 
-      await appartenancesLocales.ecrire(sessionMembre.userId, <Appartenance>[
-        appartenanceMembre,
-      ]);
-      await cacheAstreintes.ecrire(
-        stationId: appartenanceMembre.stationId,
-        userId: sessionMembre.userId,
-        donnees: _uneAstreinte(),
+      await _remplirLesCaches(
+        astreintes: cacheAstreintes,
+        appartenances: appartenancesLocales,
+        planning: cachePlanning,
       );
 
       final avant = await SharedPreferences.getInstance();
       await avant.reload();
       expect(
         _clesDesCaches(avant),
-        hasLength(2),
-        reason: 'Le décor du test doit vraiment avoir écrit les deux caches.',
+        // Appartenances, astreintes, liste des mois, et **un document par mois
+        // visité** : un pompier qui a consulté deux mois en a laissé deux.
+        hasLength(5),
+        reason: 'Le décor du test doit vraiment avoir écrit les trois caches.',
       );
 
       final faux = await monterApp(
@@ -81,6 +134,7 @@ void main() {
         appartenances: const <Appartenance>[appartenanceMembre],
         astreintes: FauxAstreintesRepository(),
         cacheAstreintes: cacheAstreintes,
+        cachePlanningCaserne: cachePlanning,
         appartenancesLocales: appartenancesLocales,
       );
 
@@ -103,8 +157,8 @@ void main() {
         _clesDesCaches(apres),
         isEmpty,
         reason:
-            'Le nom de la caserne et les noms des autres membres du créneau '
-            'ne restent pas sur le téléphone de qui vient de partir.',
+            'Le nom de la caserne, les noms des équipiers et ceux de toute la '
+            'caserne ne restent pas sur le téléphone de qui vient de partir.',
       );
     });
 
@@ -113,14 +167,12 @@ void main() {
       SharedPreferences.setMockInitialValues(<String, Object>{});
       const cacheAstreintes = CacheAstreintesPartage();
       const appartenancesLocales = AppartenancesLocalesPartagees();
+      const cachePlanning = CachePlanningCasernePartage();
 
-      await appartenancesLocales.ecrire(sessionMembre.userId, <Appartenance>[
-        appartenanceMembre,
-      ]);
-      await cacheAstreintes.ecrire(
-        stationId: appartenanceMembre.stationId,
-        userId: sessionMembre.userId,
-        donnees: _uneAstreinte(),
+      await _remplirLesCaches(
+        astreintes: cacheAstreintes,
+        appartenances: appartenancesLocales,
+        planning: cachePlanning,
       );
 
       final faux = await monterApp(
@@ -129,6 +181,7 @@ void main() {
         appartenances: const <Appartenance>[appartenanceMembre],
         astreintes: FauxAstreintesRepository(),
         cacheAstreintes: cacheAstreintes,
+        cachePlanningCaserne: cachePlanning,
         appartenancesLocales: appartenancesLocales,
       );
       faux.auth.erreurDeconnexion = AuthErreur.reseau;
@@ -254,6 +307,37 @@ void main() {
       // revérifier n'accorde rien.
       expect(find.text(AppStrings.navAdmin), findsNothing);
     });
+
+    testWidgets(
+      'une lecture qui **se tait** n\'est pas « aucune caserne »',
+      (WidgetTester tester) async {
+        // Le réseau des zones rurales n'est pas un refus, c'est un trou noir :
+        // la requête part et ne revient jamais.
+        //
+        // `appartenancesProvider` observe `sessionProvider` : il est d'abord
+        // calculé sans session — liste vide — puis recalculé quand la session
+        // est restaurée. Riverpod **garde la valeur précédente** pendant ce
+        // recalcul, et décider dessus envoyait un membre parfaitement rattaché
+        // sur « Aucune caserne », écran qui ne propose que la déconnexion.
+        // Vu dans Chrome, API coupée (`design/023 § 10`).
+        final faux = await monterApp(
+          tester,
+          sessionEnAttente: true,
+          appartenancesSuspendues: true,
+          astreintes: FauxAstreintesRepository(),
+          stabiliser: false,
+        );
+        expect(find.byType(DemarrageScreen), findsOneWidget);
+
+        // La session se restaure. La caserne, elle, ne répond pas.
+        faux.auth.ouvrirSession(sessionMembre);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+
+        expect(find.text(AppStrings.aucuneCaserneTitre), findsNothing);
+        expect(find.byType(DemarrageScreen), findsOneWidget);
+      },
+    );
 
     testWidgets('un refus n\'est jamais masqué par le cache', (
       WidgetTester tester,

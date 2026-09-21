@@ -2414,4 +2414,121 @@ abstract final class AppStrings {
       'Impossible de charger tes astreintes.';
 
   static const String astreintesVideAction = 'Voir mes propositions';
+
+  // -------------------------------------------------------------------
+  // Le planning de la caserne (ticket 023)
+  // -------------------------------------------------------------------
+
+  /// Le titre suit la portée : la barre d'application est ce qu'un lecteur
+  /// d'écran annonce en arrivant, et « Mes astreintes » serait faux de ce
+  /// côté-ci du sélecteur.
+  static const String planningCaserneTitre = 'Planning de la caserne';
+
+  static const String planningCaserneRafraichir =
+      'Rafraîchir le planning de la caserne';
+
+  // --- Le sélecteur de portée ---------------------------------------------
+
+  static const String porteeLabel = 'Astreintes affichées';
+  static const String porteeMoi = 'Moi';
+  static const String porteeCaserne = 'La caserne';
+
+  // --- Le sélecteur de mois -----------------------------------------------
+
+  /// Les flèches parcourent les **plannings**, pas les mois : un mois sans
+  /// planning n'est pas une destination (`design/023 § 5`).
+  static const String planningCaserneMoisAvantDebut =
+      'Aucun planning publié avant ce mois.';
+  static const String planningCaserneMoisApresFin =
+      'Aucun planning publié après ce mois.';
+
+  // --- La règle de visibilité ---------------------------------------------
+
+  /// Le titre du bloc d'attente. « Publié » est un état nommé du produit, que
+  /// le pompier a vu passer dans sa notification. Ni « accès restreint » ni
+  /// « données partielles » : rien n'est cassé et personne n'est puni.
+  static const String planningCaserneAttenteTitre =
+      'Planning publié, pas encore validé';
+
+  /// Pourquoi la vue est partielle. **La phrase est obligatoire** : sans elle,
+  /// une liste courte se lirait « le planning est presque vide », ce qui est
+  /// faux (`design/023 § 4`).
+  static const String planningCaserneAttenteTexte =
+      'Tu ne vois que tes propres créneaux. Les autres noms s\'afficheront '
+      'quand ton chef de centre aura validé le planning.';
+
+  // --- Le registre --------------------------------------------------------
+
+  /// Les noms d'un créneau, séparés par un point médian : « Marie L. · Thomas
+  /// M. ». Le séparateur ne se lit pas à voix haute — la phrase annoncée est
+  /// construite à part par [planningCaserneCreneauSemantique].
+  static const String planningCaserneSeparateurNoms = ' · ';
+
+  /// Comment le lecteur se nomme lui-même dans la liste des noms. En tête,
+  /// marqué d'une icône pleine : trois signaux, jamais la couleur seule.
+  static const String planningCaserneToi = 'Toi';
+
+  /// Un créneau que personne ne couvre. C'est un **trou du planning**, donc une
+  /// information : il ne se tait pas.
+  static const String planningCaserneCreneauVide =
+      'Personne n\'est d\'astreinte.';
+
+  /// Les membres acceptés dont le nom n'a pas pu être lu — quelqu'un qui a
+  /// quitté la caserne. Comptés, jamais affichés sous forme d'identifiant.
+  static String planningCaserneAutres(int n) =>
+      n <= 1 ? 'et 1 autre' : 'et $n autres';
+
+  /// La phrase complète d'un créneau : « Samedi 24 octobre, nuit, de 19:00 à
+  /// 07:00, avec toi et Marie L. »
+  static String planningCaserneCreneauSemantique({
+    required String jourEtDate,
+    required String creneau,
+    required String heures,
+    required String personnes,
+  }) => '$jourEtDate, ${creneau.toLowerCase()}, $heures, $personnes';
+
+  /// « avec toi et Marie L. », « personne n'est d'astreinte ».
+  static String planningCaserneAvec(List<String> personnes) {
+    if (personnes.isEmpty) return 'personne n\'est d\'astreinte';
+    if (personnes.length == 1) return 'avec ${personnes.single}';
+    final debut = personnes.sublist(0, personnes.length - 1).join(', ');
+    return 'avec $debut et ${personnes.last}';
+  }
+
+  // --- États vides et erreurs ---------------------------------------------
+
+  static const String planningCaserneAucunTitre = 'Aucun planning publié';
+  static const String planningCaserneAucunTexte =
+      'Quand ton chef de centre publiera le planning du mois, tu le verras '
+      'ici.';
+  static const String planningCaserneAucunAction = 'Voir mes astreintes';
+
+  /// Le mois listé n'a plus de planning lisible : archivé ou supprimé entre la
+  /// lecture de la liste et celle du mois.
+  static const String planningCaserneIntrouvableTitre =
+      'Ce mois n\'a plus de planning';
+  static const String planningCaserneIntrouvableTexte =
+      'Il a été archivé ou retiré depuis la dernière lecture.';
+
+  /// Planning publié, et ce pompier n'y a aucun créneau. Le bloc d'attente
+  /// reste au-dessus : c'est lui qui distingue « personne n'est de garde » de
+  /// « je n'ai pas le droit de voir ».
+  static String planningCaserneSansMoiTitre(String mois) =>
+      'Tu n\'as pas d\'astreinte en ${_enMinuscule(mois)}';
+  static const String planningCaserneSansMoiTexte =
+      'Les créneaux des autres apparaîtront ici dès la validation du '
+      'planning.';
+
+  /// Planning validé et pas un seul créneau demandé. Rare, mais possible : une
+  /// caserne peut n'avoir besoin de personne un mois donné.
+  static const String planningCaserneMoisVideTitre =
+      'Aucun créneau à pourvoir ce mois-ci';
+  static const String planningCaserneMoisVideTexte =
+      'Le planning est validé, et la caserne ne demande personne.';
+
+  static const String planningCaserneErreurTexte =
+      'Impossible de charger le planning de la caserne.';
+
+  static const String planningCaserneNonActualise =
+      'Ce planning n\'a pas pu être actualisé.';
 }
