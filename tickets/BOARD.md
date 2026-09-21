@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 028 | [Export calendrier ICS](in-progress/028-export-ics.md) | P1 | 027 |  |
 
 ## À faire
 
@@ -53,6 +52,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 025 | [Edge Function send-notification](done/025-edge-send-notification.md) | P0 | 002 024 | https://github.com/slider973/astreinte-manager/pull/15 |
 | 026 | [Centre de notifications in-app](done/026-centre-notifications.md) | P1 | 025 | https://github.com/slider973/astreinte-manager/pull/16 |
 | 027 | [Écran Mes astreintes](done/027-mes-astreintes.md) | P0 | 021 | https://github.com/slider973/astreinte-manager/pull/24 |
+| 028 | [Export calendrier ICS](done/028-export-ics.md) | P1 | 027 |  |
 | 029 | [Abonnement Stripe par caserne](done/029-stripe-abonnement.md) | P0 | 008 010 | https://github.com/slider973/astreinte-manager/pull/27 |
 | 030 | [Mode suspendu et bannières](done/030-gating-suspension.md) | P1 | 029 | https://github.com/slider973/astreinte-manager/pull/28 |
 | 031 | [Interface super-admin](done/031-super-admin.md) | P1 | 008 029 | https://github.com/slider973/astreinte-manager/pull/29 |

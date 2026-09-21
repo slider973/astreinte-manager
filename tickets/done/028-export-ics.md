@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 027
 - **Branche** : `feat/028-export-ics`
-- **Statut** : en cours depuis 2026-09-21
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## À faire
 - Edge Function `ics-feed` : GET public avec token secret par membre (colonne `ics_token` sur `profiles`, régénérable), renvoie un `.ics` des astreintes acceptées avec heures depuis les settings de la caserne.
