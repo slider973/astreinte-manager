@@ -20,9 +20,25 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Gestion des astreintes pour les centres de secours.">
 
+  <!--
+    Le moteur Flutter pose son propre `viewport` au démarrage et remplace
+    celui-ci. Mais l'écran d'attente ci-dessous s'affiche **avant** le moteur :
+    sans cette balise, un téléphone lui donne une fenêtre de 980 px et le
+    squelette arrive en miniature (ticket 032).
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <!-- Le navigateur peint son fond avant la première règle CSS : sans cette
+       ligne, un système en thème sombre montre un éclair blanc. -->
+  <meta name="color-scheme" content="light dark">
+
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <!-- `default` et non `black` : le produit est clair par défaut
+       (DESIGN.md § Colors, surface = papier blanc) et `background_color` du
+       manifeste vaut #FFFFFF. Une barre d'état noire au-dessus d'une page
+       blanche est une bande étrangère. -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
   <!-- Couleur de chrome du navigateur : surface-container-low du thème actif
        (DESIGN.md § Zones sûres et chrome PWA). -->
@@ -49,8 +65,262 @@
 
   <title>Astreinte SP</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    ÉCRAN D'ATTENTE, EN HTML (ticket 032, design/032-web-pwa-deploy.md § 3)
+
+    Entre l'ouverture de la page et la première image de Flutter, il y a
+    `main.dart.js`, CanvasKit et l'amorçage du moteur. Sur la 4G rurale visée
+    par le brief, c'est plusieurs secondes de page blanche — et une page
+    blanche qui dure se referme.
+
+    Ce n'est pas un logo qui pulse et ce n'est pas une roue
+    (`design/004-design-system.md § Don't`) : c'est **le squelette du premier
+    écran Flutter**, `DemarrageScreen`, redessiné en CSS aux mêmes largeurs,
+    mêmes surfaces tonales et même rayon. Quand le moteur prend la main,
+    l'ossature ne bouge pas ; seul le pied de page s'efface.
+
+    Tout est en ligne, sans requête supplémentaire : une feuille de style
+    externe ou une police web retarderaient l'écran censé masquer l'attente.
+  -->
+  <style>
+    :root {
+      --surface: #FFFFFF;
+      --conteneur-haut: #E9EDF0;
+      --conteneur-bas: #F7F9FA;
+      --filet: #C3CDD3;
+      --encre: #16212A;
+      --papier: #FFFFFF;
+      --texte: #131C23;
+      --texte-second: #45535C;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --surface: #0F161B;
+        --conteneur-haut: #222C33;
+        --conteneur-bas: #141C22;
+        --filet: #3A454C;
+        --encre: #D8E2E8;
+        --papier: #16212A;
+        --texte: #E2E8EC;
+        --texte-second: #B3C0C8;
+      }
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: var(--surface);
+    }
+
+    #amorce {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483000;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      padding: calc(16px + env(safe-area-inset-top)) 16px
+               calc(16px + env(safe-area-inset-bottom));
+      background: var(--surface);
+      color: var(--texte);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      /* 180 ms / easeOutCubic = token « courant » (DESIGN.md § Motion). */
+      transition: opacity 180ms cubic-bezier(0.215, 0.61, 0.355, 1);
+    }
+
+    #amorce.parti {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* --- L'ossature : la copie exacte de DemarrageScreen ------------------ */
+
+    .amorce-ossature { display: flex; flex-direction: column; gap: 16px; }
+
+    .amorce-barre {
+      height: 16px;
+      border-radius: 4px; /* AppRadius.caseRegistre */
+      background-color: var(--conteneur-haut);
+      background-image: linear-gradient(
+        90deg,
+        var(--conteneur-haut) 0%,
+        var(--conteneur-haut) 35%,
+        var(--conteneur-bas) 50%,
+        var(--conteneur-haut) 65%,
+        var(--conteneur-haut) 100%
+      );
+      background-size: 300% 100%;
+      background-position-x: 150%;
+      /* 1400 ms linéaire = AppDuration.balayage / AppCurve.balayage. */
+      animation: amorce-balayage 1400ms linear infinite;
+    }
+
+    .amorce-titre { width: 180px; height: 24px; margin-bottom: 8px; }
+    .amorce-bloc-titre { width: 140px; height: 20px; }
+    .amorce-bloc-courte { width: 200px; }
+
+    .amorce-bloc {
+      box-sizing: border-box;
+      min-height: 96px;
+      padding: 12px;
+      border: 1px solid var(--filet);
+      border-radius: 8px; /* AppRadius.controle */
+      display: flex;
+      flex-direction: column;
+      gap: 8px; /* AppSpacing.sm, entre les deux lignes de texte */
+    }
+
+    /* 8 (gap) + 4 = 12 : AppSpacing.md sous le titre du bloc. */
+    .amorce-bloc .amorce-bloc-titre { margin-bottom: 4px; }
+
+    @keyframes amorce-balayage {
+      from { background-position-x: 150%; }
+      to   { background-position-x: -150%; }
+    }
+
+    /* --- Le pied : la marque, et ce qui se passe -------------------------- */
+
+    .amorce-pied {
+      margin-top: auto;
+      padding-top: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+
+    .amorce-marque {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--texte);
+    }
+
+    .amorce-marque svg { display: block; width: 28px; height: 28px; }
+
+    .amorce-etat {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.4;
+      max-width: 34ch;
+      color: var(--texte-second);
+    }
+
+    .amorce-recharger {
+      min-height: 44px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--encre);
+      color: var(--papier);
+      font: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .amorce-recharger:focus-visible {
+      outline: 2px solid var(--encre);
+      outline-offset: 2px;
+    }
+
+    [hidden] { display: none !important; }
+
+    /* `DESIGN.md § Motion` : Reduce Motion coupe tout, sans exception. */
+    @media (prefers-reduced-motion: reduce) {
+      .amorce-barre { animation: none; background-image: none; }
+      #amorce { transition: none; }
+    }
+  </style>
 </head>
 <body>
+  <div id="amorce">
+    <!-- L'ossature est décorative : elle est annoncée une seule fois, par la
+         ligne d'état, qui est la vraie information. -->
+    <div class="amorce-ossature" aria-hidden="true">
+      <div class="amorce-barre amorce-titre"></div>
+      <div class="amorce-bloc">
+        <div class="amorce-barre amorce-bloc-titre"></div>
+        <div class="amorce-barre"></div>
+        <div class="amorce-barre amorce-bloc-courte"></div>
+      </div>
+      <div class="amorce-bloc">
+        <div class="amorce-barre amorce-bloc-titre"></div>
+        <div class="amorce-barre"></div>
+        <div class="amorce-barre amorce-bloc-courte"></div>
+      </div>
+    </div>
+
+    <div class="amorce-pied">
+      <p class="amorce-marque">
+        <svg viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+          <rect width="512" height="512" rx="96" fill="var(--encre)"/>
+          <rect x="88" y="88" width="336" height="336" rx="44" fill="var(--papier)"/>
+          <path d="M168 258 L232 322 L346 190" fill="none" stroke="var(--encre)"
+                stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Astreinte SP</span>
+      </p>
+      <p class="amorce-etat" id="amorce-etat" role="status">Chargement…</p>
+      <button type="button" class="amorce-recharger" id="amorce-recharger" hidden>
+        Recharger
+      </button>
+      <noscript>
+        <p class="amorce-etat">
+          Astreinte SP a besoin de JavaScript. Active-le dans les réglages de
+          ton navigateur, puis recharge la page.
+        </p>
+      </noscript>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var amorce = document.getElementById('amorce');
+      if (!amorce) return;
+
+      // Un réseau qui se tait ne coupe rien : il fait attendre. Sans ce
+      // garde-fou, le squelette balaierait pour l'éternité — ce qui a l'air
+      // de marcher, et c'est pire qu'une panne annoncée.
+      var alerte = window.setTimeout(function () {
+        var etat = document.getElementById('amorce-etat');
+        var bouton = document.getElementById('amorce-recharger');
+        if (etat) {
+          etat.textContent =
+            'Le chargement prend plus de temps que prévu. Vérifie ta ' +
+            'connexion, puis recharge la page.';
+        }
+        if (bouton) {
+          bouton.hidden = false;
+          bouton.addEventListener('click', function () {
+            window.location.reload();
+          });
+        }
+      }, 20000);
+
+      // Le relais se prend sur la **première image réellement peinte** par
+      // Flutter, jamais sur une durée devinée.
+      window.addEventListener('flutter-first-frame', function () {
+        window.clearTimeout(alerte);
+        amorce.classList.add('parti');
+        // `transitionend` ne se déclenche pas sous Reduce Motion : le retrait
+        // est armé des deux côtés, et `remove()` est idempotent.
+        amorce.addEventListener('transitionend', function () {
+          amorce.remove();
+        });
+        window.setTimeout(function () {
+          amorce.remove();
+        }, 400);
+      }, { once: true });
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
