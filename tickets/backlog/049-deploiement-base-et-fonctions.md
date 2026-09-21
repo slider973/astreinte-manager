@@ -1,0 +1,82 @@
+# 049 — Mettre la base et les Edge Functions en ligne avec la PWA
+
+- **Épopée** : E9 Release
+- **Priorité** : P0
+- **Dépend de** : 032
+- **Branche** : `feat/049-deploiement-base-et-fonctions`
+- **PR** : —
+- **Statut** : à faire
+
+## Contexte
+
+Le 21 septembre 2026, le propriétaire a voulu inviter son premier pompier depuis la production.
+L'écran a répondu « Impossible de joindre le serveur. Vérifie ta connexion, puis réessaie. » Son
+réseau allait très bien. La vérité était ailleurs : **aucune des onze Edge Functions n'était
+déployée sur le projet de production**, et **cinq migrations manquaient** — 0030 à 0034.
+
+Les fonctions rendaient toutes un 404. Invitation, acceptation d'invitation, publication du
+planning, envoi de notification, export d'agenda, réattribution, export RGPD, abonnement Stripe :
+tout ce qui passe par une fonction était mort en production depuis le premier jour, sans que rien
+ne le signale. La table du plafond d'envoi et la colonne de prénom des invitations n'existaient pas
+non plus.
+
+Réparé à la main le jour même, par `supabase db push --linked --include-all` puis
+`supabase functions deploy`. Ce ticket existe pour que la réparation ne soit plus à refaire.
+
+**La cause est une lacune, pas une panne.** `.github/workflows/deploy.yml` ne met en ligne que la
+PWA sur Vercel. Il ne connaît ni `supabase/migrations/`, ni `supabase/functions/`. Chaque PR
+fusionnée qui touche la base ou une fonction creuse donc un écart de plus entre le dépôt et la
+production, et cet écart ne se voit qu'au moment où quelqu'un s'en sert.
+
+`docs/DEPLOIEMENT.md § 8` connaît deux états, base absente et base présente. Il lui manque le
+troisième, celui qu'on a eu : **base présente mais en retard**.
+
+## À faire
+
+### Mettre la base en ligne
+Appliquer les migrations en attente sur le projet de production, après une CI verte sur `main`,
+comme le fait déjà la mise en ligne de la PWA. Le jeton d'accès Supabase et la référence du projet
+sont des secrets GitHub, jamais des valeurs du dépôt.
+
+**Une migration en production ne se joue pas à l'aveugle.** Décider et documenter le garde-fou :
+soit un environnement GitHub protégé qui demande une approbation humaine avant d'écrire sur la base
+de production, soit une exécution à blanc dont le résultat est lisible avant l'exécution réelle.
+Trancher à l'implémentation, et écrire la raison retenue dans le workflow lui-même.
+
+### Mettre les Edge Functions en ligne
+Déployer les fonctions dans la même foulée, en respectant les `verify_jwt` de
+`supabase/config.toml`. Ne déployer que ce qui a changé si le temps de mise en ligne le demande,
+mais ne jamais laisser une fonction en retard sur la base dont elle dépend.
+
+### Ordonner les trois mises en ligne
+La base d'abord, les fonctions ensuite, la PWA en dernier. Une fonction qui appelle une procédure
+que la base n'a pas encore ne rend pas un message clair, elle rend une erreur de serveur. L'ordre
+inverse casse la production pendant quelques minutes à chaque déploiement.
+
+### Dire quand la production est en retard
+Le défaut a vécu tant que personne ne s'en est servi, parce que rien ne le disait. Ajouter une vérification qui compare les
+migrations du dépôt à celles de la production et les fonctions attendues à celles déployées, et qui
+échoue bruyamment en cas d'écart. Elle tourne à la mise en ligne, et elle doit pouvoir être lancée
+à la demande pour répondre à la question « est-ce que la production est à jour ? ».
+
+### Le jeton Vercel
+Le jeton actuellement posé en secret est lié au projet et non au compte : la ligne de commande
+Vercel répond « User not found ». La mise en ligne de la PWA échoue donc, et le déploiement se fait
+à la main par l'API. Poser un jeton de compte, depuis les réglages personnels de Vercel, et vérifier
+que le workflow passe.
+
+### Mettre à jour la documentation
+`docs/DEPLOIEMENT.md` gagne le troisième état, base en retard, avec ce qu'il donne à l'écran et
+comment le rattraper. La procédure manuelle de secours y figure aussi : c'est elle qui a sauvé la
+journée du 21 septembre.
+
+## Critères d'acceptation
+
+- Une PR fusionnée sur `main` qui ajoute une migration la voit appliquée en production sans
+  intervention manuelle, dans le garde-fou retenu.
+- Une PR fusionnée qui modifie une Edge Function la voit déployée en production.
+- La base est mise en ligne avant les fonctions, et les fonctions avant la PWA.
+- Un écart entre le dépôt et la production est signalé par un échec, pas découvert par un 404.
+- La mise en ligne de la PWA par le workflow réussit, sans passer par l'API à la main.
+- Aucun jeton ni mot de passe n'apparaît dans le dépôt, et l'analyse de secrets passe.
+- `docs/DEPLOIEMENT.md` décrit les trois états et la procédure de secours.
