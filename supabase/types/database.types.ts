@@ -277,6 +277,42 @@ export type Database = {
           },
         ]
       }
+      invitation_rate_events: {
+        Row: {
+          actor_id: string
+          created_at: string
+          id: string
+          station_id: string
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          id?: string
+          station_id: string
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          id?: string
+          station_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitation_rate_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitation_rate_events_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -1155,6 +1191,10 @@ export type Database = {
         Args: { p_reference?: string; p_token: string }
         Returns: Json
       }
+      invitation_rate_limit: {
+        Args: { p_actor: string; p_now?: string; p_station: string }
+        Returns: Json
+      }
       is_admin: { Args: { p_station: string }; Returns: boolean }
       is_member: { Args: { p_station: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
@@ -1229,6 +1269,10 @@ export type Database = {
         Args: { p_days?: number; p_reference?: string }
         Returns: number
       }
+      prune_invitation_rate_events: {
+        Args: { p_days?: number; p_reference?: string }
+        Returns: number
+      }
       prune_invitations: {
         Args: {
           p_accepted_days?: number
@@ -1270,6 +1314,10 @@ export type Database = {
       schedule_complet: { Args: { p_schedule: string }; Returns: boolean }
       schedule_reevaluer: { Args: { p_schedule: string }; Returns: boolean }
       station_access: { Args: { p_station: string }; Returns: Json }
+      station_invitation_hourly_limit: {
+        Args: { p_station: string }
+        Returns: number
+      }
       station_required_count: {
         Args: {
           p_date: string
