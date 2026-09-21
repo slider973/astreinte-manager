@@ -1318,6 +1318,14 @@ export type Database = {
         Args: { p_station: string }
         Returns: number
       }
+      station_notification_hour: {
+        Args: { p_station: string }
+        Returns: number
+      }
+      station_notification_window: {
+        Args: { p_instant?: string; p_station: string }
+        Returns: boolean
+      }
       station_required_count: {
         Args: {
           p_date: string

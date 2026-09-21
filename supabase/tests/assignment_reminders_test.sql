@@ -522,15 +522,23 @@ insert into shifts (id, station_id, schedule_id, date, slot, required_count) val
   ('90909090-0000-4000-8000-000000000401', '90909090-0000-4000-8000-000000000001',
    '90909090-0000-4000-8000-000000000305', '2029-05-04', 'day', 1);
 
+-- Proposée à 10:00 heure de Gambier (UTC-9), et non à 23:00 comme avant le
+-- ticket 041 : les paliers de cette caserne tombent désormais à 12:00 et 14:00
+-- locales, donc dans sa fenêtre d'envoi. Ce que cette section éprouve, ce sont
+-- les **délais** de chaque caserne ; l'heure locale a sa section à elle (§ 8).
 insert into assignments (id, station_id, shift_id, user_id, status, proposed_at, created_by) values
   ('90909090-0000-4000-8000-000000000501', '90909090-0000-4000-8000-000000000001',
    '90909090-0000-4000-8000-000000000401', '90909090-0000-4000-8000-000000000101',
-   'proposed', '2029-04-20 08:00:00+00', '90909090-0000-4000-8000-000000000100');
+   'proposed', '2029-04-20 19:00:00+00', '90909090-0000-4000-8000-000000000100');
 
--- Même instant de proposition, deux mondes : Q est réglée à 2 h, R à 24 h.
+-- Deux mondes : Q est réglée à 2 h, R à 24 h. Paris est doublement muette à ces
+-- deux instants — son délai de 24 h n'est pas franchi, et il y est 23:00 puis
+-- 01:00. Onze heures séparent les deux fuseaux : une seule heure UTC les met
+-- tous deux dans leur fenêtre, il n'existe donc pas d'instant qui isole le
+-- délai. Le palier de Paris est vérifié trois lignes plus bas, à 10:00 chez elle.
 select tests_rel.egal(
-  cron_assignment_reminders('2029-04-20 10:00:00+00'), 1,
-  'T+2 h : Gambier relance, Paris ne bouge pas');
+  cron_assignment_reminders('2029-04-20 21:00:00+00'), 1,
+  'T+2 h chez Gambier (12 h locales) : elle relance, Paris ne bouge pas');
 
 select tests_rel.egal(
   (select ligne.station_id from notification_outbox ligne
@@ -544,8 +552,8 @@ select tests_rel.egal(
   0, 'aucune attribution de Paris n''est marquée');
 
 select tests_rel.egal(
-  cron_assignment_reminders('2029-04-20 12:00:00+00'), 1,
-  'T+4 h : Gambier passe au courriel, Paris dort toujours');
+  cron_assignment_reminders('2029-04-20 23:00:00+00'), 1,
+  'T+4 h chez Gambier (14 h locales) : elle passe au courriel, Paris dort toujours');
 
 select tests_rel.check(
   (select channels = array['email', 'inapp'] from notification_outbox
@@ -566,9 +574,23 @@ release savepoint s5;
 -- ===========================================================================
 -- 6. Cohabitation avec la relance manuelle (remind_schedule, 0019)
 -- ===========================================================================
--- `remind_schedule` lit `now()` et n'accepte pas d'instant de référence : cette
--- section travaille donc autour de l'horloge réelle, sur un planning à elle.
--- C'est la seule façon d'éprouver les deux gestes ensemble pour de vrai.
+-- `remind_schedule` lit `now()` et n'accepte pas d'instant de référence : le
+-- **clic** a donc lieu à l'heure réelle, sur un planning à elle. C'est la seule
+-- façon d'éprouver les deux gestes ensemble pour de vrai.
+--
+-- Les **paliers**, eux, sont posés sur un `proposed_at` fixe (2029) et non sur
+-- `now()`. Depuis le ticket 041 les relances n'envoient que dans la fenêtre
+-- locale de la caserne : `now() + interval '49 hours'` tombait à une heure
+-- locale qui dépend de l'heure à laquelle la CI est lancée, et le test aurait
+-- été vert le matin et rouge le soir. Les trois instants ci-dessous valent
+-- T+25 h, T+49 h et T+72 h, tous à 09:00 ou 10:00 heure de Paris. Ils sont
+-- placés en **mars** 2029, soit avant le `proposed_at` des attributions du
+-- planning 305 (20 avril) : celui-là ne doit pas se réveiller au milieu de cette
+-- section, et l'ancienne ancre `now()` le tenait à l'écart pour la même raison.
+--
+-- Le `last_reminder_at` posé par le clic est l'heure réelle, donc très
+-- antérieure à `proposed_at + response_email_hours` : c'est exactement la
+-- situation que la seconde branche du palier courriel doit reconnaître.
 \echo ''
 \echo '--- 6. Une relance manuelle ne fait sauter aucun palier automatique'
 savepoint s6;
@@ -587,7 +609,7 @@ insert into shifts (id, station_id, schedule_id, date, slot, required_count) val
 insert into assignments (id, station_id, shift_id, user_id, status, proposed_at, created_by) values
   ('99999999-0000-4000-8000-000000000511', '99999999-0000-4000-8000-000000000001',
    '99999999-0000-4000-8000-000000000411', '99999999-0000-4000-8000-000000000101',
-   'proposed', now(), '99999999-0000-4000-8000-000000000100');
+   'proposed', '2029-03-01 08:00:00+00', '99999999-0000-4000-8000-000000000100');
 
 -- Le bouton « Relancer maintenant », pour de vrai, sous l'identité de l'admin.
 set local role authenticated;
@@ -612,7 +634,7 @@ select tests_rel.egal(
 -- a) Le palier push est sauté : le pompier vient d'être relancé, deux poussées
 --    à quatorze heures d'écart pour la même garde seraient du harcèlement.
 select tests_rel.egal(
-  cron_assignment_reminders(now() + interval '25 hours'), 0,
+  cron_assignment_reminders('2029-03-02 09:00:00+00'), 0,
   'T+25 h : le push automatique est sauté, la relance manuelle en tenait lieu');
 
 select tests_rel.egal(
@@ -624,7 +646,7 @@ select tests_rel.egal(
 --    le palier courriel se lit « au moins une relance, et aucune depuis
 --    l'échéance », pas « exactement une relance ».
 select tests_rel.egal(
-  cron_assignment_reminders(now() + interval '49 hours'), 1,
+  cron_assignment_reminders('2029-03-03 09:00:00+00'), 1,
   'T+49 h : le courriel part, la relance manuelle ne l''a pas escamoté');
 
 select tests_rel.check(
@@ -640,7 +662,7 @@ select tests_rel.egal(
 -- c) Et il ne repart pas ensuite : `last_reminder_at` est désormais postérieur à
 --    l'échéance du courriel, ce qui referme le palier.
 select tests_rel.egal(
-  cron_assignment_reminders(now() + interval '72 hours'), 0,
+  cron_assignment_reminders('2029-03-04 08:00:00+00'), 0,
   'et le courriel ne se répète pas les heures suivantes');
 
 rollback to savepoint s6;
@@ -666,7 +688,7 @@ insert into shifts (id, station_id, schedule_id, date, slot, required_count) val
 insert into assignments (id, station_id, shift_id, user_id, status, proposed_at, created_by) values
   ('99999999-0000-4000-8000-000000000511', '99999999-0000-4000-8000-000000000001',
    '99999999-0000-4000-8000-000000000411', '99999999-0000-4000-8000-000000000101',
-   'proposed', now(), '99999999-0000-4000-8000-000000000100');
+   'proposed', '2029-03-01 08:00:00+00', '99999999-0000-4000-8000-000000000100');
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"99999999-0000-4000-8000-000000000100","role":"authenticated"}';
@@ -687,7 +709,7 @@ select tests_rel.egal(
   2, 'deux clics : le compteur partagé vaut 2');
 
 select tests_rel.egal(
-  cron_assignment_reminders(now() + interval '49 hours'), 1,
+  cron_assignment_reminders('2029-03-03 09:00:00+00'), 1,
   'et le courriel part quand même — aucun nombre de clics ne le fait sauter');
 
 rollback to savepoint s6;
@@ -849,8 +871,20 @@ rollback to savepoint s7;
 release savepoint s7;
 
 -- ===========================================================================
--- 8. Le rapport ne tombe pas au milieu de la nuit locale (ticket 041)
+-- 8. Rien ne part au milieu de la nuit locale (ticket 041)
 -- ===========================================================================
+-- Cette section a été écrite au ticket 022 pour le seul rapport aux
+-- administrateurs, avec une fenêtre 8 h – 20 h écrite en dur dans la tâche. Le
+-- ticket 041 a remplacé cette constante par `station_notification_window`, le
+-- mécanisme commun aux trois tâches qui écrivent aux membres. Deux choses
+-- changent donc ici, et les deux sont voulues :
+--   - la fenêtre s'ouvre à `settings.notification_hour`, 9 par défaut et non 8 ;
+--     une caserne matinale règle 8 et retrouve l'ancien comportement.
+--   - **les relances d'attribution passent sous la même fenêtre**, à l'inverse
+--     de ce que cette section affirmait. L'argument d'alors — « un push de
+--     rappel n'a pas d'heure de bureau » — ne tient pas : le palier tombe à
+--     l'heure de publication du planning plus vingt-quatre heures, c'est-à-dire
+--     n'importe quand, y compris à 1 h du matin chez une caserne du Pacifique.
 \echo ''
 \echo '--- 8. Fenêtre horaire locale : jamais un push à 3 h du matin'
 savepoint s8;
@@ -880,13 +914,37 @@ select tests_rel.egal(
   '7 h du matin : toujours trop tôt');
 
 select tests_rel.egal(
-  cron_late_responders_report('2029-04-20 17:00:00+00'), 1,
-  '8 h du matin à Gambier : le rapport part');
+  cron_late_responders_report('2029-04-20 17:00:00+00'), 0,
+  '8 h du matin : trop tôt aussi — l''heure visée par défaut est 9 h (ticket 041)');
+
+select tests_rel.egal(
+  cron_late_responders_report('2029-04-20 18:00:00+00'), 1,
+  '9 h du matin à Gambier : l''heure visée, le rapport part');
 
 select tests_rel.egal(
   (select dedupe_key from notification_outbox where type = 'late_responders'),
   'late_responders:90909090-0000-4000-8000-000000000305:2029-04-20',
   'et sa clé porte la date **locale** de la caserne, pas celle du serveur');
+
+-- L'heure visée est un réglage : une caserne matinale retrouve le 8 h que la
+-- tâche imposait à tout le monde avant le ticket 041.
+update stations
+   set settings = settings || '{"notification_hour": 8}'::jsonb
+ where id = '90909090-0000-4000-8000-000000000001';
+
+select tests_rel.egal(
+  station_notification_hour('90909090-0000-4000-8000-000000000001'), 8,
+  'la caserne a réglé son heure visée à 8 h');
+
+delete from notification_outbox where type = 'late_responders';
+
+select tests_rel.egal(
+  cron_late_responders_report('2029-04-20 17:00:00+00'), 1,
+  'et à 8 h locales, son rapport part : la fenêtre suit le réglage');
+
+update stations
+   set settings = settings - 'notification_hour'
+ where id = '90909090-0000-4000-8000-000000000001';
 
 -- Le bord haut de la fenêtre : 21 h locale, c'est non ; le rapport attend le
 -- lendemain matin. Gambier UTC-9 : 21:00 local = 06:00 UTC le jour suivant.
@@ -918,12 +976,38 @@ select tests_rel.egal(
   cron_late_responders_report('2029-04-21 06:00:00+00'), 0,
   '21 h locale : c''est non, ce sera demain matin');
 
--- Les relances d'attribution, elles, restent horaires et sans fenêtre : un push
--- de rappel suit la proposition de quelques heures et n'a pas d'heure de bureau.
--- On vérifie seulement qu'elles ne se sont pas mises à dépendre du fuseau.
+-- Les relances d'attribution passent sous la même fenêtre depuis le ticket 041.
+-- L'attribution de Gambier a été proposée à 08:00 UTC, soit 23:00 chez elle :
+-- son palier push est dû dès 10:00 UTC — 1 h du matin sur place. Il attend.
 select tests_rel.egal(
-  cron_assignment_reminders('2029-04-20 10:00:00+00'), 1,
-  'le palier push de Gambier part à T+2 h, quelle que soit l''heure locale');
+  (select extract(hour from timestamptz '2029-04-20 10:00:00+00'
+                            at time zone 'Pacific/Gambier')::int),
+  1, 'décor : à 10:00 UTC, il est 1 h du matin à Gambier');
+
+select tests_rel.check(
+  assignment_reminder_targets('90909090-0000-4000-8000-000000000305', 'push',
+                              '2029-04-20 10:00:00+00') is not null,
+  'le palier est bel et bien dû : T+2 h est franchi');
+
+select tests_rel.egal(
+  cron_assignment_reminders('2029-04-20 10:00:00+00'), 0,
+  'et pourtant rien ne part : on ne réveille pas un pompier à 1 h du matin');
+
+select tests_rel.egal(
+  (select count(*)::int from assignments
+    where id = '90909090-0000-4000-8000-000000000501' and reminder_count > 0),
+  0, 'et rien n''est marqué : le palier reste dû, il n''est pas consommé');
+
+-- 18:00 UTC, 9 h du matin à Gambier : l'heure visée. Le rappel part enfin,
+-- entier — le retard de la nuit ne lui a rien coûté.
+select tests_rel.egal(
+  cron_assignment_reminders('2029-04-20 18:00:00+00'), 1,
+  'à 9 h locales, le palier push de Gambier part');
+
+select tests_rel.egal(
+  (select reminder_count from assignments
+    where id = '90909090-0000-4000-8000-000000000501'),
+  1, 'et la marque suit l''envoi, pas l''échéance');
 
 rollback to savepoint s8;
 release savepoint s8;

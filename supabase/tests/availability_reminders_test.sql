@@ -105,7 +105,9 @@ end $$;
 -- Le décor : une période ouverte en juillet 2031 pour la caserne A, date limite
 -- le 15 juin 2031 à 23:59:59 heure de Paris. Aucun membre n'a saisi.
 -- ---------------------------------------------------------------------------
--- Les deux instants de référence sont pris à 09:00 UTC, l'heure de la tâche.
+-- Les deux instants de référence sont pris à 09:00 UTC, soit 11:00 à Paris :
+-- dans la fenêtre d'envoi de la caserne depuis le ticket 041 (de 09:00 à 20:59
+-- locales), et bien le bon jour sur place.
 --   - J-3 = 12 juin 2031, 09:00 UTC (11:00 à Paris, donc bien le 12 sur place)
 --   - J-1 = 14 juin 2031, 09:00 UTC
 \set periode_id '''eeeeeeee-0000-4000-8000-000000000001'''
@@ -231,7 +233,7 @@ rollback to savepoint avant_j1;
 savepoint avant_jours_muets;
 
 -- Tous les autres jours, la tâche ne doit rien faire : c'est ce qui la rend sûre
--- à lancer tous les jours à 09:00.
+-- à lancer toutes les heures (ticket 041).
 select tests.check(
   cron_availability_reminders('2031-06-11 09:00:00+00') = 0, 'J-4 : rien');
 select tests.check(
@@ -311,12 +313,19 @@ insert into periods (id, station_id, year, month, status, deadline_at) values
   ('eeeeeeee-0000-4000-8000-000000000002', :caserne_b, 2031, 7, 'open',
    make_timestamptz(2031, 6, 15, 23, 59, 59, 'Pacific/Kiritimati'));
 
--- Le 12 juin 2031 à 09:00 UTC : il est encore le 11 juin à Midway (22:00), et
--- déjà le 12 juin à Kiritimati (23:00). Midway est donc à J-4, Kiritimati à J-3.
+-- Le 12 juin 2031 à 00:00 UTC : il est encore le 11 juin à Midway (13:00), et
+-- déjà le 12 juin à Kiritimati (14:00). Midway est donc à J-4, Kiritimati à J-3.
 -- Un calcul en UTC aurait relancé Midway un jour trop tôt.
+--
+-- Les deux instants de cette section sont pris à minuit UTC et non à 09:00
+-- depuis le ticket 041 : la tâche est horaire, et chaque caserne n'est servie
+-- que dans sa fenêtre locale (9 h – 20 h par défaut). À 09:00 UTC il est 23:00 à
+-- Kiritimati et 22:00 à Midway — la nuit chez les deux, donc plus personne. Ce
+-- que cette section vérifie, c'est le **jour** ; l'heure est vérifiée tir par
+-- tir par supabase/tests/heure_locale_notifications_test.sql.
 select tests.check(
-  cron_availability_reminders('2031-06-12 09:00:00+00') = 9,
-  'le 12 juin 09:00 UTC : Kiritimati (déjà le 12) est à J-3, Midway (encore le 11) non');
+  cron_availability_reminders('2031-06-12 00:00:00+00') = 9,
+  'le 12 juin 00:00 UTC : Kiritimati (déjà le 12, 14 h) est à J-3, Midway (encore le 11) non');
 
 select tests.check(
   (select count(*) from notification_outbox
@@ -328,7 +337,7 @@ select tests.check(
 -- Vingt-quatre heures plus tard, Midway est à son tour le 12 : son J-3 arrive,
 -- celui de Kiritimati est passé. Chaque caserne a eu son jour, une seule fois.
 select tests.check(
-  cron_availability_reminders('2031-06-13 09:00:00+00') = 9,
+  cron_availability_reminders('2031-06-13 00:00:00+00') = 9,
   'le lendemain : c''est au tour de Midway, ni un jour trop tôt ni un jour trop tard');
 
 select tests.check(
@@ -418,8 +427,8 @@ select tests.check(
   'la tâche availability_reminders est planifiée, qualifiée et sans argument');
 
 select tests.check(
-  (select schedule from cron.job where jobname = 'availability_reminders') = '0 9 * * *',
-  'tous les jours à 09:00 (docs/SCHEMA.md § 8)');
+  (select schedule from cron.job where jobname = 'availability_reminders') = '30 * * * *',
+  'toutes les heures (:30) depuis le ticket 041 — docs/SCHEMA.md § 8');
 
 select tests.check(
   not has_function_privilege('authenticated',
