@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 042 | [Réduire le coût d'une transition de route](in-progress/042-transition-de-route.md) | P1 | 016 |  |
 
 ## À faire
 
@@ -14,6 +13,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 |---|---|---|---|---|
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
+| 045 | [Destination perdue au chargement à froid d'un écran d'administration](backlog/045-destination-perdue-a-froid.md) | P1 | 024 031 |  |
 
 ## Terminés
 
@@ -57,6 +57,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 038 | [Limiter le débit des invitations](done/038-limite-debit-invitations.md) | P1 | 006 | https://github.com/slider973/astreinte-manager/pull/39 |
 | 040 | [Rendre visible une notification définitivement perdue](done/040-ligne-interne-echec-definitif.md) | P0 | 025 026 | https://github.com/slider973/astreinte-manager/pull/26 |
 | 041 | [Envoyer les rappels à une heure décente dans chaque fuseau](done/041-heure-locale-rappels.md) | P1 | 015 | https://github.com/slider973/astreinte-manager/pull/40 |
+| 042 | [Réduire le coût d'une transition de route](done/042-transition-de-route.md) | P1 | 016 | https://github.com/slider973/astreinte-manager/pull/41 |
 | 043 | [Purger réellement les anciennes notifications](done/043-purge-notifications.md) | P0 | 034 | https://github.com/slider973/astreinte-manager/pull/36 |
 | 044 | [Archiver réellement les plannings des mois passés](done/044-archivage-plannings.md) | P1 | 019 | https://github.com/slider973/astreinte-manager/pull/37 |
 
