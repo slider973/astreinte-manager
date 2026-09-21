@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 052 | [Le centre de notifications n'a pas de retour](in-progress/052-centre-notifications-sans-retour.md) | P1 | 026 | — |
 
 ## À faire
 
@@ -15,7 +16,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 050 | [L'écran super-admin annonce un envoi sans preuve](backlog/050-envoi-annonce-sans-preuve-superadmin.md) | P2 | 048 | — |
 | 051 | [Une invitation en attente reste invisible pour qui vient de se connecter](backlog/051-invitation-en-attente-ignoree.md) | P1 | 006 | — |
-| 052 | [Le centre de notifications n'a pas de retour](backlog/052-centre-notifications-sans-retour.md) | P1 | 026 | — |
+| 053 | [L'écran super-admin n'offre aucune déconnexion](backlog/053-superadmin-sans-deconnexion.md) | P2 | 031 | — |
 
 ## Terminés
 
