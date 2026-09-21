@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 021, 020
 - **Branche** : `feat/035-tests-e2e`
+- **Statut** : en cours depuis 2026-09-21
 
 ## À faire
 - Tests `integration_test` Flutter sur le parcours complet contre un Supabase local seedé : admin invite → membre accepte → membre saisit un mois → admin construit et publie → membre refuse un créneau → admin réattribue → second membre accepte → planning validé.
