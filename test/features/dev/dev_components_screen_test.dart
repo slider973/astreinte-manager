@@ -4,6 +4,7 @@ import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/theme/app_theme.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
+import 'package:astreinte_sp/core/widgets/bouton_retour.dart';
 import 'package:astreinte_sp/core/widgets/count_stat.dart';
 import 'package:astreinte_sp/core/widgets/day_cell.dart';
 import 'package:astreinte_sp/core/widgets/empty_state.dart';
@@ -106,6 +107,7 @@ void main() {
         LoadingSkeleton,
         CountStat,
         SaveIndicator,
+        BoutonRetour,
       ]) {
         expect(
           find.byType(type, skipOffstage: false),
@@ -123,6 +125,33 @@ void main() {
       await tester.tap(find.text(AppStrings.devThemeSombre).first);
       await tester.pump();
 
+      expect(tester.takeException(), isNull);
+    });
+
+    // **Les deux formes de la sortie, à côté l'une de l'autre** (ticket 052).
+    // C'est le seul endroit du produit où on les voit ensemble : la pile
+    // pleine et la pile vide n'arrivent jamais sur le même écran.
+    testWidgets('montre les deux formes de BoutonRetour', (tester) async {
+      await _monter(tester);
+
+      // La pile pleine : la flèche seule, « Retour » annoncé.
+      expect(find.byTooltip(AppStrings.actionRetour), findsWidgets);
+      // La pile vide : le mot est écrit à côté de la flèche.
+      expect(find.text(AppStrings.retourAccueil), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('les deux formes tiennent à l\'échelle 2.0', (tester) async {
+      await _monter(tester);
+
+      // `pumpAndSettle` ne rendrait jamais la main : le catalogue porte un
+      // squelette de chargement dont le balayage tourne en boucle.
+      await tester.tap(find.text(AppStrings.devEchelleValeur(2)));
+      await tester.pump();
+
+      // La sortie existe toujours, dans les deux spécimens et les deux
+      // thèmes ; le mot, lui, a le droit de tomber.
+      expect(find.byType(BoutonRetour, skipOffstage: false), findsWidgets);
       expect(tester.takeException(), isNull);
     });
 

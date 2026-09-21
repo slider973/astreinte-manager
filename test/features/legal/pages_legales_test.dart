@@ -4,7 +4,6 @@ import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/features/legal/domain/document_legal.dart';
 import 'package:astreinte_sp/features/legal/domain/documents_legaux.dart';
 import 'package:astreinte_sp/features/legal/presentation/document_legal_screen.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -83,13 +82,15 @@ void main() {
   });
 
   group('Pages légales — écran', () {
+    // **Par la route, pas par un `MaterialApp` nu.** Depuis le ticket 052,
+    // l'écran porte `BoutonRetour`, qui interroge la pile du routeur dès sa
+    // construction : le monter hors de l'application ne dirait rien de ce
+    // qu'un pompier voit.
     testWidgets('la politique de confidentialité se rend en entier', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: DocumentLegalScreen.confidentialite()),
-      );
-      await tester.pumpAndSettle();
+      await monterApp(tester);
+      await ouvrirRoute(tester, AppRoutes.confidentialite);
 
       expect(
         find.text(DocumentsLegaux.confidentialite.titre),
@@ -107,10 +108,8 @@ void main() {
     testWidgets('les marques à compléter sont visibles, pas cachées', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: DocumentLegalScreen.mentions()),
-      );
-      await tester.pumpAndSettle();
+      await monterApp(tester);
+      await ouvrirRoute(tester, AppRoutes.mentions);
 
       expect(find.text(AppStrings.legalACompleterTitre), findsWidgets);
       expect(

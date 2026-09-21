@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/l10n/app_strings.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_banner.dart';
 import '../../../../core/widgets/app_divider.dart';
 import '../../../../core/widgets/app_scaffold.dart';
+import '../../../../core/widgets/bouton_retour.dart';
 import '../../../../core/widgets/count_stat.dart';
 import '../../../../core/widgets/day_cell.dart';
 import '../../../../core/widgets/empty_state.dart';
@@ -40,6 +43,7 @@ class DevCatalogue extends StatelessWidget {
         _SectionChargement(),
         _SectionMesures(),
         _SectionOssature(),
+        _SectionRetour(),
       ],
     );
   }
@@ -891,6 +895,141 @@ class _Fenetre extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/// La sortie d'un écran sans ossature de navigation, dans ses deux états de
+/// pile (ticket 052).
+///
+/// Chaque spécimen porte **son propre routeur** : `BoutonRetour` lit la pile
+/// de navigation dès sa construction, et la lui fabriquer est la seule façon
+/// de montrer les deux formes côte à côte dans un catalogue.
+class _SectionRetour extends StatelessWidget {
+  const _SectionRetour();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DevSection(
+      titre: 'BoutonRetour',
+      note:
+          'Flèche seule quand il y a une pile à dépiler, flèche suivie du mot '
+          '« Accueil » quand il n\'y en a pas. Même place, seul le mot '
+          'change — et à l\'échelle 2.0 sur un téléphone étroit, le mot tombe '
+          'et la flèche reste.',
+      children: <Widget>[
+        DevRangee(
+          children: <Widget>[
+            DevSpecimen(
+              nom: 'pile pleine — la flèche dépile',
+              child: _FenetreRetour(pilePleine: true),
+            ),
+            DevSpecimen(
+              nom: 'pile vide — lien profond, URL collée, rechargement',
+              child: _FenetreRetour(pilePleine: false),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Une barre d'application isolée, avec la pile qu'on lui demande.
+class _FenetreRetour extends StatefulWidget {
+  const _FenetreRetour({required this.pilePleine});
+
+  /// Vrai : la barre s'ouvre sur une route enfant, il y a donc de quoi
+  /// dépiler. Faux : elle s'ouvre à la racine, comme un lien profond.
+  final bool pilePleine;
+
+  @override
+  State<_FenetreRetour> createState() => _FenetreRetourState();
+}
+
+class _FenetreRetourState extends State<_FenetreRetour> {
+  static const String _detour = 'detour';
+
+  late final GoRouter _routeur = GoRouter(
+    initialLocation: widget.pilePleine ? '/$_detour' : AppRoutes.accueil,
+    routes: <RouteBase>[
+      GoRoute(
+        path: AppRoutes.accueil,
+        // Le nom de repli de `BoutonRetour` : sans lui, presser la sortie en
+        // pile vide chercherait une route qui n'existe pas ici.
+        name: AppRoutes.accueilName,
+        builder: (context, state) => const _BarreSeule(titre: 'Accueil'),
+        routes: <RouteBase>[
+          GoRoute(
+            path: _detour,
+            builder: (context, state) =>
+                const _BarreSeule(titre: 'Notifications'),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  @override
+  void dispose() {
+    _routeur.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Une fenêtre simulée grandit avec l'échelle de texte, comme celle de
+    // l'ossature : à 2.0, un téléphone réel équivaut à un écran deux fois plus
+    // petit, et c'est là que le mot « Accueil » doit tomber.
+    final facteur = MediaQuery.textScalerOf(context).scale(16) / 16;
+    final largeur = 320 * facteur;
+    final hauteur = 96 * facteur;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: context.statuts.filetDecoratif),
+        borderRadius: AppRadius.controleRadius,
+      ),
+      child: ClipRRect(
+        borderRadius: AppRadius.controleRadius,
+        child: SizedBox(
+          width: largeur,
+          height: hauteur,
+          child: MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              size: Size(largeur, hauteur),
+              viewPadding: EdgeInsets.zero,
+              padding: EdgeInsets.zero,
+            ),
+            child: MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              theme: Theme.of(context),
+              routerConfig: _routeur,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Le spécimen lui-même : une barre, sa sortie, son titre.
+class _BarreSeule extends StatelessWidget {
+  const _BarreSeule({required this.titre});
+
+  final String titre;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: const BoutonRetour(),
+        leadingWidth: BoutonRetour.largeur(context),
+        title: Text(titre),
+      ),
+      body: const SizedBox.expand(),
     );
   }
 }
