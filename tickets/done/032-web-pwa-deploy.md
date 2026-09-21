@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 001
 - **Branche** : `feat/032-web-pwa-deploy`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/35
 - **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte

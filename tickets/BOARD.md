@@ -55,7 +55,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 029 | [Abonnement Stripe par caserne](done/029-stripe-abonnement.md) | P0 | 008 010 | https://github.com/slider973/astreinte-manager/pull/27 |
 | 030 | [Mode suspendu et bannières](done/030-gating-suspension.md) | P1 | 029 | https://github.com/slider973/astreinte-manager/pull/28 |
 | 031 | [Interface super-admin](done/031-super-admin.md) | P1 | 008 029 | https://github.com/slider973/astreinte-manager/pull/29 |
-| 032 | [Build web PWA et déploiement](done/032-web-pwa-deploy.md) | P0 | 001 |  |
+| 032 | [Build web PWA et déploiement](done/032-web-pwa-deploy.md) | P0 | 001 | https://github.com/slider973/astreinte-manager/pull/35 |
 | 034 | [RGPD : export et suppression des données](done/034-rgpd-export.md) | P1 | 007 | https://github.com/slider973/astreinte-manager/pull/31 |
 | 035 | [Tests d'intégration bout en bout](done/035-tests-e2e.md) | P1 | 021 020 | https://github.com/slider973/astreinte-manager/pull/32 |
 | 040 | [Rendre visible une notification définitivement perdue](done/040-ligne-interne-echec-definitif.md) | P0 | 025 026 | https://github.com/slider973/astreinte-manager/pull/26 |
