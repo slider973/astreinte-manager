@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/appartenance.dart';
+import '../domain/import_membres.dart';
 import '../domain/invitation.dart';
 import '../domain/membre_caserne.dart';
 
@@ -30,6 +31,22 @@ abstract interface class MembresRepository {
     required List<String> emails,
     required RoleMembre role,
   });
+
+  /// Invite des personnes nommées, un rôle par personne (import du ticket 047).
+  ///
+  /// Vingt au maximum par appel, comme [inviter] : c'est la borne d'une requête
+  /// (`invite-member`), et l'import découpe lui-même son fichier en lots.
+  Future<RapportInvitations> inviterPersonnes({
+    required String stationId,
+    required List<PersonneAInviter> personnes,
+  });
+
+  /// Ce que la caserne a déjà consommé de son plafond horaire d'invitations.
+  ///
+  /// Sert à **annoncer** ce qui partira avant de commencer un import. Le
+  /// serveur reste l'autorité ; ceci n'est qu'une prévision, et elle a le droit
+  /// d'échouer — l'écran se tait alors plutôt que d'inventer une inquiétude.
+  Future<BudgetInvitations> budgetInvitations(String stationId);
 
   /// Supprime une invitation en attente. Le lien déjà envoyé cesse de marcher.
   Future<void> annuler(String invitationId);
@@ -108,7 +125,7 @@ class SupabaseMembresRepository implements MembresRepository {
   /// du rôle `authenticated`, et une étoile ferait échouer la requête entière
   /// (`docs/SCHEMA.md § 4`, migration `0008`).
   static const String _colonnesInvitations =
-      'id, email, role, expires_at, created_at';
+      'id, email, role, first_name, last_name, expires_at, created_at';
 
   @override
   Future<List<MembreCaserne>> membres(String stationId) async {
@@ -145,15 +162,29 @@ class SupabaseMembresRepository implements MembresRepository {
     required String stationId,
     required List<String> emails,
     required RoleMembre role,
-  }) async {
+  }) => _inviter(<String, dynamic>{
+    'station_id': stationId,
+    'emails': emails,
+    'role': role.valeurSql,
+  });
+
+  @override
+  Future<RapportInvitations> inviterPersonnes({
+    required String stationId,
+    required List<PersonneAInviter> personnes,
+  }) => _inviter(<String, dynamic>{
+    'station_id': stationId,
+    'people': personnes
+        .map((PersonneAInviter p) => p.versJson())
+        .toList(growable: false),
+  });
+
+  /// L'unique appel à `invite-member`, quelle que soit la forme du corps.
+  Future<RapportInvitations> _inviter(Map<String, dynamic> corpsRequete) async {
     try {
       final reponse = await _client.functions.invoke(
         'invite-member',
-        body: <String, dynamic>{
-          'station_id': stationId,
-          'emails': emails,
-          'role': role.valeurSql,
-        },
+        body: corpsRequete,
       );
 
       final corps = reponse.data;
@@ -164,6 +195,51 @@ class SupabaseMembresRepository implements MembresRepository {
     } on FunctionException catch (echec) {
       throw _traduire(echec);
     }
+  }
+
+  @override
+  Future<BudgetInvitations> budgetInvitations(String stationId) async {
+    // La fenêtre est glissante : on compte ce qui est parti depuis une heure,
+    // exactement comme `invitation_rate_limit()` (migration 0032). L'instant de
+    // référence est celui du client ; un écart de quelques secondes avec la
+    // base ne change rien à une annonce arrondie à la minute.
+    final depuis = DateTime.now().toUtc().subtract(fenetrePlafond);
+
+    final (
+      Map<String, dynamic>? station,
+      List<Map<String, dynamic>> evenements,
+    ) = await (
+      _client.from('stations').select('settings').eq('id', stationId).maybeSingle(),
+      _client
+          .from('invitation_rate_events')
+          .select('created_at')
+          .eq('station_id', stationId)
+          .gt('created_at', depuis.toIso8601String())
+          .order('created_at'),
+    ).wait;
+
+    return BudgetInvitations(
+      plafond: _plafondDe(station?['settings']),
+      envoisRecents: List<DateTime>.unmodifiable(<DateTime>[
+        for (final Map<String, dynamic> ligne in evenements)
+          if (ligne['created_at'] is String)
+            DateTime.parse(ligne['created_at']! as String).toLocal(),
+      ]),
+    );
+  }
+
+  /// `settings.invitation_hourly_limit`, ou 60 — le même repli que
+  /// `station_invitation_hourly_limit()` côté base.
+  static int _plafondDe(Object? settings) {
+    if (settings is! Map) return plafondInvitationsParDefaut;
+    final valeur = settings['invitation_hourly_limit'];
+    if (valeur is int && valeur > 0) return valeur;
+    if (valeur is num && valeur > 0) return valeur.round();
+    if (valeur is String) {
+      final lu = int.tryParse(valeur);
+      if (lu != null && lu > 0) return lu;
+    }
+    return plafondInvitationsParDefaut;
   }
 
   @override

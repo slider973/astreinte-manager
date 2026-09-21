@@ -2,6 +2,7 @@ import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart';
 import 'package:astreinte_sp/features/invitation/domain/acceptation.dart';
 import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
+import 'package:astreinte_sp/features/membres/domain/import_membres.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
 import 'package:astreinte_sp/features/membres/domain/membre_caserne.dart';
 
@@ -98,6 +99,25 @@ class FauxMembresRepository implements MembresRepository {
   final List<List<String>> envois = <List<String>>[];
   final List<RoleMembre> rolesEnvoyes = <RoleMembre>[];
 
+  /// Les lots de personnes nommées envoyés par l'import (ticket 047).
+  final List<List<PersonneAInviter>> lotsImportes =
+      <List<PersonneAInviter>>[];
+
+  /// Rapports rendus par [inviterPersonnes], un par lot, dans l'ordre. Un lot
+  /// sans rapport prévu reçoit le rapport « tout est passé ».
+  List<RapportInvitations> rapportsParLot = <RapportInvitations>[];
+
+  /// Refus de la requête entière au n-ième lot (compté depuis 0), ou `null`.
+  /// C'est ainsi qu'un test joue un plafond atteint en cours d'import.
+  int? lotQuiEchoue;
+
+  /// Le budget rendu par [budgetInvitations]. `null` fait échouer la lecture,
+  /// pour vérifier que l'écran se tait au lieu d'inventer une inquiétude.
+  BudgetInvitations? budget = const BudgetInvitations(
+    plafond: 60,
+    envoisRecents: <DateTime>[],
+  );
+
   /// La caserne visée par chaque envoi. L'écran de l'éditeur (ticket 031)
   /// invite dans une caserne dont il n'est pas membre : le test doit pouvoir
   /// vérifier laquelle.
@@ -140,6 +160,39 @@ class FauxMembresRepository implements MembresRepository {
               ),
           ],
         );
+  }
+
+  @override
+  Future<RapportInvitations> inviterPersonnes({
+    required String stationId,
+    required List<PersonneAInviter> personnes,
+  }) async {
+    final rang = lotsImportes.length;
+    lotsImportes.add(personnes);
+    casernesInvitees.add(stationId);
+
+    if (lotQuiEchoue == rang) {
+      throw echecInvitation ??
+          const EchecInvitation(ErreurInvitation.debitAtteint);
+    }
+    if (rang < rapportsParLot.length) return rapportsParLot[rang];
+
+    return RapportInvitations(
+      resultats: <ResultatInvitation>[
+        for (final personne in personnes)
+          ResultatInvitation(
+            email: personne.email,
+            statut: StatutResultatInvitation.invitee,
+          ),
+      ],
+    );
+  }
+
+  @override
+  Future<BudgetInvitations> budgetInvitations(String stationId) async {
+    final lu = budget;
+    if (lu == null) throw const FormatException('budget illisible');
+    return lu;
   }
 
   @override

@@ -58,7 +58,8 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 
 ### 4.1 MVP (v1.0)
 - Authentification par email sans mot de passe (code à 6 chiffres ou lien magique).
-- Casernes multi-tenant, invitation des membres par email.
+- Casernes multi-tenant, invitation des membres par email, **import d'une liste depuis un fichier
+  tableur** (ticket 047 : la première caserne réelle en avait besoin le premier jour, pas en v1.1).
 - Saisie des disponibilités avec raccourcis et préférences de charge.
 - Date limite de saisie et verrouillage du mois.
 - Construction du planning par l'admin avec la matrice des disponibilités.
@@ -72,7 +73,7 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 - Échange d'astreinte entre deux membres avec validation admin.
 - Statistiques par membre et par caserne (astreintes faites, taux de réponse).
 - Export PDF et impression du planning du mois.
-- Import des membres par CSV.
+- ~~Import des membres par CSV~~ — livré au MVP, ticket 047.
 
 ### 4.3 Hors périmètre (pour l'instant)
 - Apps iOS et Android sur les stores : uniquement à la demande explicite d'une caserne. Le code

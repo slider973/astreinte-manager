@@ -13,6 +13,7 @@ import '../../features/demarrage/presentation/demarrage_screen.dart';
 import '../../features/dev/presentation/dev_components_screen.dart';
 import '../../features/invitation/presentation/invitation_screen.dart';
 import '../../features/legal/presentation/document_legal_screen.dart';
+import '../../features/membres/presentation/importer_screen.dart';
 import '../../features/membres/presentation/inviter_screen.dart';
 import '../../features/membres/presentation/membres_screen.dart';
 import '../../features/notifications/domain/destination_push.dart';
@@ -110,6 +111,11 @@ abstract final class AppRoutes {
   /// (ticket 006).
   static const String membres = '/admin/membres';
   static const String membresName = 'membres';
+
+  /// L'import d'un fichier de membres, enfant de l'écran des membres
+  /// (ticket 047). Même logique de route fille que le formulaire.
+  static const String importerChemin = 'importer';
+  static const String importerName = 'importerMembres';
 
   /// Le formulaire d'invitation, enfant de l'écran des membres : le retour du
   /// navigateur ramène à la liste.
@@ -390,6 +396,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.inviterChemin,
             name: AppRoutes.inviterName,
             builder: (context, state) => const InviterScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.importerChemin,
+            name: AppRoutes.importerName,
+            builder: (context, state) => const ImporterScreen(),
           ),
         ],
       ),

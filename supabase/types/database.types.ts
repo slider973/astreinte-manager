@@ -319,8 +319,10 @@ export type Database = {
           created_at: string
           email: string
           expires_at: string
+          first_name: string | null
           id: string
           invited_by: string
+          last_name: string | null
           role: Database["public"]["Enums"]["membership_role"]
           station_id: string
           token: string
@@ -330,8 +332,10 @@ export type Database = {
           created_at?: string
           email: string
           expires_at?: string
+          first_name?: string | null
           id?: string
           invited_by: string
+          last_name?: string | null
           role?: Database["public"]["Enums"]["membership_role"]
           station_id: string
           token?: string
@@ -341,8 +345,10 @@ export type Database = {
           created_at?: string
           email?: string
           expires_at?: string
+          first_name?: string | null
           id?: string
           invited_by?: string
+          last_name?: string | null
           role?: Database["public"]["Enums"]["membership_role"]
           station_id?: string
           token?: string
@@ -1095,7 +1101,9 @@ export type Database = {
       create_invitation: {
         Args: {
           p_email: string
+          p_first_name?: string
           p_invited_by: string
+          p_last_name?: string
           p_role: Database["public"]["Enums"]["membership_role"]
           p_station: string
         }

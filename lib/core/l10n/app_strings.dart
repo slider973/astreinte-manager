@@ -149,6 +149,11 @@ abstract final class AppStrings {
   static String dateCourte({required int jour, required int mois}) =>
       '${jour == 1 ? '1er' : jour} ${moisCourts[mois - 1]}';
 
+  /// « 15 h 12 ». L'espace autour du « h » est l'usage typographique français,
+  /// et il est insécable : une heure ne se coupe pas en fin de ligne.
+  static String heureDuJour({required int heures, required int minutes}) =>
+      '$heures\u00A0h\u00A0${minutes.toString().padLeft(2, '0')}';
+
   static const String jourAujourdhui = 'Aujourd\'hui';
   static const String jourWeekend = 'Weekend';
   static const String jourFerie = 'Jour férié';
@@ -519,6 +524,150 @@ abstract final class AppStrings {
       'sont bloquées.';
   static const String inviteCaserneInconnue =
       'Cette caserne est introuvable. Reconnecte-toi, puis réessaie.';
+
+  // -------------------------------------------------------------------
+  // Import de membres depuis un fichier (ticket 047)
+  // -------------------------------------------------------------------
+
+  static const String membresImporter = 'Importer un fichier';
+
+  static const String importTitre = 'Importer des membres';
+  static const String importIntro =
+      'Dépose la liste que tu as déjà : chaque ligne devient une invitation, '
+      'avec le nom. Tu verras tout avant que quoi que ce soit ne parte.';
+
+  static const String importFormatTitre = 'Ce que le fichier doit contenir';
+  static const String importFormatEntetes = 'prenom;nom;email;role';
+  static const String importFormatExplication =
+      'Un fichier tableur enregistré en CSV, séparé par des virgules ou des '
+      'points-virgules. Seule la colonne d\'adresse est obligatoire. Les '
+      'colonnes sont reconnues par leur intitulé : peu importe leur ordre.';
+  static const String importFormatVariantes =
+      'Intitulés acceptés : prénom, nom, email (ou courriel, e-mail, adresse) '
+      'et rôle. La colonne rôle vaut « admin » ou rien.';
+  static const String importFormatLimites =
+      'Limites : 512 Ko et 500 lignes par import.';
+
+  static const String importChoisir = 'Choisir un fichier';
+  static const String importChoisirAutre = 'Choisir un autre fichier';
+  static const String importExemple = 'Télécharger un fichier d\'exemple';
+  static const String importExempleEchec =
+      'Le fichier d\'exemple n\'a pas pu être enregistré.';
+  static const String importIndisponible =
+      'La lecture d\'un fichier n\'est possible que depuis un navigateur. '
+      'Ouvre Astreinte SP sur ton ordinateur ou ton téléphone.';
+
+  // --- Les refus de lecture ------------------------------------------
+
+  static String importTropGros(String taille, String limite) =>
+      'Ce fichier fait $taille. La limite est de $limite. Enregistre ta liste '
+      'en CSV : elle tiendra largement dessous.';
+
+  static String importTropDeLignes(int lignes, int limite) =>
+      'Ce fichier compte $lignes lignes. La limite est de $limite par import. '
+      'Coupe la liste en deux, et importe-la en deux fois.';
+
+  static const String importColonneAdresseAbsente =
+      'Aucune colonne d\'adresse e-mail dans ce fichier. Nomme-la email, '
+      'e-mail, courriel, mail ou adresse sur la première ligne, puis '
+      'redépose-le.';
+  static const String importFichierVide =
+      'Ce fichier ne contient aucune ligne sous ses en-têtes.';
+  static const String importFichierIllisible =
+      'Ce fichier n\'a pas pu être lu. Vérifie qu\'il s\'agit bien d\'un CSV, '
+      'puis réessaie.';
+
+  // --- L'aperçu --------------------------------------------------------
+
+  static String importApercuResume({
+    required int lues,
+    required int aInviter,
+    required int ecartees,
+  }) {
+    final debut = lues <= 1 ? '$lues ligne lue' : '$lues lignes lues';
+    final envoi = aInviter <= 1
+        ? '$aInviter à inviter'
+        : '$aInviter à inviter';
+    if (ecartees == 0) return '$debut : $envoi.';
+    final reste = ecartees <= 1 ? '1 écartée' : '$ecartees écartées';
+    return '$debut : $envoi, $reste.';
+  }
+
+  static const String importApercuTitre = 'Ligne par ligne';
+
+  static String importEnvoyer(int nombre) => nombre <= 1
+      ? 'Envoyer l\'invitation'
+      : 'Envoyer les $nombre invitations';
+
+  static const String importRienAEnvoyer =
+      'Aucune ligne de ce fichier ne peut être invitée. Corrige-le, puis '
+      'redépose-le.';
+
+  static String importAvancement({required int faites, required int total}) =>
+      '$faites invitations sur $total envoyées…';
+
+  /// Le numéro d'une ligne dépourvue d'adresse : c'est le seul repère qui
+  /// permette de la retrouver dans le tableur.
+  static String importLigneNumero(int numero) => 'Ligne $numero';
+
+  static const String importSansNom =
+      'Sans nom : le pompier le saisira lui-même.';
+  static const String importDejaInvitee =
+      'Invitation déjà en attente. Ignorée.';
+  static String importDoublon(int premiere) =>
+      'Déjà présente ligne $premiere.';
+  static const String importAdresseAbsente =
+      'Pas d\'adresse e-mail sur cette ligne.';
+
+  // --- Le budget d'envoi (plafond du ticket 038) -----------------------
+
+  static String importBudgetToutPasse(int nombre) => nombre <= 1
+      ? 'L\'invitation peut partir maintenant.'
+      : 'Les $nombre invitations peuvent partir maintenant.';
+
+  static String importBudgetPartiel({
+    required int maintenant,
+    required int reste,
+    required String heure,
+  }) =>
+      '$maintenant invitations peuvent partir maintenant, '
+      '${reste <= 1 ? '1 à' : '$reste à'} partir de $heure. Reviens ici avec '
+      'le même fichier : les personnes déjà invitées seront ignorées.';
+
+  static String importBudgetNul(String heure) =>
+      'Aucune invitation ne peut partir avant $heure. La caserne a atteint son '
+      'plafond horaire d\'envois.';
+
+  // --- Le rapport ------------------------------------------------------
+
+  static String importEcarteesResume(int nombre, String motifs) =>
+      nombre <= 1
+      ? '1 ligne du fichier n\'a rien reçu : $motifs.'
+      : '$nombre lignes du fichier n\'ont rien reçu : $motifs.';
+
+  static String importEcarteesMotif(int nombre, String motif) =>
+      '$nombre $motif';
+
+  static const String importMotifDejaMembre = 'déjà membre';
+  static const String importMotifDejaInvitee = 'déjà invitée';
+  static const String importMotifDoublon = 'en double';
+  static const String importMotifAdresseInvalide = 'adresse invalide';
+  static const String importMotifAdresseAbsente = 'sans adresse';
+
+  static String importReprendreApres(String heure) =>
+      'Reprends l\'import après $heure avec le même fichier : les personnes '
+      'déjà invitées seront ignorées.';
+
+  static const String importReprendre = 'Reprendre l\'import';
+
+  // --- Tailles de fichier ----------------------------------------------
+
+  static String tailleOctets(int octets) => '$octets octets';
+
+  static String tailleKo(double ko) => '${ko.toStringAsFixed(0)} Ko';
+
+  static String tailleMo(double mo) =>
+      '${mo.toStringAsFixed(1).replaceAll('.', ',')} Mo';
 
   // -------------------------------------------------------------------
   // Administration d'un membre (ticket 009)

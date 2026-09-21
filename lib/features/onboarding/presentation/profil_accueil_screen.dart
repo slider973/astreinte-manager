@@ -10,6 +10,7 @@ import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/champ_texte.dart';
 import '../../../core/widgets/ecran_simple.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../profil/domain/profil.dart';
 import '../../profil/domain/profil_providers.dart';
 import '../domain/parcours_accueil.dart';
 
@@ -29,6 +30,26 @@ class _ProfilAccueilScreenState extends ConsumerState<ProfilAccueilScreen> {
   final TextEditingController _prenom = TextEditingController();
   final TextEditingController _nom = TextEditingController();
   final TextEditingController _telephone = TextEditingController();
+
+  /// Posé une seule fois : sans ce repère, une relecture du profil écraserait
+  /// une correction en cours de frappe.
+  bool _prerempli = false;
+
+  /// Pré-remplit les deux champs avec ce que la base sait déjà du nom.
+  ///
+  /// **C'est ici qu'atterrit le nom saisi par l'administrateur à l'import**
+  /// (ticket 047) : `accept_invitation` l'a recopié dans le profil au moment de
+  /// l'acceptation, parce qu'il était vide. Rien ne le signale à l'écran —
+  /// « voici ce que ton chef de centre a écrit de toi » n'apporte rien et
+  /// invite à discuter. Le pompier lit son nom, le corrige s'il le faut, et
+  /// **ce qu'il valide gagne** : c'est la décision du § 7 du brief.
+  void _preremplir(Profil profil) {
+    if (_prerempli) return;
+    if (profil.prenom.isEmpty && profil.nom.isEmpty) return;
+    _prerempli = true;
+    _prenom.text = profil.prenom;
+    _nom.text = profil.nom;
+  }
 
   @override
   void dispose() {
@@ -59,6 +80,11 @@ class _ProfilAccueilScreenState extends ConsumerState<ProfilAccueilScreen> {
   Widget build(BuildContext context) {
     final etat = ref.watch(profilControllerProvider);
     final effacer = ref.read(profilControllerProvider.notifier).effacerErreurs;
+
+    // Une lecture qui échoue ne bloque rien : les champs restent vides, et la
+    // personne saisit son nom comme avant le ticket 047.
+    final profil = ref.watch(monProfilProvider).value;
+    if (profil != null) _preremplir(profil);
 
     return EcranSimple(
       titre: AppStrings.profilTitre,

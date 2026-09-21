@@ -4,7 +4,8 @@
 - **Priorité** : P0
 - **Dépend de** : 006, 009, 038
 - **Branche** : `feat/047-import-membres`
-- **Statut** : en cours depuis 2026-09-21
+- **PR** : https://github.com/slider973/astreinte-manager/pull/43
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
 Demandé par le propriétaire au moment de créer sa première caserne réelle. Aujourd'hui, l'admin

@@ -7,7 +7,13 @@ import '../../../../core/theme/app_status.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../domain/invitation.dart';
 
-/// Une invitation en attente : l'adresse, son échéance, et les deux sorties.
+/// Une invitation en attente : qui elle vise, son échéance, et les deux
+/// sorties.
+///
+/// **Le nom en titre quand il est connu** (ticket 047) : un chef de centre qui
+/// vient d'importer sa caserne passerait sinon deux semaines devant une liste
+/// d'adresses. Une invitation créée à la main n'en a pas — le formulaire ne
+/// demande que des adresses — et garde exactement la forme du ticket 006.
 ///
 /// L'état est porté par un badge (marque + icône + libellé) et non par la
 /// seule couleur : une invitation périmée se lit en niveaux de gris.
@@ -58,7 +64,19 @@ class LigneInvitation extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(invitation.email, style: theme.textTheme.titleMedium),
+                    Text(
+                      invitation.nomComplet ?? invitation.email,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    if (invitation.nomComplet != null) ...<Widget>[
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        invitation.email,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.xs),
                     Wrap(
                       spacing: AppSpacing.sm,

@@ -6,6 +6,7 @@ import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
 import 'package:astreinte_sp/features/onboarding/presentation/guide_screen.dart';
 import 'package:astreinte_sp/features/onboarding/presentation/installation_screen.dart';
 import 'package:astreinte_sp/features/onboarding/presentation/profil_accueil_screen.dart';
+import 'package:astreinte_sp/features/profil/domain/profil.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -48,7 +49,15 @@ Future<void> _remplirLeProfil(WidgetTester tester) async {
 void main() {
   group('Complément de profil', () {
     testWidgets('refuse un prénom ou un nom vide, et le dit', (tester) async {
-      final profils = FauxProfilRepository();
+      // Un profil vierge : c'est l'état dans lequel on arrive ici quand
+      // l'administrateur n'a pas donné de nom à l'invitation (ticket 047).
+      final profils = FauxProfilRepository(
+        profil: const Profil(
+          prenom: '',
+          nom: '',
+          email: 'recrue@caserne-a.test',
+        ),
+      );
       await _ouvrir(tester, '/bienvenue/profil', profils: profils);
 
       await tester.tap(find.text(AppStrings.profilEnregistrer));

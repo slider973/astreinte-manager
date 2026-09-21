@@ -94,3 +94,12 @@ String formaterInstantRelatif(DateTime instant, {DateTime? maintenant}) {
   if (locale.year == reference.year) return formaterDateCourte(locale);
   return formaterDateLongue(locale);
 }
+
+/// L'heure du jour : « 15 h 12 ».
+///
+/// Sur l'heure **locale** : le moment où le plafond d'invitations se rouvre est
+/// une heure qu'on lit sur sa montre, pas un horodatage UTC.
+String formaterHeureDuJour(DateTime instant) {
+  final locale = instant.toLocal();
+  return AppStrings.heureDuJour(heures: locale.hour, minutes: locale.minute);
+}

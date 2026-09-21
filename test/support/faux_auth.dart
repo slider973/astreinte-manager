@@ -7,6 +7,7 @@ import 'package:astreinte_sp/core/env.dart';
 import 'package:astreinte_sp/core/firebase/firebase_bootstrap.dart';
 import 'package:astreinte_sp/core/plateforme/contexte_plateforme.dart';
 import 'package:astreinte_sp/core/plateforme/ouverture_externe.dart';
+import 'package:astreinte_sp/core/plateforme/selection_fichier.dart';
 import 'package:astreinte_sp/core/plateforme/telechargement.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
@@ -67,6 +68,7 @@ import 'faux_calendrier.dart';
 import 'faux_caserne.dart';
 import 'faux_dispos.dart';
 import 'faux_export.dart';
+import 'faux_fichier.dart';
 import 'faux_notifications.dart';
 import 'faux_planning.dart';
 import 'faux_planning_caserne.dart';
@@ -255,6 +257,7 @@ Future<AppMontee> monterApp(
   ProfilRepository? profils,
   FauxExportRepository? export,
   FauxTelechargement? telechargement,
+  FauxSelecteurFichier? selecteurFichier,
   FauxCalendrierRepository? calendrier,
   FauxPressePapiers? pressePapiers,
   ParametresRepository? parametres,
@@ -337,6 +340,12 @@ Future<AppMontee> monterApp(
         ),
         telechargementProvider.overrideWithValue(
           (telechargement ?? FauxTelechargement()).call,
+        ),
+        // L'import d'un fichier de membres (ticket 047) : sans faux, le bouton
+        // « Choisir un fichier » appellerait un navigateur qui n'existe pas
+        // sous `flutter test`.
+        selectionFichierProvider.overrideWithValue(
+          (selecteurFichier ?? FauxSelecteurFichier()).call,
         ),
         // L'abonnement calendrier (ticket 028) est posé sur l'onglet
         // « Profil », et son bloc **lit dès qu'il se construit** : sans faux,

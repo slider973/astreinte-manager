@@ -55,6 +55,7 @@ import 'package:astreinte_sp/features/dispos/domain/preferences_mois.dart';
 import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart';
 import 'package:astreinte_sp/features/invitation/domain/acceptation.dart';
 import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
+import 'package:astreinte_sp/features/membres/domain/import_membres.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
 import 'package:astreinte_sp/features/membres/domain/membre_caserne.dart';
 import 'package:astreinte_sp/features/planning/data/matrice_repository.dart';
@@ -94,8 +95,12 @@ class MembreMemoire {
 
   final String membershipId;
   final String userId;
-  final String prenom;
-  final String nom;
+
+  /// Mutables depuis le ticket 047 : `accept_invitation` amorce un profil vide
+  /// avec le nom saisi par l'administrateur à l'import.
+  String prenom;
+  String nom;
+
   final String email;
   RoleMembre role;
   StatutMembre statut;
@@ -121,6 +126,8 @@ class InvitationMemoire {
     required this.jeton,
     required this.creeLe,
     required this.expireLe,
+    this.prenom,
+    this.nom,
   });
 
   final String id;
@@ -129,6 +136,12 @@ class InvitationMemoire {
   final String jeton;
   final DateTime creeLe;
   final DateTime expireLe;
+
+  /// Le nom saisi par l'administrateur à l'import (ticket 047). Amorce le
+  /// profil à l'acceptation, et seulement s'il est vide.
+  String? prenom;
+  String? nom;
+
   DateTime? accepteeLe;
 
   bool get enAttente => accepteeLe == null;
@@ -257,6 +270,13 @@ class BackendMemoire {
   /// assertions sans passer par l'écran de bienvenue.
   final Map<String, ({String prenom, String nom})> annuaire =
       <String, ({String prenom, String nom})>{};
+
+  /// Le plafond horaire d'invitations de la caserne (ticket 038).
+  int plafondInvitations = 60;
+
+  /// Les instants des courriels d'invitation déjà partis, du plus ancien au
+  /// plus récent. Un test qui veut jouer un plafond atteint le remplit.
+  final List<DateTime> envoisInvitations = <DateTime>[];
 
   /// Appelé juste après une acceptation réussie.
   ///
@@ -466,6 +486,8 @@ class _MembresMemoire implements MembresRepository {
             role: invitation.role,
             expireLe: invitation.expireLe,
             creeLe: invitation.creeLe,
+            prenom: invitation.prenom,
+            nom: invitation.nom,
           ),
     ]..sort((Invitation a, Invitation b) => b.creeLe.compareTo(a.creeLe));
     return List<Invitation>.unmodifiable(liste);
@@ -476,12 +498,31 @@ class _MembresMemoire implements MembresRepository {
     required String stationId,
     required List<String> emails,
     required RoleMembre role,
-  }) async {
+  }) => _inviter(<PersonneAInviter>[
+    for (final email in emails)
+      PersonneAInviter(email: email.trim().toLowerCase(), role: role),
+  ]);
+
+  @override
+  Future<RapportInvitations> inviterPersonnes({
+    required String stationId,
+    required List<PersonneAInviter> personnes,
+  }) => _inviter(personnes);
+
+  @override
+  Future<BudgetInvitations> budgetInvitations(String stationId) async =>
+      BudgetInvitations(
+        plafond: _base.plafondInvitations,
+        envoisRecents: List<DateTime>.unmodifiable(_base.envoisInvitations),
+      );
+
+  Future<RapportInvitations> _inviter(List<PersonneAInviter> personnes) async {
     final maintenant = _base.horloge();
     final resultats = <ResultatInvitation>[];
 
-    for (final brute in emails) {
-      final email = brute.trim().toLowerCase();
+    for (final personne in personnes) {
+      final email = personne.email.trim().toLowerCase();
+      final role = personne.role;
 
       // `create_invitation` refuse **par adresse** : le lot continue.
       if (_base.membreParEmail(email)?.actif ?? false) {
@@ -519,8 +560,11 @@ class _MembresMemoire implements MembresRepository {
           jeton: jetonPour(email),
           creeLe: maintenant,
           expireLe: maintenant.add(const Duration(days: 14)),
+          prenom: personne.prenom,
+          nom: personne.nom,
         ),
       );
+      _base.envoisInvitations.add(maintenant);
 
       // `invite-member` crée le compte chez le fournisseur d'authentification.
       // L'**appartenance**, elle, n'arrive qu'à l'acceptation : la personne
@@ -641,6 +685,16 @@ class _InvitationMemoire implements InvitationRepository {
     final recrue = _base.membreParEmail(invitation.email)!
       ..role = invitation.role
       ..statut = StatutMembre.actif;
+
+    // `accept_invitation` (migration 0034) recopie le nom de l'invitation dans
+    // le profil **s'il est vide**. Le nom que la personne saisit sur elle-même
+    // n'est jamais écrasé.
+    if (recrue.prenom.isEmpty && (invitation.prenom ?? '').isNotEmpty) {
+      recrue.prenom = invitation.prenom!;
+    }
+    if (recrue.nom.isEmpty && (invitation.nom ?? '').isNotEmpty) {
+      recrue.nom = invitation.nom!;
+    }
     _base.apresAcceptation?.call(recrue);
 
     return AcceptationInvitation(
