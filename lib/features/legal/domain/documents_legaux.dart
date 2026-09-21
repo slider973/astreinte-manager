@@ -21,7 +21,7 @@ import 'document_legal.dart';
 abstract final class DocumentsLegaux {
   /// Date de la version en vigueur des deux documents. Une seule, parce qu'ils
   /// se répondent et qu'ils sont relus ensemble.
-  static const String _version = 'Version 1 — 21 septembre 2026';
+  static const String _version = 'Version 2 — 21 septembre 2026';
 
   // =====================================================================
   // Politique de confidentialité — les paragraphes
@@ -138,6 +138,14 @@ abstract final class DocumentsLegaux {
       'Elles décrivent des gardes tenues, c\'est-à-dire l\'activité du centre, '
       'et elles ne portent plus ton nom. C\'est le seul point où l\'effacement '
       's\'arrête, et il est assumé.';
+
+  static const String _dureeJournaux =
+      'Le reste a une durée. Une notification lue est effacée trois mois après '
+      'sa lecture, une notification jamais ouverte au bout d\'un an. Le journal '
+      'des actes d\'administration — qui a coché une case à ta place, qui t\'a '
+      'attribué une garde — est conservé trois ans, le temps pendant lequel une '
+      'réclamation sur une garde peut encore se poser, puis il est effacé. Une '
+      'invitation jamais acceptée disparaît un mois après avoir expiré.';
 
   static const String _dureeDernierAdmin =
       'Si tu es le seul administrateur actif de ta caserne, la suppression est '
@@ -273,9 +281,6 @@ abstract final class DocumentsLegaux {
   static const String _aCompleterDpo =
       'Désignation ou non d\'un délégué à la protection des données.';
 
-  static const String _aCompleterDureeAudit =
-      'Durée de conservation du journal d\'audit et des notifications lues.';
-
   static const String _aCompleterDureeFacturation =
       'Durée de conservation des pièces de facturation de l\'abonnement.';
 
@@ -368,10 +373,10 @@ abstract final class DocumentsLegaux {
           _dureeActif,
           _dureeSuppression,
           _dureeAstreintes,
+          _dureeJournaux,
           _dureeDernierAdmin,
         ],
         aCompleter: <String>[
-          _aCompleterDureeAudit,
           _aCompleterDureeFacturation,
         ],
       ),
