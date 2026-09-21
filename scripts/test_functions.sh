@@ -118,6 +118,14 @@ nettoyer() {
        delete from invitations;
        delete from memberships where left(user_id::text, 4) <> left(station_id::text, 4);
        delete from auth.users where email like 'invite-test-%';
+       -- Le profil ne part plus avec le compte depuis la migration 0026 :
+       -- profiles.id ne référence plus auth.users, justement pour qu'un profil
+       -- anonymisé survive à la suppression d'un compte. Un jeu d'essai doit
+       -- donc balayer derrière lui, sans quoi l'orphelin fausse la section
+       -- suivante. « supprime@… » est le profil qu'une section 24 interrompue
+       -- aurait laissé : cette adresse constante n'appartient à personne.
+       delete from profiles
+        where email like 'invite-test-%' or email = 'supprime@astreinte.invalid';
        delete from notifications where type <> 'invitation';
        delete from notification_outbox;
        delete from push_tokens where token like 'jeton-test-%';
@@ -1137,6 +1145,124 @@ if [ -n "${STRIPE_WEBHOOK_SECRET:-}" ]; then
               current_period_end = null, suspended_at = null" >/dev/null
 else
   echo '    (sans secret : aucun événement ne franchit la signature, voir § 20)'
+fi
+
+# ---------------------------------------------------------------------------
+echo ''
+echo '--- 24. delete-account : anonymiser sans effacer l'"'"'histoire (ticket 007)'
+# ---------------------------------------------------------------------------
+# Le test travaille sur un **compte jetable**, jamais sur un membre du seed : une
+# suppression est définitive et un compte d'authentification ne se recrée pas par
+# un `delete` annulé. Le profil anonymisé, lui, n'a plus d'adresse pour être
+# retrouvé — son identifiant est donc gardé ici, et c'est par lui qu'on nettoie.
+JETABLE_EMAIL="invite-test-suppression@caserne-a.test"
+JETABLE_ID="$(curl -s -X POST "$API_URL/auth/v1/admin/users" \
+  -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" \
+  -H 'content-type: application/json' \
+  -d "{\"email\":\"$JETABLE_EMAIL\",\"password\":\"$MDP\",\"email_confirm\":true}" \
+  | jq -r '.id // empty')"
+
+if [ -z "$JETABLE_ID" ]; then
+  echo '    (compte jetable non créé : section ignorée)' >&2
+  echecs=$((echecs + 1))
+else
+  sql "update profiles
+          set first_name = 'Jean', last_name = 'Jetable', phone = '+33600000999'
+        where id = '$JETABLE_ID';
+       insert into memberships (station_id, user_id, role, status, display_name)
+       values ('$STATION_A', '$JETABLE_ID', 'member', 'active', 'Jean J.');
+       insert into push_tokens (user_id, token, platform)
+       values ('$JETABLE_ID', 'jeton-test-suppression', 'web');
+       insert into availabilities (station_id, user_id, date, slot, status, set_by)
+       values ('$STATION_A', '$JETABLE_ID', current_date, 'day', 'available',
+               '$JETABLE_ID');" >/dev/null
+
+  # Une attribution passée, acceptée : c'est elle que la caserne doit garder. Le
+  # planning du mois peut déjà exister — la section 15 en crée un sur la même
+  # période — et `schedules` n'en accepte qu'un par mois.
+  sql "insert into schedules (station_id, period_id, status, created_by, published_at)
+       select '$STATION_A', '$PERIODE_A', 'published',
+              'aaaaaaaa-0000-4000-8000-000000000100', now()
+        where not exists (select 1 from schedules where period_id = '$PERIODE_A');
+       insert into shifts (station_id, schedule_id, date, slot, required_count)
+       select '$STATION_A', id, current_date, 'night', 1
+         from schedules where period_id = '$PERIODE_A'
+       on conflict (schedule_id, date, slot) do nothing;
+       insert into assignments (station_id, shift_id, user_id, status, created_by,
+                                proposed_at, responded_at)
+       select '$STATION_A', s.id, '$JETABLE_ID', 'accepted',
+              'aaaaaaaa-0000-4000-8000-000000000100', now(), now()
+         from shifts s
+         join schedules sc on sc.id = s.schedule_id
+        where sc.period_id = '$PERIODE_A'
+          and s.date = current_date and s.slot = 'night';" >/dev/null
+
+  # a. Le portier : ni corps, ni identité déclarée. Tout vient du jeton.
+  appeler delete-account - '{}'
+  verifier "sans jeton : 401" "401" "$STATUT"
+  verifier "et le code le dit" "unauthenticated" "$(jq -r '.error.code' <<<"$CORPS")"
+
+  # b. Le dernier administrateur d'une caserne ne part pas.
+  JETON_ADMIN="$(connexion admin@caserne-a.test)"
+  appeler delete-account "$JETON_ADMIN" '{}'
+  verifier "le dernier administrateur est refusé : 409" "409" "$STATUT"
+  verifier "avec le code last_admin" "last_admin" "$(jq -r '.error.code' <<<"$CORPS")"
+  verifier "et la caserne nommée" "CIS Saint-Martin" \
+    "$(jq -r '.error.station' <<<"$CORPS")"
+  verifier "**un refus n'écrit rien** : son appartenance est intacte" "active" \
+    "$(sql "select status from memberships
+             where user_id = 'aaaaaaaa-0000-4000-8000-000000000100'")"
+
+  # c. La suppression elle-même.
+  JETON_JETABLE="$(connexion "$JETABLE_EMAIL")"
+  appeler delete-account "$JETON_JETABLE" '{}'
+  verifier "la suppression aboutit : 200" "200" "$STATUT"
+  verifier "une appartenance désactivée" "1" "$(jq -r '.memberships' <<<"$CORPS")"
+
+  verifier "le compte d'authentification est supprimé" "0" \
+    "$(sql "select count(*) from auth.users where id = '$JETABLE_ID'")"
+  verifier "le profil reste, anonymisé" "Membre supprimé" \
+    "$(sql "select trim(first_name || ' ' || last_name)
+              from profiles where id = '$JETABLE_ID'")"
+  verifier "l'adresse devient non routable" "supprime@astreinte.invalid" \
+    "$(sql "select email from profiles where id = '$JETABLE_ID'")"
+  verifier "le téléphone est effacé" "" \
+    "$(sql "select coalesce(phone, '') from profiles where id = '$JETABLE_ID'")"
+  verifier "l'appartenance est désactivée" "disabled" \
+    "$(sql "select status from memberships where user_id = '$JETABLE_ID'")"
+  verifier "le surnom de caserne est effacé" "" \
+    "$(sql "select coalesce(display_name, '') from memberships
+             where user_id = '$JETABLE_ID'")"
+  verifier "les disponibilités sont effacées" "0" \
+    "$(sql "select count(*) from availabilities where user_id = '$JETABLE_ID'")"
+  verifier "les appareils sont effacés" "0" \
+    "$(sql "select count(*) from push_tokens where user_id = '$JETABLE_ID'")"
+
+  # d. **Le critère d'acceptation du ticket.**
+  verifier "l'attribution passée subsiste" "1" \
+    "$(sql "select count(*) from assignments
+             where user_id = '$JETABLE_ID' and status = 'accepted'")"
+  verifier "et elle se lit « Membre supprimé »" "Membre supprimé" \
+    "$(sql "select trim(p.first_name || ' ' || p.last_name)
+              from assignments a join profiles p on p.id = a.user_id
+             where a.user_id = '$JETABLE_ID'")"
+  verifier "la suppression est tracée dans la caserne" "1" \
+    "$(sql "select count(*) from audit_log
+             where entity_id = '$JETABLE_ID' and action = 'account.deleted'")"
+
+  # e. Le jeton d'un compte supprimé n'ouvre plus rien.
+  appeler delete-account "$JETON_JETABLE" '{}'
+  verifier "le jeton d'un compte supprimé est refusé" "401" "$STATUT"
+
+  # Remise du décor : le compte jetable ne laisse rien derrière lui. Le planning
+  # et son créneau partent avec lui — `nettoyer` en fait autant à la sortie.
+  sql "alter table schedules disable trigger schedules_guard_suppression;
+       delete from assignments where user_id = '$JETABLE_ID';
+       delete from schedules where period_id = '$PERIODE_A';
+       alter table schedules enable trigger schedules_guard_suppression;
+       delete from audit_log where entity_id = '$JETABLE_ID';
+       delete from memberships where user_id = '$JETABLE_ID';
+       delete from profiles where id = '$JETABLE_ID';" >/dev/null
 fi
 
 # ---------------------------------------------------------------------------

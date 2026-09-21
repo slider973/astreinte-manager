@@ -110,6 +110,14 @@ create table profiles (
 Créé par trigger sur `auth.users` à l'inscription. `email` est dupliqué pour les jointures
 sans toucher au schéma `auth`.
 
+**`id` n'a pas de contrainte de clé étrangère** depuis la migration `0026` (ticket 007). Elle
+existait — `references auth.users(id) on delete cascade` — et elle rendait la suppression de
+compte impossible à tenir : supprimer le compte d'authentification effaçait le profil, qui
+cascadait sur `assignments` et emportait **les attributions passées**, que le produit promet de
+ne jamais supprimer (`docs/PRD.md § 7` règle 6). Un profil anonymisé survit donc à son compte : il
+est ce qui reste du membre dans l'histoire de la caserne. La création reste inchangée
+(`handle_new_user`, et `profiles_insert_self` qui n'autorise que `id = auth.uid()`).
+
 ### 2.3 `memberships` — appartenance à une caserne
 
 ```sql
@@ -868,6 +876,27 @@ deux rôles sur toute fonction créée dans `public`, qu'un simple `revoke from 
 retire pas. Sans ce verrou, un admin lirait le token en RPC PostgREST — celui-là même que
 `0008` a retiré de son `grant` de `select`.
 
+### Suppression de compte (migration `0026`, ticket 007)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `delete_own_account` | `(p_user_id uuid) returns jsonb` `security definer`, **réservée à `service_role`** | Anonymise le profil en « Membre supprimé » (adresse non routable, téléphone effacé, `push_enabled` à faux), désactive ses appartenances et efface leur surnom, supprime disponibilités, préférences de charge, `push_tokens`, `notifications`, invitations en attente à son adresse et ligne `super_admins`, trace `account.deleted` dans le journal de chaque caserne. **Les `assignments` ne sont pas touchées.** Refuse en `{"ok": false, "code": "last_admin", "station": …}` quand l'appelant est le dernier administrateur actif d'une caserne. |
+
+Trois catégories, et la frontière est le produit, pas la technique : **ce qui reste anonymisé**
+(profil, appartenances, et les attributions qui y pendent — l'histoire de la caserne), **ce qui
+part** (les données qui ne décrivent aucune garde tenue), **ce qui ne bouge pas**
+(`audit_log.actor_id`, `assignments.created_by`, `schedules.created_by`,
+`invitations.invited_by`, `availabilities.set_by` : ces colonnes désignent désormais un profil
+anonyme, et c'est précisément pour cela qu'aucune n'est en cascade).
+
+La garde du dernier administrateur est **rejouée ici**, alors que `memberships_guard_admin`
+(`0010`) existe : ce déclencheur laisse passer les écritures serveur, et celle-ci en est une.
+Sans elle, le chef de centre seul à bord emporte sa caserne en partant.
+
+Le paramètre `p_user_id` est ce qui ferme la fonction aux clients : l'Edge Function
+`delete-account` le tire du JWT, jamais du corps de la requête. Même verrou que les fonctions
+d'invitation — `revoke` nommé sur `anon` et `authenticated`.
+
 ## 4. Row Level Security
 
 RLS activé sur toutes les tables. Principes :
@@ -1284,6 +1313,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `stripe-webhook` | Stripe | **Vérifie la signature de l'événement** (HMAC-SHA256 du corps brut, lu sous un plafond d'un mégaoctet, fenêtre de cinq minutes), puis applique les cinq événements de l'abonnement par `subscription_sync`. Un événement non signé, mal signé ou hors de la fenêtre est refusé en 4xx ; un événement **déjà traité** est reconnu par `stripe_events` et n'est pas réappliqué ; sans secret configuré, **tout** est refusé en 503 (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `create-checkout` | app admin | Trois actions pour l'écran « Abonnement » : `state` (statut, tarifs, configuration — **répond même sans compte Stripe**), `checkout` (crée le client si besoin, ouvre la session, rend l'adresse) et `portal` (portail de gestion). Rôle d'administrateur revérifié en base (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `ics-feed` | GET public avec token par membre | Génère le flux calendrier des astreintes acceptées |
+| `delete-account` | app | **Aucun corps** : l'identité vient du JWT. Appelle `delete_own_account` (SQL, atomique) puis supprime le compte `auth.users`. Le profil reste, anonymisé en « Membre supprimé », et **les attributions passées avec lui** (ticket 007, contrat dans `supabase/functions/README.md`) |
 | `export-user-data` | app | Export RGPD en JSON |
 
 ## 8. Tâches planifiées (pg_cron)
@@ -1415,7 +1445,8 @@ Ordre proposé :
 23. `0023_abonnement_stripe.sql` (ticket 029 : `subscription_bootstrap` et son déclencheur, `subscription_sync`, `subscription_set_customer`, `cron_suspend_subscriptions` et la tâche `suspend_subscriptions`)
 24. `0024_gating_suspension.sql` (ticket 030 : `station_access`, deux `notification_type`, `cron_subscription_reminders` et la tâche `subscription_reminders`, `cron_suspend_subscriptions` qui prévient les administrateurs)
 25. `0025_super_admin.sql` (ticket 031 : `is_super_admin()` retiré des trois politiques de `stations`, `station_slug`, `super_admin_stations`, `super_admin_create_station`, `super_admin_set_station_suspended`, `super_admin_support_schedules`, branche super-admin de `create_invitation`)
-26. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
+26. `0026_suppression_compte.sql` (ticket 007 : contrainte `profiles.id → auth.users` retirée pour que le profil anonymisé survive à son compte d'authentification, `delete_own_account`, exécution réservée à `service_role`)
+27. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
     `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des

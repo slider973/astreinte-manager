@@ -96,6 +96,9 @@ nettoyer() {
        delete from memberships where station_id = '$STATION';
        delete from stations where id = '$STATION';
        delete from auth.users where email like '%@concurrence.test';
+       -- Depuis la migration 0026, `profiles` ne pend plus à `auth.users` : le
+       -- profil d'essai ne part plus tout seul, il se supprime ici.
+       delete from profiles where email like '%@concurrence.test';
        drop table if exists concurrence_resultats;
        alter table shifts    enable trigger shifts_guard_suppression;
        alter table schedules enable trigger schedules_guard_suppression;" >/dev/null 2>&1 || true

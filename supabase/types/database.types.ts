@@ -1128,6 +1128,7 @@ export type Database = {
         Args: { p_reference?: string }
         Returns: number
       }
+      delete_own_account: { Args: { p_user_id: string }; Returns: Json }
       est_jour_ferie: { Args: { p_date: string }; Returns: boolean }
       is_admin: { Args: { p_station: string }; Returns: boolean }
       is_member: { Args: { p_station: string }; Returns: boolean }

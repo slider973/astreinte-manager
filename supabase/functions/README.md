@@ -289,6 +289,69 @@ cul-de-sac.
 
 ---
 
+## `delete-account`
+
+La sortie définitive d'un membre. Référence : `docs/PRD.md § 8` (RGPD), `docs/SCHEMA.md § 7`,
+migration `0026`, `design/007-profil.md § 5.3` et `§ 5.4`, ticket 007.
+
+```
+POST /functions/v1/delete-account
+apikey: <clé anon>
+Authorization: Bearer <access_token du membre>
+```
+
+**Aucun corps, et c'est une règle de sécurité, pas une économie.** L'identité vient du JWT,
+vérifiée auprès de GoTrue par `caller()`. Un `user_id` accepté dans la requête ferait de cette
+fonction une porte pour supprimer le compte d'un autre — `verify_jwt` ne dit rien du *qui*, la
+clé anon étant elle-même un JWT valide et publique.
+
+Réponse `200` :
+
+```jsonc
+{
+  "ok": true,
+  "stations": ["uuid"], // les casernes où l'appartenance vient de passer « disabled »
+  "memberships": 1
+}
+```
+
+Deux temps, dans cet ordre :
+
+1. `delete_own_account` (SQL, atomique, migration `0026`) — le profil devient
+   « Membre supprimé », adresse non routable, téléphone effacé, push coupé ; les appartenances
+   passent `disabled` et perdent leur surnom ; disponibilités, préférences de charge, appareils,
+   notifications reçues et invitations en attente à son adresse sont supprimés. **Les attributions
+   passées restent** : c'est l'histoire de la caserne (`docs/PRD.md § 7` règle 6), et elles se
+   lisent désormais sous la mention neutre.
+2. `auth.admin.deleteUser` — le compte d'authentification est supprimé. Il ne l'était pas avant,
+   parce que `profiles.id` ne référence plus `auth.users` (migration `0026`) : c'est exactement ce
+   qui permet au profil anonymisé de survivre.
+
+Si le second temps échoue, la réponse est `500 auth_delete_failed` avec `anonymized: true` : rien
+de nominatif n'est resté en base, mais l'accès n'est pas fermé et il faut le signaler. L'ordre
+inverse produirait la panne symétrique et pire — un compte supprimé, un nom en clair, et plus
+personne pour le nettoyer.
+
+Erreurs :
+
+| Statut | `code`               | Détails joints à `error` |
+| ------ | -------------------- | ------------------------ |
+| 401    | `unauthenticated`    | —                        |
+| 405    | `method_not_allowed` | —                        |
+| 409    | `last_admin`         | `station`                |
+| 409    | `profile_missing`    | —                        |
+| 500    | `auth_delete_failed` | `anonymized: true`       |
+| 500    | `internal_error`     | —                        |
+
+`last_admin` est la seule erreur métier attendue : une caserne garde au moins un administrateur
+actif (même règle que `memberships_guard_admin`, migration `0010`). L'écran nomme la caserne et
+dit la sortie — « nomme quelqu'un d'abord ».
+
+L'export RGPD préalable (`export-user-data`, ticket 034) n'existe pas encore : cette fonction ne
+l'appelle pas et ne l'attend pas.
+
+---
+
 ## `publish-schedule`
 
 Le geste qui fait sortir le planning du bureau du chef de centre. Référence :
