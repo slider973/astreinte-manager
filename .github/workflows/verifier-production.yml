@@ -32,6 +32,13 @@ on:
 permissions:
   contents: read
 
+env:
+  # La même valeur que `.github/workflows/deploy.yml`, et pour la même raison :
+  # ce qui a rejoué les migrations en intégration doit être ce qui les compare à
+  # la production. Deux versions figées à deux endroits finissent par diverger,
+  # et c'est alors le comparateur qui ment.
+  SUPABASE_CLI_VERSION: 2.117.0
+
 jobs:
   ecart:
     name: Le dépôt contre la production
@@ -48,7 +55,7 @@ jobs:
       - name: Installer le CLI Supabase
         uses: supabase/setup-cli@v1
         with:
-          version: 2.117.0
+          version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Vérifier les secrets Supabase
         env:

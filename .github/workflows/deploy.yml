@@ -36,10 +36,20 @@
 # l'exécution : « ce qui est parti en production, et quand » se lit après coup,
 # sans ouvrir de journal.
 #
-# Ce choix reste réversible sans toucher à ce fichier : le travail « base »
-# déclare `environment: production`. Le jour où une migration demandera un regard
-# humain, il suffit d'ajouter un relecteur requis à cet environnement dans
-# Settings → Environments, et la mise en ligne attendra.
+# Ce choix reste réversible sans toucher à ce fichier, et **sans arrêter le
+# reste** : le travail « base » déclare `environment: production-base`, un
+# environnement à lui, quand les trois autres déclarent `production`. Le jour où
+# une migration demandera un regard humain, ajouter un relecteur requis à
+# `production-base` (Settings → Environments) fera attendre les migrations —
+# elles seules. Les fonctions, la configuration et la PWA suivront derrière,
+# puisqu'elles dépendent de « base », mais sans demander chacune leur clic : un
+# relecteur posé sur `production` en réclamerait quatre par mise en ligne.
+#
+# Corollaire à ne pas oublier : les secrets `SUPABASE_*` doivent être des secrets
+# **de dépôt** et non d'environnement. Le travail « verification » appelle
+# `verifier-production.yml`, qui ne déclare aucun `environment:` ; des secrets
+# rangés dans `production` lui seraient invisibles et la vérification s'arrêterait
+# en disant qu'ils manquent (docs/DEPLOIEMENT.md § 3).
 #
 # ## La construction de la PWA
 #
@@ -88,16 +98,32 @@ jobs:
   base:
     name: Base — migrations et secrets Vault
     # Une CI rouge ne se déploie pas. `workflow_dispatch` n'a pas de
-    # `workflow_run`, d'où la seconde branche. Les travaux suivants héritent de
-    # cette condition par `needs` : un travail sauté saute ses dépendants.
+    # `workflow_run`, d'où la seconde branche — mais **seulement depuis `main`**.
+    # « Run workflow » propose toutes les branches du dépôt ; sans ce
+    # `github.ref`, un clic depuis une branche de travail appliquerait ses
+    # migrations en production sans qu'aucune CI les ait jouées, et le
+    # `checkout` ci-dessous les prendrait bien, puisque faute de `workflow_run`
+    # il retombe sur `github.ref`.
+    #
+    # Les quatre travaux suivants n'ont pas de `if` : ils héritent de cette
+    # garde par leurs `needs`, un travail sauté sautant ses dépendants.
+    # « fonctions » dépend de « base », « configuration » et « vercel » de
+    # « fonctions », et « verification » exige explicitement
+    # `needs.base.result != 'skipped'` parce que son `!cancelled()` la ferait
+    # tourner même après un saut.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Déclaré exprès : c'est ici qu'un relecteur requis se branche si l'exécution
-    # à blanc ne suffit plus (voir l'en-tête).
-    environment: production
+    # **Son propre environnement, et c'est tout l'intérêt.** Les trois autres
+    # travaux déclarent `production` ; si `base` le déclarait aussi, ajouter un
+    # relecteur requis à `production` demanderait quatre approbations par mise en
+    # ligne, PWA comprise, pour protéger la seule base. Avec `production-base`,
+    # le garde-fou humain se pose là où il a un sens — Settings → Environments →
+    # production-base → Required reviewers — et ne porte que sur les migrations.
+    # Rien à changer dans ce fichier le jour où il servira.
+    environment: production-base
     steps:
       # Le commit exact que la CI a validé, jamais « la tête de main » : entre
       # les deux, `main` a pu avancer.
