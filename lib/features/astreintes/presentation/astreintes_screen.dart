@@ -16,19 +16,29 @@ import '../../../core/widgets/entete_section.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../domain/astreinte.dart';
 import '../domain/astreintes_providers.dart';
+import '../domain/planning_caserne.dart';
+import '../domain/planning_caserne_providers.dart';
 import 'widgets/bascule_vue.dart';
 import 'widgets/calendrier_astreintes.dart';
 import 'widgets/feuille_astreinte.dart';
 import 'widgets/ligne_astreinte.dart';
 import 'widgets/squelette_astreintes.dart';
+import 'widgets/vue_planning_caserne.dart';
 
-/// **« Mes astreintes »** — l'écran que ce produit affichera le plus souvent
-/// une fois le planning validé.
+/// **« Astreintes »** — l'écran que ce produit affichera le plus souvent une
+/// fois le planning validé.
 ///
-/// Il répond à une seule question — « suis-je d'astreinte, et quand ? » — et il
-/// doit y répondre **sans réseau** : une caserne est un bâtiment de béton dans
-/// une zone rurale (`design/027 § 1`). La source de vérité de l'affichage est
-/// donc le cache local, et la requête vient par-dessus.
+/// Il répond à une question posée à deux échelles — « suis-je d'astreinte, et
+/// quand ? » puis « qui est d'astreinte ? » — et il doit y répondre **sans
+/// réseau** : une caserne est un bâtiment de béton dans une zone rurale
+/// (`design/027 § 1`). La source de vérité de l'affichage est donc le cache
+/// local, et la requête vient par-dessus.
+///
+/// **Les deux portées sont deux filtres d'une même donnée**, pas deux écrans :
+/// même table `assignments`, même politique — mes attributions dès `published`,
+/// celles de toute la caserne dès `validated` (`design/027 § 4`,
+/// `design/023 § 2`). D'où un sélecteur en tête, et non une sixième
+/// destination.
 ///
 /// L'écran vit dans l'onglet 2 de la coquille d'accueil, la destination
 /// « Astreintes », où mène déjà le lien public `/schedule/<période>` d'une
@@ -100,8 +110,24 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
     if (etat == AppLifecycleState.resumed) _rafraichir();
   }
 
+  /// Rafraîchit **la portée affichée**, pas les deux : lire le planning entier
+  /// de la caserne pour quelqu'un qui regarde ses propres dates serait trois
+  /// requêtes pour rien, sur un réseau qu'on sait mauvais.
   void _rafraichir() {
-    unawaited(ref.read(astreintesControllerProvider.notifier).rafraichir());
+    unawaited(
+      ref.read(porteeAstreintesProvider) == PorteeAstreintes.caserne
+          ? ref.read(planningCaserneControllerProvider.notifier).rafraichir()
+          : ref.read(astreintesControllerProvider.notifier).rafraichir(),
+    );
+  }
+
+  void _choisirPortee(PorteeAstreintes portee) {
+    ref.read(porteeAstreintesProvider.notifier).choisir(portee);
+    // La portée qu'on vient d'ouvrir va chercher mieux que son cache, tout de
+    // suite : elle a pu vieillir pendant qu'on regardait l'autre.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _rafraichir();
+    });
   }
 
   void _ouvrir(List<Astreinte> astreintes, HeuresAffichage heures) {
@@ -122,17 +148,17 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
 
   @override
   Widget build(BuildContext context) {
-    final etat = ref.watch(astreintesControllerProvider);
+    final portee = ref.watch(porteeAstreintesProvider);
+    final caserne = portee == PorteeAstreintes.caserne;
     final enLigne = ref.watch(enLigneProvider).value ?? true;
-    final valeur = etat.value;
-
-    // Le bouton « Calendrier » cesse d'être sélectionnable **et** la vue
-    // retombe sur la liste : un bouton sélectionné qui montre autre chose que
-    // ce qu'il nomme est un mensonge.
-    final vue = _calendrierTropGrand ? VueAstreintes.liste : _vue;
 
     return AppScaffold(
-      titre: AppStrings.astreintesTitre,
+      // Le titre suit la portée : la barre d'application est ce qu'un lecteur
+      // d'écran annonce en arrivant, et « Mes astreintes » serait faux de
+      // l'autre côté du sélecteur.
+      titre: caserne
+          ? AppStrings.planningCaserneTitre
+          : AppStrings.astreintesTitre,
       destinations: widget.destinations,
       indexSelectionne: widget.indexSelectionne,
       onDestination: widget.onDestination,
@@ -142,36 +168,48 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
         IconButton(
           onPressed: _rafraichir,
           icon: const Icon(Icons.refresh),
-          tooltip: AppStrings.astreintesRafraichir,
+          tooltip: caserne
+              ? AppStrings.planningCaserneRafraichir
+              : AppStrings.astreintesRafraichir,
         ),
         const BoutonNotifications(),
       ],
-      banniere: _banniere(enLigne: enLigne, valeur: valeur),
-      child: _corps(etat: etat, vue: vue),
+      banniere: caserne
+          ? _banniereCaserne(enLigne: enLigne)
+          : _banniereMoi(enLigne: enLigne),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          BasculePortee(portee: portee, onChoisir: _choisirPortee),
+          const AppDivider(),
+          Expanded(child: caserne ? _corpsCaserne() : _corpsMoi()),
+        ],
+      ),
     );
   }
+
+  /// La ligne de fraîcheur, commune aux deux portées : « Dernière mise à
+  /// jour : il y a 2 h. »
+  String? _fraicheur(DateTime? instant) => instant == null
+      ? null
+      : AppStrings.astreintesFraicheur(
+          // La même horloge que le tri « à venir » / « passé ». Deux horloges
+          // sur un même écran finissent toujours par se contredire.
+          formaterInstantRelatif(
+            instant,
+            maintenant: ref.read(horlogeAstreintesProvider)(),
+          ),
+        );
 
   /// **Une seule bannière à la fois**, par l'ordre de priorité du système.
   ///
   /// Hors ligne, cet écran ne promet pas d'envoyer des modifications — il ne
   /// fait que lire. Ce qu'il dit, c'est l'âge de ce qu'on lit
   /// (`design/027 § 9`).
-  AppBanner? _banniere({
-    required bool enLigne,
-    required EtatAstreintes? valeur,
-  }) {
+  AppBanner? _banniereMoi({required bool enLigne}) {
+    final valeur = ref.watch(astreintesControllerProvider).value;
     if (valeur == null) return null;
-    final fraicheur = valeur.donnees.luLe;
-    final detail = fraicheur == null
-        ? null
-        : AppStrings.astreintesFraicheur(
-            // La même horloge que le tri « à venir » / « passé ». Deux
-            // horloges sur un même écran finissent toujours par se contredire.
-            formaterInstantRelatif(
-              fraicheur,
-              maintenant: ref.read(horlogeAstreintesProvider)(),
-            ),
-          );
+    final detail = _fraicheur(valeur.donnees.luLe);
 
     if (!enLigne) {
       return AppBanner(
@@ -192,6 +230,78 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
     }
 
     return null;
+  }
+
+  /// La même mécanique côté caserne. **Le bloc « planning publié » n'est pas
+  /// ici** : ce fait n'est pas transverse, il décrit le mois affiché, et un
+  /// pompier hors ligne perdrait l'explication dont il a besoin
+  /// (`design/023 § 4`).
+  AppBanner? _banniereCaserne({required bool enLigne}) {
+    final valeur = ref.watch(planningCaserneControllerProvider).value;
+    if (valeur == null) return null;
+    final detail = _fraicheur(valeur.planning?.luLe);
+
+    if (!enLigne) {
+      return AppBanner(
+        variante: AppBannerVariante.horsLigne,
+        texte: AppStrings.astreintesHorsLigne,
+        detail: detail,
+      );
+    }
+
+    // Seulement quand il reste quelque chose de lisible à l'écran : un mois
+    // qui n'a rien du tout porte son échec dans son corps, pas en bandeau.
+    if (valeur.depuisCache && valeur.planning != null) {
+      return AppBanner(
+        variante: AppBannerVariante.attention,
+        texte: AppStrings.planningCaserneNonActualise,
+        detail: detail,
+        libelleAction: AppStrings.actionReessayer,
+        onAction: _rafraichir,
+      );
+    }
+
+    return null;
+  }
+
+  Widget _corpsCaserne() {
+    final etat = ref.watch(planningCaserneControllerProvider);
+
+    if (etat.isLoading && !etat.hasValue) {
+      return const SquelettePlanningCaserne();
+    }
+
+    if (etat.hasError && !etat.hasValue) {
+      final enLigne = ref.read(enLigneProvider).value ?? true;
+      // Le seul cas où l'écran n'a vraiment rien : pas de cache, pas de
+      // réseau. La phrase nomme alors ce qui manque.
+      return enLigne
+          ? EmptyState.erreur(
+              texte: AppStrings.planningCaserneErreurTexte,
+              onAction: _rafraichir,
+            )
+          : EmptyState.horsLigne(onAction: _rafraichir);
+    }
+
+    return VuePlanningCaserne(
+      etat: etat.value ?? const EtatPlanningCaserne(),
+      onMois: (MoisPlanning mois) => unawaited(
+        ref.read(planningCaserneControllerProvider.notifier).allerAu(mois),
+      ),
+      onRafraichir: ref
+          .read(planningCaserneControllerProvider.notifier)
+          .rafraichir,
+      onVersMoi: () => _choisirPortee(PorteeAstreintes.moi),
+    );
+  }
+
+  Widget _corpsMoi() {
+    final etat = ref.watch(astreintesControllerProvider);
+    // Le bouton « Calendrier » cesse d'être sélectionnable **et** la vue
+    // retombe sur la liste : un bouton sélectionné qui montre autre chose que
+    // ce qu'il nomme est un mensonge.
+    final vue = _calendrierTropGrand ? VueAstreintes.liste : _vue;
+    return _corps(etat: etat, vue: vue);
   }
 
   Widget _corps({

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // les fonctionnalités viendraient garnir d'elles-mêmes serait une liste qu'on
 // oublie de garnir, et c'est exactement le défaut qu'on corrige.
 import '../../features/astreintes/data/cache_astreintes.dart';
+import '../../features/astreintes/data/cache_planning_caserne.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/primary_button.dart';
@@ -59,17 +60,18 @@ class DeconnexionController extends Notifier<EtatDeconnexion> {
   /// membre ni celui de sa caserne ne sont plus lisibles : les deux caches
   /// rangent par clé, et une clé qu'on ne sait plus composer ne s'efface pas.
   ///
-  /// Ce qui part : le nom de la caserne (`session.appartenances.…`) et
-  /// l'instantané des astreintes (`astreintes.cache.…`), qui porte en plus
-  /// **les noms des autres membres du créneau**. Sur un téléphone prêté ou
-  /// dans un véhicule partagé, ce sont des données de tiers qui n'ont rien à
-  /// faire là pour la personne suivante — même règle que la destination en
-  /// attente, oubliée elle aussi à la déconnexion (`DESIGN.md § Écarts,
-  /// ticket 024`).
+  /// Ce qui part : le nom de la caserne (`session.appartenances.…`),
+  /// l'instantané des astreintes (`astreintes.cache.…`), qui porte **les noms
+  /// des autres membres du créneau**, et les mois du planning de la caserne
+  /// (`planning.caserne.…`), qui portent **les noms de toute la caserne**. Sur
+  /// un téléphone prêté ou dans un véhicule partagé, ce sont des données de
+  /// tiers qui n'ont rien à faire là pour la personne suivante — même règle que
+  /// la destination en attente, oubliée elle aussi à la déconnexion
+  /// (`DESIGN.md § Écarts, ticket 024`).
   ///
   /// Aucune panne de stockage ne remonte : elles sont déjà avalées par les
-  /// deux dépôts. Un effacement qui échoue ne doit pas retenir quelqu'un dans
-  /// une session qu'il veut quitter.
+  /// dépôts. Un effacement qui échoue ne doit pas retenir quelqu'un dans une
+  /// session qu'il veut quitter.
   Future<void> _oublierLesCaches() async {
     final userId = ref.read(sessionProvider).value?.userId;
     if (userId == null) return;
@@ -80,6 +82,9 @@ class DeconnexionController extends Notifier<EtatDeconnexion> {
     if (stationId == null) return;
     await ref
         .read(cacheAstreintesProvider)
+        .effacer(stationId: stationId, userId: userId);
+    await ref
+        .read(cachePlanningCaserneProvider)
         .effacer(stationId: stationId, userId: userId);
   }
 }

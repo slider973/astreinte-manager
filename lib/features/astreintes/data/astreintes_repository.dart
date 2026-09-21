@@ -33,6 +33,45 @@ class EchecAstreintes implements Exception {
   String toString() => 'EchecAstreintes(${erreur.name})';
 }
 
+/// Vrai quand l'échec est un **défaut de transport** : la requête n'est jamais
+/// partie, ou la réponse n'est jamais arrivée.
+///
+/// Partagé par les deux dépôts de cette fonctionnalité, qui lisent les mêmes
+/// tables sous les mêmes politiques et n'ont donc aucune raison de classer
+/// leurs pannes différemment. Un `PostgrestException` **sans code** est le
+/// signal d'une réponse absente ; avec un code, la base a répondu, et l'écran
+/// n'a pas à promettre qu'un simple « Réessayer » suffira.
+bool echecDeTransport(Object echec) {
+  if (echec is PostgrestException) return echec.code == null;
+  if (echec is AuthException) return false;
+  return true;
+}
+
+/// Les heures d'affichage d'une caserne.
+///
+/// La lecture passe par [ParametresCaserne], seul lecteur légitime du document
+/// `settings` : un second lecteur des mêmes clés divergerait du premier au
+/// premier réglage ajouté. Hors de toute classe parce que les deux dépôts de
+/// cette fonctionnalité en ont besoin, et qu'une seconde copie divergerait
+/// pour la même raison.
+Future<HeuresAffichage> lireHeuresAffichage(
+  SupabaseClient client,
+  String stationId,
+) async {
+  final ligne = await client
+      .from('stations')
+      .select('id, name, timezone, settings')
+      .eq('id', stationId)
+      .maybeSingle();
+  if (ligne == null) return HeuresAffichage.defaut;
+
+  final parametres = ParametresCaserne.depuisJson(ligne);
+  return HeuresAffichage(
+    debutJour: parametres.debutJour,
+    finJour: parametres.finJour,
+  );
+}
+
 /// Tout ce que l'écran « Mes astreintes » sait faire.
 abstract interface class AstreintesRepository {
   /// Les astreintes **acceptées** de ce membre, ses équipiers quand le
@@ -65,7 +104,7 @@ class SupabaseAstreintesRepository implements AstreintesRepository {
     required DateTime depuis,
   }) async {
     try {
-      final heures = await _heures(stationId);
+      final heures = await lireHeuresAffichage(_client, stationId);
 
       // **La borne porte sur `shifts.date`, pas sur `assignments`.**
       // `assignments` ne connaît que `proposed_at`, qui est la date de la
@@ -107,26 +146,6 @@ class SupabaseAstreintesRepository implements AstreintesRepository {
     } on Object catch (echec) {
       throw EchecAstreintes(_traduire(echec));
     }
-  }
-
-  /// Les heures d'affichage de la caserne. Une ligne, quatre colonnes.
-  ///
-  /// La lecture passe par [ParametresCaserne], seul lecteur légitime du
-  /// document `settings` : un second lecteur des mêmes clés divergerait du
-  /// premier au premier réglage ajouté.
-  Future<HeuresAffichage> _heures(String stationId) async {
-    final ligne = await _client
-        .from('stations')
-        .select('id, name, timezone, settings')
-        .eq('id', stationId)
-        .maybeSingle();
-    if (ligne == null) return HeuresAffichage.defaut;
-
-    final parametres = ParametresCaserne.depuisJson(ligne);
-    return HeuresAffichage(
-      debutJour: parametres.debutJour,
-      finJour: parametres.finJour,
-    );
   }
 
   /// Les autres membres acceptés, par identifiant de créneau.
@@ -195,13 +214,8 @@ class SupabaseAstreintesRepository implements AstreintesRepository {
 
   static ErreurAstreintes _traduire(Object echec) {
     if (echec is EchecAstreintes) return echec.erreur;
-    if (echec is PostgrestException) {
-      // Un code absent signale une réponse qui n'est jamais arrivée.
-      return echec.code == null
-          ? ErreurAstreintes.reseau
-          : ErreurAstreintes.inconnue;
-    }
-    if (echec is AuthException) return ErreurAstreintes.inconnue;
-    return ErreurAstreintes.reseau;
+    return echecDeTransport(echec)
+        ? ErreurAstreintes.reseau
+        : ErreurAstreintes.inconnue;
   }
 }

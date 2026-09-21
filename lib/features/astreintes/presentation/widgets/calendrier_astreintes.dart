@@ -8,6 +8,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../domain/astreinte.dart';
+import 'barre_mois.dart';
 
 /// **La vue calendrier** : sept colonnes, du lundi au dimanche, un mois à la
 /// fois.
@@ -89,14 +90,18 @@ class CalendrierAstreintes extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _BarreMois(
-          mois: mois,
+        BarreMois(
+          libelle: AppStrings.moisNomEtAnnee(mois.month, mois.year),
           onPrecedent: mois.isAfter(premier)
               ? () => onMois(DateTime(mois.year, mois.month - 1))
               : null,
           onSuivant: mois.isBefore(dernier)
               ? () => onMois(DateTime(mois.year, mois.month + 1))
               : null,
+          libellePrecedent: AppStrings.astreintesMoisPrecedent,
+          libelleSuivant: AppStrings.astreintesMoisSuivant,
+          raisonPrecedent: AppStrings.astreintesMoisAvantDebut,
+          raisonSuivant: AppStrings.astreintesMoisApresFin,
         ),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: marge),
@@ -164,59 +169,6 @@ class CalendrierAstreintes extends StatelessWidget {
 
 bool _memeJour(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
-
-/// « ‹ Octobre 2026 › ». Les flèches font 48 dp et s'annoncent.
-class _BarreMois extends StatelessWidget {
-  const _BarreMois({
-    required this.mois,
-    required this.onPrecedent,
-    required this.onSuivant,
-  });
-
-  final DateTime mois;
-  final VoidCallback? onPrecedent;
-  final VoidCallback? onSuivant;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      child: Row(
-        children: <Widget>[
-          IconButton(
-            onPressed: onPrecedent,
-            icon: const Icon(Icons.chevron_left),
-            tooltip: onPrecedent == null
-                ? AppStrings.astreintesMoisAvantDebut
-                : AppStrings.astreintesMoisPrecedent,
-          ),
-          Expanded(
-            child: Semantics(
-              header: true,
-              child: Text(
-                AppStrings.moisNomEtAnnee(mois.month, mois.year),
-                style: theme.textTheme.titleLarge,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-          IconButton(
-            onPressed: onSuivant,
-            icon: const Icon(Icons.chevron_right),
-            tooltip: onSuivant == null
-                ? AppStrings.astreintesMoisApresFin
-                : AppStrings.astreintesMoisSuivant,
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// Les initiales des sept jours. Décoratives : la sémantique de chaque case
 /// dit le jour en toutes lettres.

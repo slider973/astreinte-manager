@@ -17,7 +17,10 @@ import 'package:astreinte_sp/core/session/session_utilisateur.dart';
 import 'package:astreinte_sp/core/supabase/supabase_bootstrap.dart';
 import 'package:astreinte_sp/features/astreintes/data/astreintes_repository.dart';
 import 'package:astreinte_sp/features/astreintes/data/cache_astreintes.dart';
+import 'package:astreinte_sp/features/astreintes/data/cache_planning_caserne.dart';
+import 'package:astreinte_sp/features/astreintes/data/planning_caserne_repository.dart';
 import 'package:astreinte_sp/features/astreintes/domain/astreintes_providers.dart';
+import 'package:astreinte_sp/features/astreintes/domain/planning_caserne_providers.dart';
 import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
 import 'package:astreinte_sp/features/dispos/data/file_locale.dart';
 import 'package:astreinte_sp/features/dispos/domain/dispos_providers.dart';
@@ -52,6 +55,7 @@ import 'faux_dispos.dart';
 import 'faux_invitations.dart';
 import 'faux_notifications.dart';
 import 'faux_planning.dart';
+import 'faux_planning_caserne.dart';
 import 'faux_propositions.dart';
 import 'faux_push.dart';
 import 'faux_suivi.dart';
@@ -229,6 +233,8 @@ Future<AppMontee> monterApp(
   PropositionsRepository? propositions,
   AstreintesRepository? astreintes,
   CacheAstreintes? cacheAstreintes,
+  PlanningCaserneRepository? planningCaserne,
+  CachePlanningCaserne? cachePlanningCaserne,
   DateTime Function()? horloge,
   DisposRepository? dispos,
   FileLocale? fileLocale,
@@ -312,6 +318,16 @@ Future<AppMontee> monterApp(
         // test attendrait un canal de plateforme qui ne répond jamais.
         cacheAstreintesProvider.overrideWithValue(
           cacheAstreintes ?? CacheAstreintesMemoire(),
+        ),
+        // « La caserne » (ticket 023) est la seconde portée du même écran, et
+        // son cache est effacé par **toute** déconnexion : sans faux, chaque
+        // test de déconnexion attendrait un canal de plateforme qui ne répond
+        // jamais.
+        planningCaserneRepositoryProvider.overrideWithValue(
+          planningCaserne ?? FauxPlanningCaserneRepository(),
+        ),
+        cachePlanningCaserneProvider.overrideWithValue(
+          cachePlanningCaserne ?? CachePlanningCaserneMemoire(),
         ),
         if (horloge != null)
           horlogeAstreintesProvider.overrideWithValue(horloge),

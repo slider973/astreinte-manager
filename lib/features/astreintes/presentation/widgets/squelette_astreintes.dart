@@ -55,3 +55,47 @@ class SqueletteAstreintes extends StatelessWidget {
     ),
   );
 }
+
+/// Le squelette du registre de la caserne : **à la forme d'une journée**, en-tête
+/// de date puis deux créneaux nommés (`DESIGN.md § Don't` : jamais un indicateur
+/// circulaire au milieu de l'écran).
+///
+/// Il n'apparaît que lorsqu'il n'y a **rien en cache pour ce mois-là** : dès
+/// qu'un mois est gardé, c'est lui qu'on montre, et la requête part derrière.
+class SquelettePlanningCaserne extends StatelessWidget {
+  const SquelettePlanningCaserne({super.key, this.journees = 3});
+
+  final int journees;
+
+  @override
+  Widget build(BuildContext context) => LoadingSkeleton(
+    child: SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (var journee = 0; journee < journees; journee++) ...<Widget>[
+            const SkeletonLigne(largeur: 180, hauteur: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.lg),
+            for (var creneau = 0; creneau < 2; creneau++) ...<Widget>[
+              const Row(
+                children: <Widget>[
+                  SkeletonLigne(largeur: 72, hauteur: AppTouch.badgeCompact),
+                  SizedBox(width: AppSpacing.sm),
+                  SkeletonLigne(largeur: 110),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              const SkeletonLigne(largeur: 210),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+          ],
+        ],
+      ),
+    ),
+  );
+}
