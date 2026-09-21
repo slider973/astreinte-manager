@@ -897,6 +897,36 @@ Le paramètre `p_user_id` est ce qui ferme la fonction aux clients : l'Edge Func
 `delete-account` le tire du JWT, jamais du corps de la requête. Même verrou que les fonctions
 d'invitation — `revoke` nommé sur `anon` et `authenticated`.
 
+### Export RGPD (migration `0027`, ticket 034)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `export_own_data` | `(p_user_id uuid) returns jsonb` `security definer` `stable`, **réservée à `service_role`** | Rend en un seul instantané tout ce que la base sait de la personne : profil, casernes, appartenances, disponibilités, préférences de charge, attributions, notifications, appareils, invitations reçues et envoyées, actes d'audit la concernant et actes qu'elle a elle-même posés, plus `editeur_du_produit`. Accompagné d'un `inventaire` qui compte chaque section, **y compris vide**. Rend `{"ok": false, "code": "profile_missing"}` pour un identifiant inconnu. |
+
+**Rien d'une autre personne n'en sort**, et c'est la règle qui a décidé de la
+forme de chaque section : un export livré est un fichier qui voyage. L'administrateur
+qui a saisi une disponibilité à ma place est un **booléen**
+(`saisie_par_un_administrateur`), pas un nom ; l'attribution qui a remplacé la mienne
+est un **booléen** (`remplacee`), pas un identifiant ; l'adresse que j'ai invitée est
+**masquée** (`mask_email`, `0009`) ; le `data` d'une ligne d'`audit_log` est filtré par
+**liste blanche** — une liste noire laisserait passer la prochaine clé ajoutée par une
+migration ; et `push_tokens.token` est tronqué à ses douze derniers caractères, assez
+pour reconnaître un appareil, pas assez pour en réutiliser un.
+
+Ce que l'export **recopie** sans que ce soit une donnée personnelle : le nom de la
+caserne, la date et le créneau d'une attribution, l'année et le mois d'une préférence,
+le statut du planning. Sans eux le fichier est une liste d'UUID, donc illisible, donc
+inutile. Ce qu'il **écarte** : `periods`, `shifts`, `schedules`, `stations.settings`
+(configuration de caserne, identique pour tous ses membres), `subscriptions` et
+`stripe_events` (la caserne et son prestataire de paiement, aucun membre),
+`notification_outbox` (file technique multi-casernes, dont ce qui me concernait a
+déjà produit une ligne `notifications`) et `invitations.token` (porteur de droits).
+
+Même verrou que `delete_own_account` : le paramètre `p_user_id` est ce qui ferme la
+fonction aux clients, l'Edge Function `export-user-data` le tire du JWT, `revoke` est
+nommé sur `anon` et `authenticated`. Le registre des traitements est dans
+`docs/RGPD.md`.
+
 ## 4. Row Level Security
 
 RLS activé sur toutes les tables. Principes :
@@ -1314,7 +1344,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `create-checkout` | app admin | Trois actions pour l'écran « Abonnement » : `state` (statut, tarifs, configuration — **répond même sans compte Stripe**), `checkout` (crée le client si besoin, ouvre la session, rend l'adresse) et `portal` (portail de gestion). Rôle d'administrateur revérifié en base (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `ics-feed` | GET public avec token par membre | Génère le flux calendrier des astreintes acceptées |
 | `delete-account` | app | **Aucun corps** : l'identité vient du JWT. Appelle `delete_own_account` (SQL, atomique) puis supprime le compte `auth.users`. Le profil reste, anonymisé en « Membre supprimé », et **les attributions passées avec lui** (ticket 007, contrat dans `supabase/functions/README.md`) |
-| `export-user-data` | app | Export RGPD en JSON |
+| `export-user-data` | app | **Aucun corps** : l'identité vient du JWT, et un `user_id` envoyé quand même est ignoré. Appelle `export_own_data` (SQL, un seul instantané), y ajoute les trois faits du compte d'authentification (`auth.admin.getUserById` — le SQL du projet ne touche pas au schéma `auth`) et rend le tout en JSON. Le fichier est composé par le client : servir un `Content-Disposition` mettrait le jeton d'accès dans l'URL (ticket 034, contrat dans `supabase/functions/README.md`) |
 
 ## 8. Tâches planifiées (pg_cron)
 
@@ -1446,7 +1476,8 @@ Ordre proposé :
 24. `0024_gating_suspension.sql` (ticket 030 : `station_access`, deux `notification_type`, `cron_subscription_reminders` et la tâche `subscription_reminders`, `cron_suspend_subscriptions` qui prévient les administrateurs)
 25. `0025_super_admin.sql` (ticket 031 : `is_super_admin()` retiré des trois politiques de `stations`, `station_slug`, `super_admin_stations`, `super_admin_create_station`, `super_admin_set_station_suspended`, `super_admin_support_schedules`, branche super-admin de `create_invitation`)
 26. `0026_suppression_compte.sql` (ticket 007 : contrainte `profiles.id → auth.users` retirée pour que le profil anonymisé survive à son compte d'authentification, `delete_own_account`, exécution réservée à `service_role`)
-27. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
+27. `0027_export_rgpd.sql` (ticket 034 : `export_own_data`, exécution réservée à `service_role`)
+28. les tâches d'entretien restantes du § 8, une migration par ticket : `archive_schedules` et
     `prune_notifications`
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
@@ -1480,7 +1511,9 @@ et `0022` par `supabase/tests/notifications_test.sql`, les rappels de saisie de 
 `supabase/tests/matrice_admin_test.sql`, la publication de `0019` par
 `supabase/tests/publication_test.sql`, la réattribution de `0020` par
 `supabase/tests/reattribution_test.sql` et les relances automatiques de `0021` par
-`supabase/tests/assignment_reminders_test.sql`, joués par le même script. La logique pure
+`supabase/tests/assignment_reminders_test.sql`, la suppression de compte de `0026` par
+`supabase/tests/suppression_compte_test.sql` et l'export RGPD de `0027` par
+`supabase/tests/export_rgpd_test.sql`, joués par le même script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge
