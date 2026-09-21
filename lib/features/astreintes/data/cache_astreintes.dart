@@ -31,6 +31,15 @@ abstract interface class CacheAstreintes {
     required String userId,
     required MesAstreintes donnees,
   });
+
+  /// Oublie l'instantané de ce membre dans cette caserne.
+  ///
+  /// Appelée à la déconnexion, **avant** la fermeture de session : après, ni
+  /// l'identifiant du membre ni celui de la caserne ne sont plus lisibles. Ce
+  /// document porte des dates de garde **et les noms des autres membres du
+  /// créneau** : des données de tiers, qui n'ont rien à faire sur le téléphone
+  /// une fois la personne partie (`DESIGN.md § Écarts, ticket 024`).
+  Future<void> effacer({required String stationId, required String userId});
 }
 
 /// Implémentation `shared_preferences` — `localStorage` sur le web.
@@ -87,6 +96,20 @@ class CacheAstreintesPartage implements CacheAstreintes {
     }
   }
 
+  @override
+  Future<void> effacer({
+    required String stationId,
+    required String userId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(cleDe(stationId: stationId, userId: userId));
+    } on Object {
+      // Même politique que partout : une panne de stockage ne fait pas échouer
+      // une déconnexion. La session, elle, est bien fermée.
+    }
+  }
+
   /// Le document rangé. Public pour que les tests puissent vérifier ce qui est
   /// gardé sans passer par le stockage de plateforme.
   static Map<String, dynamic> composer(MesAstreintes donnees) =>
@@ -137,13 +160,42 @@ class CacheAstreintesPartage implements CacheAstreintes {
 }
 
 /// Implémentation en mémoire, pour les tests.
+///
+/// **Elle range par caserne et par membre, exactement comme la vraie.** Une
+/// mémoire qui rendrait le même instantané à n'importe qui ne pourrait
+/// attraper aucune régression de cloisonnement — et ce document porte les noms
+/// des autres membres du créneau.
 class CacheAstreintesMemoire implements CacheAstreintes {
-  CacheAstreintesMemoire([this.garde]);
+  CacheAstreintesMemoire([
+    MesAstreintes? garde,
+    String stationId = stationDeTestId,
+    String userId = membreDeTestUserId,
+  ]) : _parMembre = <String, MesAstreintes>{
+         _cle(stationId, userId): ?garde,
+       };
 
-  MesAstreintes? garde;
+  /// La caserne et le membre des jeux de test du projet
+  /// (`test/support/faux_auth.dart`). Tout autre couple ne lit rien.
+  static const String stationDeTestId =
+      'aaaaaaaa-0000-4000-8000-000000000001';
+  static const String membreDeTestUserId =
+      'aaaaaaaa-0000-4000-8000-000000000101';
+
+  static String _cle(String stationId, String userId) => '$stationId.$userId';
+
+  final Map<String, MesAstreintes> _parMembre;
 
   int lectures = 0;
   int ecritures = 0;
+  int effacements = 0;
+
+  /// L'instantané du couple par défaut, tel que les tests l'inspectent.
+  MesAstreintes? get garde =>
+      _parMembre[_cle(stationDeTestId, membreDeTestUserId)];
+
+  /// Les clés encore occupées. Un test de déconnexion vérifie qu'elle est
+  /// vide.
+  Set<String> get clesGardees => _parMembre.keys.toSet();
 
   @override
   Future<MesAstreintes?> lire({
@@ -151,7 +203,7 @@ class CacheAstreintesMemoire implements CacheAstreintes {
     required String userId,
   }) async {
     lectures++;
-    return garde;
+    return _parMembre[_cle(stationId, userId)];
   }
 
   @override
@@ -161,7 +213,16 @@ class CacheAstreintesMemoire implements CacheAstreintes {
     required MesAstreintes donnees,
   }) async {
     ecritures++;
-    garde = donnees;
+    _parMembre[_cle(stationId, userId)] = donnees;
+  }
+
+  @override
+  Future<void> effacer({
+    required String stationId,
+    required String userId,
+  }) async {
+    effacements++;
+    _parMembre.remove(_cle(stationId, userId));
   }
 }
 

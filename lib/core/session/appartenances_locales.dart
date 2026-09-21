@@ -26,6 +26,15 @@ abstract interface class AppartenancesLocales {
   /// Remplace ce qui est gardé. Instantané, pas file : il n'y a ni fusion ni
   /// conflit.
   Future<void> ecrire(String userId, List<Appartenance> appartenances);
+
+  /// Oublie tout ce qui est gardé pour cet utilisateur.
+  ///
+  /// Appelée à la déconnexion, **avant** la fermeture de session : après, il
+  /// n'y a plus d'identifiant à qui rattacher la clé. Le nom de la caserne est
+  /// une donnée de la personne qui part ; sur un téléphone prêté ou dans un
+  /// véhicule partagé, il n'a rien à faire là pour la suivante
+  /// (`DESIGN.md § Écarts, ticket 024`).
+  Future<void> effacer(String userId);
 }
 
 /// Implémentation `shared_preferences`.
@@ -66,6 +75,17 @@ class AppartenancesLocalesPartagees implements AppartenancesLocales {
     }
   }
 
+  @override
+  Future<void> effacer(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(cleDe(userId));
+    } on Object {
+      // Même politique que partout : une panne de stockage ne fait pas échouer
+      // une déconnexion. La session, elle, est bien fermée.
+    }
+  }
+
   /// Le document rangé. Public pour que les tests vérifient le format sans
   /// passer par le stockage de plateforme.
   static Map<String, dynamic> composer(List<Appartenance> appartenances) =>
@@ -86,14 +106,14 @@ class AppartenancesLocalesPartagees implements AppartenancesLocales {
 
   /// Relit un document.
   ///
-  /// **Tout ce qui sort d'ici est un simple membre.** Un rôle qu'on n'a pas pu
-  /// revérifier n'accorde aucun privilège : c'est la règle déjà écrite dans
-  /// `RoleMembre.depuisSql`, appliquée à une valeur qu'on ne peut pas
-  /// confirmer plutôt qu'à une valeur qu'on ne comprend pas. Conséquence
-  /// assumée : un chef de centre hors ligne perd l'onglet « Admin », qui ne
-  /// lui servirait de toute façon qu'à ouvrir des listes vides et des
-  /// formulaires qui échouent (`DESIGN.md § Écarts, ticket 024`). Il revient
-  /// dès que le réseau revient.
+  /// **Tout ce qui sort d'ici est un simple membre**, puisque le rôle n'y est
+  /// même pas écrit. C'est la seconde ceinture : la première est
+  /// `appartenancesProvider`, qui rétrograde tout ce qui vient du stockage
+  /// quelle que soit l'implémentation branchée (`Appartenance.commeMembre`).
+  /// Conséquence assumée : un chef de centre hors ligne perd l'onglet
+  /// « Admin », qui ne lui servirait de toute façon qu'à ouvrir des listes
+  /// vides et des formulaires qui échouent (`DESIGN.md § Écarts, ticket 024`).
+  /// Il revient dès que le réseau revient.
   static List<Appartenance> relire(String? brut) {
     if (brut == null) return const <Appartenance>[];
     try {
@@ -125,23 +145,55 @@ class AppartenancesLocalesPartagees implements AppartenancesLocales {
 }
 
 /// Implémentation en mémoire, pour les tests.
+///
+/// **Elle range par utilisateur, exactement comme la vraie.** Une mémoire qui
+/// rendrait le même contenu à n'importe qui ne pourrait attraper aucune
+/// régression de cloisonnement — et c'est précisément le cloisonnement qu'on
+/// vérifie ici.
 class AppartenancesLocalesMemoire implements AppartenancesLocales {
-  AppartenancesLocalesMemoire([List<Appartenance>? gardees])
-    : _gardees = <Appartenance>[...?gardees];
+  AppartenancesLocalesMemoire([
+    List<Appartenance>? gardees,
+    String userId = sessionMembreDeTestUserId,
+  ]) : _parUtilisateur = <String, List<Appartenance>>{
+         if (gardees != null && gardees.isNotEmpty)
+           userId: <Appartenance>[...gardees],
+       };
 
-  List<Appartenance> _gardees;
+  /// L'utilisateur auquel le raccourci de construction rattache ses
+  /// appartenances. C'est celui des jeux de test du projet
+  /// (`test/support/faux_auth.dart`) ; tout autre identifiant ne lit rien.
+  static const String sessionMembreDeTestUserId =
+      'aaaaaaaa-0000-4000-8000-000000000101';
+
+  final Map<String, List<Appartenance>> _parUtilisateur;
 
   int ecritures = 0;
+  int effacements = 0;
 
-  List<Appartenance> get gardees => List<Appartenance>.unmodifiable(_gardees);
+  /// Les clés encore occupées. Un test de déconnexion vérifie qu'elle est
+  /// vide.
+  Set<String> get utilisateursGardes => _parUtilisateur.keys.toSet();
 
   @override
-  Future<List<Appartenance>> lire(String userId) async => gardees;
+  Future<List<Appartenance>> lire(String userId) async =>
+      List<Appartenance>.unmodifiable(
+        _parUtilisateur[userId] ?? const <Appartenance>[],
+      );
 
   @override
   Future<void> ecrire(String userId, List<Appartenance> appartenances) async {
     ecritures++;
-    _gardees = <Appartenance>[...appartenances];
+    if (appartenances.isEmpty) {
+      _parUtilisateur.remove(userId);
+      return;
+    }
+    _parUtilisateur[userId] = <Appartenance>[...appartenances];
+  }
+
+  @override
+  Future<void> effacer(String userId) async {
+    effacements++;
+    _parUtilisateur.remove(userId);
   }
 }
 

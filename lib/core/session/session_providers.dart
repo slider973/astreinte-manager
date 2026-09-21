@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../supabase/supabase_bootstrap.dart';
 import 'appartenance.dart';
 import 'appartenances_locales.dart';
+import 'auth_erreur.dart';
 import 'auth_repository.dart';
 import 'etat_auth.dart';
 import 'membership_repository.dart';
@@ -32,13 +33,23 @@ final StreamProvider<SessionUtilisateur?> sessionProvider =
 /// Les appartenances de l'utilisateur connecté, relues à chaque changement de
 /// session. Liste vide si personne n'est connecté.
 ///
-/// **Une lecture qui échoue retombe sur ce qui est gardé sur l'appareil**
+/// **Un échec de transport retombe sur ce qui est gardé sur l'appareil**
 /// (ticket 027). Sans ce repli, un démarrage à froid sans réseau s'arrête sur
 /// « Pas de connexion » : la session se restaure toute seule, mais la caserne
 /// manque, et aucun écran de consultation n'est atteint. Le cache d'astreintes
 /// ne servirait alors jamais dans la seule scène qui le justifie — une remise
 /// sans couverture. Ce qui revient du stockage est **toujours un simple
 /// membre** (`AppartenancesLocalesPartagees.relire`).
+///
+/// **Le repli ne couvre que [AuthErreur.reseau].** Un refus, un jeton périmé,
+/// une réponse illisible remontent tels quels : masquer une révocation
+/// derrière un instantané périmé ferait croire à quelqu'un qu'il appartient
+/// encore à une caserne qui l'a retiré. Un échec de transport est la seule
+/// panne dont on sait qu'elle ne dit rien sur les droits.
+///
+/// La rétrogradation est appliquée **ici**, et pas seulement à la relecture du
+/// document : la garantie ne doit pas dépendre de l'implémentation de stockage
+/// qu'on a branchée.
 ///
 /// Si rien n'est gardé non plus, l'échec est relancé tel quel : l'écran de
 /// démarrage propose de réessayer, il n'annonce jamais « aucune caserne ».
@@ -54,10 +65,13 @@ final FutureProvider<List<Appartenance>> appartenancesProvider =
             .mesAppartenances(session.userId);
         await local.ecrire(session.userId, appartenances);
         return appartenances;
-      } on Object {
+      } on AuthEchec catch (echec) {
+        if (echec.erreur != AuthErreur.reseau) rethrow;
         final gardees = await local.lire(session.userId);
         if (gardees.isEmpty) rethrow;
-        return gardees;
+        return <Appartenance>[
+          for (final gardee in gardees) gardee.commeMembre,
+        ];
       }
     });
 
