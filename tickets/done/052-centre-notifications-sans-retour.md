@@ -4,8 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 026
 - **Branche** : `feat/052-centre-notifications-sans-retour`
-- **PR** : —
-- **Statut** : en cours depuis 2026-09-21
+- **PR** : https://github.com/slider973/astreinte-manager/pull/47
+- **Statut** : terminé le 2026-09-21 (PR créée)
 
 ## Contexte
 

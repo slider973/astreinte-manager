@@ -5,6 +5,7 @@ import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/bouton_retour.dart';
 import '../domain/document_legal.dart';
 import '../domain/documents_legaux.dart';
 
@@ -49,15 +50,16 @@ class DocumentLegalScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        // Le geste de retour du navigateur marche déjà ; ce bouton existe pour
-        // la PWA installée, où il n'y a pas de barre d'adresse — et pour qui
-        // arrive ici par une URL collée, auquel cas il ramène à l'accueil
-        // plutôt que de ne rien faire.
-        leading: BackButton(
-          onPressed: () => context.canPop()
-              ? context.pop()
-              : context.goNamed(AppRoutes.accueilName),
-        ),
+        // Le geste de retour du navigateur marche déjà ; cette sortie existe
+        // pour la PWA installée, où il n'y a pas de barre d'adresse — et pour
+        // qui arrive ici par une URL collée, auquel cas elle ramène à
+        // l'accueil plutôt que de ne rien faire, et **elle le dit**.
+        //
+        // La flèche faite main de cet écran est devenue `BoutonRetour`
+        // (ticket 052) : le centre de notifications avait le même besoin, et
+        // deux flèches à repli écrites deux fois divergent toujours.
+        leading: const BoutonRetour(),
+        leadingWidth: BoutonRetour.largeur(context),
         title: Text(document.titre),
       ),
       body: SafeArea(
@@ -220,7 +222,12 @@ class _LienVersLAutre extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: AppTouch.cible),
         child: TextButton.icon(
-          onPressed: () => context.goNamed(route),
+          // **Un mouvement latéral, pas un détour dans le détour.** Les deux
+          // documents se répondent : passer de l'un à l'autre remplace le
+          // sommet de la pile au lieu de l'empiler, donc la flèche ramène
+          // toujours à la provenance — l'onglet « Profil », l'écran de
+          // connexion — et jamais à l'autre document (ticket 052).
+          onPressed: () => context.pushReplacementNamed(route),
           icon: const Icon(Icons.description_outlined, size: AppTouch.icone),
           label: Text(libelle),
         ),

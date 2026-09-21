@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/l10n/app_strings.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_banner.dart';
 import '../../../../core/widgets/app_divider.dart';
 import '../../../../core/widgets/app_scaffold.dart';
+import '../../../../core/widgets/bouton_retour.dart';
 import '../../../../core/widgets/count_stat.dart';
 import '../../../../core/widgets/day_cell.dart';
 import '../../../../core/widgets/empty_state.dart';
@@ -40,6 +43,7 @@ class DevCatalogue extends StatelessWidget {
         _SectionChargement(),
         _SectionMesures(),
         _SectionOssature(),
+        _SectionRetour(),
       ],
     );
   }
@@ -891,6 +895,168 @@ class _Fenetre extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/// La sortie d'un écran sans ossature de navigation, dans ses deux états de
+/// pile (ticket 052).
+///
+/// Chaque spécimen porte **son propre routeur** : `BoutonRetour` lit la pile
+/// de navigation dès sa construction, et la lui fabriquer est la seule façon
+/// de montrer les deux formes côte à côte dans un catalogue.
+class _SectionRetour extends StatelessWidget {
+  const _SectionRetour();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DevSection(
+      titre: 'BoutonRetour',
+      note:
+          'Flèche seule quand il y a une pile à dépiler, flèche suivie du mot '
+          '« Accueil » quand il n\'y en a pas. Même place, seul le mot '
+          'change — et à l\'échelle 2.0 sur un téléphone étroit, le mot tombe '
+          'et la flèche reste.',
+      children: <Widget>[
+        DevRangee(
+          children: <Widget>[
+            DevSpecimen(
+              nom: 'pile pleine — la flèche dépile',
+              child: _FenetreRetour(pilePleine: true),
+            ),
+            DevSpecimen(
+              nom: 'pile vide — lien profond, URL collée, rechargement',
+              child: _FenetreRetour(pilePleine: false),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Une barre d'application isolée, avec la pile qu'on lui demande.
+class _FenetreRetour extends StatefulWidget {
+  const _FenetreRetour({required this.pilePleine});
+
+  /// Vrai : la barre s'ouvre sur une route enfant, il y a donc de quoi
+  /// dépiler. Faux : elle s'ouvre à la racine, comme un lien profond.
+  final bool pilePleine;
+
+  @override
+  State<_FenetreRetour> createState() => _FenetreRetourState();
+}
+
+class _FenetreRetourState extends State<_FenetreRetour> {
+  static const String _detour = 'detour';
+
+  late final GoRouter _routeur = _fabriquerRouteur();
+
+  /// Le routeur du spécimen, **posé sur sa pile à la main**.
+  ///
+  /// `initialLocation` ne conviendrait pas : il transite par le fournisseur
+  /// d'information de route, que ce spécimen n'a justement pas (voir [build]),
+  /// et sur le web il serait de toute façon écrasé par l'adresse réelle de la
+  /// page — `/dev/components`, qui ne correspond à aucune route d'ici.
+  /// `currentConfiguration` est la même valeur que `Router` aurait fini par
+  /// donner au délégué, sans le détour par la plateforme.
+  GoRouter _fabriquerRouteur() {
+    final routeur = GoRouter(
+      routes: <RouteBase>[
+        GoRoute(
+          path: AppRoutes.accueil,
+          // Le nom de repli de `BoutonRetour` : sans lui, presser la sortie en
+          // pile vide chercherait une route qui n'existe pas ici.
+          name: AppRoutes.accueilName,
+          builder: (context, state) => const _BarreSeule(titre: 'Accueil'),
+          routes: <RouteBase>[
+            GoRoute(
+              path: _detour,
+              builder: (context, state) =>
+                  const _BarreSeule(titre: 'Notifications'),
+            ),
+          ],
+        ),
+      ],
+    );
+    routeur.routerDelegate.currentConfiguration = routeur.configuration
+        .findMatch(
+          Uri.parse(widget.pilePleine ? '/$_detour' : AppRoutes.accueil),
+        );
+    return routeur;
+  }
+
+  @override
+  void dispose() {
+    _routeur.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Une fenêtre simulée grandit avec l'échelle de texte, comme celle de
+    // l'ossature : à 2.0, un téléphone réel équivaut à un écran deux fois plus
+    // petit, et c'est là que le mot « Accueil » doit tomber.
+    final facteur = MediaQuery.textScalerOf(context).scale(16) / 16;
+    final largeur = 320 * facteur;
+    final hauteur = 96 * facteur;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: context.statuts.filetDecoratif),
+        borderRadius: AppRadius.controleRadius,
+      ),
+      child: ClipRRect(
+        borderRadius: AppRadius.controleRadius,
+        child: SizedBox(
+          width: largeur,
+          height: hauteur,
+          child: MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              size: Size(largeur, hauteur),
+              viewPadding: EdgeInsets.zero,
+              padding: EdgeInsets.zero,
+            ),
+            // **Un `Router` nu, sans fournisseur ni analyseur d'information
+            // de route.** Une application imbriquée en aurait un : `Router`
+            // rapporte alors l'adresse de son délégué à la plateforme dès la
+            // première image, quelle que soit sa profondeur dans l'arbre, et
+            // ouvrir le catalogue réécrivait la barre d'adresse en « / » ou
+            // « /detour » — un rechargement ne revenait plus ici. Un seul
+            // `Router` écrit l'URL, celui de l'application.
+            //
+            // Ce qu'il en coûte : `go` et `goNamed` passent par ce
+            // fournisseur absent et ne font donc rien ici. La flèche de la
+            // pile pleine dépile bien — `pop` parle au délégué — et la sortie
+            // de la pile vide mène à l'accueil, qui est déjà l'écran affiché :
+            // les deux spécimens montrent à l'écran ce qu'ils promettent.
+            child: Router<RouteMatchList>(
+              routerDelegate: _routeur.routerDelegate,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Le spécimen lui-même : une barre, sa sortie, son titre.
+class _BarreSeule extends StatelessWidget {
+  const _BarreSeule({required this.titre});
+
+  final String titre;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: const BoutonRetour(),
+        leadingWidth: BoutonRetour.largeur(context),
+        title: Text(titre),
+      ),
+      body: const SizedBox.expand(),
     );
   }
 }
