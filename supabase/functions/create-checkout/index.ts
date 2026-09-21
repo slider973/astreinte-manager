@@ -51,9 +51,10 @@ import {
   portailOuvrable,
 } from "./acces.ts";
 
-/** Où Stripe renvoie le navigateur. Le chemin suit la stratégie de hash de
- * go_router, en vigueur dans l'application (même choix qu'`APP_INVITE_PATH`). */
-const CHEMIN_RETOUR_DEFAUT = "/#/admin/abonnement";
+/** Où Stripe renvoie le navigateur. Le chemin suit la stratégie d'URL de
+ * l'application — sans dièse depuis le ticket 046 (même choix
+ * qu'`APP_INVITE_PATH`). */
+const CHEMIN_RETOUR_DEFAUT = "/admin/abonnement";
 
 function lienRetour(resultat: "ok" | "annule"): string {
   const base = (Deno.env.get("APP_BASE_URL") ?? "http://127.0.0.1:3000").replace(/\/+$/, "");

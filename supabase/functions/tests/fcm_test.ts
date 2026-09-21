@@ -135,7 +135,7 @@ Deno.test("le message porte les blocs notification ET data attendus par le clien
     titre: "Astreinte proposée le 12 octobre, nuit",
     corps: "CIS Saint-Martin te propose une astreinte.",
     donnees: { route: "/proposals", type: "assignment_proposed" },
-    lien: "https://app.astreinte-sp.fr/#/proposals",
+    lien: "https://app.astreinte-sp.fr/proposals",
     etiquette: "assignment_proposed:2026-10",
   }) as CorpsFcm;
 
@@ -147,15 +147,15 @@ Deno.test("le message porte les blocs notification ET data attendus par le clien
   assertEquals(corps.message.data.route, "/proposals");
   assertEquals(corps.message.data.tag, "assignment_proposed:2026-10");
   // Le lien du message est une adresse complète, jamais le chemin interne.
-  assertEquals(corps.message.webpush.fcm_options?.link, "https://app.astreinte-sp.fr/#/proposals");
+  assertEquals(corps.message.webpush.fcm_options?.link, "https://app.astreinte-sp.fr/proposals");
 });
 
 Deno.test("seule une adresse complète en https est acceptée comme lien", () => {
-  assert(lienPubliable("https://app.astreinte-sp.fr/#/proposals"));
+  assert(lienPubliable("https://app.astreinte-sp.fr/proposals"));
   // Le chemin interne : c'est lui qui aurait fait échouer tous les messages.
   assert(!lienPubliable("/proposals"));
   // La pile locale : `webpush.fcm_options.link` impose https.
-  assert(!lienPubliable("http://127.0.0.1:3000/#/proposals"));
+  assert(!lienPubliable("http://127.0.0.1:3000/proposals"));
   assert(!lienPubliable(""));
   assert(!lienPubliable(undefined));
   assert(!lienPubliable("javascript:alert(1)"));
@@ -180,7 +180,7 @@ Deno.test("un lien inutilisable est omis, pas envoyé — le message part quand 
     titre: "t",
     corps: "c",
     donnees: {},
-    lien: "http://127.0.0.1:3000/#/proposals",
+    lien: "http://127.0.0.1:3000/proposals",
   }) as CorpsFcm;
   assertEquals(local.message.webpush.fcm_options, undefined);
 });
