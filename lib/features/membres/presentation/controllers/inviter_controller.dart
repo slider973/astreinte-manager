@@ -26,8 +26,10 @@ class EtatInviter {
   /// Ce qui cloche dans la saisie, avant tout appel réseau.
   final String? erreurChamp;
 
-  /// Le refus de la requête entière : ni adresse ni rôle en cause.
-  final ErreurInvitation? erreurRequete;
+  /// Le refus de la requête entière : ni adresse ni rôle en cause. C'est
+  /// l'échec lui-même, et non son code : sa phrase peut venir du serveur
+  /// (plafond de débit, ticket 038).
+  final EchecInvitation? erreurRequete;
 
   /// Le sort de chaque adresse, une fois l'envoi fait.
   final RapportInvitations? rapport;
@@ -73,7 +75,7 @@ class InviterController extends Notifier<EtatInviter> {
     if (stationId == null) {
       state = EtatInviter(
         role: state.role,
-        erreurRequete: ErreurInvitation.caserneInconnue,
+        erreurRequete: const EchecInvitation(ErreurInvitation.caserneInconnue),
       );
       return false;
     }
@@ -94,12 +96,12 @@ class InviterController extends Notifier<EtatInviter> {
       ref.invalidate(membresControllerProvider);
       return true;
     } on EchecInvitation catch (echec) {
-      state = EtatInviter(role: state.role, erreurRequete: echec.erreur);
+      state = EtatInviter(role: state.role, erreurRequete: echec);
       return false;
     } on Object {
       state = EtatInviter(
         role: state.role,
-        erreurRequete: ErreurInvitation.inconnue,
+        erreurRequete: const EchecInvitation(ErreurInvitation.inconnue),
       );
       return false;
     }

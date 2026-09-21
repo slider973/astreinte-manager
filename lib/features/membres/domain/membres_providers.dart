@@ -217,9 +217,11 @@ class MembresController extends AsyncNotifier<EtatMembres> {
           ? null
           : rapport.resultats.first;
       if (premier == null || premier.enEchec) {
+        // `detail` et non `motif.message` : un refus de débit (ticket 038)
+        // porte sa phrase depuis le serveur, délai compris.
         return ResultatAction(
           reussi: false,
-          message: premier?.motif?.message ?? AppStrings.invitationRenvoiEchec,
+          message: premier?.detail ?? AppStrings.invitationRenvoiEchec,
         );
       }
       return ResultatAction(

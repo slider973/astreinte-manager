@@ -70,8 +70,10 @@ class FauxMembresRepository implements MembresRepository {
   /// Vrai pour faire échouer les deux lectures.
   bool erreurLecture;
 
-  /// Refus de la requête entière d'invitation, ou `null`.
-  ErreurInvitation? echecInvitation;
+  /// Refus de la requête entière d'invitation, ou `null`. C'est l'échec
+  /// complet et non son code : un refus de débit porte en plus la phrase du
+  /// serveur (ticket 038).
+  EchecInvitation? echecInvitation;
 
   /// Rapport rendu par [inviter]. Par défaut : une adresse invitée.
   RapportInvitations? rapport;
@@ -126,7 +128,7 @@ class FauxMembresRepository implements MembresRepository {
     casernesInvitees.add(stationId);
 
     final echec = echecInvitation;
-    if (echec != null) throw EchecInvitation(echec);
+    if (echec != null) throw echec;
 
     return rapport ??
         RapportInvitations(

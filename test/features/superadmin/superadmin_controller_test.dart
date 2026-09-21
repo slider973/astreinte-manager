@@ -121,7 +121,7 @@ void main() {
 
     test('une invitation refusée rend le message du serveur', () async {
       final membres = FauxMembresRepository()
-        ..echecInvitation = ErreurInvitation.caserneSuspendue;
+        ..echecInvitation = const EchecInvitation(ErreurInvitation.caserneSuspendue);
       final conteneur = _conteneur(
         editeur: FauxSuperAdminRepository(),
         membres: membres,

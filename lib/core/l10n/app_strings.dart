@@ -490,6 +490,23 @@ abstract final class AppStrings {
   static const String inviteErreurServeur =
       'Incident serveur sur cette adresse. Réessaie dans un instant.';
 
+  // --- Plafond horaire d'invitations (ticket 038) --------------------
+  //
+  // Ces deux phrases sont des **secours**. Le refus de débit porte le délai
+  // avant de pouvoir réessayer, qui change à chaque seconde : la phrase
+  // affichée est celle que le serveur compose et renvoie
+  // (`supabase/functions/README.md § Le plafond de débit`). On ne s'en passe
+  // qu'au cas où elle manquerait, pour ne jamais annoncer une panne à la
+  // place d'une limite.
+
+  static const String inviteDebitAtteint =
+      'Limite d\'invitations atteinte pour cette caserne. Réessaie dans un '
+      'moment.';
+
+  static String inviteDebitAtteintDans(int minutes) =>
+      'Limite d\'invitations atteinte pour cette caserne. Réessaie dans '
+      '${minutes <= 1 ? 'une minute' : '$minutes minutes'}.';
+
   // --- Erreurs de la requête d'invitation ----------------------------
 
   static const String inviteRequeteInvalide =
