@@ -1076,6 +1076,10 @@ export type Database = {
         Returns: number
       }
       cron_lock_periods: { Args: { p_reference?: string }; Returns: number }
+      cron_suspend_subscriptions: {
+        Args: { p_reference?: string }
+        Returns: number
+      }
       est_jour_ferie: { Args: { p_date: string }; Returns: boolean }
       is_admin: { Args: { p_station: string }; Returns: boolean }
       is_member: { Args: { p_station: string }; Returns: boolean }
@@ -1135,6 +1139,7 @@ export type Database = {
       notify_endpoint: { Args: never; Returns: Record<string, unknown> }
       notify_internal_secret: { Args: never; Returns: string }
       notify_post: { Args: { p_outbox: string }; Returns: boolean }
+      notify_trace_echec: { Args: { p_outbox: string }; Returns: string }
       paques_gregorien: { Args: { p_annee: number }; Returns: string }
       period_deadline_at: {
         Args: {
@@ -1186,6 +1191,23 @@ export type Database = {
       }
       station_settings_valid: { Args: { p_settings: Json }; Returns: boolean }
       station_writable: { Args: { p_station: string }; Returns: boolean }
+      subscription_set_customer: {
+        Args: { p_customer: string; p_station: string }
+        Returns: Json
+      }
+      subscription_sync: {
+        Args: {
+          p_customer?: string
+          p_event?: string
+          p_period_end?: string
+          p_plan?: string
+          p_reference?: string
+          p_station?: string
+          p_status?: Database["public"]["Enums"]["subscription_status"]
+          p_subscription?: string
+        }
+        Returns: Json
+      }
       unite_weekend: { Args: { p_date: string }; Returns: string }
     }
     Enums: {

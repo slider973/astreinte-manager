@@ -218,10 +218,16 @@ where u.ordinal between 1 and 4
 order by u.station_id, u.ordinal, sp.first_day;
 
 -- ---------------------------------------------------------------------------
--- Abonnements : période d'essai de 30 jours par caserne.
+-- Abonnements : l'essai de 60 jours est posé par le déclencheur
+-- `stations_subscription_bootstrap` (migration 0023, ticket 029) au moment de
+-- l'insertion des casernes ci-dessus. Le seed ne fait que le confirmer, pour
+-- rester lisible seul et pour figer la date de fin d'essai des deux casernes
+-- de développement.
 -- ---------------------------------------------------------------------------
 insert into subscriptions (station_id, status, trial_ends_at) values
-  ('aaaaaaaa-0000-4000-8000-000000000001', 'trialing', now() + interval '30 days'),
-  ('bbbbbbbb-0000-4000-8000-000000000001', 'trialing', now() + interval '30 days');
+  ('aaaaaaaa-0000-4000-8000-000000000001', 'trialing', now() + interval '60 days'),
+  ('bbbbbbbb-0000-4000-8000-000000000001', 'trialing', now() + interval '60 days')
+on conflict (station_id) do update
+  set status = excluded.status, trial_ends_at = excluded.trial_ends_at;
 
 commit;
