@@ -4,10 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/env.dart';
 import 'core/firebase/firebase_bootstrap.dart';
+import 'core/plateforme/strategie_url.dart';
 import 'core/supabase/supabase_bootstrap.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Avant tout le reste, et avant `runApp` : les routes vivent dans le chemin
+  // de l'adresse. Le fragment, lui, appartient au fournisseur
+  // d'authentification, qui y dépose ses jetons (ticket 046). Démarrer Supabase
+  // avant que le routeur existe n'est donc pas un détail d'ordonnancement :
+  // c'est ce qui laisse `supabase_flutter` lire le fragment, ouvrir la session
+  // et nettoyer l'adresse pendant que personne ne regarde.
+  adopterAdressesSansDiese();
 
   const env = Env.fromDefines;
   // Le démarrage ne lève jamais : une configuration absente ou un client
