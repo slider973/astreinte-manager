@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 019
 - **Branche** : `feat/023-planning-caserne`
+- **Statut** : en cours depuis 2026-09-21
 
 ## À faire
 - Écran « Planning » : calendrier du mois avec, par créneau, les noms des membres acceptés. Visible dès `published` pour ses propres créneaux, complet dès `validated`.

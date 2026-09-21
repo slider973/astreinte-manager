@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 023 | [Vue du planning de la caserne pour les membres](in-progress/023-planning-caserne.md) | P1 | 019 |  |
 
 ## À faire
 
@@ -13,7 +14,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 |---|---|---|---|---|
 | 007 | [Profil utilisateur](backlog/007-profil.md) | P1 | 005 |  |
 | 018 | [Proposition automatique de remplissage](backlog/018-proposition-automatique.md) | P1 | 017 |  |
-| 023 | [Vue du planning de la caserne pour les membres](backlog/023-planning-caserne.md) | P1 | 019 |  |
 | 028 | [Export calendrier ICS](backlog/028-export-ics.md) | P1 | 027 |  |
 | 029 | [Abonnement Stripe par caserne](backlog/029-stripe-abonnement.md) | P0 | 008 010 |  |
 | 030 | [Mode suspendu et bannières](backlog/030-gating-suspension.md) | P1 | 029 |  |
