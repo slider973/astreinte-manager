@@ -177,6 +177,7 @@ class FauxMembershipRepository implements MembershipRepository {
   FauxMembershipRepository({
     this.appartenances = const <Appartenance>[],
     this.erreur,
+    this.suspendue = false,
   });
 
   List<Appartenance> appartenances;
@@ -184,11 +185,18 @@ class FauxMembershipRepository implements MembershipRepository {
   /// Erreur levée à la lecture, ou `null`.
   AuthErreur? erreur;
 
+  /// **Une lecture qui ne rend jamais la main.** C'est le réseau des zones
+  /// rurales : pas un refus, pas une coupure franche, un trou noir. Elle
+  /// distingue « je ne sais pas encore » de « il n'y a rien », et c'est
+  /// exactement ce que l'écran doit distinguer aussi.
+  final bool suspendue;
+
   int lectures = 0;
 
   @override
   Future<List<Appartenance>> mesAppartenances(String userId) async {
     lectures++;
+    if (suspendue) return Completer<List<Appartenance>>().future;
     final echec = erreur;
     if (echec != null) throw AuthEchec(echec);
     return appartenances;
@@ -218,6 +226,10 @@ Future<AppMontee> monterApp(
   AuthErreur? erreurEnvoi,
   AuthErreur? erreurVerification,
   AuthErreur? erreurAppartenances,
+
+  /// La lecture des appartenances ne rend jamais la main : un réseau qui
+  /// n'échoue pas, il se tait.
+  bool appartenancesSuspendues = false,
 
   /// Simule un démarrage à froid : la session n'arrive qu'à l'appel de
   /// `faux.auth.ouvrirSession(...)`.
@@ -263,6 +275,7 @@ Future<AppMontee> monterApp(
   final memberships = FauxMembershipRepository(
     appartenances: appartenances,
     erreur: erreurAppartenances,
+    suspendue: appartenancesSuspendues,
   );
   final push = messagerie ?? FauxMessageriePush();
   addTearDown(push.fermer);
