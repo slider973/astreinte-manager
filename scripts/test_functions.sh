@@ -1392,29 +1392,33 @@ verifier "l'admin de la caserne voisine ne remplit pas : 403" "403" "$STATUT"
 verifier "et le code le dit" "not_admin" "$(jq -r '.error.code' <<<"$CORPS")"
 
 # Trois lignes écrites à la main, prises dans les disponibilités réelles du
-# seed : deux que la base doit accepter, une qu'elle doit écarter — le même
-# pompier deux fois sur le même créneau.
-PICKS_B="$(sql "select jsonb_agg(p order by p ->> 'ordre')::text from (
-  select jsonb_build_object(
-           'ordre', row_number() over (order by sh.date, sh.slot),
-           'shift_id', sh.id, 'user_id', av.user_id) as p
+# seed : les deux premiers créneaux qui ont un candidat, chacun avec **un seul**
+# pompier, puis une répétition de la première — que la base doit écarter.
+PICKS_B="$(sql "select jsonb_agg(p order by rang)::text from (
+  select row_number() over (order by sh.date, sh.slot) as rang,
+         jsonb_build_object('shift_id', sh.id, 'user_id', av.user_id) as p
     from shifts sh
-    join availabilities av
-      on av.station_id = sh.station_id
-     and av.date = sh.date and av.slot = sh.slot
-     and av.status = 'available'
+    join lateral (
+      select a.user_id from availabilities a
+       where a.station_id = sh.station_id
+         and a.date = sh.date and a.slot = sh.slot
+         and a.status = 'available'
+       order by a.user_id
+       limit 1
+    ) av on true
    where sh.schedule_id = '$PLANNING_B'
-   order by sh.date, sh.slot, av.user_id
+   order by sh.date, sh.slot
    limit 2
 ) t")"
-# La troisième ligne répète la première : elle doit être écartée.
 PICKS_B="$(jq -c '. + [.[0]]' <<<"$PICKS_B")"
+
+OUTBOX_AVANT="$(sql "select count(*) from notification_outbox")"
 
 appeler auto-propose "$ADMIN_B" "{\"schedule_id\": \"$PLANNING_B\", \"picks\": $PICKS_B}"
 verifier "l'admin remplit son brouillon : 200" "200" "$STATUT"
 verifier "deux attributions posées" "2" "$(jq -r '.applied' <<<"$CORPS")"
 verifier "la ligne en double est écartée" "already_assigned" \
-  "$(jq -r '.skipped[0].code' <<<"$CORPS")"
+  "$(jq -r '[.skipped[].code] | join(",")' <<<"$CORPS")"
 verifier "les attributions sont bien en base" "2" \
   "$(sql "select count(*) from assignments a
            join shifts sh on sh.id = a.shift_id
@@ -1427,7 +1431,7 @@ verifier "rien n'est parti : proposed_at reste nul" "0" \
   "$(sql "select count(*) from assignments a
            join shifts sh on sh.id = a.shift_id
           where sh.schedule_id = '$PLANNING_B' and a.proposed_at is not null")"
-verifier "et personne n'a été notifié" "0" \
+verifier "et personne n'a été notifié" "$OUTBOX_AVANT" \
   "$(sql "select count(*) from notification_outbox")"
 
 # ---------------------------------------------------------------------------

@@ -198,9 +198,11 @@ grande échelle, ni sur une décision automatisée produisant des effets juridiq
 qui sont à surveiller et non à écarter :
 
 1. Le commentaire libre des préférences de charge (§ 2.2) peut recueillir une donnée de santé.
-2. La proposition automatique de remplissage du planning (ticket 018, hors périmètre à ce jour)
-   serait un traitement automatisé **assisté** : l'administrateur décide, la machine suggère. Si un
-   jour la suggestion devenait une décision, l'analyse serait à refaire.
+2. La proposition automatique de remplissage du planning (ticket 018) est un traitement automatisé
+   **assisté**, et il l'est par construction : la machine compose un plan, l'administrateur en lit
+   le récapitulatif chiffré, et **rien n'est écrit tant qu'il n'a pas confirmé**. Aucune décision
+   n'est prise sans lui. Si un jour la suggestion devenait une application directe, l'analyse serait
+   à refaire.
 
 `[À COMPLÉTER : position du responsable de traitement. Un SDIS a souvent un cadre interne qui
 impose une AIPD indépendamment de ce raisonnement.]`
