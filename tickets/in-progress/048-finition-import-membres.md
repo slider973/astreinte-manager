@@ -50,6 +50,14 @@ partout. Il affiche des adresses là où l'aperçu affichait des noms, alors que
 permet de reconnaître les pompiers. La réutilisation du compte rendu du ticket 006 coûte ici :
 décider si ce compte rendu accueille les noms, ou si l'import a le sien.
 
+### Le refus du serveur est annoncé comme une panne de réseau (P2)
+Constaté en production le 21 septembre 2026 : les Edge Functions n'étaient pas déployées, et
+l'écran d'invitation affichait « Impossible de joindre le serveur. Vérifie ta connexion, puis
+réessaie. » Le réseau allait très bien, la fonction rendait 404. Le repli de `ErreurInvitation` sur
+`reseau` avale toute réponse non typée, et envoie la personne vérifier son wifi pendant que le
+défaut est ailleurs. Distinguer au moins une fonction absente ou en erreur d'une panne de liaison,
+et le dire sans envoyer chercher au mauvais endroit. Vaut pour l'import comme pour l'invitation.
+
 ### Trois broutilles (P3)
 - `ImporterController._phraseDeLecture` passe `maxOctetsFichier` comme taille réelle à
   `AppStrings.importTropGros` : le message affiche la limite deux fois.
@@ -67,4 +75,5 @@ décider si ce compte rendu accueille les noms, ou si l'import a le sien.
 - Le compte rendu d'import nomme les personnes, et n'aligne pas un marqueur identique sur chaque
   ligne quand tout est passé.
 - Les trois broutilles P3 sont corrigées ou le code mort est retiré.
+- Une réponse d'erreur du serveur n'est plus annoncée comme une panne de connexion.
 - `flutter analyze` sans avertissement, `flutter test` verts, `flutter build web` qui passe.
