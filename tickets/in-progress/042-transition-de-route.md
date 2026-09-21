@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 016
 - **Branche** : `feat/042-transition-de-route`
+- **Statut** : en cours depuis 2026-09-21
 
 ## Contexte
 Mesuré au ticket 016, en mode profil dans un vrai navigateur : il s'écoule environ six cents
