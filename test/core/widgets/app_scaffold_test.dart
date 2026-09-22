@@ -1,6 +1,7 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
 import 'package:astreinte_sp/core/widgets/app_scaffold.dart';
+import 'package:astreinte_sp/core/widgets/colonne_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -76,17 +77,20 @@ void main() {
       expect(find.byType(NavigationBar), findsNothing);
     });
 
-    testWidgets('expanded étend le rail', (tester) async {
+    testWidgets('expanded passe du rail à la colonne de navigation', (
+      tester,
+    ) async {
       await monterEcran(
         tester,
         _ossature(admin: true),
         taille: const Size(900, 900),
       );
 
-      expect(
-        tester.widget<NavigationRail>(find.byType(NavigationRail)).extended,
-        isTrue,
-      );
+      // Depuis le ticket 061b, le rail étendu **est** la colonne : libellés à
+      // côté des icônes, pastille sur toute la largeur de l'élément. Le
+      // détail de sa composition est couvert par `coquille_large_test.dart`.
+      expect(find.byType(ColonneNavigation), findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
     });
 
     testWidgets('les libellés sont toujours visibles', (tester) async {

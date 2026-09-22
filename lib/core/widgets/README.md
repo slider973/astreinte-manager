@@ -21,6 +21,9 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `champ_texte.dart` | `ChampTexte` | Champ rempli M3 : libellé au-dessus, erreur annoncée sous le champ, une ou plusieurs lignes. |
 | `ecran_simple.dart` | `EcranSimple` | L'ossature des écrans sans navigation : connexion, invitation, accueil d'un nouveau membre. |
 | `barre_actions_basse.dart` | `BarreActionsBasse` | Le pied de la colonne : les actions du bas s'y bornent à la même largeur que le corps (`largeurMax`, 720 par défaut, `EcranSimple.colonneLecture` sous un écran sans navigation), derrière un filet de niveau 1. |
+| `colonne_navigation.dart` | `ColonneNavigation` | La navigation du grand écran (ticket 061b) : libellés à côté des icônes, pastille `primary-container` sur toute la largeur de l'élément, nom du produit en tête. Elle remplace le rail étendu dès `expanded`. |
+| `entete_travail.dart` | `EnTeteTravail` | L'en-tête de la zone de travail sur grand écran, **à la place de la barre d'application** : nom de la caserne à gauche, actions de l'écran puis cloche et compte à droite. |
+| `avatar_initiales.dart` | `AvatarInitiales` | Un disque d'initiales. Pas de photo : ce serait une donnée personnelle de plus, et les pompiers n'en ont pas dans ce produit. |
 | `bouton_retour.dart` | `BoutonRetour` | La sortie d'un écran sans ossature ni parent dans le routeur. Flèche seule quand il y a une pile à dépiler, flèche **suivie du mot « Accueil »** quand il n'y en a pas (ticket 052). |
 
 ## La règle qui a produit `BoutonRetour`
