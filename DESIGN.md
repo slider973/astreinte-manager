@@ -347,13 +347,13 @@ En sombre : `dark-error #FB7CAA` → 7,44:1 ; `dark-error-container #6F203D` sur
 Inchangés depuis le ticket 004 : `surface #FFFFFF`, `on-surface #131C23`, `on-surface-variant #45535C`, les crans de surface `#F7F9FA`, `#F1F4F6`, `#E9EDF0`, `#E2E7EA`, `outline #6E7D87`, `outline-variant #C3CDD3`, et leurs équivalents sombres.
 
 ### Named Rules — la sémantique des états
-- **Disponible** : famille indigo. Texte `etat-disponible #5840BC`, case pleine `etat-disponible-plein #7655FA` (4,72:1 sous un glyphe blanc, le ratio le plus bas du système clair), fond `etat-disponible-fond #E4DDFE`, texte sur fond encre.
+- **Disponible** : famille indigo. Texte `etat-disponible #5840BC`, case pleine `etat-disponible-plein #7655FA` (4,72:1 sous un glyphe blanc, le ratio le plus bas des paires de texte du système clair), fond `etat-disponible-fond #E4DDFE`, texte sur fond encre.
 - **Accepté, validé, publié, période ouverte, couvert, information** : famille verte. Texte `etat-accepte #086959`, fond `etat-accepte-fond #CEE5E1`, texte sur fond `#065144`.
 - **Proposé, à pourvoir, en attente** : famille orange. Texte `etat-attente #9F6224`, fond `etat-attente-fond #FDEAD7`, texte sur fond encre.
 - **Absent, refusé, conflit** : famille rose. Texte `etat-absent #BB285D`, fond `etat-absent-fond #FED7E5`, texte sur fond encre.
 - **Non saisi, neutre, annulé, archivé, verrouillé** : gris inchangés.
 - **Sélection** : `primary-container` sur `on-primary-container`, pour tout composant Material qui exprime un choix, réglé dans `app_theme.dart`. Le vert ne dit jamais « choisi ».
-- Texte coloré sur blanc : indigo `accent-texte` et vert `etat-accepte` seulement. Orange et rose, jamais.
+- Texte coloré sur blanc : indigo `accent-texte`, vert `etat-accepte`, et les deux teintes assombries `tertiary #9F6224` (4,94:1) et `error #BB285D` (5,87:1) pour un libellé d'état qui doit être lu. Les teintes vives `orange-vif`, `rose-vif` et `accent-decoratif`, jamais : un test les y refuse (§ Écarts, ticket 061).
 
 #### Disponibilité — la grammaire de la case
 
@@ -364,7 +364,7 @@ Inchangés depuis le ticket 004 : `surface #FFFFFF`, `on-surface #131C23`, `on-s
 | **non saisi** | case vide, filet tireté 3/3 | `Icons.check_box_outline_blank` (`remove` dans la grille) | « Non saisi » | fond `surface`, filet `#73828B`, glyphe `#52626C` (6.32:1) | filet `#6E7D87`, glyphe `#A4B1B9` (8.31:1) |
 
 Le triplet vient du registre lui-même : cochée / barrée / vide. Il tient en niveaux de gris
-(luminance relative 0.16 / 0.78 hachurée de 0.09 / 1.00) et il tient à 40 cm au soleil.
+(luminance relative 0.17 / 0.75 hachurée de 0.13 / 1.00) et il tient à 40 cm au soleil.
 
 #### Créneau — jour et nuit
 
@@ -450,14 +450,14 @@ des **instances statiques sous-ensemblées** au latin et aux diacritiques franç
 
 | Fichier | Graisse | Poids |
 |---|---|---|
-| `AtkinsonHyperlegibleNext-Regular.ttf` | 400 | 42 Ko |
-| `AtkinsonHyperlegibleNext-SemiBold.ttf` | 600 | 42 Ko |
-| `AtkinsonHyperlegibleNext-Bold.ttf` | 700 | 42 Ko |
+| `AtkinsonHyperlegibleNext-Regular.ttf` | 400 | 43 Ko |
+| `AtkinsonHyperlegibleNext-SemiBold.ttf` | 600 | 43 Ko |
+| `AtkinsonHyperlegibleNext-Bold.ttf` | 700 | 43 Ko |
 | `AtkinsonHyperlegibleMono-SemiBold.ttf` | 600 | 30 Ko |
 | `AtkinsonHyperlegibleMono-Bold.ttf` | 700 | 30 Ko |
 | `AtkinsonHyperlegibleNext-Repli.ttf` | — | 10 Ko |
-| `Archivo-SemiBold.ttf` | 600 | 57 Ko |
-| `Archivo-Bold.ttf` | 700 | 57 Ko |
+| `Archivo-SemiBold.ttf` | 600 | 58 Ko |
+| `Archivo-Bold.ttf` | 700 | 58 Ko |
 | **Total** | | **316 Ko** |
 
 316 Ko sur disque (315 720 octets), huit fichiers ; 41 Ko de plus au démarrage une fois compressés en brotli. Le budget de 180 Ko du ticket 004 est dépassé sciemment au ticket 061, pour deux graisses d'Archivo sur les titres. `AtkinsonHyperlegibleNext-Repli.ttf` est un repli déclaré sous la famille Roboto pour désamorcer le chargement système. Les italiques ne sont pas embarquées
