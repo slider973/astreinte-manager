@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 006
 - **Branche** : `feat/051-invitation-en-attente-ignoree`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/51
 - **Statut** : terminé le 2026-09-22 (PR créée)
 
 ## Contexte
