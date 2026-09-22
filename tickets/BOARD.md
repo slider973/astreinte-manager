@@ -73,5 +73,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main
 | 052 | [Le centre de notifications n'a pas de retour](done/052-centre-notifications-sans-retour.md) | P1 | 026 | https://github.com/slider973/astreinte-manager/pull/47 |
 | 053 | [L'écran super-admin n'offre aucune déconnexion](done/053-superadmin-sans-deconnexion.md) | P2 | 031 | https://github.com/slider973/astreinte-manager/pull/50 |
 | 054 | [Le déploiement automatique des fonctions ignore la carte d'imports](done/054-deploiement-fonctions-carte-imports.md) | P0 | 049 | https://github.com/slider973/astreinte-manager/pull/48 |
-| 060 | [Mettre la PWA en ligne par l'API Vercel, avec le jeton de projet](done/060-deploiement-pwa-par-api.md) | P0 | 054 | — |
+| 060 | [Mettre la PWA en ligne par l'API Vercel, avec le jeton de projet](done/060-deploiement-pwa-par-api.md) | P0 | 054 | https://github.com/slider973/astreinte-manager/pull/52 |
 

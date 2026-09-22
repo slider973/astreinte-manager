@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 054
 - **Branche** : `feat/060-deploiement-pwa-par-api`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/52
 - **Statut** : terminé le 2026-09-22 (PR créée)
 
 ## Contexte
