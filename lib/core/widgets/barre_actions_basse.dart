@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_breakpoints.dart';
 import '../theme/app_spacing.dart';
 import 'app_divider.dart';
+import 'ecran_simple.dart';
 
 /// La bande d'actions collée au bas d'un écran dont le contenu défile.
 ///
@@ -28,7 +29,19 @@ import 'app_divider.dart';
 /// grandit ou que l'échelle de texte monte, et une limite qui apparaît et
 /// disparaît sous le pouce coûte plus qu'elle ne rapporte.
 class BarreActionsBasse extends StatelessWidget {
-  const BarreActionsBasse({required this.child, super.key});
+  const BarreActionsBasse({
+    required this.child,
+    this.largeurMax = AppSpacing.colonneMax,
+    super.key,
+  });
+
+  /// La largeur de la colonne dont cette barre est le pied.
+  ///
+  /// Par défaut celle d'un corps de liste, [AppSpacing.colonneMax]. Les écrans
+  /// sans navigation lisent plus étroit — [EcranSimple.colonneLecture], 420
+  /// points — et leur barre doit les suivre : une barre plus large que son
+  /// corps est le même défaut que celui du ticket 048, d'un cran plus petit.
+  final double largeurMax;
 
   /// Les actions : un bouton, ou une colonne de boutons empilés.
   ///
@@ -52,9 +65,7 @@ class BarreActionsBasse extends StatelessWidget {
               padding: EdgeInsets.all(marge),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: AppSpacing.colonneMax,
-                  ),
+                  constraints: BoxConstraints(maxWidth: largeurMax),
                   // La colonne étire ses enfants : un bouton d'action prend
                   // toute la largeur utile, jamais celle de son libellé.
                   child: Column(

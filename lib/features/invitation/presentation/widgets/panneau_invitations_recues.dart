@@ -5,6 +5,7 @@ import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_divider.dart';
+import '../../../../core/widgets/ecran_simple.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../domain/invitation_recue.dart';
 import 'ligne_invitation_recue.dart';
@@ -100,7 +101,8 @@ class PanneauInvitationsRecues extends StatelessWidget {
   }
 }
 
-/// La colonne de lecture : bornée à 420 dp, centrée, défilante.
+/// La colonne de lecture : bornée à [EcranSimple.colonneLecture], centrée,
+/// défilante.
 ///
 /// Les mesures sont celles d'`EcranSimple` — même marge de page selon la
 /// classe de fenêtre, même largeur maximale. Ce n'est pas `EcranSimple` parce
@@ -124,7 +126,9 @@ class _Colonne extends StatelessWidget {
               constraints: BoxConstraints(minHeight: contraintes.maxHeight),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
+                  constraints: const BoxConstraints(
+                    maxWidth: EcranSimple.colonneLecture,
+                  ),
                   child: Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: marge,

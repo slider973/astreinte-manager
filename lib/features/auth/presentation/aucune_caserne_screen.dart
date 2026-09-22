@@ -8,8 +8,9 @@ import '../../../core/router/app_router.dart';
 import '../../../core/session/appartenance.dart';
 import '../../../core/session/deconnexion.dart';
 import '../../../core/session/session_providers.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
+import '../../../core/widgets/barre_actions_basse.dart';
+import '../../../core/widgets/ecran_simple.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../invitation/domain/invitation_providers.dart';
 import '../../invitation/domain/invitation_recue.dart';
@@ -104,7 +105,11 @@ class _AucuneCaserneScreenState extends ConsumerState<AucuneCaserneScreen> {
     final echec = invitations.hasError && !invitations.isLoading;
 
     return Scaffold(
+      // Le bas n'est pas pris ici : c'est `BarreActionsBasse` qui le porte,
+      // sinon sa surface tonale s'arrêterait au-dessus de la barre d'accueil
+      // et laisserait une bande de fond sous le filet.
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: <Widget>[
             ?_banniere(echec: echec, desactivee: desactivee, liste: liste),
@@ -116,8 +121,14 @@ class _AucuneCaserneScreenState extends ConsumerState<AucuneCaserneScreen> {
                 desactivee: desactivee,
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.all(AppSpacing.lg),
+
+            // La sortie se borne à la colonne qu'elle termine, et pas à la
+            // fenêtre : sur un poste de 1280 points, un « Se déconnecter » de
+            // 1248 sous une colonne de 420 est exactement le défaut corrigé au
+            // ticket 048. Le corps de cet écran lit à
+            // `EcranSimple.colonneLecture`, son pied aussi.
+            const BarreActionsBasse(
+              largeurMax: EcranSimple.colonneLecture,
               child: BoutonDeconnexion(),
             ),
           ],

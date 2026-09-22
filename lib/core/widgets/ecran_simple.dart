@@ -37,6 +37,14 @@ class EcranSimple extends StatelessWidget {
   /// Élément placé entre la bannière et le titre (un retour, par exemple).
   final Widget? enTete;
 
+  /// La largeur de la colonne de lecture, 420 points.
+  ///
+  /// Publique parce que deux autres meubles la suivent : la colonne
+  /// d'« Aucune caserne », qui garde son propre `Scaffold`, et la
+  /// `BarreActionsBasse` qui lui sert de pied. Une barre d'actions plus large
+  /// que le corps qu'elle termine est le défaut corrigé au ticket 048.
+  static const double colonneLecture = 420;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -60,7 +68,7 @@ class EcranSimple extends StatelessWidget {
                     ),
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
+                        constraints: const BoxConstraints(maxWidth: colonneLecture),
                         child: Padding(
                           padding: EdgeInsets.symmetric(
                             horizontal: marge,

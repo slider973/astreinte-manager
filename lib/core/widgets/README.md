@@ -20,7 +20,7 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `hachures.dart` | `Hachures`, `HachuresPainter` | Primitive de dessin, pas un composant : le motif à 45° partagé par `SlotChip` et `AppBanner`. |
 | `champ_texte.dart` | `ChampTexte` | Champ rempli M3 : libellé au-dessus, erreur annoncée sous le champ, une ou plusieurs lignes. |
 | `ecran_simple.dart` | `EcranSimple` | L'ossature des écrans sans navigation : connexion, invitation, accueil d'un nouveau membre. |
-| `barre_actions_basse.dart` | `BarreActionsBasse` | Le pied de la colonne : les actions du bas s'y bornent à la même largeur que le corps, derrière un filet de niveau 1. |
+| `barre_actions_basse.dart` | `BarreActionsBasse` | Le pied de la colonne : les actions du bas s'y bornent à la même largeur que le corps (`largeurMax`, 720 par défaut, `EcranSimple.colonneLecture` sous un écran sans navigation), derrière un filet de niveau 1. |
 | `bouton_retour.dart` | `BoutonRetour` | La sortie d'un écran sans ossature ni parent dans le routeur. Flèche seule quand il y a une pile à dépiler, flèche **suivie du mot « Accueil »** quand il n'y en a pas (ticket 052). |
 
 ## La règle qui a produit `BoutonRetour`
