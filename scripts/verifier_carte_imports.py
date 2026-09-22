@@ -48,8 +48,9 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parent.parent
 WORKFLOW = RACINE / ".github/workflows/deploy.yml"
-DOSSIER_FONCTIONS = RACINE / "supabase/functions"
-CONFIG = RACINE / "supabase/config.toml"
+DOSSIER_SUPABASE = RACINE / "supabase"
+DOSSIER_FONCTIONS = DOSSIER_SUPABASE / "functions"
+CONFIG = DOSSIER_SUPABASE / "config.toml"
 
 # Dossiers de `supabase/functions/` qui ne sont pas des fonctions déployées.
 NON_DEPLOYES = {"_shared", "tests"}
@@ -111,7 +112,11 @@ def commande_de_deploiement() -> str:
 
 
 def carte_globale(commande: str) -> Path | None:
-    """Le chemin passé à `--import-map`, s'il y en a un."""
+    """Le chemin passé à `--import-map`, s'il y en a un.
+
+    Le CLI le résout depuis le dossier de travail, qui est la racine du dépôt
+    dans le workflow.
+    """
     trouve = re.search(r"--import-map[=\s]+([^\s]+)", commande)
     if not trouve:
         return None
@@ -121,8 +126,10 @@ def carte_globale(commande: str) -> Path | None:
 def cartes_de_config() -> dict[str, str]:
     """Les `import_map` déclarés par fonction dans `supabase/config.toml`.
 
-    L'autre voie possible : `[functions.<nom>] import_map = "…"`. Elle vaut la
-    première, à ceci près qu'elle se répète onze fois.
+    L'autre voie possible : `[functions.<nom>] import_map = "…"`. Elle ne vaut
+    que faute de mieux : `--import-map` la couvre (voir `carte_retenue`). Les
+    chemins sont relatifs au dossier `supabase/`, pas à la racine du dépôt —
+    `join(input.supabaseDir, configured.import_map)` dans le CLI.
     """
     if not CONFIG.exists():
         return {}
@@ -145,6 +152,30 @@ def cartes_de_config() -> dict[str, str]:
     return cartes
 
 
+def carte_retenue(
+    fonction: str, globale: Path | None, par_fonction: dict[str, str]
+) -> Path | None:
+    """La carte que le déploiement enverra pour cette fonction.
+
+    Précédence du CLI (2.117.0, `apps/cli/src/shared/functions/deploy.ts`) :
+
+        let importMap = importMapOverride;
+        if (importMap.length === 0) { … join(input.supabaseDir, configured.import_map) … }
+
+    C'est donc `--import-map` qui prime, et non `[functions.<nom>] import_map` :
+    dès que la commande désigne une carte, celle de `config.toml` est ignorée,
+    pour toutes les fonctions. Prendre la précédence à l'envers laisserait
+    passer une fonction dont le `config.toml` déclare une carte complète
+    pendant que le déploiement enverrait la carte globale, incomplète.
+    """
+    if globale is not None:
+        return globale
+    relatif = par_fonction.get(fonction)
+    if relatif is None:
+        return None
+    return DOSSIER_SUPABASE / relatif
+
+
 def lire_carte(chemin: Path) -> dict[str, str] | None:
     if not chemin.exists():
         defaut(
@@ -159,6 +190,11 @@ def lire_carte(chemin: Path) -> dict[str, str] | None:
         return None
     imports = contenu.get("imports")
     if not isinstance(imports, dict) or not imports:
+        # Faux positif théorique assumé : une carte d'imports n'ayant que
+        # `scopes` est légale et peut tout résoudre. Aucune des nôtres n'est
+        # dans ce cas, et le message resterait juste sur le fond (la carte
+        # envoyée ne résout rien au premier niveau). À reprendre le jour où une
+        # fonction aura besoin de `scopes`.
         defaut(f"La carte {chemin.name} ne déclare aucun `imports`.")
         return None
     return imports
@@ -241,6 +277,11 @@ def main() -> int:
             "Le déploiement désigne une carte : "
             f"{globale.relative_to(RACINE) if globale.is_relative_to(RACINE) else globale}"
         )
+        if par_fonction:
+            info(
+                f"{len(par_fonction)} `import_map` de supabase/config.toml "
+                "ignoré(s) : `--import-map` les couvre."
+            )
     elif par_fonction:
         ok(f"Cartes déclarées dans supabase/config.toml : {len(par_fonction)}")
     else:
@@ -253,6 +294,10 @@ def main() -> int:
             "refusée (exécution 35651547935, docs/DEPLOIEMENT.md § 8)."
         )
 
+    # Une fonction est un dossier avec un `index.ts` : c'est la forme de nos
+    # onze. Le CLI accepte aussi `[functions.<nom>] entrypoint = "…"`, qui
+    # rendrait la fonction invisible ici. Aucune ne l'utilise ; à reprendre si
+    # l'une vient à le faire.
     fonctions = sorted(
         dossier
         for dossier in DOSSIER_FONCTIONS.iterdir()
@@ -272,11 +317,7 @@ def main() -> int:
             ok(f"{fonction.name} — aucun specifier nu")
             continue
 
-        chemin_carte = (
-            RACINE / par_fonction[fonction.name]
-            if fonction.name in par_fonction
-            else globale
-        )
+        chemin_carte = carte_retenue(fonction.name, globale, par_fonction)
         if chemin_carte is None:
             for fichier, specifier, ligne in nus:
                 defaut(
