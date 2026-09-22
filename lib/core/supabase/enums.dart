@@ -71,6 +71,31 @@ extension PlanningSql on PlanningEtat {
   };
 }
 
+/// `assignment_status` : `proposed` / `accepted` / `declined` / `replaced` /
+/// `cancelled`.
+///
+/// Un statut inconnu se lit comme **annulé** : le côté sûr est celui qui ne
+/// compte pas dans la couverture. La règle vient du ticket 019, où elle est
+/// née dans le suivi ; elle vit ici depuis le 061b, le planning en brouillon
+/// ayant lui aussi besoin de distinguer une proposition d'une acceptation.
+extension AttributionSql on AttributionEtat {
+  String get valeurSql => switch (this) {
+    AttributionEtat.propose => 'proposed',
+    AttributionEtat.accepte => 'accepted',
+    AttributionEtat.refuse => 'declined',
+    AttributionEtat.remplace => 'replaced',
+    AttributionEtat.annule => 'cancelled',
+  };
+
+  static AttributionEtat depuisSql(String? valeur) => switch (valeur) {
+    'proposed' => AttributionEtat.propose,
+    'accepted' => AttributionEtat.accepte,
+    'declined' => AttributionEtat.refuse,
+    'replaced' => AttributionEtat.remplace,
+    _ => AttributionEtat.annule,
+  };
+}
+
 /// `period_status` : `open` / `locked`.
 extension PeriodeSql on PeriodeEtat {
   String get valeurSql => switch (this) {
