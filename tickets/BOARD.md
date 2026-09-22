@@ -69,6 +69,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main
 | 049 | [Mettre la base et les Edge Functions en ligne avec la PWA](done/049-deploiement-base-et-fonctions.md) | P0 | 032 | https://github.com/slider973/astreinte-manager/pull/46 |
 | 050 | [L'écran super-admin annonce un envoi sans preuve](done/050-envoi-annonce-sans-preuve-superadmin.md) | P2 | 048 | https://github.com/slider973/astreinte-manager/pull/49 |
 | 052 | [Le centre de notifications n'a pas de retour](done/052-centre-notifications-sans-retour.md) | P1 | 026 | https://github.com/slider973/astreinte-manager/pull/47 |
-| 053 | [L'écran super-admin n'offre aucune déconnexion](done/053-superadmin-sans-deconnexion.md) | P2 | 031 | — |
+| 053 | [L'écran super-admin n'offre aucune déconnexion](done/053-superadmin-sans-deconnexion.md) | P2 | 031 | https://github.com/slider973/astreinte-manager/pull/50 |
 | 054 | [Le déploiement automatique des fonctions ignore la carte d'imports](done/054-deploiement-fonctions-carte-imports.md) | P0 | 049 | https://github.com/slider973/astreinte-manager/pull/48 |
 

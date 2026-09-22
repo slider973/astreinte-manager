@@ -4,7 +4,7 @@
 - **Priorité** : P2
 - **Dépend de** : 031
 - **Branche** : `feat/053-superadmin-sans-deconnexion`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/50
 - **Statut** : terminé le 2026-09-22 (PR créée)
 
 ## Contexte
