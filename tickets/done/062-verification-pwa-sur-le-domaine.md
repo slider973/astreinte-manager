@@ -4,8 +4,8 @@
 - **Priorité** : P0
 - **Dépend de** : 060
 - **Branche** : `feat/062-verification-pwa-sur-le-domaine`
-- **PR** : —
-- **Statut** : en cours depuis 2026-09-22
+- **PR** : https://github.com/slider973/astreinte-manager/pull/53
+- **Statut** : terminé le 2026-09-22 (PR créée)
 
 ## Contexte
 
