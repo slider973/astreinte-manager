@@ -553,9 +553,18 @@ Future<void> demonter(WidgetTester tester) =>
 ///
 /// C'est ce que la barre d'adresse affiche : les tests de liens profonds
 /// vérifient la destination réelle, pas l'écran qui se trouve dessus.
+///
+/// **Passe par `restoreRouteInformation`**, la fonction même dont `Router` se
+/// sert pour écrire l'adresse. `GoRouter.state.uri` ne conviendrait pas : pour
+/// une route empilée, il rend l'adresse de l'écran **sous** la pile, alors que
+/// le navigateur affiche celle du sommet — c'est tout l'objet de
+/// `optionURLReflectsImperativeAPIs` (ticket 052).
 String emplacementCourant(WidgetTester tester) {
-  final conteneur = ProviderScope.containerOf(
+  final routeur = ProviderScope.containerOf(
     tester.element(find.byType(AstreinteApp)),
+  ).read(appRouterProvider);
+  final adresse = routeur.routeInformationParser.restoreRouteInformation(
+    routeur.routerDelegate.currentConfiguration,
   );
-  return conteneur.read(appRouterProvider).state.uri.toString();
+  return (adresse?.uri ?? routeur.state.uri).toString();
 }

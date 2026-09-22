@@ -21,6 +21,16 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `champ_texte.dart` | `ChampTexte` | Champ rempli M3 : libellé au-dessus, erreur annoncée sous le champ, une ou plusieurs lignes. |
 | `ecran_simple.dart` | `EcranSimple` | L'ossature des écrans sans navigation : connexion, invitation, accueil d'un nouveau membre. |
 | `barre_actions_basse.dart` | `BarreActionsBasse` | Le pied de la colonne : les actions du bas s'y bornent à la même largeur que le corps, derrière un filet de niveau 1. |
+| `bouton_retour.dart` | `BoutonRetour` | La sortie d'un écran sans ossature ni parent dans le routeur. Flèche seule quand il y a une pile à dépiler, flèche **suivie du mot « Accueil »** quand il n'y en a pas (ticket 052). |
+
+## La règle qui a produit `BoutonRetour`
+
+Un écran atteint par une navigation depuis un autre écran, déclaré au premier niveau du routeur et
+sans barre de navigation, n'a **par construction aucune sortie** : sur iPhone en PWA plein écran il
+n'y a pas de barre d'adresse, et la personne est enfermée. À vérifier pour toute nouvelle route :
+
+> *Un écran qui ne porte ni `AppScaffold` ni un parent dans le routeur s'ouvre par `push` et porte
+> une flèche à repli.*
 
 ## Ce qu'aucun de ces widgets ne fait
 

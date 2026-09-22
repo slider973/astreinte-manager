@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -73,7 +75,12 @@ class _Lien extends StatelessWidget {
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: AppTouch.cible),
       child: TextButton(
-        onPressed: () => context.goNamed(route),
+        // **Un détour, pas une destination** (ticket 052). `push` pose la page
+        // au-dessus de l'écran courant : la flèche ramène à l'onglet
+        // « Profil » ou à l'écran de connexion d'où l'on vient, alors qu'un
+        // `go` remettait la pile à plat et renvoyait tout le monde sur
+        // « Mon mois ».
+        onPressed: () => unawaited(context.pushNamed<void>(route)),
         child: Text(libelle),
       ),
     );

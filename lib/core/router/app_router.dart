@@ -258,6 +258,22 @@ abstract final class AppRoutes {
 /// lui-même n'est construit qu'une fois — le reconstruire à chaque connexion
 /// remettrait la pile de navigation à zéro.
 final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
+  // **L'URL doit dire la vérité, même pour un écran empilé** (ticket 052).
+  //
+  // `GoRouter.optionURLReflectsImperativeAPIs` vaut `false` par défaut
+  // (`go_router 17.5.0`, `lib/src/router.dart:340`), et `lib/src/parser.dart`
+  // n'utilise l'adresse d'une route empilée que si ce drapeau est vrai. Sans
+  // lui, le centre de notifications s'afficherait pendant que la barre
+  // d'adresse resterait sur `/`, et un rechargement rendrait l'accueil au lieu
+  // du centre — écart direct à `DESIGN.md § Navigation` : « chaque écran est
+  // une route nommée, jamais un état local ».
+  //
+  // À savoir pour éviter un faux diagnostic : l'entrée d'historique, elle, est
+  // poussée dans les deux cas. **Le bouton précédent fonctionnerait déjà sans
+  // ce drapeau** ; c'est l'URL et le rechargement qui l'exigent, pas le
+  // retour. Ne pas retirer cette ligne en croyant qu'elle sert au retour.
+  GoRouter.optionURLReflectsImperativeAPIs = true;
+
   final env = ref.watch(envProvider);
   final demarrage = ref.watch(supabaseDemarrageProvider);
 
