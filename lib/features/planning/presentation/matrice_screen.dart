@@ -741,12 +741,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               barre,
-              BandeauMois(
-                resume: bandeau,
-                mois: etat.periode.mois,
-                annee: etat.periode.annee,
-                compact: true,
-              ),
+              BandeauMois(resume: bandeau, compact: true),
             ],
           ),
           planning,
@@ -778,12 +773,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   if (complet || reduit)
-                    BandeauMois(
-                      resume: bandeau,
-                      mois: etat.periode.mois,
-                      annee: etat.periode.annee,
-                      compact: reduit,
-                    ),
+                    BandeauMois(resume: bandeau, compact: reduit),
                   if (complet || reduit)
                     BandeSemaine(
                       annee: etat.periode.annee,

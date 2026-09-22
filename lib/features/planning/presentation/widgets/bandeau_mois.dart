@@ -22,17 +22,11 @@ import 'barre_repartition.dart';
 class BandeauMois extends StatelessWidget {
   const BandeauMois({
     required this.resume,
-    required this.mois,
-    required this.annee,
     super.key,
     this.compact = false,
   });
 
   final ResumeMois resume;
-
-  /// Le mois affiché, en base 1.
-  final int mois;
-  final int annee;
 
   /// Vrai en `compact` : une seule ligne de trois chiffres, sans barre.
   final bool compact;
@@ -72,23 +66,13 @@ class BandeauMois extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              // Le mois et ses chiffres sur la même ligne : la matrice a
-              // besoin de toute la hauteur qu'on ne lui prend pas, et un
-              // titre sur sa propre ligne coûterait trois lignes de membres.
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      AppStrings.moisNomEtAnnee(mois, annee),
-                      style: theme.textTheme.titleLarge,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.xl),
-                  Expanded(flex: 3, child: chiffres),
-                ],
-              ),
+              // **Le mois n'est pas écrit ici.** Le sélecteur de la barre de
+              // commande, juste au-dessus, le porte déjà — avec l'état de la
+              // période, que lui seul connaît. La ligne des chiffres part
+              // donc du bord gauche du bloc, sur la même verticale que la
+              // barre et que sa légende : un intitulé neutre à cette place
+              // se lirait comme un quatrième compteur privé de son nombre.
+              chiffres,
               const SizedBox(height: AppSpacing.md),
               BarreRepartition(parts: _parts(context)),
             ],

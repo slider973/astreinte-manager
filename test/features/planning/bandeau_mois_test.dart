@@ -199,16 +199,19 @@ void main() {
       enAttente: 7,
     );
 
-    testWidgets('trois chiffres, leur libellé, et le mois en titre', (
+    testWidgets('trois chiffres et leur libellé, sans titre de mois', (
       tester,
     ) async {
       await monter(
         tester,
-        const BandeauMois(resume: resume, mois: 10, annee: 2026),
+        const BandeauMois(resume: resume),
         taille: const Size(1280, 900),
       );
 
-      expect(find.text(AppStrings.moisNomEtAnnee(10, 2026)), findsOneWidget);
+      // **Le mois est écrit une seule fois, dans le sélecteur** de la barre
+      // de commande. Le bandeau ne le répète pas : deux fois « Septembre
+      // 2026 » à trente points d'écart, c'est une question posée au lecteur.
+      expect(find.text(AppStrings.moisNomEtAnnee(10, 2026)), findsNothing);
       expect(find.text(AppStrings.bandeauCouverts), findsOneWidget);
       expect(find.text(AppStrings.bandeauAPourvoir), findsOneWidget);
       expect(find.text(AppStrings.bandeauEnAttente), findsOneWidget);
@@ -219,11 +222,43 @@ void main() {
       expect(find.text('7'), findsOneWidget);
     });
 
+    testWidgets('la ligne des chiffres part du bord gauche, comme la barre', (
+      tester,
+    ) async {
+      await monter(
+        tester,
+        const BandeauMois(resume: resume),
+        taille: const Size(1280, 900),
+      );
+
+      // Le premier libellé, la barre et la première ligne de légende
+      // partagent une verticale : la place laissée par le titre de mois n'a
+      // pas été rendue à un intitulé, elle est rendue aux chiffres.
+      final gaucheDuLibelle = tester
+          .getTopLeft(find.text(AppStrings.bandeauCouverts))
+          .dx;
+      final gaucheDeLaBarre = tester.getTopLeft(find.byType(BarreRepartition)).dx;
+      final gaucheDeLaLegende = tester
+          .getTopLeft(find.text(AppStrings.bandeauPartCouverts))
+          .dx;
+
+      expect(gaucheDuLibelle, moreOrLessEquals(gaucheDeLaBarre, epsilon: 1));
+      expect(gaucheDeLaLegende, greaterThan(gaucheDeLaBarre));
+
+      // Et les trois compteurs se partagent toute la largeur du bloc : le
+      // troisième commence après les deux tiers.
+      final largeur = tester.getSize(find.byType(BarreRepartition)).width;
+      final troisieme = tester
+          .getTopLeft(find.text(AppStrings.bandeauEnAttente))
+          .dx;
+      expect(troisieme - gaucheDeLaBarre, greaterThan(largeur * 0.6));
+    });
+
     testWidgets('la barre a quatre parts proportionnelles, chacune avec sa '
         'ligne de légende', (tester) async {
       await monter(
         tester,
-        const BandeauMois(resume: resume, mois: 10, annee: 2026),
+        const BandeauMois(resume: resume),
         taille: const Size(1280, 900),
       );
 
@@ -294,8 +329,6 @@ void main() {
             nonSaisis: 0,
             enAttente: 0,
           ),
-          mois: 10,
-          annee: 2026,
         ),
         taille: const Size(1280, 900),
       );
@@ -310,12 +343,7 @@ void main() {
     ) async {
       await monter(
         tester,
-        const BandeauMois(
-          resume: resume,
-          mois: 10,
-          annee: 2026,
-          compact: true,
-        ),
+        const BandeauMois(resume: resume, compact: true),
       );
 
       expect(find.text(AppStrings.bandeauCouverts), findsOneWidget);
@@ -326,7 +354,7 @@ void main() {
     testWidgets('sombre : le bandeau tient sans exception', (tester) async {
       await monter(
         tester,
-        const BandeauMois(resume: resume, mois: 10, annee: 2026),
+        const BandeauMois(resume: resume),
         taille: const Size(1280, 900),
         brightness: Brightness.dark,
       );
