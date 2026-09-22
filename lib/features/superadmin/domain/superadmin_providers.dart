@@ -151,6 +151,14 @@ class SuperAdminController extends AsyncNotifier<VueSuperAdmin> {
   /// `MembresRepository.inviter` qui part, donc l'Edge Function
   /// `invite-member`, donc `create_invitation` — laquelle reconnaît l'éditeur
   /// depuis la migration `0025`.
+  ///
+  /// **Et le compte rendu est celui des écrans de caserne**, à une adresse
+  /// près : [ResultatInvitation.libelle] et [ResultatInvitation.detail] disent
+  /// le sort de l'invitation et celui de son courriel, l'écran ne fait que les
+  /// mettre en phrase. Cet écran annonçait « Invitation envoyée » dès que le
+  /// rapport ne comptait aucun échec, sans regarder si un courriel était
+  /// sorti : le mensonge du ticket 048, au même endroit logique, sur l'écran
+  /// qu'il n'avait pas ouvert (ticket 050).
   Future<ResultatSuperAdmin> inviterAdministrateur({
     required String stationId,
     required String email,
@@ -176,9 +184,14 @@ class SuperAdminController extends AsyncNotifier<VueSuperAdmin> {
             role: RoleMembre.admin,
           );
 
-      if (!rapport.toutEstPasse) {
-        final refus = rapport.resultats
-            .where((ResultatInvitation r) => r.enEchec)
+      // Une adresse, donc un résultat. **Et c'est lui qu'on annonce, pas
+      // l'absence d'échec** : le rapport d'un envoi sans fournisseur de
+      // courriel configuré ne compte aucun échec et n'a pourtant rien envoyé.
+      // Un corps sans résultat n'est pas une réussite non plus : personne
+      // n'est invité, et l'annoncer serait le même mensonge en plus gros.
+      final resultat = rapport.resultats.firstOrNull;
+      if (!rapport.toutEstPasse || resultat == null) {
+        final refus = rapport.refus
             .map((ResultatInvitation r) => r.detail)
             .whereType<String>()
             .firstOrNull;
@@ -187,8 +200,17 @@ class SuperAdminController extends AsyncNotifier<VueSuperAdmin> {
 
       await relire();
       return ResultatSuperAdmin(
+        // L'invitation existe : l'action a abouti, même si le courriel est
+        // resté à quai — c'est un renvoi à faire, pas un refus à corriger.
+        // La phrase, elle, ne dit que ce qui est vrai.
         reussi: true,
-        message: AppStrings.superAdminInvitationEnvoyee(email),
+        message: AppStrings.superAdminResultatInvitation(
+          // Le serveur normalise l'adresse ; c'est la sienne qu'on relit à la
+          // personne, et la saisie ne sert que s'il ne l'a pas rendue.
+          email: resultat.email.isEmpty ? email : resultat.email,
+          libelle: resultat.libelle,
+          detail: resultat.detail,
+        ),
       );
     } on EchecInvitation catch (echec) {
       return _refuser(vue, echec.message);

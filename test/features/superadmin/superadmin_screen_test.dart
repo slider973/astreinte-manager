@@ -3,6 +3,7 @@ import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/widgets/champ_texte.dart';
 import 'package:astreinte_sp/core/widgets/empty_state.dart';
 import 'package:astreinte_sp/core/widgets/primary_button.dart';
+import 'package:astreinte_sp/features/membres/domain/invitation.dart';
 import 'package:astreinte_sp/features/superadmin/data/superadmin_repository.dart';
 import 'package:astreinte_sp/features/superadmin/domain/caserne_supervisee.dart';
 import 'package:astreinte_sp/features/superadmin/presentation/superadmin_screen.dart';
@@ -13,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/faux_auth.dart';
 import '../../support/faux_invitations.dart';
 import '../../support/faux_superadmin.dart';
+import '../../support/promesse_envoi.dart';
 
 /// Un écran de bureau : c'est là que l'éditeur travaille, et trois blocs
 /// doivent y tenir sans défilement acrobatique.
@@ -68,6 +70,38 @@ Future<void> _remplirEtValider(
   await tester.tap(_bouton(bouton));
   await tester.pumpAndSettle();
 }
+
+/// Le geste complet : ouvrir la feuille du premier administrateur, taper
+/// l'adresse, valider. Trois lignes identiques dans chaque cas d'annonce.
+Future<void> _inviter(
+  WidgetTester tester, {
+  String email = 'chef@cis-neuve.test',
+}) async {
+  await _toucher(
+    tester,
+    AppStrings.superAdminInviterAdmin,
+    caserneSansAdmin.nom,
+  );
+  await _remplirEtValider(
+    tester,
+    champ: AppStrings.superAdminChampEmail,
+    valeur: email,
+    bouton: AppStrings.superAdminInviterValider,
+  );
+}
+
+/// Le serveur du 21 septembre : l'invitation est retenue, aucun courriel ne
+/// sort, et le rapport ne compte **aucun échec**.
+FauxMembresRepository _depotQuiNEnvoiePas({
+  StatutResultatInvitation statut = StatutResultatInvitation.invitee,
+  String email = 'chef@cis-neuve.test',
+}) => FauxMembresRepository(
+  rapport: RapportInvitations(
+    resultats: <ResultatInvitation>[
+      ResultatInvitation(email: email, statut: statut, courrielEnvoye: false),
+    ],
+  ),
+);
 
 /// Le champ de saisie sous un libellé : `ChampTexte` place le libellé **à
 /// côté** du `TextField`, jamais dedans (`DESIGN.md § Inputs`).
@@ -314,25 +348,89 @@ void main() {
 
     testWidgets('la réussite est annoncée, jamais silencieuse', (tester) async {
       await _ouvrir(tester);
-
-      await _toucher(
-        tester,
-        AppStrings.superAdminInviterAdmin,
-        caserneSansAdmin.nom,
-      );
-      await _remplirEtValider(
-        tester,
-        champ: AppStrings.superAdminChampEmail,
-        valeur: 'chef@cis-neuve.test',
-        bouton: AppStrings.superAdminInviterValider,
-      );
+      await _inviter(tester);
 
       expect(
         find.text(
-          AppStrings.superAdminInvitationEnvoyee('chef@cis-neuve.test'),
+          AppStrings.superAdminResultatInvitation(
+            email: 'chef@cis-neuve.test',
+            libelle: AppStrings.resultatInvitee,
+          ),
         ),
         findsOneWidget,
       );
+    });
+
+    // Le ticket 050. Le rapport d'un envoi sans fournisseur de courriel
+    // configuré — la production du 21 septembre — ne compte **aucun échec**
+    // et n'a pourtant rien envoyé : l'écran annonçait « Invitation envoyée à
+    // X. » sur cette seule absence. La règle de vérité est celle des écrans
+    // de caserne (ticket 048), et [aucunEnvoiPromis] garde ce qui est rendu,
+    // y compris ce qu'un lecteur d'écran prononce.
+    group('l\'annonce ne promet que l\'envoi qui a eu lieu', () {
+      testWidgets('courriel non parti : l\'invitation est créée, et rien de '
+          'plus', (tester) async {
+        await _ouvrir(tester, membres: _depotQuiNEnvoiePas());
+        await _inviter(tester);
+
+        expect(
+          find.text(
+            AppStrings.superAdminResultatInvitation(
+              email: 'chef@cis-neuve.test',
+              libelle: AppStrings.resultatCreee,
+              detail: AppStrings.resultatCourrielNonParti,
+            ),
+          ),
+          findsOneWidget,
+        );
+        aucunEnvoiPromis(tester);
+      });
+
+      testWidgets('adresse déjà invitée et courriel non parti : rien de neuf '
+          'n\'est annoncé', (tester) async {
+        await _ouvrir(
+          tester,
+          membres: _depotQuiNEnvoiePas(
+            statut: StatutResultatInvitation.relancee,
+          ),
+        );
+        await _inviter(tester);
+
+        expect(
+          find.text(
+            AppStrings.superAdminResultatInvitation(
+              email: 'chef@cis-neuve.test',
+              libelle: AppStrings.resultatDejaEnAttente,
+              detail: AppStrings.resultatCourrielNonParti,
+            ),
+          ),
+          findsOneWidget,
+        );
+        aucunEnvoiPromis(tester);
+      });
+
+      // Zéro échec **et** zéro résultat : personne n'est invité. « Tout est
+      // passé » se lit encore vrai, et c'est exactement pour cela qu'on
+      // n'annonce pas une réussite dessus.
+      testWidgets('un rapport sans résultat est un refus, pas une réussite', (
+        tester,
+      ) async {
+        await _ouvrir(
+          tester,
+          membres: FauxMembresRepository(
+            rapport: const RapportInvitations(
+              resultats: <ResultatInvitation>[],
+            ),
+          ),
+        );
+        await _inviter(tester);
+
+        expect(
+          find.text(AppStrings.superAdminEchecInvitation),
+          findsWidgets,
+        );
+        aucunEnvoiPromis(tester);
+      });
     });
   });
 
