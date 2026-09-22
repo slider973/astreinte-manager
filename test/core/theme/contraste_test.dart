@@ -518,4 +518,168 @@ void main() {
       );
     });
   });
+
+  /// La sélection indigo et le vert de l'accepté, mesurés séparément.
+  ///
+  /// Deux teintes, deux sens, et deux pastilles qui se posent sous du texte :
+  /// `primary-container` derrière ce qui est **choisi** (segment, puce, mois,
+  /// jour, destination), `secondary-container` derrière ce qui est **acquis**
+  /// (accepté, couvert, validé, publié). Tout ce qui se pose dessus est
+  /// vérifié ici.
+  group('Contraste — la pastille de sélection et le bloc de l\'accepté', () {
+    for (final (nom, scheme) in <(String, ColorScheme)>[
+      ('clair', AppTheme.clair.colorScheme),
+      ('sombre', AppTheme.sombre.colorScheme),
+    ]) {
+      test('$nom : la pastille de sélection porte son texte et son filet', () {
+        // Libellé d'un segment ou d'une puce choisie.
+        verifier(
+          'onPrimaryContainer/primaryContainer',
+          scheme.onPrimaryContainer,
+          scheme.primaryContainer,
+        );
+        // Encre du registre : le nombre du jour choisi, le nom du mois choisi.
+        verifier(
+          'onSurface/primaryContainer',
+          scheme.onSurface,
+          scheme.primaryContainer,
+        );
+        // Texte de soutien de la même pastille : le jour de la semaine
+        // au-dessus du quantième, la ligne d'état sous le nom du mois.
+        verifier(
+          'onSurfaceVariant/primaryContainer',
+          scheme.onSurfaceVariant,
+          scheme.primaryContainer,
+        );
+        // Le filet de sélection, 2 dp : porteur d'état, donc 3:1.
+        verifier(
+          'primary/primaryContainer',
+          scheme.primary,
+          scheme.primaryContainer,
+          seuil: seuilFilet,
+        );
+        verifier(
+          'primary/surface',
+          scheme.primary,
+          scheme.surface,
+          seuil: seuilFilet,
+        );
+        // La pastille doit se détacher du papier, sans quoi « choisi » ne se
+        // voit plus : même cible de 1.3:1 que les conteneurs de nuit.
+        verifier(
+          'primaryContainer/surface',
+          scheme.primaryContainer,
+          scheme.surface,
+          seuil: 1.3,
+        );
+      });
+    }
+
+    test('clair : le vert de l\'accepté', () {
+      verifier(
+        'etatAccepteSurFond/etatAccepteFond',
+        AppColors.etatAccepteSurFond,
+        AppColors.etatAccepteFond,
+      );
+      verifier(
+        'etatInfoSurFond/etatInfoFond',
+        AppColors.etatInfoSurFond,
+        AppColors.etatInfoFond,
+      );
+      // Le vert est, avec l'indigo de texte, la seule teinte d'état lisible
+      // sur blanc : c'est ce qui autorise « Enregistré » en texte vert.
+      verifier('etatAccepte/surface', AppColors.etatAccepte, AppColors.surface);
+      verifier(
+        'etatAccepteFond/surface',
+        AppColors.etatAccepteFond,
+        AppColors.surface,
+        seuil: 1.3,
+      );
+    });
+
+    test('sombre : le vert de l\'accepté', () {
+      verifier(
+        'darkEtatAccepteSurFond/darkEtatAccepteFond',
+        AppColors.darkEtatAccepteSurFond,
+        AppColors.darkEtatAccepteFond,
+      );
+      verifier(
+        'darkEtatAccepte/darkSurface',
+        AppColors.darkEtatAccepte,
+        AppColors.darkSurface,
+      );
+      verifier(
+        'darkEtatAccepteFond/darkSurface',
+        AppColors.darkEtatAccepteFond,
+        AppColors.darkSurface,
+        seuil: 1.3,
+      );
+    });
+
+    test('les deux pastilles ont la même valeur : c\'est la marque qui les '
+        'sépare, pas la teinte', () {
+      // 1.01:1 en clair, 1.06:1 en nuit : en niveaux de gris, la pastille
+      // indigo et le bloc vert sont **le même gris**. C'est mesuré ici pour
+      // qu'on ne se raconte pas l'inverse : rien de ce qui distingue
+      // « choisi » de « accepté » ne peut reposer sur la couleur. L'icône
+      // et le libellé le font, et le système les rend obligatoires
+      // (`StatusDescriptor`).
+      expect(
+        ratio(AppColors.primaryContainer, AppColors.etatAccepteFond),
+        lessThan(1.1),
+      );
+      expect(
+        ratio(AppColors.darkPrimaryContainer, AppColors.darkEtatAccepteFond),
+        lessThan(1.1),
+      );
+
+      final acceptee = AppStatusColors.clair.attribution(
+        AttributionEtat.accepte,
+      );
+      final disponible = AppStatusColors.clair.disponibilite(
+        DisponibiliteEtat.disponible,
+      );
+      expect(acceptee.icone, isNot(disponible.icone));
+      expect(acceptee.libelle, isNot(disponible.libelle));
+    });
+
+    test('les ratios écrits dans `app_colors.dart` sont les vrais', () {
+      expect(
+        ratio(AppColors.etatAccepte, AppColors.surface),
+        closeTo(6.61, 0.02),
+      );
+      expect(
+        ratio(AppColors.etatAccepteSurFond, AppColors.etatAccepteFond),
+        closeTo(7.02, 0.02),
+      );
+      expect(
+        ratio(AppColors.etatAccepteFond, AppColors.surface),
+        closeTo(1.32, 0.02),
+      );
+      expect(
+        ratio(AppColors.darkEtatAccepte, AppColors.darkSurface),
+        closeTo(6.72, 0.02),
+      );
+      expect(
+        ratio(AppColors.darkEtatAccepteSurFond, AppColors.darkEtatAccepteFond),
+        closeTo(8.67, 0.02),
+      );
+      expect(
+        ratio(AppColors.darkEtatAccepteFond, AppColors.darkSurface),
+        closeTo(1.63, 0.02),
+      );
+      expect(
+        ratio(AppColors.onPrimaryContainer, AppColors.primaryContainer),
+        closeTo(6.74, 0.02),
+      );
+      expect(
+        ratio(AppColors.primary, AppColors.primaryContainer),
+        closeTo(3.61, 0.02),
+      );
+      expect(
+        ratio(AppColors.darkPrimary, AppColors.darkPrimaryContainer),
+        closeTo(4.52, 0.02),
+      );
+    });
+  });
 }

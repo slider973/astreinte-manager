@@ -45,6 +45,26 @@ d'état vide seulement. Le test de contraste garde ces trois-là en vérifiant q
 De nuit, l'orange et le rose vifs deviennent du texte (`darkTertiary`, `darkError`), parce que le
 fond a changé de côté. C'est mesuré, pas supposé.
 
+## Ce que dit l'indigo, ce que dit le vert
+
+Deux teintes, deux sens, et aucun recouvrement.
+
+- **Indigo** — ce qui est **choisi** et ce qui est **disponible**. `primary-container` est la
+  pastille de la sélection : segment choisi, puce choisie, mois choisi, jour choisi, destination
+  de navigation courante. `onPrimaryContainer` est son encre, 6.74:1 en clair, 9.07:1 de nuit.
+- **Vert** — ce qui est **acquis** : accepté, couvert, validé, publié, saisie ouverte,
+  enregistré. C'est la famille `etatAccepte*`, mêmes valeurs que `etatInfo*`.
+
+Material 3 sélectionne en `secondary-container`, c'est-à-dire, depuis le 061, en vert. **Tout
+composant qui exprime une sélection doit donc être réglé dans `app_theme.dart`** —
+`segmentedButtonTheme`, `chipTheme`, `navigationBarTheme`, `navigationRailTheme`,
+`navigationDrawerTheme` le sont. Un composant Material ajouté sans ce réglage repartira en vert
+et fera dire à la couleur deux choses à la fois.
+
+Les deux pastilles ont presque la même valeur (1.01:1 l'une contre l'autre) : en niveaux de gris
+elles sont le même gris. Rien de ce qui sépare « choisi » de « accepté » ne repose donc sur la
+teinte — l'icône et le libellé le font, et `StatusDescriptor` les rend obligatoires.
+
 ## Valeurs dérivées ici
 
 Les accents sombres viennent du brief ; **les conteneurs sombres ont été dérivés dans
@@ -60,4 +80,6 @@ réemploient les tokens des quatre familles de tête (indigo, vert, orange, rose
 `test/core/theme/contraste_test.dart` recalcule le ratio WCAG de chaque paire du système à chaque
 exécution : un changement de couleur qui casse 4.5:1 (texte) ou 3:1 (filet porteur d'état) fait
 échouer la suite. `test/core/theme/app_status_test.dart` interdit deux icônes identiques dans une
-même famille d'états.
+même famille d'états. `test/core/theme/selection_et_accepte_test.dart` monte un bouton segmenté,
+une puce et les badges « Accepté » et « Validé » en clair et en sombre, et vérifie sur la couleur
+**peinte** que la sélection est indigo et que l'acquis est vert.
