@@ -255,6 +255,18 @@ void main() {
           .toList();
       expect(flexs, <int>[40, 15, 5, 2]);
 
+      // Et chaque part est **peinte** : une part centrée dans la barre plutôt
+      // qu'étirée n'aurait aucune hauteur, et la barre serait invisible.
+      final peintes = find.descendant(
+        of: find.byType(BarreRepartition),
+        matching: find.byType(ColoredBox),
+      );
+      for (var index = 0; index < peintes.evaluate().length; index++) {
+        final taille = tester.getSize(peintes.at(index));
+        expect(taille.height, BarreRepartition.hauteur);
+        expect(taille.width, greaterThan(0));
+      }
+
       // La légende double la couleur d'une icône, d'un libellé et du nombre.
       for (final libelle in <String>[
         AppStrings.bandeauPartCouverts,

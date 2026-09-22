@@ -62,6 +62,10 @@ class BarreRepartition extends StatelessWidget {
               child: visibles.isEmpty
                   ? ColoredBox(color: theme.colorScheme.surfaceContainerHigh)
                   : Row(
+                      // `stretch` et non le centrage par défaut : une part
+                      // n'a pas de hauteur à elle, et centrée elle en prend
+                      // zéro. La barre serait invisible.
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
                         for (final part in visibles)
                           Expanded(
