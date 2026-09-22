@@ -5,7 +5,7 @@
 - **Dépend de** : 054
 - **Branche** : `feat/060-deploiement-pwa-par-api`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-22
 
 ## Contexte
 
