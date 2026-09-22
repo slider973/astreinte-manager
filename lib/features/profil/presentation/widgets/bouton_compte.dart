@@ -32,15 +32,19 @@ class BoutonCompte extends ConsumerWidget {
         ? AppStrings.compteOuvrir
         : AppStrings.compteOuvrirNomme(nom);
 
+    // **Le libellé est porté une seule fois, par l'infobulle.** `tooltip` pose
+    // déjà un nœud de bouton nommé — c'est ainsi que « Membres » et
+    // « Notifications » s'annoncent dans le même en-tête. Un `Semantics` de
+    // plus autour du disque en posait un second, superposé au premier : deux
+    // boutons dans l'arbre, le même libellé lu deux fois.
+    //
+    // Les initiales, elles, sortent de l'arbre : elles ne s'épellent pas, et
+    // fondues dans le nœud du bouton elles ajouteraient « DJ » à la fin du
+    // nom qu'elles abrègent.
     return IconButton(
       onPressed: () => _ouvrir(context),
       tooltip: libelle,
-      icon: Semantics(
-        label: libelle,
-        button: true,
-        excludeSemantics: true,
-        child: AvatarInitiales(nom: nom),
-      ),
+      icon: ExcludeSemantics(child: AvatarInitiales(nom: nom)),
     );
   }
 
