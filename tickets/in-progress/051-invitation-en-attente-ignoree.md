@@ -5,7 +5,7 @@
 - **Dépend de** : 006
 - **Branche** : `feat/051-invitation-en-attente-ignoree`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-22
 
 ## Contexte
 
