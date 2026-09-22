@@ -70,6 +70,10 @@ colors:
   dark-surface-container-highest: "#2C373E"
   dark-outline: "#7E8D96"
   dark-outline-variant: "#3A454C"
+  dark-inverse-surface: "#E2E8EC"
+  dark-on-inverse-surface: "#131C23"
+  dark-inverse-primary: "#5840BC"
+  dark-shadow: "#000000"
   # — Encres d'état (clair)
   etat-disponible: "#5840BC"
   etat-disponible-plein: "#7655FA"
@@ -225,7 +229,7 @@ components:
     height: "52px"
   bouton-secondaire:
     backgroundColor: "{colors.surface}"
-    textColor: "{colors.primary}"
+    textColor: "{colors.accent-texte}"
     typography: "{typography.libelle-action}"
     rounded: "{rounded.controle}"
     padding: "14px 24px"
@@ -356,11 +360,11 @@ Inchangés depuis le ticket 004 : `surface #FFFFFF`, `on-surface #131C23`, `on-s
 | État | Marque | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|---|
 | **disponible** | case pleine | `Icons.check_box` (`check` dans la grille) | « Disponible » | fond `#7655FA`, glyphe `#FFFFFF` (4.72:1) | fond `#5840BC`, glyphe `#FFFFFF` (7.31:1) |
-| **absent** | case hachurée à 45°, bord 2 dp | `Icons.disabled_by_default` (`close` dans la grille) | « Absent » | fond `#FED7E5`, bord et hachures `#BB285D` (4.49:1 sur blanc) | fond `#6F203D`, bord `#FB7CAA` (4.39:1) |
+| **absent** | case hachurée à 45°, bord 2 dp | `Icons.disabled_by_default` (`close` dans la grille) | « Absent » | fond `#FED7E5`, bord et hachures `#BB285D` (4,49:1 sur son fond #FED7E5, 5,87:1 sur blanc) | fond `#6F203D`, bord `#FB7CAA` (4.39:1) |
 | **non saisi** | case vide, filet tireté 3/3 | `Icons.check_box_outline_blank` (`remove` dans la grille) | « Non saisi » | fond `surface`, filet `#73828B`, glyphe `#52626C` (6.32:1) | filet `#6E7D87`, glyphe `#A4B1B9` (8.31:1) |
 
 Le triplet vient du registre lui-même : cochée / barrée / vide. Il tient en niveaux de gris
-(luminance relative 0.11 / 0.78 hachurée de 0.09 / 1.00) et il tient à 40 cm au soleil.
+(luminance relative 0.16 / 0.78 hachurée de 0.09 / 1.00) et il tient à 40 cm au soleil.
 
 #### Créneau — jour et nuit
 
@@ -383,8 +387,7 @@ L'écart de valeur jour/nuit est volontairement faible (1.18:1) : c'est un repè
 | **refusé** | barré | `Icons.cancel` | « Refusé » | `#131C23` sur `#FED7E5` (13.19:1) | `#FED7E5` sur `#6F203D` (8.24:1) |
 | **annulé** | barré, atténué | `Icons.block` | « Annulé » | `#2A343A` sur `#E7EBEE` (10.61:1) | `#C4CFD6` sur `#222C33` (8.97:1) |
 
-`accepté` et `disponible` partagent le vert mais jamais l'icône (`task_alt` ≠ `check_box`) ni
-l'écran. `refusé` et `absent` partagent le vermillon mais jamais l'icône (`cancel` ≠
+`accepté` est vert, `disponible` est indigo : deux familles distinctes, et l'icône plus le libellé les séparent en niveaux de gris. `refusé` et `absent` partagent le rose `#BB285D` mais jamais l'icône (`cancel` ≠
 `disabled_by_default`). « Annulé » ne se supprime pas : il se barre et reste lisible (principe
 produit 5).
 
@@ -393,7 +396,7 @@ produit 5).
 | État | Marque | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|---|
 | **brouillon** | contour tireté | `Icons.edit_note` | « Brouillon » | `#45535C` sur `#E7EBEE` (6.62:1) | `#C4CFD6` sur `#222C33` (8.97:1) |
-| **publié** | plein, bleu de réglure | `Icons.campaign` | « Publié » | `#065144` sur `#CDE7F2` (7.19:1) | `#CDE8E2` sur `#14423B` (8.67:1) |
+| **publié** | plein, filet vert | `Icons.campaign` | « Publié » | `#065144` sur `#CEE5E1` (7.02:1) | `#CDE8E2` sur `#14423B` (8.67:1) |
 | **validé** | tampon | `Icons.verified` | « Validé » | `#065144` sur `#CEE5E1` (7.02:1) | `#CDE8E2` sur `#14423B` (8.67:1) |
 | **archivé** | atténué | `Icons.inventory_2` | « Archivé » | `#4A5860` sur `#EEF1F3` (6.48:1) | `#A4B1B9` sur `#182127` (7.44:1) |
 
@@ -401,7 +404,7 @@ produit 5).
 
 | État | Marque | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|---|
-| **ouverte** | filet bleu en marge | `Icons.lock_open` | « Saisie ouverte jusqu'au {date} » | `#065144` sur `#CDE7F2` (7.19:1) | `#CDE8E2` sur `#14423B` (8.67:1) |
+| **ouverte** | filet vert en marge | `Icons.lock_open` | « Saisie ouverte jusqu'au {date} » | `#065144` sur `#CEE5E1` (7.02:1) | `#CDE8E2` sur `#14423B` (8.67:1) |
 | **verrouillée** | fond hachuré gris, cases non interactives | `Icons.lock` | « Mois verrouillé » | `#3A464E` sur `#DDE3E7` (7.49:1) | `#B3C0C8` sur `#222C33` (7.65:1) |
 
 Le verrouillage **n'est pas une erreur** : il est gris-encre, jamais rouge. C'est un fait, pas une
@@ -413,7 +416,7 @@ grille entière pour que l'état soit compris sans lire la bannière.
 | État | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|
 | **au repos** | `Icons.cloud_done_outlined` | « À jour » | `on-surface-variant` sur `surface` (7.94:1) | `#B3C0C8` sur `#0F161B` (9.81:1) |
-| **hors ligne** | `Icons.cloud_off` | « Hors ligne — tes modifications partiront au retour du réseau » | ocre `#7A5200` sur `#FFE9BF` (5.82:1) | `#FFE0A3` sur `#4A3400` (9.23:1) |
+| **hors ligne** | `Icons.cloud_off` | « Hors ligne — tes modifications partiront au retour du réseau » | encre sur fond orange `#131C23` sur `#FDEAD7` (14.72:1) | `#FDEBD8` sur `#613305` (9.10:1) |
 | **enregistrement** | `Icons.sync` | « Enregistrement… » | `on-surface-variant` sur `surface` | `#B3C0C8` sur `#0F161B` |
 | **enregistré** | `Icons.cloud_done` | « Enregistré » | `#086959` sur `surface` (6.61:1) | `#5FAA9E` sur `#0F161B` (6.72:1) |
 | **échec** | `Icons.error_outline` | « Non enregistré » + action « Réessayer » | `#BB285D` sur `surface` (5.87:1) | `#FB7CAA` sur `#0F161B` (7.44:1) |
@@ -425,7 +428,7 @@ document ; aucune valeur nouvelle n'a été inventée.
 
 ## Typography
 
-**Deux familles, chacune à sa place, décidées au ticket 061.** **Archivo** (SIL OFL, embarquée dans `assets/fonts/`, graisses 600 et 700) porte les trois styles de titre à 28, 22 et 18 points, avec un interlettrage au plus de −0,02 em : c'est là que se voit le caractère de la référence choisie par le propriétaire, et là où la confusion de glyphes n'a pas d'enjeu. **Atkinson Hyperlegible Next** garde tout le texte à 16 points et moins, pour la raison de brief du ticket 004 : distinction `1`/`l`/`I` et `0`/`O`, lecture au soleil et en mouvement, public de tous âges. **Atkinson Hyperlegible Mono** garde tous les chiffres.
+**Trois fontes, chacune à sa place, décidées au ticket 061.** **Archivo** (SIL OFL, embarquée dans `assets/fonts/`, graisses 600 et 700) porte les trois styles de titre à 28, 22 et 18 points, avec un interlettrage au plus de −0,02 em : c'est là que se voit le caractère de la référence choisie par le propriétaire, et là où la confusion de glyphes n'a pas d'enjeu. **Atkinson Hyperlegible Next** garde tout le texte à 16 points et moins, pour la raison de brief du ticket 004 : distinction `1`/`l`/`I` et `0`/`O`, lecture au soleil et en mouvement, public de tous âges. **Atkinson Hyperlegible Mono** garde tous les chiffres.
 
 **Un second cut pour les nombres : Atkinson Hyperlegible Mono**, même famille, chasse fixe. Tout
 nombre qui s'aligne verticalement ou qui change en place — compteurs jour/nuit/weekend, quotas
@@ -436,13 +439,12 @@ costume technique.
   doit s'ouvrir vite en 4G rurale, et un FOUT sur une grille d'états est un défaut de lecture.
 - Si une fonte manque, repli explicite : même famille + `FontFeature.tabularFigures()`
   sur tous les styles numériques, écart à signaler dans la PR. **Ce repli n'a pas été nécessaire :
-  les deux familles sont disponibles.**
+  les trois familles sont disponibles.**
 - `FontFeature.tabularFigures()` est appliqué **en plus** sur les styles `nombre*` dans tous les cas.
-- Repli système : `system-ui, -apple-system, Segoe UI, Roboto, sans-serif`.
+- Repli système : `system-ui, -apple-system, Segoe UI, sans-serif`.
 
-**Fichiers retenus au ticket 004.** Source : dépôt officiel Google Fonts, `ofl/atkinsonhyperlegiblenext`
-et `ofl/atkinsonhyperlegiblemono`, publiés par le Braille Institute sous licence SIL OFL 1.1. Les deux
-familles n'existent en amont que sous forme **variable** (axe `wght` 200–800) ; l'application embarque
+**Fichiers retenus aux tickets 004 et 061.** Source : dépôt officiel Google Fonts, `ofl/atkinsonhyperlegiblenext`
+et `ofl/atkinsonhyperlegiblemono`, publiés par le Braille Institute sous licence SIL OFL 1.1. Les familles Atkinson n'existent en amont que sous forme **variable** (axe `wght` 200–800) ; Archivo vient de `ofl/archivo` avec son axe de largeur figé. L'application embarque
 des **instances statiques sous-ensemblées** au latin et aux diacritiques français, produites avec
 `fontTools` (procédure reproductible dans `assets/fonts/README.md`) :
 
@@ -453,11 +455,12 @@ des **instances statiques sous-ensemblées** au latin et aux diacritiques franç
 | `AtkinsonHyperlegibleNext-Bold.ttf` | 700 | 42 Ko |
 | `AtkinsonHyperlegibleMono-SemiBold.ttf` | 600 | 30 Ko |
 | `AtkinsonHyperlegibleMono-Bold.ttf` | 700 | 30 Ko |
+| `AtkinsonHyperlegibleNext-Repli.ttf` | — | 10 Ko |
 | `Archivo-SemiBold.ttf` | 600 | 57 Ko |
 | `Archivo-Bold.ttf` | 700 | 57 Ko |
-| **Total** | | **312 Ko** |
+| **Total** | | **316 Ko** |
 
-312 Ko sur disque, sept fichiers ; 41 Ko de plus au démarrage une fois compressés en brotli. Le budget de 180 Ko du ticket 004 est dépassé sciemment au ticket 061, pour deux graisses d'Archivo sur les titres. Les italiques ne sont pas embarquées
+316 Ko sur disque (315 720 octets), huit fichiers ; 41 Ko de plus au démarrage une fois compressés en brotli. Le budget de 180 Ko du ticket 004 est dépassé sciemment au ticket 061, pour deux graisses d'Archivo sur les titres. `AtkinsonHyperlegibleNext-Repli.ttf` est un repli déclaré sous la famille Roboto pour désamorcer le chargement système. Les italiques ne sont pas embarquées
 (l'italique est proscrit comme moyen de hiérarchie) et les graisses 200, 300, 500 et 800 non plus
 (l'échelle n'utilise que 400, 600 et 700).
 
@@ -638,7 +641,7 @@ Hachures : trait 1.5 dp à 45°, pas de 6 dp, opacité 28 % de l'encre de l'éta
 | Variante | Fond | Texte | Bordure |
 |---|---|---|---|
 | `primaire` | `primary` | `on-primary` | — |
-| `secondaire` | `surface` | `primary` | 1 dp `outline` |
+| `secondaire` | `surface` | `accent-texte` | 1 dp `outline` |
 | `danger` | `error` | `on-error` | — |
 
 - États obligatoires : normal, pressé (`primary` + 8 % d'`on-primary` en surimpression), focus
@@ -721,9 +724,9 @@ faits qui changent tout ce qui est en dessous, et qu'on doit comprendre sans lir
 | Variante | Fond / encre | Icône | Exemple |
 |---|---|---|---|
 | `verrouille` | `#DDE3E7` / `#3A464E`, fond hachuré | `lock` | « Mois verrouillé depuis le 15 septembre. Contacte ton chef de centre. » |
-| `information` | `etat-info-fond` / `etat-info` | `info_outline` | « Saisie ouverte jusqu'au 15 septembre. » |
-| `attention` | `etat-attente-fond` / `etat-attente` | `schedule` | « Plus que 2 jours pour saisir octobre. » |
-| `hors-ligne` | `etat-attente-fond` / `etat-attente` | `cloud_off` | « Hors ligne. Tes modifications partiront au retour du réseau. » |
+| `information` | `etat-info-fond` / `etat-info-sur-fond` | `info_outline` | « Saisie ouverte jusqu'au 15 septembre. » |
+| `attention` | `etat-attente-fond` / `etat-attente-sur-fond` | `schedule` | « Plus que 2 jours pour saisir octobre. » |
+| `hors-ligne` | `etat-attente-fond` / `etat-attente-sur-fond` | `cloud_off` | « Hors ligne. Tes modifications partiront au retour du réseau. » |
 | `lecture-seule` | `etat-neutre-fond` / `etat-neutre`, fond hachuré | `visibility` | « Caserne suspendue : lecture seule. » |
 | `erreur` | `error-container` / `on-error-container` | `error_outline` | « Impossible d'enregistrer. » + action « Réessayer » |
 
@@ -870,8 +873,8 @@ navigateur, avec la matrice réelle et ses en-têtes collants.
 | Destination 3 | `groups` / `groups_outlined`, « Planning », route `/planning` | `event_available_outlined` / `event_available`, **« Astreintes »**, route `astreintes` — elle porte « Mes astreintes » | Le brief du ticket 004 notait que la place de cet écran serait à revoir à l'usage. Le compte reste à cinq, l'ordre ne bouge pas, et l'icône cesse de promettre « les autres » sur une destination qui, tant qu'un planning reste `published`, ne montre que soi. « Quand suis-je d'astreinte » (027) et « qui est d'astreinte » (023) lisent la **même** table sous la **même** politique : ce sont deux filtres d'une vue, pas deux écrans, et le ticket 023 s'y rangera derrière un sélecteur à deux segments. D'où « Astreintes », qui couvre les deux (`design/027 § 4`). |
 | Bannière `hors-ligne` | « Hors ligne. Tes modifications partiront au retour du réseau. » | sur un écran de consultation : « Hors ligne. » + seconde ligne « Dernière mise à jour : il y a 2 h. » Même variante, même ocre, même icône | Cet écran **n'écrit rien**. Promettre l'envoi de modifications inexistantes serait faux ; ce qu'il faut dire, c'est l'âge de ce qu'on lit. Une seconde phrase, `attention`, couvre le cas « en ligne mais lecture ratée » : rien n'est cassé, c'est juste vieux. |
 | Grille calendaire en compact | écart du ticket 011 : « le calendrier à sept colonnes reprend dès `expanded` » | le calendrier existe **aussi en compact**, derrière une bascule explicite, avec une marge de grille ramenée à 8 et un écart de 4 | L'écart du 011 vise une grille dont **les 62 cases** se touchent : `7 × 48 + 6 × 8 = 384 dp` contre 328. Ici trois ou quatre cases par mois sont actionnables et les autres sont du texte ; à marge 8 et écart 4, une case fait 45,7 dp sur un téléphone de 360. La liste reste la vue par défaut, et au-delà de ×1,6 d'échelle de texte le calendrier cède la place à la liste, le bouton désactivé disant pourquoi. |
-| Contrôle à deux choix | non traité ; `§ Shapes` proscrit la pastille sur un contrôle | la bascule « Liste » / « Calendrier » est faite de **deux blocs à rayon `controle`**, le choisi en `secondary-container` avec `Icons.check` en tête — jamais un `SegmentedButton` | Le segmenté Material est en gélule (`StadiumBorder`). La composition du sélecteur de mois du ticket 011 existe déjà et tient les trois signaux : la coche, le fond, `Semantics(selected:)`. |
-| Marque d'un jour d'astreinte | `§ Attribution` : « accepté » = `#05321A` sur `#CFE9D8` | la case du calendrier prend l'encre de **`etat-disponible-plein`** (`#7655FA`, glyphe blanc) et porte l'**icône du créneau** | Le vert pâle d'« accepté » ne tient pas en niveaux de gris (0,78 contre 1,00 pour une case vide), et c'est la lecture signature de l'écran. L'encre est prise pour sa **valeur**, pas pour son sens : sur cet écran « accepté » est universel et ne distingue rien — c'est le créneau qui porte l'information, par son glyphe et par la phrase annoncée. La règle « jamais la couleur seule » reste tenue par quatre signaux. |
+| Contrôle à deux choix | non traité ; `§ Shapes` proscrit la pastille sur un contrôle | la bascule « Liste » / « Calendrier » est faite de **deux blocs à rayon `controle`**, le choisi en `primary-container` avec `Icons.check` en tête — jamais un `SegmentedButton` | Le segmenté Material est en gélule (`StadiumBorder`). La composition du sélecteur de mois du ticket 011 existe déjà et tient les trois signaux : la coche, le fond, `Semantics(selected:)`. |
+| Marque d'un jour d'astreinte | au ticket 004, `§ Attribution` : « accepté » = `#05321A` sur `#CFE9D8` | la case du calendrier prend l'encre de **`etat-disponible-plein`** (`#7655FA`, glyphe blanc) et porte l'**icône du créneau** | Le vert pâle d'« accepté » ne tient pas en niveaux de gris (0,78 contre 1,00 pour une case vide), et c'est la lecture signature de l'écran. L'encre est prise pour sa **valeur**, pas pour son sens : sur cet écran « accepté » est universel et ne distingue rien — c'est le créneau qui porte l'information, par son glyphe et par la phrase annoncée. La règle « jamais la couleur seule » reste tenue par quatre signaux. |
 | Raison d'un contrôle désactivé | « une raison affichée à côté du contrôle » | pour les deux flèches de mois du calendrier, la raison est le **nom accessible** de la flèche et son info-bulle | Une phrase permanente sous la barre de mois coûterait 20 dp de grille pour redire ce qu'une flèche grise dit déjà. Le nom porte la raison : un lecteur d'écran annonce « Tu n'as pas d'astreinte avant ce mois, bouton, désactivé ». La règle tient pour les boutons de `PrimaryButton`, qui gardent leur phrase. |
 | Restauration de session | non traitée | **la caserne du membre est gardée sur l'appareil** (`core/session/appartenances_locales.dart`), et `appartenancesProvider` y retombe **quand, et seulement quand, `memberships` échoue sur le transport**. Ce qui revient du stockage est **toujours un simple membre** (`Appartenance.commeMembre`, appliqué dans le provider) | Sans ce repli, un démarrage à froid sans réseau s'arrête sur « Pas de connexion » avant d'atteindre le moindre écran : la session se restaure toute seule, la caserne non. Aucun cache de données ne servait donc dans la seule scène qui les justifie. Le repli est borné au réseau : masquer un refus ferait croire à un membre retiré de sa caserne qu'il y appartient encore. Et un rôle qu'on n'a pas pu revérifier n'accorde aucun privilège — même règle que `RoleMembre.depuisSql` ; conséquence assumée : hors ligne, un chef de centre perd l'onglet « Admin », qui ne lui ouvrirait que des listes vides (écart du ticket 024). |
 | Déconnexion | « garder [la destination en attente] à la déconnexion rejouerait l'écran d'un chef de centre pour le pompier suivant » (écart du ticket 024), dit de la seule destination | la règle vaut pour **tout ce que l'appareil garde** : `DeconnexionController` efface les deux caches — la caserne et l'instantané des astreintes — **avant** de fermer la session | Le second document porte les **noms des autres membres du créneau** : des données de tiers. Avant la fermeture, parce qu'après, ni l'identifiant du membre ni celui de la caserne ne sont plus lisibles, et une clé qu'on ne sait plus composer ne s'efface pas. Les pannes de stockage restent avalées : un effacement qui échoue ne retient personne dans une session qu'il veut quitter. Tout nouveau cache local devra être branché ici. |
@@ -883,7 +886,7 @@ navigateur, avec la matrice réelle et ses en-têtes collants.
 | Deuxième contrôle à deux choix | `§ Écarts, ticket 027` : la bascule « Liste » / « Calendrier » est faite de deux blocs à rayon `controle`, jamais un `SegmentedButton` | la composition est **extraite** dans `BasculeDeux`, et les deux bascules de l'écran — « Moi » / « La caserne » et « Liste » / « Calendrier » — en sont deux instances | Le ticket 023 en demandait une seconde. Deux copies auraient divergé au premier réglage de contraste, et c'est exactement ce que le système existe pour empêcher. Les trois signaux de l'état choisi — coche, fond, `Semantics(selected:)` — vivent désormais à un seul endroit. |
 | Deux bascules empilées | non traité | la bascule de vue **appartient à la portée « Moi »** et vit dans son sous-arbre ; « La caserne » n'a qu'une forme, donc pas de seconde rangée | Deux rangées de 48 dp coûteraient 128 dp de chrome sur un téléphone de 844, pour deux questions qui ne sont pas du même ordre. Le chrome reste comparable des deux côtés : portée + vue à gauche, portée + mois à droite. |
 | Un fait qui décrit le contenu, pas l'écran | `§ Signature Component` : une seule `AppBanner` à la fois, par ordre de priorité | « Planning publié, pas encore validé » est un **bloc réglé dans le contenu**, premier élément de la liste, pas une bannière | La bannière ne porte qu'un fait à la fois : un pompier hors ligne aurait perdu exactement l'explication dont il a besoin. Et ce fait ne décrit pas l'écran, il décrit **le mois affiché** — il se déplace donc avec lui. Ocre d'attente et `Icons.hourglass_top` de l'état **proposé** (`§ Attribution`), sans filet coloré à gauche (`§ Écarts, ticket 020`). |
-| Liste de personnes | non traité ; `§ Chips` décrit la case du registre, pas une personne | les noms d'un créneau sont **du texte qui s'enroule**, séparés par un point médian, jamais des pastilles | Douze pastilles de 28 dp mangeraient trois hauteurs d'écran pour une information qui se lit d'un coup. Le lecteur lui-même est en tête, marqué par `Icons.person` plein, l'encre `primary` et le mot « Toi » — trois signaux, et la phrase annoncée dit « avec toi et … ». |
+| Liste de personnes | non traité ; `§ Chips` décrit la case du registre, pas une personne | les noms d'un créneau sont **du texte qui s'enroule**, séparés par un point médian, jamais des pastilles | Douze pastilles de 28 dp mangeraient trois hauteurs d'écran pour une information qui se lit d'un coup. Le lecteur lui-même est en tête, marqué par `Icons.person` plein, l'encre `accent-texte` et le mot « Toi » — trois signaux, et la phrase annoncée dit « avec toi et … ». |
 | Barre de mois | `§ Écarts, ticket 027` : la raison d'une flèche désactivée est son nom accessible et son info-bulle | la barre est **extraite** dans `BarreMois`, partagée par le calendrier de « Mes astreintes » et le registre de la caserne, chacun fournissant ses libellés | Même composant, mêmes cibles de 48 dp, deux jeux de raisons : « Tu n'as pas d'astreinte avant ce mois » d'un côté, « Aucun planning publié avant ce mois » de l'autre. Le sélecteur de la caserne marche **de planning en planning** et non de mois en mois : un mois sans planning n'est pas une destination. |
 | Un état vide qui n'en est pas un | `§ Don't` : pas d'état vide muet | **un échec de lecture ne devient jamais un état vide** : la condition porte sur le contenu (`mois.isEmpty`) et non sur `hasValue`, et une liste vide encore en chargement ne décide d'aucune redirection dans `etatAuthProvider` | `AsyncValue` garde la valeur du calcul précédent à côté d'une erreur ou d'un chargement. Sans ces deux gardes, une caserne parfaitement organisée s'affichait « Aucun planning publié », et un membre parfaitement rattaché « Aucune caserne » — sur un écran qui ne propose que la déconnexion. Vu dans Chrome, API arrêtée (`design/023 § 10`). |
 | Caches locaux | `§ Écarts, ticket 027` : « tout nouveau cache local devra être branché ici » | `CachePlanningCaserne` est effacé par `DeconnexionController`, **avant** la fermeture de session, et son effacement balaie **tout le préfixe** du couple caserne/membre | Il range **une entrée par mois visité** : effacer une clé en laisserait cinq. C'est le cache le plus chargé en données de tiers du produit — il porte les noms de toute la caserne. Il ne décide d'aucun droit : un mois gardé alors que le planning n'était que publié ne contient que les créneaux du lecteur, il ne peut donc pas révéler ce que la base refusait. |
