@@ -1,24 +1,29 @@
 ---
 name: Astreinte SP
-description: Le registre de garde de la caserne, porté à l'écran — structure imprimée, états lisibles au soleil et avec des gants.
+description: Le registre de garde de la caserne, porté à l'écran — structure imprimée, accent indigo, états lisibles au soleil et avec des gants.
 colors:
   # — Rôles Material 3, thème clair
-  primary: "#16212A"
+  primary: "#7655FA"
   on-primary: "#FFFFFF"
-  primary-container: "#D6DEE4"
-  on-primary-container: "#0B141A"
-  secondary: "#0F5C7A"
+  primary-container: "#E4DDFE"
+  on-primary-container: "#4D37A2"
+  accent-texte: "#5840BC"
+  secondary: "#097C69"
   on-secondary: "#FFFFFF"
-  secondary-container: "#CDE7F2"
-  on-secondary-container: "#052B3B"
-  tertiary: "#7A5200"
+  secondary-container: "#CEE5E1"
+  on-secondary-container: "#065144"
+  tertiary: "#9F6224"
   on-tertiary: "#FFFFFF"
-  tertiary-container: "#FFE6B0"
-  on-tertiary-container: "#2A1C00"
-  error: "#A3231A"
+  tertiary-container: "#FDEAD7"
+  on-tertiary-container: "#131C23"
+  orange-vif: "#F59638"
+  error: "#BB285D"
   on-error: "#FFFFFF"
-  error-container: "#FCDDD8"
-  on-error-container: "#3E0A05"
+  error-container: "#FED7E5"
+  on-error-container: "#131C23"
+  rose-vif: "#F9357C"
+  accent-decoratif: "#B142E8"
+  accent-decoratif-fond: "#EFD9FA"
   surface: "#FFFFFF"
   on-surface: "#131C23"
   on-surface-variant: "#45535C"
@@ -32,25 +37,30 @@ colors:
   outline-variant: "#C3CDD3"
   inverse-surface: "#222C33"
   on-inverse-surface: "#EDF1F3"
-  inverse-primary: "#D8E2E8"
+  inverse-primary: "#A690FC"
   shadow: "#0B141A"
   # — Rôles Material 3, thème sombre
-  dark-primary: "#D8E2E8"
-  dark-on-primary: "#16212A"
-  dark-primary-container: "#3A454C"
-  dark-on-primary-container: "#E7EFF4"
-  dark-secondary: "#7FD0EC"
-  dark-on-secondary: "#00344A"
-  dark-secondary-container: "#0B4C66"
-  dark-on-secondary-container: "#C8E9F7"
-  dark-tertiary: "#F0C46A"
-  dark-on-tertiary: "#402C00"
-  dark-tertiary-container: "#4A3400"
-  dark-on-tertiary-container: "#FFE0A3"
-  dark-error: "#FFB4A6"
-  dark-on-error: "#5C0F07"
-  dark-error-container: "#7E1A12"
-  dark-on-error-container: "#FFDAD4"
+  dark-primary: "#A690FC"
+  dark-on-primary: "#131C23"
+  dark-primary-container: "#3A2B73"
+  dark-on-primary-container: "#E4DDFE"
+  dark-accent-texte: "#A690FC"
+  dark-secondary: "#5FAA9E"
+  dark-on-secondary: "#131C23"
+  dark-secondary-container: "#14423B"
+  dark-on-secondary-container: "#CDE8E2"
+  dark-tertiary: "#F59638"
+  dark-on-tertiary: "#131C23"
+  dark-tertiary-container: "#613305"
+  dark-on-tertiary-container: "#FDEBD8"
+  dark-orange-vif: "#F59638"
+  dark-error: "#FB7CAA"
+  dark-on-error: "#131C23"
+  dark-error-container: "#6F203D"
+  dark-on-error-container: "#FED7E5"
+  dark-rose-vif: "#FB7CAA"
+  dark-accent-decoratif: "#CC84F0"
+  dark-accent-decoratif-fond: "#522768"
   dark-surface: "#0F161B"
   dark-on-surface: "#E2E8EC"
   dark-on-surface-variant: "#B3C0C8"
@@ -63,40 +73,57 @@ colors:
   dark-outline: "#7E8D96"
   dark-outline-variant: "#3A454C"
   # — Encres d'état (clair)
-  etat-disponible: "#145C31"
-  etat-disponible-plein: "#1A6B3A"
-  etat-disponible-fond: "#CFE9D8"
-  etat-disponible-sur-fond: "#05321A"
-  etat-absent: "#A3231A"
-  etat-absent-fond: "#FBDED9"
-  etat-absent-sur-fond: "#3E0A05"
+  etat-disponible: "#5840BC"
+  etat-disponible-plein: "#7655FA"
+  etat-disponible-fond: "#E4DDFE"
+  etat-disponible-sur-fond: "#131C23"
+  etat-absent: "#BB285D"
+  etat-absent-fond: "#FED7E5"
+  etat-absent-sur-fond: "#131C23"
   etat-non-saisi: "#52626C"
   etat-non-saisi-filet: "#73828B"
-  etat-attente: "#7A5200"
-  etat-attente-fond: "#FFE9BF"
-  etat-attente-sur-fond: "#2A1C00"
+  etat-attente: "#9F6224"
+  etat-attente-fond: "#FDEAD7"
+  etat-attente-sur-fond: "#131C23"
   etat-neutre: "#45535C"
   etat-neutre-fond: "#E7EBEE"
-  etat-info: "#0F5C7A"
-  etat-info-fond: "#CDE7F2"
+  etat-info: "#086959"
+  etat-info-fond: "#CEE5E1"
+  etat-info-sur-fond: "#065144"
+  etat-accepte: "#086959"
+  etat-accepte-fond: "#CEE5E1"
+  etat-accepte-sur-fond: "#065144"
+  etat-annule: "#2A343A"
+  etat-archive: "#4A5860"
+  etat-archive-fond: "#EEF1F3"
+  etat-verrouille: "#3A464E"
+  etat-verrouille-fond: "#DDE3E7"
   # — Encres d'état (sombre)
-  dark-etat-disponible: "#7ADB9F"
-  dark-etat-disponible-plein: "#2F7E4E"
-  dark-etat-disponible-fond: "#0C4A28"
-  dark-etat-disponible-sur-fond: "#BFEFD1"
-  dark-etat-absent: "#FFB4A6"
-  dark-etat-absent-filet: "#FF9D8C"
-  dark-etat-absent-fond: "#4A1B15"
-  dark-etat-absent-sur-fond: "#FFDAD4"
+  dark-etat-disponible: "#A690FC"
+  dark-etat-disponible-plein: "#5840BC"
+  dark-etat-disponible-fond: "#3A2B73"
+  dark-etat-disponible-sur-fond: "#E4DDFE"
+  dark-etat-absent: "#FB7CAA"
+  dark-etat-absent-filet: "#FB7CAA"
+  dark-etat-absent-fond: "#6F203D"
+  dark-etat-absent-sur-fond: "#FED7E5"
   dark-etat-non-saisi: "#A4B1B9"
   dark-etat-non-saisi-filet: "#6E7D87"
-  dark-etat-attente: "#F0C46A"
-  dark-etat-attente-fond: "#4A3400"
-  dark-etat-attente-sur-fond: "#FFE0A3"
+  dark-etat-attente: "#F59638"
+  dark-etat-attente-fond: "#613305"
+  dark-etat-attente-sur-fond: "#FDEBD8"
   dark-etat-neutre: "#C4CFD6"
   dark-etat-neutre-fond: "#222C33"
-  dark-etat-info: "#7FD0EC"
-  dark-etat-info-fond: "#0B4C66"
+  dark-etat-info: "#5FAA9E"
+  dark-etat-info-fond: "#14423B"
+  dark-etat-info-sur-fond: "#CDE8E2"
+  dark-etat-accepte: "#5FAA9E"
+  dark-etat-accepte-fond: "#14423B"
+  dark-etat-accepte-sur-fond: "#CDE8E2"
+  dark-etat-archive: "#A4B1B9"
+  dark-etat-archive-fond: "#182127"
+  dark-etat-verrouille: "#B3C0C8"
+  dark-etat-verrouille-fond: "#222C33"
 typography:
   display-nombre:
     fontFamily: "Atkinson Hyperlegible Mono, ui-monospace, monospace"
@@ -251,6 +278,7 @@ components:
     height: "72px"
 ---
 
+
 # Design System: Astreinte SP
 
 ## Overview
@@ -295,59 +323,39 @@ dans la PR et reporté ici.
 
 ## Colors
 
-Stratégie : **Restrained** (neutres + un accent), l'accent étant l'encre. Mode Impeccable :
-Operate. Aucune surface n'est « drenchée » de couleur ; la couleur est un porteur d'information.
+Stratégie : **Restrained**, neutres plus un accent, et l'accent est désormais l'indigo. Mode Impeccable : Operate. Monde visuel de remplacement décidé au ticket 061, à partir d'une référence et d'une charte fournies par le propriétaire (Archivo, indigo, vert, orange, rose, violet). La couleur reste un porteur d'information, jamais un décor, et aucun état n'est porté par la couleur seule : icône et libellé partout.
 
-### Primary — l'encre
+### Primary — l'indigo, l'accent
+`primary #7655FA` sur `on-primary #FFFFFF` → **4,72:1**. Boutons principaux, élément de navigation choisi, focus, jour courant, filet de sélection, case « disponible » pleine. `primary-container #E4DDFE` sur `on-primary-container #4D37A2` → **6,74:1** : la pastille de sélection de tout composant Material (barre et rail de navigation, tiroir, boutons segmentés, puces). En texte sur blanc, l'indigo vif est trop juste sur le papier : le texte indigo utilise `accent-texte #5840BC` → 7,31:1 sur blanc, 6,92:1 sur le papier `#F7F9FA`. L'encre `#131C23` reste la couleur du texte, des titres et des chiffres ; elle n'est plus celle des boutons.
+En sombre : `dark-primary #A690FC` sur `dark-surface #0F161B` → 6,97:1, sur `dark-on-primary #131C23` → 6,58:1 ; `dark-primary-container #3A2B73` sur `dark-on-primary-container #E4DDFE` → 9,07:1.
 
-`primary #16212A` sur `on-primary #FFFFFF` → **16.34:1**. C'est le noir-encre bleuté du registre,
-jamais le noir pur. Il porte : bouton principal, titre de barre d'application, indicateur de
-navigation sélectionnée, filet du jour courant, focus.
+### Secondary — le vert, l'accepté
+`secondary #097C69` sur blanc → **5,12:1**. Accepté, validé, publié, période ouverte, couvert, information. Texte vert sur blanc : `etat-accepte #086959` → 6,61:1. `secondary-container #CEE5E1` sur `on-secondary-container #065144` → 7,02:1.
+En sombre : `dark-secondary #5FAA9E` → 6,72:1 ; `dark-secondary-container #14423B` sur `#CDE8E2` → 8,67:1.
+Une mesure à connaître : `primary-container` et `etat-accepte-fond` ont la même luminance (1,01:1 entre eux). En niveaux de gris, « choisi » et « accepté » sont le même gris ; l'icône et le libellé les séparent, jamais la teinte. C'est écrit et testé.
 
-En sombre, la relation s'inverse comme un registre sous la lampe de garde :
-`dark-primary #D8E2E8` (papier) sur `dark-on-primary #16212A` → **12.42:1**.
+### Tertiary — l'orange, l'attente
+L'orange de la charte, `orange-vif #F59638`, ne fait que 2,26:1 sur blanc : il ne sert **jamais** de texte, seulement de remplissage de bloc ou de barre. En texte, l'orange est assombri : `tertiary #9F6224` → 4,94:1 sur blanc. `tertiary-container #FDEAD7` sur `on-tertiary-container #131C23` → 14,72:1. Proposé, à pourvoir, en attente de réponse, bannière hors ligne et attention.
+En sombre, l'orange vif redevient du texte : `dark-tertiary #F59638` → 8,08:1 ; `dark-tertiary-container #613305` sur `#FDEBD8` → 9,10:1.
 
-### Secondary — le bleu de réglure
+### Error — le rose, le refus
+`rose-vif #F9357C` fait 3,60:1 sur blanc : remplissage seulement. En texte, `error #BB285D` → 5,87:1. `error-container #FED7E5` sur `on-error-container #131C23` → 13,19:1. Refusé, absent, conflit, erreur.
+En sombre : `dark-error #FB7CAA` → 7,44:1 ; `dark-error-container #6F203D` sur `#FED7E5` → 8,24:1.
 
-`secondary #0F5C7A` sur blanc → **7.41:1**. Information neutre, liens, état « publié » et
-« période ouverte », sélection dans les listes denses. En sombre `#7FD0EC` sur `#0F161B` → 10.54:1.
-
-### Tertiary — l'ocre d'attente
-
-`tertiary #7A5200` sur blanc → **6.92:1**. Tout ce qui attend une action humaine : proposition en
-attente, mois bientôt verrouillé, hors ligne. En sombre `#F0C46A` sur `#0F161B` → 11.13:1.
-
-### Error — le vermillon
-
-`error #A3231A` sur blanc → **7.47:1**. Absent, refusé, échec. En sombre `#FFB4A6` → 10.71:1.
+### Accent décoratif — le violet
+`accent-decoratif #B142E8` (4,36:1 sur blanc) et `accent-decoratif-fond #EFD9FA`. Marque, illustration d'état vide, rien d'autre : jamais du texte, jamais un état. En sombre `dark-accent-decoratif #CC84F0`, fond `#522768`. Un test refuse que ce token, `orange-vif` ou `rose-vif` atteignent le seuil du texte : tant qu'ils échouent à 4,5:1, personne ne peut les glisser dans un style de texte en croyant bien faire.
 
 ### Neutral — le papier et l'encre
-
-Le gris est légèrement froid (teinte bleu-vert), jamais neutre pur : c'est le papier de registre,
-pas le carton crème.
-
-| Rôle | Clair | Sombre | Usage |
-|---|---|---|---|
-| `surface` | `#FFFFFF` | `#0F161B` | fond d'écran, case « jour » |
-| `surface-container-low` | `#F7F9FA` | `#141C22` | barre de navigation, champs |
-| `surface-container` | `#F1F4F6` | `#182127` | feuilles, panneaux |
-| `surface-container-high` | `#E9EDF0` | `#222C33` | case « nuit », en-têtes collants |
-| `surface-container-highest` | `#E2E7EA` | `#2C373E` | contrôle désactivé |
-| `surface-dim` | `#E7ECEE` | `#0A1015` | fond de grille derrière les cases |
-| `on-surface` | `#131C23` (17.24:1) | `#E2E8EC` (14.76:1) | texte |
-| `on-surface-variant` | `#45535C` (7.94:1) | `#B3C0C8` (9.81:1) | texte secondaire, icônes |
-| `outline` | `#6E7D87` | `#7E8D96` | bordure de contrôle (≥ 3:1) |
-| `outline-variant` | `#C3CDD3` | `#3A454C` | **filet de réglure**, décoratif |
-
-> Deux filets, deux rôles. `outline-variant` est la réglure décorative du registre (1.62:1, elle ne
-> porte aucune information). Tout filet **qui porte un état** — le contour tireté d'une case non
-> saisie, le contour d'une case sélectionnée — utilise `#73828B` en clair (3.33:1 sur le fond de
-> grille) et `#6E7D87` en sombre (4.30:1). Ne jamais confondre les deux.
+Inchangés depuis le ticket 004 : `surface #FFFFFF`, `on-surface #131C23`, `on-surface-variant #45535C`, les crans de surface `#F7F9FA`, `#F1F4F6`, `#E9EDF0`, `#E2E7EA`, `outline #6E7D87`, `outline-variant #C3CDD3`, et leurs équivalents sombres.
 
 ### Named Rules — la sémantique des états
-
-**Règle absolue : jamais la couleur seule.** Chaque état s'écrit `marque + icône + libellé`, et la
-couleur arrive en quatrième. Un état rendu uniquement par une teinte est un défaut bloquant en revue.
+- **Disponible** : famille indigo. Texte `etat-disponible #5840BC`, case pleine `etat-disponible-plein #7655FA` (4,72:1 sous un glyphe blanc, le ratio le plus bas du système clair), fond `etat-disponible-fond #E4DDFE`, texte sur fond encre.
+- **Accepté, validé, publié, période ouverte, couvert, information** : famille verte. Texte `etat-accepte #086959`, fond `etat-accepte-fond #CEE5E1`, texte sur fond `#065144`.
+- **Proposé, à pourvoir, en attente** : famille orange. Texte `etat-attente #9F6224`, fond `etat-attente-fond #FDEAD7`, texte sur fond encre.
+- **Absent, refusé, conflit** : famille rose. Texte `etat-absent #BB285D`, fond `etat-absent-fond #FED7E5`, texte sur fond encre.
+- **Non saisi, neutre, annulé, archivé, verrouillé** : gris inchangés.
+- **Sélection** : `primary-container` sur `on-primary-container`, pour tout composant Material qui exprime un choix, réglé dans `app_theme.dart`. Le vert ne dit jamais « choisi ».
+- Texte coloré sur blanc : indigo `accent-texte` et vert `etat-accepte` seulement. Orange et rose, jamais.
 
 #### Disponibilité — la grammaire de la case
 
@@ -423,11 +431,7 @@ document ; aucune valeur nouvelle n'a été inventée.
 
 ## Typography
 
-**Une famille : Atkinson Hyperlegible Next**, dessinée par le Braille Institute pour maximiser la
-distinction entre caractères en basse vision. Elle est choisie pour une raison de brief, pas de
-goût : public de tous âges, aisance numérique variable, lecture au soleil et en mouvement, et des
-écrans pleins de chiffres (dates, codes à 6 chiffres, quotas) où confondre `1`/`l`/`I` ou `0`/`O`
-coûte cher. Licence SIL OFL.
+**Deux familles, chacune à sa place, décidées au ticket 061.** **Archivo** (SIL OFL, embarquée dans `assets/fonts/`, graisses 600 et 700) porte les trois styles de titre à 28, 22 et 18 points, avec un interlettrage au plus de −0,02 em : c'est là que se voit le caractère de la référence choisie par le propriétaire, et là où la confusion de glyphes n'a pas d'enjeu. **Atkinson Hyperlegible Next** garde tout le texte à 16 points et moins, pour la raison de brief du ticket 004 : distinction `1`/`l`/`I` et `0`/`O`, lecture au soleil et en mouvement, public de tous âges. **Atkinson Hyperlegible Mono** garde tous les chiffres.
 
 **Un second cut pour les nombres : Atkinson Hyperlegible Mono**, même famille, chasse fixe. Tout
 nombre qui s'aligne verticalement ou qui change en place — compteurs jour/nuit/weekend, quotas
@@ -711,6 +715,7 @@ sûres. Destinations, dans cet ordre :
   et double le chiffre d'un libellé de semantics (« 3 propositions en attente »).
 - Le bouton retour du navigateur et le geste retour iOS restent fonctionnels : chaque écran est une
   route nommée, jamais un état local.
+- L'élément choisi porte `primary-container` et `on-primary-container`, en barre, en rail, en tiroir et en boutons segmentés : la sélection est toujours indigo.
 
 ### [Signature Component] — La bannière de contexte, `AppBanner`
 
@@ -744,6 +749,7 @@ persistant.
 - Tutoyer le membre, vouvoyer personne, faire des phrases courtes.
 - Écrire chaque chaîne dans `AppStrings`, jamais dans un widget.
 - Traiter « verrouillé », « suspendu », « annulé » comme des faits gris, pas comme des alarmes rouges.
+- Régler dans `app_theme.dart` tout composant Material qui exprime une sélection, sinon il retombe sur le vert de Material et dit « accepté » au lieu de « choisi ».
 
 ### Don't:
 
@@ -762,6 +768,7 @@ persistant.
 - Pas de `CircularProgressIndicator` au milieu d'un écran : squelette à la forme du contenu attendu.
 - Pas d'état vide muet : un état vide explique et propose une action.
 - Pas de séquence d'animation au chargement, pas de mouvement qui ne dit pas un changement d'état.
+- Mettre `orange-vif`, `rose-vif` ou `accent-decoratif` dans un style de texte.
 
 ## Écarts d'implémentation (ticket 004)
 
@@ -919,3 +926,7 @@ navigateur, avec la matrice réelle et ses en-têtes collants.
 | Pages de texte long | non traité | la politique de confidentialité et les mentions légales sont **des routes** (`/legal/confidentialite`, `/legal/mentions`), joignables dans les quatre états d'authentification, et leur contenu est une **donnée** (`features/legal/domain/documents_legaux.dart`) que le widget se contente de rendre | Une politique de confidentialité doit se lire **sans compte** — par une mairie, par un candidat à l'invitation — et avoir une URL qu'on colle dans une délibération. Quatre pages de texte dans un `Column` ne se relisent pas et contrediraient « chaque chaîne dans `AppStrings` » ; en données, la liste des sections se lit comme un sommaire et un diff nomme le paragraphe qui change. |
 | Ce qui n'est pas décidé | non traité | chaque mention qui relève du propriétaire — raison sociale, adresse, hébergeur contractuel, durées légales — s'affiche dans un bloc réglé `surface-container-high`, icône `edit_note` + libellé « À compléter avant mise en service » | Le produit est destiné à des casernes françaises. Une mention légale inventée se croit ; une mention trouée se corrige. Le bloc est porté par icône + libellé, la couleur en quatrième (`§ Do's`), et il ne se ferme pas. |
 | Deux liens en pied de bloc | `§ Cibles tactiles` : 48 dp, 8 dp d'écart | « Confidentialité » et « Mentions légales » sont deux `TextButton` de 48 dp dans un `Wrap`, jamais deux mots collés dans un `RichText` | Un lien de la taille d'un mot n'est pas une cible avec des gants. Le `Wrap` les fait passer l'un sous l'autre à grande échelle de texte, au lieu de déborder. |
+
+## Écarts d'implémentation (ticket 061)
+
+Le monde visuel du ticket 004, bleu nuit sur blanc et Atkinson seule, est remplacé au ticket 061 par le monde décrit ci-dessus : accent indigo, vert pour l'accepté, orange pour l'attente, rose pour le refus, violet décoratif, Archivo sur les titres. Tous les écrans ont changé d'apparence par les tokens, sans changement de structure. Cinq endroits lisaient une teinte qui a changé de métier et ont été rebranchés : le texte d'attente sur son propre bloc (4,22:1, sous le seuil) passe sur le texte sur fond ; le texte en `primary` sur le fond de grille (3,96:1) passe sur `accent-texte`. Les états « accepté », « validé » et « enregistré » avaient suivi « disponible » vers l'indigo par cascade de tokens ; ils sont revenus au vert, avec des tokens nommés `etat-accepte-*`. Les boutons segmentés et les puces sélectionnaient en vert, le défaut de Material ; ils sélectionnent en indigo. Les mesures sont dans `test/core/theme/contraste_test.dart` et `test/core/theme/selection_et_accepte_test.dart`.
