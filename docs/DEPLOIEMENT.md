@@ -27,7 +27,7 @@ Déploiement (.github/workflows/deploy.yml)
       │
       ├─ 1. base          supabase db push --dry-run   puis  --include-all
       │                   migrations en attente + secrets Vault de config.toml
-      ├─ 2. fonctions     supabase functions deploy --use-api
+      ├─ 2. fonctions     supabase functions deploy --use-api --import-map …/deno.json
       │                   les onze, avec le verify_jwt de supabase/config.toml
       ├─ 3. configuration supabase config diff  puis  config push
       │                   gabarits de courriel, serveur d'envoi, plafonds, redirections
@@ -293,6 +293,37 @@ semaines.
 | Le secret Vault **`notify_function_url`** mal posé | rien. `cron_dispatch_notifications` réussit toutes les minutes, pousse vers un hôte inexistant, et la file grossit : `select * from notification_outbox where status <> 'sent'` |
 | La **configuration d'authentification** non poussée | le courriel de connexion arrive en anglais, avec un lien au lieu du code à six chiffres. Ouvrir le lien change de page, le jeton d'invitation ne vit qu'en mémoire : l'invitation ne peut plus être acceptée et l'écran dit « Aucune caserne » |
 | Le **plafond d'envoi** resté à celui du plan gratuit | la troisième invitation de l'heure ne part pas, et l'écran annonce un envoi réussi |
+| Les **fonctions refusées à l'empaquetage** — le travail `fonctions` est rouge, rien n'est parti | rien de neuf : la production garde les fonctions de la mise en ligne précédente et l'écart ne se lit que dans le workflow. À la **première** mise en ligne, c'est le 404 de la première ligne de ce tableau |
+
+### Fonctions refusées à l'empaquetage
+
+Le travail `fonctions` téléverse ses fichiers, puis échoue autant de fois qu'il y a de fonctions :
+
+```
+unexpected deploy status 400: {"message":"Failed to bundle the function (reason: Relative
+import path \"@supabase/supabase-js\" not prefixed with / or ./ or ../
+  at …/supabase/functions/_shared/supabase.ts:7:51)."}
+```
+
+**La cause** : `--use-api` empaquette **côté serveur**, avec les seuls fichiers téléversés. Le CLI
+téléverse le graphe des imports relatifs et la carte d'imports — mais la carte **seulement si on la
+lui nomme**. La nôtre est unique pour les onze fonctions, `supabase/functions/deno.json` : Deno la
+trouve en remontant les dossiers, le téléverseur non. C'est arrivé à la première exécution du
+workflow, le 21 septembre 2026 (ticket 054) ; `configuration` et `vercel` ont été sautés par
+dépendance, et la production n'a rien perdu puisqu'elle en était déjà à la mise en ligne manuelle
+du même jour.
+
+**Le rattrapage** : désigner la carte, `--import-map supabase/functions/deno.json`, à la ligne de
+commande comme dans le workflow. La preuve que la carte est partie se lit dans le journal, une fois
+par fonction, **avant** les autres fichiers :
+
+```
+Uploading asset (invite-member): supabase/functions/deno.json
+```
+
+Une carte oubliée ne peut plus atteindre la production sans être vue : `scripts/verifier_carte_imports.py`,
+joué par la CI, lit la commande de `deploy.yml` et refuse la pull request si un specifier nu d'une
+fonction n'est pas résolu par la carte qu'elle désigne.
 
 ### Savoir dans quel état on est
 
@@ -330,8 +361,11 @@ supabase db push --project-ref "$SUPABASE_PROJECT_REF" --include-all --dry-run -
 supabase db push --project-ref "$SUPABASE_PROJECT_REF" --include-all
 #    Depuis un poste lié (`supabase link`), `--linked` remplace `--project-ref`.
 
-# 2. Les fonctions. Sans argument : les onze, avec le verify_jwt de config.toml.
-supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api
+# 2. Les fonctions. Sans nom de fonction : les onze, avec le verify_jwt de config.toml.
+#    `--import-map` n'est pas facultatif : avec `--use-api`, l'empaquetage a lieu côté
+#    serveur et ne voit que les fichiers téléversés (voir « refusées à l'empaquetage »).
+supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" \
+  --import-map supabase/functions/deno.json --use-api
 
 # 3. La configuration d'authentification : gabarits, serveur d'envoi, plafonds, redirections.
 export SUPABASE_AUTH_SMTP_PASSWORD=re_…            # clé d'API Resend, sinon le mot de passe part vide

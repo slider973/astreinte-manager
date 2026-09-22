@@ -177,6 +177,24 @@ jobs:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
 
+      # **Ce que les quatre étapes suivantes ne peuvent pas voir** (ticket 054).
+      # `deno fmt`, `deno lint`, `deno check` et `deno test` lisent le
+      # `supabase/functions/deno.json` local, trouvé en remontant les dossiers :
+      # `@supabase/supabase-js` s'y résout, tout passe. Le déploiement, lui,
+      # empaquette **côté serveur** (`--use-api`) sur les seuls fichiers
+      # téléversés, et ce `deno.json` n'en faisait pas partie : les onze
+      # fonctions ont été refusées à l'empaquetage le 21 septembre 2026, sans
+      # qu'aucune CI ait pu le dire.
+      #
+      # Cette étape lit la commande de déploiement dans `deploy.yml`, en déduit
+      # la carte que le déploiement enverra, et vérifie que chaque specifier nu
+      # du graphe des onze fonctions y est résolu. Elle échoue donc dans les
+      # deux cas à craindre : la carte retirée de la commande, ou un specifier
+      # nu qu'elle ne couvre pas. Sans réseau, sans Deno, en moins d'une seconde.
+      - name: Vérifier la carte d'imports du déploiement
+        working-directory: ${{ github.workspace }}
+        run: python3 scripts/verifier_carte_imports.py
+
       - name: Installer Deno
         uses: denoland/setup-deno@v2
         with:

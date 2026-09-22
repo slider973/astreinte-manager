@@ -1,12 +1,11 @@
 # Tableau des tickets
 
-Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main.
+Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main.
 
 ## En cours
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 054 | [Le déploiement automatique des fonctions ignore la carte d'imports](in-progress/054-deploiement-fonctions-carte-imports.md) | P0 | 049 | — |
 
 ## À faire
 
@@ -69,4 +68,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-21. Ne pas éditer à la main
 | 048 | [Finition de l'écran d'import des membres](done/048-finition-import-membres.md) | P1 | 047 | https://github.com/slider973/astreinte-manager/pull/45 |
 | 049 | [Mettre la base et les Edge Functions en ligne avec la PWA](done/049-deploiement-base-et-fonctions.md) | P0 | 032 | https://github.com/slider973/astreinte-manager/pull/46 |
 | 052 | [Le centre de notifications n'a pas de retour](done/052-centre-notifications-sans-retour.md) | P1 | 026 | https://github.com/slider973/astreinte-manager/pull/47 |
+| 054 | [Le déploiement automatique des fonctions ignore la carte d'imports](done/054-deploiement-fonctions-carte-imports.md) | P0 | 049 | https://github.com/slider973/astreinte-manager/pull/48 |
 

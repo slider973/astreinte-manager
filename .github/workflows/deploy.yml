@@ -238,6 +238,33 @@ jobs:
       #
       # Pas de `--prune` : une fonction déployée que le dépôt ne connaît plus est
       # signalée par la vérification d'écart, pas supprimée sans qu'on l'ait lu.
+      #
+      # **`--import-map` n'est pas une précaution, c'est la condition de
+      # `--use-api`** (ticket 054). L'empaquetage côté serveur ne voit que les
+      # fichiers téléversés, et le CLI téléverse le graphe des imports relatifs
+      # plus la carte — *seulement si on la lui nomme*. La nôtre est unique pour
+      # les onze fonctions, `supabase/functions/deno.json` : Deno la trouve en
+      # remontant les dossiers, le téléverseur non. Première exécution de ce
+      # workflow, le 21 septembre 2026 : onze téléversements sans `deno.json`,
+      # onze refus « Relative import path "@supabase/supabase-js" not prefixed
+      # with / or ./ or ../ » à `_shared/supabase.ts:7`. La désigner rend à
+      # l'empaquetage distant ce que l'empaquetage local avait tout seul ; le
+      # journal le montre, ligne « Uploading asset (…): supabase/functions/deno.json »
+      # avant chaque fonction.
+      #
+      # L'autre voie était de retirer `--use-api` : l'empaquetage local trouve la
+      # carte sans qu'on la nomme, puisque c'est Deno qui remonte les dossiers.
+      # Vérifié le 21 septembre 2026 avec le CLI 2.117.0, il ne demande **pas**
+      # Docker — aucun conteneur créé, un eszip de 861 ko pour `invite-member`.
+      # Il a deux défauts ici : il empaquette sur l'exécuteur, donc y installe une
+      # chaîne Deno et résout les dépendances npm onze fois ; et il téléverse un
+      # paquet opaque, où l'on ne peut plus lire quel fichier est parti. C'est
+      # cette lecture-là qui a permis de nommer le défaut, et c'est elle qui prouve
+      # aujourd'hui qu'il est réparé.
+      #
+      # `scripts/verifier_carte_imports.py`, joué par la CI, lit cette commande
+      # et vérifie que chaque specifier nu des onze fonctions est résolu par la
+      # carte qu'elle désigne : retirer l'option ci-dessous fait rougir la CI.
       - name: Déployer les Edge Functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -246,6 +273,7 @@ jobs:
           set -o pipefail
           supabase functions deploy \
             --project-ref "$SUPABASE_PROJECT_REF" \
+            --import-map supabase/functions/deno.json \
             --use-api --jobs 4 2>&1 | tee /tmp/fonctions.txt
           {
             echo "### Edge Functions"
