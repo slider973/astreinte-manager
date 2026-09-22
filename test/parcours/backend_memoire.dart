@@ -54,6 +54,7 @@ import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/dispos/domain/preferences_mois.dart';
 import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart';
 import 'package:astreinte_sp/features/invitation/domain/acceptation.dart';
+import 'package:astreinte_sp/features/invitation/domain/invitation_recue.dart';
 import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
 import 'package:astreinte_sp/features/membres/domain/import_membres.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
@@ -422,6 +423,14 @@ class BackendMemoire {
 
   InvitationRepository get invitationRepository => _InvitationMemoire(this);
 
+  /// Le dépôt d'invitation **d'une session donnée**.
+  ///
+  /// `my_pending_invitations()` n'a pas de paramètre : l'adresse vient du
+  /// jeton de la session, jamais d'un argument. Ici elle vient de la personne
+  /// pour qui l'application est montée, ce qui revient au même.
+  InvitationRepository invitationsDe(String email) =>
+      _InvitationMemoire(this, email);
+
   DisposRepository get disposRepository => _DisposMemoire(this);
 
   /// Le dépôt de disponibilités **d'un membre donné** : c'est la session qui
@@ -632,25 +641,64 @@ class _MembresMemoire implements MembresRepository {
 
 /// L'acceptation d'un jeton. C'est le seul dépôt qui **crée** une appartenance.
 class _InvitationMemoire implements InvitationRepository {
-  _InvitationMemoire(this._base);
+  _InvitationMemoire(this._base, [this.sessionEmail]);
 
   final BackendMemoire _base;
 
-  /// L'adresse de la session qui accepte. Le parcours la pose avant d'ouvrir
-  /// le lien : `accept_invitation` confronte le jeton à l'adresse du compte,
-  /// et un jeton accepté par quelqu'un d'autre est un `email_mismatch`.
-  String? sessionEmail;
+  /// L'adresse de la session. `accept_invitation` confronte l'invitation à
+  /// l'adresse du compte, et une invitation acceptée par quelqu'un d'autre est
+  /// un `email_mismatch` ; `my_pending_invitations()` ne rend que les siennes.
+  final String? sessionEmail;
 
   @override
-  Future<AcceptationInvitation> accepter(String jeton) async {
-    final cible = jeton.trim();
+  Future<List<InvitationRecue>> mesInvitations() async {
+    final adresse = (sessionEmail ?? '').toLowerCase();
+    if (adresse.isEmpty) return const <InvitationRecue>[];
+
+    // La forme exacte de la réponse de la fonction SQL : cinq champs, jamais
+    // de jeton, et l'expiration **tranchée par le serveur**.
+    return InvitationRecue.depuisListe(<Map<String, dynamic>>[
+      for (final InvitationMemoire i in _base.invitations)
+        if (i.enAttente && i.email.toLowerCase() == adresse)
+          <String, dynamic>{
+            'id': i.id,
+            'station_name': _base.nomCaserne,
+            'invited_by_name': 'Jean Dupont',
+            'expires_at': i.expireLe.toIso8601String(),
+            'status': i.expireLe.isBefore(_base.horloge())
+                ? 'expired'
+                : 'pending',
+          },
+    ]);
+  }
+
+  @override
+  Future<AcceptationInvitation> accepter(EntreeInvitation entree) async {
+    final cible = entree.valeurNettoyee;
     if (cible.isEmpty) {
       throw const EchecAcceptation(ErreurAcceptation.jetonManquant);
     }
 
+    final parIdentifiant = entree.mode == ModeInvitation.identifiant;
     final trouvees = _base.invitations
-        .where((InvitationMemoire i) => i.jeton == cible)
+        .where(
+          (InvitationMemoire i) =>
+              parIdentifiant ? i.id == cible : i.jeton == cible,
+        )
         .toList(growable: false);
+
+    // Par identifiant, un inconnu et celui de l'invitation de quelqu'un
+    // d'autre rendent **la même chose**, sans caserne ni adresse masquée : les
+    // distinguer ferait un oracle d'existence (`docs/SCHEMA.md § 3`).
+    if (parIdentifiant &&
+        (trouvees.isEmpty ||
+            trouvees.single.email.toLowerCase() !=
+                (sessionEmail ?? '').toLowerCase())) {
+      throw EchecAcceptation(
+        ErreurAcceptation.mauvaisCompte,
+        adresseCourante: sessionEmail,
+      );
+    }
     if (trouvees.isEmpty) {
       throw const EchecAcceptation(ErreurAcceptation.introuvable);
     }

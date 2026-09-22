@@ -9,6 +9,9 @@ import 'app_router.dart';
 /// [chemin] est `GoRouterState.matchedLocation`, sans la chaîne de requête :
 /// `/connexion/code?email=…` arrive donc comme `/connexion/code`.
 ///
+/// Deux chemins sortent de la garde quoi qu'il arrive : `/invite/<jeton>` et
+/// `/rejoindre/<identifiant>`, les deux entrées d'une même invitation.
+///
 /// [cheminInvitationEnAttente] est le lien d'invitation en cours de parcours,
 /// gardé en mémoire par `core/session/jeton_invitation.dart`. Il change une
 /// seule chose : un compte qui vient de se connecter sans caserne retourne à
@@ -50,6 +53,16 @@ String? redirectionAuth({
   // restauration de session : rediriger vers l'écran de démarrage perdrait le
   // jeton, qui n'existe que dans l'URL reçue par courriel.
   if (chemin.startsWith(AppRoutes.prefixeInvitation)) return null;
+
+  // **La seconde entrée de la même invitation** (ticket 051), et la même
+  // exemption, pour deux raisons distinctes. En amont : un compte sans caserne
+  // y serait renvoyé sur « Aucune caserne » avant d'avoir rien affiché — ou
+  // pire, détourné vers un jeton gardé en mémoire, qui n'est pas l'invitation
+  // qu'il vient de choisir. En aval : dès que l'appartenance apparaît, l'état
+  // passe à [EtatAuth.connecte], et cette branche-là arracherait l'écran vers
+  // l'accueil à la seconde où l'acceptation réussit — pas de « Bienvenue »,
+  // pas de nom de caserne, pas de profil, pas de guide.
+  if (chemin.startsWith(AppRoutes.prefixeRejoindre)) return null;
 
   // `/install` s'ouvre dans tous les états, pour la même raison qu'une page
   // légale : elle s'adresse à quelqu'un qui n'a pas encore de compte — celui

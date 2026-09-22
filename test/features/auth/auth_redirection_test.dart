@@ -172,6 +172,43 @@ void main() {
     });
   });
 
+  group('redirectionAuth et /rejoindre (ticket 051)', () {
+    final rejoindre = AppRoutes.cheminRejoindre('inv-1');
+
+    test('la seconde entrée s\'ouvre dans tous les états', () {
+      for (final etat in EtatAuth.values) {
+        expect(
+          redirectionAuth(etat: etat, chemin: rejoindre),
+          isNull,
+          reason:
+              'Renvoyée sur « Aucune caserne » avant d\'avoir affiché quoi '
+              'que ce soit (état $etat).',
+        );
+      }
+    });
+
+    test('un jeton gardé en mémoire ne détourne pas l\'invitation choisie', () {
+      expect(
+        redirectionAuth(
+          etat: EtatAuth.sansCaserne,
+          chemin: rejoindre,
+          cheminInvitationEnAttente: '/invite/a1b2c3',
+        ),
+        isNull,
+      );
+    });
+
+    test('l\'appartenance qui apparaît n\'arrache pas l\'écran', () {
+      // Sans l'exemption, cette branche renverrait sur l'accueil à la seconde
+      // où l'acceptation réussit : pas de « Bienvenue », pas de profil, pas de
+      // guide.
+      expect(
+        redirectionAuth(etat: EtatAuth.connecte, chemin: rejoindre),
+        isNull,
+      );
+    });
+  });
+
   group('redirectionAuth et les écrans d\'administration', () {
     const ecrans = <String>[
       AppRoutes.prefixeAdmin,

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart';
 import 'package:astreinte_sp/features/invitation/domain/acceptation.dart';
+import 'package:astreinte_sp/features/invitation/domain/invitation_recue.dart';
 import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
 import 'package:astreinte_sp/features/membres/domain/import_membres.dart';
 import 'package:astreinte_sp/features/membres/domain/invitation.dart';
@@ -56,6 +59,23 @@ Invitation invitationEnAttente({
   creeLe: DateTime.now().subtract(const Duration(days: 4)),
   courrielEnvoyeLe: courrielEnvoyeLe,
   courrielEnEchec: courrielEnEchec,
+);
+
+/// Une invitation reçue, telle que `my_pending_invitations()` la rendrait.
+InvitationRecue invitationRecue({
+  String id = 'inv-1',
+  String caserne = 'CS Maurepas',
+  String? inviteur = 'Marc Dubois',
+  DateTime? echeance,
+  bool expiree = false,
+}) => InvitationRecue(
+  id: id,
+  caserne: caserne,
+  inviteur: inviteur,
+  // Une date fixe : l'expiration est tranchée par le serveur, pas par une
+  // soustraction locale, donc rien ici ne dépend du jour où le test tourne.
+  echeance: echeance ?? DateTime(2026, 10, 5),
+  expiree: expiree,
 );
 
 /// Un [MembresRepository] sans réseau, qui compte ce qu'on lui demande.
@@ -290,7 +310,14 @@ class FauxMembresRepository implements MembresRepository {
 
 /// Un [InvitationRepository] sans réseau.
 class FauxInvitationRepository implements InvitationRepository {
-  FauxInvitationRepository({this.resultat, this.echec, this.auSucces});
+  FauxInvitationRepository({
+    this.resultat,
+    this.echec,
+    this.auSucces,
+    this.recues = const <InvitationRecue>[],
+    this.echecLecture,
+    this.lectureSuspendue = false,
+  });
 
   AcceptationInvitation? resultat;
   EchecAcceptation? echec;
@@ -299,11 +326,48 @@ class FauxInvitationRepository implements InvitationRepository {
   /// apparaître la nouvelle appartenance, comme la base le ferait.
   void Function()? auSucces;
 
-  final List<String> jetons = <String>[];
+  /// Ce que rend `my_pending_invitations()`. Vide par défaut : un compte sans
+  /// caserne et sans invitation voit le texte du ticket 006, inchangé.
+  List<InvitationRecue> recues;
+
+  /// L'échec de la **recherche** — réseau ou serveur. À ne pas confondre avec
+  /// [echec], qui est un refus de l'acceptation.
+  Exception? echecLecture;
+
+  /// **Une lecture qui ne rend jamais la main** : c'est le seul moyen
+  /// d'observer l'état d'attente, celui où l'écran ne doit surtout pas
+  /// afficher « Demande une invitation à ton chef de centre ».
+  final bool lectureSuspendue;
+
+  int lectures = 0;
+
+  /// Ce qui a été présenté au serveur, dans l'ordre.
+  final List<EntreeInvitation> entrees = <EntreeInvitation>[];
+
+  /// Les jetons envoyés, et eux seuls.
+  List<String> get jetons => <String>[
+    for (final EntreeInvitation e in entrees)
+      if (e.mode == ModeInvitation.jeton) e.valeur,
+  ];
+
+  /// Les identifiants envoyés, et eux seuls (ticket 051).
+  List<String> get identifiants => <String>[
+    for (final EntreeInvitation e in entrees)
+      if (e.mode == ModeInvitation.identifiant) e.valeur,
+  ];
 
   @override
-  Future<AcceptationInvitation> accepter(String jeton) async {
-    jetons.add(jeton);
+  Future<List<InvitationRecue>> mesInvitations() async {
+    lectures++;
+    if (lectureSuspendue) return Completer<List<InvitationRecue>>().future;
+    final refus = echecLecture;
+    if (refus != null) throw refus;
+    return recues;
+  }
+
+  @override
+  Future<AcceptationInvitation> accepter(EntreeInvitation entree) async {
+    entrees.add(entree);
     final refus = echec;
     if (refus != null) throw refus;
     auSucces?.call();
