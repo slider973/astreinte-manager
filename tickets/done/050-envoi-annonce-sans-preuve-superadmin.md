@@ -4,7 +4,7 @@
 - **Priorité** : P2
 - **Dépend de** : 048
 - **Branche** : `feat/050-envoi-annonce-sans-preuve-superadmin`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/49
 - **Statut** : terminé le 2026-09-22 (PR créée)
 
 ## Contexte
