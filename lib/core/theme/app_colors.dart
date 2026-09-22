@@ -237,8 +237,30 @@ abstract final class AppColors {
   /// rapport à [secondary] pour tenir aussi en texte sur le papier.
   static const Color etatInfo = Color(0xFF086959);
 
-  /// 7.02:1 sous [onSecondaryContainer].
+  /// 7.02:1 sous [etatInfoSurFond], 5.01:1 sous [etatInfo].
   static const Color etatInfoFond = secondaryContainer;
+
+  /// Encre posée **dans** un bloc vert. 7.02:1 sur [etatInfoFond]. Le pendant
+  /// clair de `darkEtatInfoSurFond`, qui existait déjà côté nuit.
+  static const Color etatInfoSurFond = onSecondaryContainer;
+
+  /// Accepté, couvert, validé, publié : **la famille verte**.
+  ///
+  /// Mêmes valeurs que la famille « information » — un seul vert dans le
+  /// système, deux sens qui ne se croisent jamais dans un même bloc. Les noms
+  /// sont séparés parce que la sémantique l'est : ce qu'un pompier a accepté
+  /// n'est pas un renseignement de bandeau, et l'un pourra bouger sans
+  /// l'autre. Ce qui est **disponible** reste indigo, ticket 061.
+  ///
+  /// 6.61:1 sur [surface] : le vert est, avec l'indigo de texte, la seule
+  /// teinte d'état qui a le droit d'être lue sur blanc.
+  static const Color etatAccepte = etatInfo;
+
+  /// Bloc de l'accepté. 1.32:1 sur [surface] — il se détache du papier.
+  static const Color etatAccepteFond = etatInfoFond;
+
+  /// 7.02:1 sur [etatAccepteFond].
+  static const Color etatAccepteSurFond = etatInfoSurFond;
 
   /// « Annulé » : un fait gris, pas une alarme. 10.61:1 sur [etatNeutreFond].
   static const Color etatAnnule = Color(0xFF2A343A);
@@ -296,6 +318,16 @@ abstract final class AppColors {
   /// Encre lisible posée sur [darkEtatInfoFond] : `dark-on-secondary-container`,
   /// réemployé tel quel pour les pastilles vertes pleines. 8.67:1.
   static const Color darkEtatInfoSurFond = darkOnSecondaryContainer;
+
+  /// Accepté, couvert, validé, publié — côté nuit. Même vert que la famille
+  /// « information », comme en clair. 6.72:1 sur [darkSurface].
+  static const Color darkEtatAccepte = darkEtatInfo;
+
+  /// 1.63:1 sur [darkSurface] : le bloc vert se détache du fond de nuit.
+  static const Color darkEtatAccepteFond = darkEtatInfoFond;
+
+  /// 8.67:1 sur [darkEtatAccepteFond].
+  static const Color darkEtatAccepteSurFond = darkEtatInfoSurFond;
 
   /// « Archivé » en sombre : encre atténuée sur un cran de surface.
   static const Color darkEtatArchive = darkEtatNonSaisi;

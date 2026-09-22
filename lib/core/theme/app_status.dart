@@ -268,11 +268,16 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         fond: AppColors.etatAttenteFond,
         filet: AppColors.etatAttente,
       ),
+      // **Accepté est vert, pas indigo** : l'indigo dit « disponible » et
+      // l'accent, le vert dit « accepté, couvert, validé, publié » (brief
+      // 061 § 3). Les deux se croisent dans la même case de matrice — une
+      // disponibilité saisie, puis une astreinte acceptée dessus : ils ne
+      // peuvent pas partager une teinte.
       AttributionEtat.accepte: StatusDescriptor(
         icone: Icons.task_alt,
         libelle: AppStrings.attributionAccepte,
-        encre: AppColors.etatDisponibleSurFond,
-        fond: AppColors.etatDisponibleFond,
+        encre: AppColors.etatAccepteSurFond,
+        fond: AppColors.etatAccepteFond,
       ),
       AttributionEtat.refuse: StatusDescriptor(
         icone: Icons.cancel,
@@ -307,14 +312,17 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       PlanningEtat.publie: StatusDescriptor(
         icone: Icons.campaign,
         libelle: AppStrings.planningPublie,
-        encre: AppColors.onSecondaryContainer,
+        encre: AppColors.etatInfoSurFond,
         fond: AppColors.etatInfoFond,
       ),
+      // « Validé » ferme le mois : c'est l'aboutissement, donc le vert, au
+      // même titre que « publié » juste au-dessus. Le tampon du suivi se pose
+      // sur ce descripteur.
       PlanningEtat.valide: StatusDescriptor(
         icone: Icons.verified,
         libelle: AppStrings.planningValide,
-        encre: AppColors.etatDisponibleSurFond,
-        fond: AppColors.etatDisponibleFond,
+        encre: AppColors.etatAccepteSurFond,
+        fond: AppColors.etatAccepteFond,
       ),
       PlanningEtat.archive: StatusDescriptor(
         icone: Icons.inventory_2,
@@ -327,7 +335,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       PeriodeEtat.ouverte: StatusDescriptor(
         icone: Icons.lock_open,
         libelle: AppStrings.periodeOuverte,
-        encre: AppColors.onSecondaryContainer,
+        encre: AppColors.etatInfoSurFond,
         fond: AppColors.etatInfoFond,
         filet: AppColors.etatInfo,
       ),
@@ -353,10 +361,13 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         encre: AppColors.onSurfaceVariant,
         fond: AppColors.surface,
       ),
+      // « Enregistré » est un fait acquis, pas un accent : il suivait
+      // `etatDisponible` et a viré à l'indigo avec lui au ticket 061. Il
+      // repart dans le vert, avec le reste de ce qui est acquis.
       SyncEtat.enregistre: StatusDescriptor(
         icone: Icons.cloud_done,
         libelle: AppStrings.saveTermine,
-        encre: AppColors.etatDisponible,
+        encre: AppColors.etatAccepte,
         fond: AppColors.surface,
       ),
       SyncEtat.echec: StatusDescriptor(
@@ -433,8 +444,8 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       AttributionEtat.accepte: StatusDescriptor(
         icone: Icons.task_alt,
         libelle: AppStrings.attributionAccepte,
-        encre: AppColors.darkEtatDisponibleSurFond,
-        fond: AppColors.darkEtatDisponibleFond,
+        encre: AppColors.darkEtatAccepteSurFond,
+        fond: AppColors.darkEtatAccepteFond,
       ),
       AttributionEtat.refuse: StatusDescriptor(
         icone: Icons.cancel,
@@ -475,8 +486,8 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       PlanningEtat.valide: StatusDescriptor(
         icone: Icons.verified,
         libelle: AppStrings.planningValide,
-        encre: AppColors.darkEtatDisponibleSurFond,
-        fond: AppColors.darkEtatDisponibleFond,
+        encre: AppColors.darkEtatAccepteSurFond,
+        fond: AppColors.darkEtatAccepteFond,
       ),
       PlanningEtat.archive: StatusDescriptor(
         icone: Icons.inventory_2,
@@ -517,7 +528,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       SyncEtat.enregistre: StatusDescriptor(
         icone: Icons.cloud_done,
         libelle: AppStrings.saveTermine,
-        encre: AppColors.darkEtatDisponible,
+        encre: AppColors.darkEtatAccepte,
         fond: AppColors.darkSurface,
       ),
       SyncEtat.echec: StatusDescriptor(
