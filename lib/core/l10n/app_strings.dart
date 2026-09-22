@@ -361,6 +361,79 @@ abstract final class AppStrings {
       'Ton accès à cette caserne a été désactivé. Contacte ton chef de centre '
       'pour le rouvrir.';
 
+  // --- Invitation en attente sur « Aucune caserne » (ticket 051) -----
+
+  /// Le titre de l'écran **tant qu'on ne sait pas** ce que la session porte.
+  ///
+  /// Neutre par nécessité : « Aucune caserne » est un verdict, et le rendre
+  /// avant d'avoir posé la question est exactement le défaut que ce ticket
+  /// répare.
+  static const String aucuneCaserneTitreNeutre = 'Ton compte';
+  static const String aucuneCaserneVerification =
+      'Vérification de tes invitations…';
+
+  /// Le **fait** seul, sans le conseil.
+  ///
+  /// [aucuneCaserneTexte] additionne un fait — le compte n'est rattaché à
+  /// aucune caserne, qui vient des appartenances, déjà chargées — et un
+  /// conseil — demander une invitation —, qui dépend d'une chose qu'on n'avait
+  /// jamais vérifiée. Quand la vérification échoue, on garde le fait et on
+  /// abandonne le conseil : c'est la seule forme qui ne peut pas se tromper.
+  static const String aucuneCaserneFait =
+      'Ton compte existe, mais il n\'est rattaché à aucune caserne.';
+
+  static String invitationsRecuesTitre(int nombre) =>
+      nombre <= 1 ? 'Une caserne t\'attend' : '$nombre casernes t\'attendent';
+
+  /// L'adresse de la session est dans la phrase, et c'est délibéré : la
+  /// personne vient de la taper, c'est le seul fait qui relie ce qu'elle voit
+  /// à ce qu'elle a fait. C'est la sienne, elle ne révèle rien.
+  static String invitationsRecuesIntro(String email, int nombre) => nombre <= 1
+      ? 'Une invitation a été envoyée à $email. Rejoins-la ici, sans ouvrir '
+            'ton courriel.'
+      : '$nombre invitations ont été envoyées à $email. Choisis la caserne '
+            'que tu rejoins.';
+
+  static String invitationsExpireesTitre(int nombre) =>
+      nombre <= 1 ? 'Ton invitation a expiré' : 'Tes invitations ont expiré';
+
+  /// Le libellé nomme la caserne : deux boutons « Rejoindre » identiques
+  /// seraient un piège, et un bouton nomme son action.
+  static String invitationRejoindre(String caserne) => 'Rejoindre $caserne';
+
+  /// La sortie d'une invitation expirée : une personne, pas un bouton.
+  static String invitationExpireeDemander(String inviteur) =>
+      'Demande à $inviteur de te la renvoyer.';
+  static const String invitationExpireeDemanderSansNom =
+      'Demande à l\'administrateur de la caserne de te la renvoyer.';
+
+  static const String invitationsRecuesEchec =
+      'Impossible de vérifier tes invitations. Tu en as peut-être une en '
+      'attente.';
+  static const String invitationsRecuesHorsLigne =
+      'Hors ligne. Impossible de vérifier tes invitations.';
+
+  /// La ligne d'invitation, lue comme une phrase par un lecteur d'écran.
+  static String invitationRecueSemantique({
+    required String caserne,
+    required String etat,
+    required String echeance,
+    String? inviteur,
+  }) => <String>[
+    caserne,
+    if (inviteur != null) 'invitation envoyée par $inviteur',
+    etat,
+    echeance,
+  ].join(', ');
+
+  /// Le rappel d'un accès désactivé quand une invitation occupe le centre de
+  /// l'écran : le fait, sans la consigne de [caserneDesactiveeTexte], parce
+  /// que la seule chose actionnable est alors l'invitation.
+  static String caserneDesactiveeRappel(String caserne) =>
+      'Ton accès à $caserne a été désactivé.';
+  static const String caserneDesactiveeRappelSansNom =
+      'Ton accès à cette caserne a été désactivé.';
+
   // --- Accueil --------------------------------------------------------
 
   static const String accueilTitre = 'Accueil';
@@ -1026,6 +1099,17 @@ abstract final class AppStrings {
       'Cette invitation a été envoyée à $adresseInvitee, et tu es connecté '
       'avec $adresseCourante. Déconnecte-toi, puis rouvre le lien avec la '
       'bonne adresse.';
+
+  /// Le même refus, quand le serveur n'a pas rendu l'adresse masquée.
+  ///
+  /// C'est le cas de l'entrée par identifiant (ticket 051) : la masquer
+  /// n'aurait pas de sens — l'identifiant n'a été donné qu'à la session qu'il
+  /// concerne —, et la rendre ferait un oracle d'existence.
+  static String invitationMauvaisCompteTexteSansAdresse(
+    String adresseCourante,
+  ) =>
+      'Cette invitation ne concerne pas $adresseCourante. Déconnecte-toi, '
+      'puis reconnecte-toi avec l\'adresse qui l\'a reçue.';
 
   static String invitationContacterAdmin(String caserne) =>
       'Écris à l\'administrateur de $caserne pour en recevoir une nouvelle.';
