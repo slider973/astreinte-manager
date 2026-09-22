@@ -5,7 +5,7 @@
 - **Dépend de** : 060
 - **Branche** : `feat/062-verification-pwa-sur-le-domaine`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-22
 
 ## Contexte
 
