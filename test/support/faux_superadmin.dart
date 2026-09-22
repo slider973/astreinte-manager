@@ -80,6 +80,7 @@ class FauxSuperAdminRepository implements SuperAdminRepository {
     List<CaserneSupervisee>? casernes,
     this.porte,
     this.plannings_ = const <PlanningSupervise>[],
+    this.echecLecture,
     this.echecCreation,
     this.echecSuspension,
     this.echecSupport,
@@ -97,6 +98,11 @@ class FauxSuperAdminRepository implements SuperAdminRepository {
   List<CaserneSupervisee> _casernes;
 
   final List<PlanningSupervise> plannings_;
+
+  /// Une lecture de la liste qui échoue : l'écran passe alors en erreur, et
+  /// c'est l'état où il serait sans issue si son pied ne tenait pas tout seul
+  /// (ticket 053).
+  final ErreurSuperAdmin? echecLecture;
 
   final ErreurSuperAdmin? echecCreation;
   final ErreurSuperAdmin? echecSuspension;
@@ -127,6 +133,8 @@ class FauxSuperAdminRepository implements SuperAdminRepository {
   @override
   Future<List<CaserneSupervisee>> casernes() async {
     lectures++;
+    final echec = echecLecture;
+    if (echec != null) throw EchecSuperAdmin(echec);
     if (!autorise) return const <CaserneSupervisee>[];
     return List<CaserneSupervisee>.unmodifiable(_casernes);
   }
