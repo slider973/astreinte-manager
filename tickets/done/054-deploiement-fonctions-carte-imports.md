@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 049
 - **Branche** : `feat/054-deploiement-fonctions-carte-imports`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/48
 - **Statut** : terminé le 2026-09-22 (PR créée)
 
 ## Contexte
