@@ -66,6 +66,19 @@ flutter:
         - asset: assets/fonts/AtkinsonHyperlegibleMono-Bold.ttf
           weight: 700
 
+    # Archivo (ticket 061) : la police des **trois styles de titre** — 28, 22
+    # et 18 points — et de rien d'autre. Tout ce qui descend à 16 points ou
+    # moins reste en Atkinson, choisie au 004 pour la distinction 1/l/I et
+    # 0/O ; tous les chiffres restent en Atkinson Mono. Deux graisses
+    # suffisent donc : 700 pour les deux grands titres, 600 pour le titre de
+    # bloc. Licence SIL OFL (`assets/fonts/OFL-Archivo.txt`).
+    - family: Archivo
+      fonts:
+        - asset: assets/fonts/Archivo-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Archivo-Bold.ttf
+          weight: 700
+
     # --- Le repli de dernier recours du moteur (ticket 037) ---------------
     #
     # CanvasKit exige une police de dernier recours, sans quoi il plante en

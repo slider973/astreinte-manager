@@ -2,11 +2,19 @@
 
 **Atkinson Hyperlegible Next** (texte) et **Atkinson Hyperlegible Mono** (nombres), dessinées par
 le Braille Institute of America pour maximiser la distinction entre caractères en basse vision.
-Licence SIL Open Font License 1.1 (`OFL.txt`).
+Licence SIL Open Font License 1.1 (`OFL-Atkinson.txt`).
 
-Source : dépôt officiel Google Fonts, `ofl/atkinsonhyperlegiblenext` et `ofl/atkinsonhyperlegiblemono`
-(fichiers variables `AtkinsonHyperlegibleNext[wght].ttf` et `AtkinsonHyperlegibleMono[wght].ttf`,
-axe `wght` 200–800).
+**Archivo** (titres, ticket 061), Omnibus-Type, licence SIL Open Font License 1.1
+(`OFL-Archivo.txt`). Elle porte les **trois styles de titre** du système — 28, 22 et 18 points —
+et rien d'autre : à 16 points et en dessous on repasse en Atkinson, et tout chiffre reste en
+Atkinson Mono. C'est la ligne que le brief du 061 trace : Archivo apporte le caractère du monde
+visuel là où il se voit, l'Atkinson garde la lisibilité là où elle compte — distinction `1`/`l`/`I`
+et `0`/`O` dans un écran plein de dates, de codes et de quotas.
+
+Source : dépôt officiel Google Fonts, `ofl/atkinsonhyperlegiblenext`,
+`ofl/atkinsonhyperlegiblemono` et `ofl/archivo` (fichiers variables
+`AtkinsonHyperlegibleNext[wght].ttf`, `AtkinsonHyperlegibleMono[wght].ttf` et
+`Archivo[wdth,wght].ttf`).
 
 Les fichiers versionnés ici sont des **instances statiques sous-ensemblées** produites avec
 `fontTools` pour ne garder que les graisses et les caractères utilisés par l'application :
@@ -34,7 +42,16 @@ fichier, aucun caractère manquant sur le français.
 | `AtkinsonHyperlegibleMono-SemiBold.ttf` | 600 | 30 Ko |
 | `AtkinsonHyperlegibleMono-Bold.ttf` | 700 | 30 Ko |
 | `AtkinsonHyperlegibleNext-Repli.ttf` | 400 | 10 Ko |
-| **Total** | | **198 Ko** |
+| `Archivo-SemiBold.ttf` | 600 | 57 Ko |
+| `Archivo-Bold.ttf` | 700 | 57 Ko |
+| **Total** | | **312 Ko** |
+
+Archivo est instanciée à `wght=600` et `700`, **`wdth=100`** — l'axe de chasse est figé, aucune
+largeur condensée n'entre dans le produit — puis sous-ensemblée sur le même jeu de caractères que
+l'Atkinson. Ses fonctionnalités OpenType sont réduites à `kern,liga,clig,ccmp,mark,mkmk,locl` :
+garder `*` traînait 92 glyphes d'alternates stylistiques que rien n'appelle, pour 12 Ko par
+fichier. Résultat : 432 glyphes, 57 Ko brut, **20 Ko une fois compressé en brotli** — le poids
+réel ajouté au démarrage est donc de 41 Ko pour les deux graisses.
 
 `…-Repli.ttf` n'est affiché par aucun écran. C'est le **dernier recours du moteur web**, celui que
 CanvasKit exige pour ne pas planter sur du texte dont la famille n'est pas enregistrée, et qu'il
