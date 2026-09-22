@@ -17,7 +17,7 @@ import 'barre_repartition.dart';
 /// cases ne répondent pas d'un coup d'œil.
 ///
 /// Sur téléphone, il se réduit à sa ligne de chiffres : la barre et sa
-/// légende coûteraient 60 points de hauteur pour redire ce que les trois
+/// légende coûteraient 76 points de hauteur pour redire ce que les trois
 /// nombres disent déjà, sur l'écran qui en a le moins.
 class BandeauMois extends StatelessWidget {
   const BandeauMois({
@@ -25,6 +25,20 @@ class BandeauMois extends StatelessWidget {
     super.key,
     this.compact = false,
   });
+
+  /// La hauteur du bloc entier, **mesurée** : cadre, ligne de chiffres, barre
+  /// et légende sur une ligne. Elle ne dépend pas de la largeur — la légende
+  /// tient sur une ligne jusqu'à 760 points de large, c'est-à-dire partout où
+  /// la matrice existe.
+  ///
+  /// C'est la grandeur avec laquelle l'écran décide s'il a la place du bloc
+  /// (`MatriceScreen.placeBandeauComplet`). Un test la tient à jour : si le
+  /// bloc grossit, la constante le dit au lieu de mentir.
+  static const double hauteurComplet = 134;
+
+  /// La même, réduite à sa ligne de trois chiffres, sur une fenêtre où les
+  /// libellés ne se replient pas.
+  static const double hauteurReduit = 58;
 
   final ResumeMois resume;
 
@@ -62,7 +76,11 @@ class BandeauMois extends StatelessWidget {
           borderRadius: AppRadius.controleRadius,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          // **Resserré à `md`** : le bloc est un résumé posé au-dessus de la
+          // matrice, pas une carte à contempler. Les quatre points gagnés de
+          // chaque côté sont quatre points rendus à la grille sur une fenêtre
+          // courte, là où ils décident de ce qui se voit.
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -125,6 +143,14 @@ class _Chiffres extends StatelessWidget {
 
   final ResumeMois resume;
 
+  /// **Le nombre au-dessus du libellé**, aux deux largeurs.
+  ///
+  /// « Réponses en attente » se replie sur deux lignes là où « À pourvoir »
+  /// tient sur une : le nombre placé dessous descendait d'une ligne pendant
+  /// que ses deux voisins restaient en haut, et les trois chiffres du mois ne
+  /// se lisaient plus d'un seul balayage. En tête, ils partagent la même
+  /// ligne quel que soit le repli des libellés — et c'est le premier nombre,
+  /// non le premier libellé, qui donne maintenant la verticale du bloc.
   @override
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,6 +160,7 @@ class _Chiffres extends StatelessWidget {
           libelle: AppStrings.bandeauCouverts,
           valeur: resume.couverts,
           plafondAttendu: false,
+          nombreEnTete: true,
         ),
       ),
       Expanded(
@@ -141,6 +168,7 @@ class _Chiffres extends StatelessWidget {
           libelle: AppStrings.bandeauAPourvoir,
           valeur: resume.manquants,
           plafondAttendu: false,
+          nombreEnTete: true,
         ),
       ),
       Expanded(
@@ -148,6 +176,7 @@ class _Chiffres extends StatelessWidget {
           libelle: AppStrings.bandeauEnAttente,
           valeur: resume.enAttente,
           plafondAttendu: false,
+          nombreEnTete: true,
         ),
       ),
     ],

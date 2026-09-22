@@ -3,11 +3,14 @@ import 'dart:math' as math;
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/l10n/format_date.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/theme/app_spacing.dart';
 import 'package:astreinte_sp/core/theme/app_theme.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/planning/domain/ligne_matrice.dart';
+import 'package:astreinte_sp/features/planning/presentation/matrice_screen.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/bande_semaine.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/bandeau_mois.dart';
+import 'package:astreinte_sp/features/planning/presentation/widgets/barre_repartition.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/geometrie_matrice.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/grille_matrice.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +21,7 @@ import '../../support/faux_auth.dart';
 import '../../support/faux_dispos.dart';
 import '../../support/faux_invitations.dart';
 import '../../support/faux_matrice.dart';
+import '../../support/polices.dart';
 
 const Size _poste = Size(1440, 900);
 
@@ -43,6 +47,23 @@ Color? _fond(WidgetTester tester, int jour) {
         .first,
   );
   return materiau.color;
+}
+
+/// Le liseré d'une pastille : `Material` porte la forme, et c'est elle qui
+/// dit si le jour est celui que la matrice montre.
+BorderSide _lisere(WidgetTester tester, int jour) {
+  final materiau = tester.widget<Material>(
+    find
+        .descendant(
+          of: find.byType(BandeSemaine),
+          matching: find.ancestor(
+            of: find.text('$jour'),
+            matching: find.byType(Material),
+          ),
+        )
+        .first,
+  );
+  return (materiau.shape! as RoundedRectangleBorder).side;
 }
 
 /// Le décalage horizontal de la grille, celui que la bande commande.
@@ -82,6 +103,11 @@ Future<void> _ouvrirLaMatrice(
   WidgetTester tester, {
   Size taille = _poste,
 }) async {
+  // **Les vraies polices, sinon la mesure ne vaut rien.** La barre de
+  // commande est une `Wrap` : composée avec la police d'essai, plus large de
+  // moitié, elle se replie d'une ligne de plus et rend une hauteur qu'aucun
+  // navigateur n'affiche. Tout ce fichier mesure des seuils de hauteur.
+  await chargerPolicesDuProduit();
   await monterApp(
     tester,
     session: sessionMembre,
@@ -191,6 +217,45 @@ void main() {
       expect(vise, 9);
     });
 
+    testWidgets('le jour visé porte un liseré et s\'annonce sélectionné', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await monter(
+        tester,
+        BandeSemaine(
+          annee: 2026,
+          mois: 10,
+          nombreDeJours: 31,
+          aujourdhui: DateTime(2026, 10, 14),
+          jourVise: 14,
+          onJour: (_) {},
+        ),
+        taille: _poste,
+      );
+
+      // **Le liseré s'ajoute au remplissage** : le 14 est à la fois
+      // aujourd'hui et le jour visé, et il le montre deux fois plutôt que de
+      // choisir.
+      final scheme = AppTheme.clair.colorScheme;
+      expect(_fond(tester, 14), scheme.primaryContainer);
+      expect(_lisere(tester, 14).width, AppStroke.etat);
+      expect(_lisere(tester, 14).color, scheme.outline);
+      // Le voisin n'a rien : un liseré à la fois.
+      expect(_lisere(tester, 15).style, BorderStyle.none);
+
+      // Et l'état ne tient pas qu'au trait : il est aussi dit.
+      final libelle = <String>[
+        dateAvecJourSemaine(DateTime(2026, 10, 14)),
+        AppStrings.jourAujourdhui,
+      ].join(', ');
+      expect(
+        tester.getSemantics(find.bySemanticsLabel(libelle)),
+        containsSemantics(label: libelle, isButton: true, isSelected: true),
+      );
+      handle.dispose();
+    });
+
     testWidgets('le jour courant s\'annonce, et chaque pastille dit où elle '
         'mène', (tester) async {
       final handle = tester.ensureSemantics();
@@ -242,9 +307,89 @@ void main() {
       );
     });
 
+    testWidgets('après un clic, la pastille marque le jour que la matrice '
+        'montre — et l\'oublie quand on défile ailleurs', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _ouvrirLaMatrice(tester);
+
+      // Rien n'est visé tant que rien n'a été demandé.
+      expect(_lisere(tester, 12).style, BorderStyle.none);
+
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(BandeSemaine),
+              matching: find.text('12'),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+
+      // La grille a bougé, et la bande le dit : liseré **et** `selected`.
+      expect(_decalage(tester), greaterThan(0));
+      expect(_lisere(tester, 12).width, AppStroke.etat);
+      expect(
+        tester.getSemantics(
+          find.descendant(
+            of: find.byType(BandeSemaine),
+            matching: find.bySemanticsLabel(
+              dateAvecJourSemaine(
+                DateTime(_maintenant.year, _maintenant.month, 12),
+              ),
+            ),
+          ),
+        ),
+        containsSemantics(isButton: true, isSelected: true),
+      );
+
+      // Un défilement à la main qui emmène la grille loin du 12 défait la
+      // marque : elle dit « la matrice est posée là », pas « tu as cliqué
+      // ici ».
+      await tester.drag(
+        find.byType(GrilleMatrice),
+        const Offset(-800, 0),
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
+      expect(_lisere(tester, 12).style, BorderStyle.none);
+
+      handle.dispose();
+    });
+
+    testWidgets('sur un portable en 720, la barre du mois et sa légende se '
+        'voient quand même', (tester) async {
+      await _ouvrirLaMatrice(tester, taille: const Size(1280, 720));
+
+      // **Le cas de référence du chantier** : un 13 pouces, sa barre
+      // d'adresse, 341 points de place sous la barre de commande. Le bloc
+      // resserré y tient — la barre de répartition et sa légende sont un
+      // livrable, pas un bonus de grand écran.
+      expect(tester.takeException(), isNull);
+      expect(find.byType(BandeauMois), findsOneWidget);
+      expect(find.byType(BarreRepartition), findsOneWidget);
+      expect(find.byType(BandeSemaine), findsOneWidget);
+      expect(find.byType(GrilleMatrice), findsOneWidget);
+
+      // La légende est lisible, pas seulement présente : ses quatre lignes
+      // tiennent côte à côte, et chacune porte son mot.
+      expect(find.text(AppStrings.bandeauPartNonSaisis), findsOneWidget);
+      final legende = tester.getSize(
+        find.byType(BarreRepartition),
+      );
+      expect(legende.height, lessThan(BandeauMois.hauteurComplet));
+
+      // Et la grille garde ses quatre lignes de réserve.
+      expect(
+        tester.getSize(find.byType(GrilleMatrice)).height,
+        greaterThanOrEqualTo(MatriceScreen.placeGrilleUtile),
+      );
+    });
+
     testWidgets('sur une fenêtre courte, la matrice garde la place : le '
         'bandeau et la bande s\'effacent', (tester) async {
-      await _ouvrirLaMatrice(tester, taille: const Size(1440, 700));
+      // Un navigateur à demi hauteur : 181 points sous la barre de commande,
+      // de quoi montrer une grille et rien d'autre.
+      await _ouvrirLaMatrice(tester, taille: const Size(1280, 560));
 
       // La grille est entière, sans débordement : c'est elle l'écran.
       expect(tester.takeException(), isNull);

@@ -17,6 +17,13 @@ import '../../../../core/theme/app_typography.dart';
 /// qu'on ne réapprenne rien d'un bandeau à l'autre : le jour courant en
 /// pastille indigo, le weekend et les fériés d'un cran de surface plus
 /// sombre **et** en gras, le reste nu.
+///
+/// Un quatrième s'y ajoute, qui ne dit pas une date mais un geste : le
+/// **jour visé**, celui qu'on vient de toucher et que la matrice a amené sous
+/// l'œil. Sans lui, la grille bougeait et la bande restait identique — on
+/// perdait de vue ce qu'on venait de demander. Il se porte en liseré et en
+/// `selected`, jamais par la couleur seule, et il coexiste avec la pastille
+/// d'aujourd'hui : les deux peuvent tomber sur le même jour.
 class BandeSemaine extends StatelessWidget {
   const BandeSemaine({
     required this.annee,
@@ -25,6 +32,7 @@ class BandeSemaine extends StatelessWidget {
     required this.aujourdhui,
     required this.onJour,
     super.key,
+    this.jourVise,
   });
 
   /// Côté d'une pastille. Au-dessus du plancher tactile, même si la bande
@@ -46,6 +54,10 @@ class BandeSemaine extends StatelessWidget {
   final int nombreDeJours;
   final DateTime aujourdhui;
 
+  /// Le jour que la matrice montre parce qu'on l'a demandé, en base 1, ou
+  /// `null` — au premier affichage, ou quand la grille a défilé ailleurs.
+  final int? jourVise;
+
   /// Appelé avec le jour du mois, en base 1.
   final ValueChanged<int> onJour;
 
@@ -66,6 +78,7 @@ class BandeSemaine extends StatelessWidget {
         itemBuilder: (BuildContext context, int index) => _Pastille(
           date: DateTime(annee, mois, index + 1),
           aujourdhui: aujourdhui,
+          vise: jourVise == index + 1,
           onJour: onJour,
         ),
       ),
@@ -77,11 +90,16 @@ class _Pastille extends StatelessWidget {
   const _Pastille({
     required this.date,
     required this.aujourdhui,
+    required this.vise,
     required this.onJour,
   });
 
   final DateTime date;
   final DateTime aujourdhui;
+
+  /// Vrai pour le jour que la matrice montre sur demande.
+  final bool vise;
+
   final ValueChanged<int> onJour;
 
   @override
@@ -112,12 +130,25 @@ class _Pastille extends StatelessWidget {
       padding: const EdgeInsets.only(right: AppSpacing.entreCibles),
       child: Semantics(
         button: true,
+        // **Le jour visé se dit aussi**, et pas seulement se voit : le liseré
+        // le porte à l'œil, `selected` le porte à l'oreille. `null` et non
+        // `false` sur les autres : tant que rien n'a été demandé, aucune
+        // pastille n'a à s'annoncer « non sélectionnée » trente fois.
+        selected: vise ? true : null,
         label: libelle,
         hint: AppStrings.bandeAllerAuJour,
         excludeSemantics: true,
         child: Material(
           color: fond,
-          borderRadius: AppRadius.controleRadius,
+          // Le liseré du jour visé **s'ajoute** au remplissage : un jour peut
+          // être aujourd'hui et visé en même temps, et il le montre deux fois
+          // plutôt que de choisir.
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.controleRadius,
+            side: vise
+                ? BorderSide(color: scheme.outline, width: AppStroke.etat)
+                : BorderSide.none,
+          ),
           child: InkWell(
             borderRadius: AppRadius.controleRadius,
             onTap: () => onJour(date.day),

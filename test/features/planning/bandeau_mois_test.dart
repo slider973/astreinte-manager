@@ -2,6 +2,7 @@ import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/theme/app_colors.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/theme/app_theme.dart';
+import 'package:astreinte_sp/core/widgets/count_stat.dart';
 import 'package:astreinte_sp/features/planning/domain/creneau_planning.dart';
 import 'package:astreinte_sp/features/planning/domain/planning_mois.dart';
 import 'package:astreinte_sp/features/planning/domain/resume_mois.dart';
@@ -12,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../core/widgets/helpers.dart';
 import '../../support/faux_planning.dart';
+import '../../support/polices.dart';
 
 /// Un mois de deux jours : quatre créneaux, assez pour exercer les quatre
 /// familles sans écrire soixante-deux lignes.
@@ -36,6 +38,13 @@ Attribution _attribution(
   creneauId: creneauId,
   userId: userId,
   etat: etat,
+);
+
+/// Le nombre **du compteur**, et non celui de la ligne de légende qui dit le
+/// même chiffre trente points plus bas.
+Finder _nombre(String valeur) => find.descendant(
+  of: find.byType(CountStat),
+  matching: find.text(valeur),
 );
 
 void main() {
@@ -222,26 +231,33 @@ void main() {
       expect(find.text('7'), findsOneWidget);
     });
 
-    testWidgets('la ligne des chiffres part du bord gauche, comme la barre', (
-      tester,
-    ) async {
+    testWidgets('la ligne d\'attaque est celle du premier nombre, et la '
+        'barre la suit', (tester) async {
+      await chargerPolicesDuProduit();
       await monter(
         tester,
         const BandeauMois(resume: resume),
         taille: const Size(1280, 900),
       );
 
-      // Le premier libellé, la barre et la première ligne de légende
-      // partagent une verticale : la place laissée par le titre de mois n'a
-      // pas été rendue à un intitulé, elle est rendue aux chiffres.
+      // Le premier nombre, son libellé, la barre et la première ligne de
+      // légende partagent une verticale : la place laissée par le titre de
+      // mois n'a pas été rendue à un intitulé, elle est rendue aux chiffres.
+      // Depuis que le nombre passe au-dessus du libellé, c'est **lui** qui
+      // ouvre le bloc — la ligne d'attaque n'a pas bougé d'un point, elle a
+      // changé de porteur.
+      final gaucheDuNombre = tester.getTopLeft(_nombre('40')).dx;
       final gaucheDuLibelle = tester
           .getTopLeft(find.text(AppStrings.bandeauCouverts))
           .dx;
-      final gaucheDeLaBarre = tester.getTopLeft(find.byType(BarreRepartition)).dx;
+      final gaucheDeLaBarre = tester
+          .getTopLeft(find.byType(BarreRepartition))
+          .dx;
       final gaucheDeLaLegende = tester
           .getTopLeft(find.text(AppStrings.bandeauPartCouverts))
           .dx;
 
+      expect(gaucheDuNombre, moreOrLessEquals(gaucheDeLaBarre, epsilon: 1));
       expect(gaucheDuLibelle, moreOrLessEquals(gaucheDeLaBarre, epsilon: 1));
       expect(gaucheDeLaLegende, greaterThan(gaucheDeLaBarre));
 
@@ -252,6 +268,87 @@ void main() {
           .getTopLeft(find.text(AppStrings.bandeauEnAttente))
           .dx;
       expect(troisieme - gaucheDeLaBarre, greaterThan(largeur * 0.6));
+    });
+
+    testWidgets('les trois nombres partagent une ligne, quel que soit le '
+        'repli des libellés', (tester) async {
+      await chargerPolicesDuProduit();
+
+      for (final taille in <Size>[
+        const Size(1280, 900),
+        const Size(390, 844),
+      ]) {
+        final compact = taille.width < 600;
+        await monter(
+          tester,
+          BandeauMois(resume: resume, compact: compact),
+          taille: taille,
+        );
+
+        // Les trois nombres sur la même ligne — c'est ce qu'on lit d'abord —
+        // et chacun **au-dessus** de son libellé.
+        final hauts = <double>[
+          for (final nombre in <String>['40', '20', '7'])
+            tester.getTopLeft(_nombre(nombre)).dy,
+        ];
+        expect(hauts[1], moreOrLessEquals(hauts.first, epsilon: 0.5));
+        expect(hauts[2], moreOrLessEquals(hauts.first, epsilon: 0.5));
+
+        for (final (nombre, libelle) in <(String, String)>[
+          ('40', AppStrings.bandeauCouverts),
+          ('20', AppStrings.bandeauAPourvoir),
+          ('7', AppStrings.bandeauEnAttente),
+        ]) {
+          expect(
+            tester.getTopLeft(_nombre(nombre)).dy,
+            lessThan(tester.getTopLeft(find.text(libelle)).dy),
+          );
+        }
+      }
+
+      // Et le repli existe bel et bien sur un téléphone : « Réponses en
+      // attente » y tient deux lignes là où « À pourvoir » en tient une.
+      // C'est ce repli qui faisait descendre le troisième nombre sous les
+      // deux autres.
+      expect(
+        tester.getSize(find.text(AppStrings.bandeauEnAttente)).height,
+        greaterThan(
+          tester.getSize(find.text(AppStrings.bandeauAPourvoir)).height,
+        ),
+      );
+    });
+
+    testWidgets('les hauteurs annoncées sont les hauteurs mesurées', (
+      tester,
+    ) async {
+      await chargerPolicesDuProduit();
+
+      // L'écran décide de montrer le bloc à partir de ces deux nombres
+      // (`MatriceScreen.placeBandeauComplet`). S'ils dérivaient du rendu, le
+      // seuil déciderait à côté et la barre disparaîtrait sans prévenir.
+      for (final largeur in <double>[1440, 1280, 1024, 840]) {
+        for (final compact in <bool>[false, true]) {
+          await monter(
+            tester,
+            Align(
+              alignment: Alignment.topCenter,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  BandeauMois(resume: resume, compact: compact),
+                ],
+              ),
+            ),
+            taille: Size(largeur, 900),
+          );
+
+          expect(
+            tester.getSize(find.byType(BandeauMois)).height,
+            compact ? BandeauMois.hauteurReduit : BandeauMois.hauteurComplet,
+            reason: 'largeur $largeur, compact $compact',
+          );
+        }
+      }
     });
 
     testWidgets('la barre a quatre parts proportionnelles, chacune avec sa '
