@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_breakpoints.dart';
 import '../theme/app_spacing.dart';
+import '../theme/app_status.dart';
 
 /// Les trois variantes du bouton, à dimensions identiques.
 enum PrimaryButtonVariante {
@@ -101,7 +102,7 @@ class PrimaryButton extends StatelessWidget {
 
     final encre = switch (variante) {
       PrimaryButtonVariante.primaire => theme.colorScheme.onPrimary,
-      PrimaryButtonVariante.secondaire => theme.colorScheme.primary,
+      PrimaryButtonVariante.secondaire => context.statuts.accentTexte,
       PrimaryButtonVariante.danger => theme.colorScheme.onError,
     };
     final encreEffective = _actif ? encre : theme.colorScheme.outline;
