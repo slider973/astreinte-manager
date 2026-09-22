@@ -12,31 +12,76 @@ import 'package:flutter/material.dart';
 abstract final class AppColors {
   // ---------------------------------------------------------------------
   // Rôles Material 3 — thème clair
+  //
+  // Chaque valeur porte son ratio WCAG mesuré, calculé par
+  // `test/core/theme/contraste_test.dart` — pas estimé à l'œil.
   // ---------------------------------------------------------------------
 
-  /// L'encre du registre : noir bleuté, jamais noir pur. 16.34:1 sur blanc.
-  static const Color primary = Color(0xFF16212A);
+  /// L'indigo : **l'accent**. Bouton principal, sélection, jour courant,
+  /// focus. 4.72:1 en remplissage sous [onPrimary].
+  ///
+  /// Ce n'est pas la couleur du texte indigo : voir [accentTexte].
+  static const Color primary = Color(0xFF7655FA);
   static const Color onPrimary = Color(0xFFFFFFFF);
-  static const Color primaryContainer = Color(0xFFD6DEE4);
-  static const Color onPrimaryContainer = Color(0xFF0B141A);
+  static const Color primaryContainer = Color(0xFFE4DDFE);
 
-  /// Le bleu de réglure. 7.41:1 sur blanc.
-  static const Color secondary = Color(0xFF0F5C7A);
+  /// 6.74:1 sur [primaryContainer].
+  static const Color onPrimaryContainer = Color(0xFF4D37A2);
+
+  /// L'indigo **en texte**, assombri pour tenir sur le papier autant que sur
+  /// le blanc : 7.31:1 sur [surface], 6.92:1 sur [surfaceContainerLow].
+  ///
+  /// Un lien, un libellé d'accent, un chiffre mis en avant passent par ici ;
+  /// [primary] reste un remplissage. Séparer les deux est ce qui permet à
+  /// l'accent d'être vif en bloc sans devenir illisible en ligne.
+  static const Color accentTexte = Color(0xFF5840BC);
+
+  /// Le vert. 5.12:1 en remplissage sous [onSecondary]. Accepté, couvert,
+  /// publié, saisie ouverte.
+  static const Color secondary = Color(0xFF097C69);
   static const Color onSecondary = Color(0xFFFFFFFF);
-  static const Color secondaryContainer = Color(0xFFCDE7F2);
-  static const Color onSecondaryContainer = Color(0xFF052B3B);
+  static const Color secondaryContainer = Color(0xFFCEE5E1);
 
-  /// L'ocre d'attente. 6.92:1 sur blanc.
-  static const Color tertiary = Color(0xFF7A5200);
+  /// 7.02:1 sur [secondaryContainer].
+  static const Color onSecondaryContainer = Color(0xFF065144);
+
+  /// L'orange **assombri**, seule forme de l'orange qui a le droit d'être du
+  /// texte. 4.94:1 sur [surface]. Attente, proposition, à pourvoir.
+  static const Color tertiary = Color(0xFF9F6224);
   static const Color onTertiary = Color(0xFFFFFFFF);
-  static const Color tertiaryContainer = Color(0xFFFFE6B0);
-  static const Color onTertiaryContainer = Color(0xFF2A1C00);
+  static const Color tertiaryContainer = Color(0xFFFDEAD7);
 
-  /// Le vermillon. 7.47:1 sur blanc. Jamais décoratif : c'est un état.
-  static const Color error = Color(0xFFA3231A);
+  /// Encre du registre sur le conteneur orange : 14.72:1.
+  static const Color onTertiaryContainer = Color(0xFF131C23);
+
+  /// L'orange vif de la charte. **Remplissage seulement** — bloc de grille,
+  /// segment de barre de répartition, pastille. 2.26:1 sur blanc : y poser du
+  /// texte est un défaut bloquant, et le texte d'un bloc orange est
+  /// [onTertiaryContainer].
+  static const Color orangeVif = Color(0xFFF59638);
+
+  /// Le rose **assombri**, seule forme du rose qui a le droit d'être du texte.
+  /// 5.87:1 sur [surface]. Refusé, absent, conflit, échec.
+  static const Color error = Color(0xFFBB285D);
   static const Color onError = Color(0xFFFFFFFF);
-  static const Color errorContainer = Color(0xFFFCDDD8);
-  static const Color onErrorContainer = Color(0xFF3E0A05);
+  static const Color errorContainer = Color(0xFFFED7E5);
+
+  /// Encre du registre sur le conteneur rose : 13.19:1.
+  static const Color onErrorContainer = Color(0xFF131C23);
+
+  /// Le rose vif de la charte. **Remplissage seulement**, comme [orangeVif] :
+  /// 3.60:1 sur blanc, sous le seuil du texte.
+  static const Color roseVif = Color(0xFFF9357C);
+
+  /// Le violet de la charte : **décoratif**, jamais porteur d'état, jamais du
+  /// texte. 4.36:1 sur blanc — sous le seuil, et c'est voulu : une couleur qui
+  /// ne peut pas être lue ne peut pas être prise pour une information.
+  /// Marque, illustration d'état vide, rien d'autre.
+  static const Color accentDecoratif = Color(0xFFB142E8);
+
+  /// Fond décoratif violet, 1.31:1 sur [surface]. Le texte posé dessus est
+  /// l'encre [onSurface] (12.75:1), jamais une teinte.
+  static const Color accentDecoratifFond = Color(0xFFEFD9FA);
 
   static const Color surface = Color(0xFFFFFFFF);
   static const Color onSurface = Color(0xFF131C23);
@@ -56,32 +101,72 @@ abstract final class AppColors {
 
   static const Color inverseSurface = Color(0xFF222C33);
   static const Color onInverseSurface = Color(0xFFEDF1F3);
-  static const Color inversePrimary = Color(0xFFD8E2E8);
+
+  /// Accent posé sur [inverseSurface] — l'action d'un bandeau. C'est l'indigo
+  /// du thème sombre, parce que le fond est sombre : 5.43:1.
+  static const Color inversePrimary = Color(0xFFA690FC);
   static const Color shadow = Color(0xFF0B141A);
 
   // ---------------------------------------------------------------------
   // Rôles Material 3 — thème sombre
+  //
+  // Les accents viennent du superviseur ; les conteneurs sont dérivés ici,
+  // avec deux cibles : le texte du conteneur à 4.5:1 au moins **sur** le
+  // conteneur, et le conteneur lui-même détaché de la surface (≥ 1.3:1), sans
+  // quoi un bloc d'état se fondrait dans le fond de nuit.
   // ---------------------------------------------------------------------
 
-  static const Color darkPrimary = Color(0xFFD8E2E8);
-  static const Color darkOnPrimary = Color(0xFF16212A);
-  static const Color darkPrimaryContainer = Color(0xFF3A454C);
-  static const Color darkOnPrimaryContainer = Color(0xFFE7EFF4);
+  /// 6.97:1 sur [darkSurface].
+  static const Color darkPrimary = Color(0xFFA690FC);
+  static const Color darkOnPrimary = Color(0xFF131C23);
 
-  static const Color darkSecondary = Color(0xFF7FD0EC);
-  static const Color darkOnSecondary = Color(0xFF00344A);
-  static const Color darkSecondaryContainer = Color(0xFF0B4C66);
-  static const Color darkOnSecondaryContainer = Color(0xFFC8E9F7);
+  /// 1.54:1 sur [darkSurface] — le bloc se détache.
+  static const Color darkPrimaryContainer = Color(0xFF3A2B73);
 
-  static const Color darkTertiary = Color(0xFFF0C46A);
-  static const Color darkOnTertiary = Color(0xFF402C00);
-  static const Color darkTertiaryContainer = Color(0xFF4A3400);
-  static const Color darkOnTertiaryContainer = Color(0xFFFFE0A3);
+  /// 9.07:1 sur [darkPrimaryContainer].
+  static const Color darkOnPrimaryContainer = Color(0xFFE4DDFE);
 
-  static const Color darkError = Color(0xFFFFB4A6);
-  static const Color darkOnError = Color(0xFF5C0F07);
-  static const Color darkErrorContainer = Color(0xFF7E1A12);
-  static const Color darkOnErrorContainer = Color(0xFFFFDAD4);
+  /// L'indigo en texte, côté nuit : c'est déjà [darkPrimary], éclairci pour
+  /// le fond sombre. Le pendant de [accentTexte].
+  static const Color darkAccentTexte = darkPrimary;
+
+  /// 6.72:1 sur [darkSurface].
+  static const Color darkSecondary = Color(0xFF5FAA9E);
+  static const Color darkOnSecondary = Color(0xFF131C23);
+
+  /// 1.63:1 sur [darkSurface].
+  static const Color darkSecondaryContainer = Color(0xFF14423B);
+
+  /// 8.67:1 sur [darkSecondaryContainer].
+  static const Color darkOnSecondaryContainer = Color(0xFFCDE8E2);
+
+  /// 8.08:1 sur [darkSurface]. **De nuit, l'orange vif passe en texte** : ce
+  /// qui lui était interdit sur blanc lui est permis ici, mesure à l'appui.
+  static const Color darkTertiary = Color(0xFFF59638);
+  static const Color darkOnTertiary = Color(0xFF131C23);
+
+  /// 1.72:1 sur [darkSurface].
+  static const Color darkTertiaryContainer = Color(0xFF613305);
+
+  /// 9.10:1 sur [darkTertiaryContainer].
+  static const Color darkOnTertiaryContainer = Color(0xFFFDEBD8);
+
+  /// 7.44:1 sur [darkSurface]. Comme l'orange, le rose passe en texte de nuit.
+  static const Color darkError = Color(0xFFFB7CAA);
+  static const Color darkOnError = Color(0xFF131C23);
+
+  /// 1.69:1 sur [darkSurface].
+  static const Color darkErrorContainer = Color(0xFF6F203D);
+
+  /// 8.24:1 sur [darkErrorContainer].
+  static const Color darkOnErrorContainer = Color(0xFFFED7E5);
+
+  /// Décoratif de nuit, jamais porteur d'état. 7.06:1 sur [darkSurface] — il
+  /// serait lisible, mais la règle tient : il ne dit rien.
+  static const Color darkAccentDecoratif = Color(0xFFCC84F0);
+
+  /// 1.61:1 sur [darkSurface].
+  static const Color darkAccentDecoratifFond = Color(0xFF522768);
 
   static const Color darkSurface = Color(0xFF0F161B);
   static const Color darkOnSurface = Color(0xFFE2E8EC);
@@ -98,21 +183,37 @@ abstract final class AppColors {
 
   static const Color darkInverseSurface = Color(0xFFE2E8EC);
   static const Color darkOnInverseSurface = Color(0xFF131C23);
-  static const Color darkInversePrimary = Color(0xFF16212A);
+
+  /// Accent posé sur [darkInverseSurface], qui est clair : c'est donc l'indigo
+  /// de jour. 5.91:1.
+  static const Color darkInversePrimary = accentTexte;
   static const Color darkShadow = Color(0xFF000000);
 
   // ---------------------------------------------------------------------
   // Encres d'état — thème clair
+  //
+  // Règle du monde visuel : sur un bloc teinté, le texte est l'encre du
+  // registre (`etat*SurFond`), jamais une teinte. La teinte `etat*` ne sert
+  // qu'au texte **sur blanc** et aux filets.
   // ---------------------------------------------------------------------
 
-  static const Color etatDisponible = Color(0xFF145C31);
-  static const Color etatDisponiblePlein = Color(0xFF1A6B3A);
-  static const Color etatDisponibleFond = Color(0xFFCFE9D8);
-  static const Color etatDisponibleSurFond = Color(0xFF05321A);
+  /// Disponible : famille indigo. 7.31:1 sur [surface].
+  static const Color etatDisponible = accentTexte;
 
-  static const Color etatAbsent = Color(0xFFA3231A);
-  static const Color etatAbsentFond = Color(0xFFFBDED9);
-  static const Color etatAbsentSurFond = Color(0xFF3E0A05);
+  /// Remplissage de la case cochée. 4.72:1 sous [onPrimary].
+  static const Color etatDisponiblePlein = primary;
+  static const Color etatDisponibleFond = primaryContainer;
+
+  /// 13.20:1 sur [etatDisponibleFond].
+  static const Color etatDisponibleSurFond = onSurface;
+
+  /// Absent, refusé : famille rose. 5.87:1 sur [surface], 4.49:1 en filet sur
+  /// [etatAbsentFond].
+  static const Color etatAbsent = error;
+  static const Color etatAbsentFond = errorContainer;
+
+  /// 13.19:1 sur [etatAbsentFond].
+  static const Color etatAbsentSurFond = onSurface;
 
   static const Color etatNonSaisi = Color(0xFF52626C);
 
@@ -120,15 +221,24 @@ abstract final class AppColors {
   /// À ne jamais confondre avec [outlineVariant], qui est décoratif.
   static const Color etatNonSaisiFilet = Color(0xFF73828B);
 
-  static const Color etatAttente = Color(0xFF7A5200);
-  static const Color etatAttenteFond = Color(0xFFFFE9BF);
-  static const Color etatAttenteSurFond = Color(0xFF2A1C00);
+  /// Attente : famille orange. 4.94:1 sur [surface], 4.22:1 en filet sur
+  /// [etatAttenteFond] — filet, donc seuil 3:1 ; **le texte d'un bloc orange
+  /// est [etatAttenteSurFond]**, pas cette teinte.
+  static const Color etatAttente = tertiary;
+  static const Color etatAttenteFond = tertiaryContainer;
+
+  /// 14.72:1 sur [etatAttenteFond].
+  static const Color etatAttenteSurFond = onSurface;
 
   static const Color etatNeutre = Color(0xFF45535C);
   static const Color etatNeutreFond = Color(0xFFE7EBEE);
 
-  static const Color etatInfo = Color(0xFF0F5C7A);
-  static const Color etatInfoFond = Color(0xFFCDE7F2);
+  /// Information : famille verte. 6.61:1 sur [surface], assombri d'un cran par
+  /// rapport à [secondary] pour tenir aussi en texte sur le papier.
+  static const Color etatInfo = Color(0xFF086959);
+
+  /// 7.02:1 sous [onSecondaryContainer].
+  static const Color etatInfoFond = secondaryContainer;
 
   /// « Annulé » : un fait gris, pas une alarme. 10.61:1 sur [etatNeutreFond].
   static const Color etatAnnule = Color(0xFF2A343A);
@@ -137,7 +247,7 @@ abstract final class AppColors {
   static const Color etatArchive = Color(0xFF4A5860);
   static const Color etatArchiveFond = Color(0xFFEEF1F3);
 
-  /// « Mois verrouillé » : gris-encre, jamais rouge. 7.49:1 sur son fond.
+  /// « Mois verrouillé » : gris-encre, jamais rose. 7.49:1 sur son fond.
   static const Color etatVerrouille = Color(0xFF3A464E);
   static const Color etatVerrouilleFond = Color(0xFFDDE3E7);
 
@@ -145,31 +255,46 @@ abstract final class AppColors {
   // Encres d'état — thème sombre
   // ---------------------------------------------------------------------
 
-  static const Color darkEtatDisponible = Color(0xFF7ADB9F);
-  static const Color darkEtatDisponiblePlein = Color(0xFF2F7E4E);
-  static const Color darkEtatDisponibleFond = Color(0xFF0C4A28);
-  static const Color darkEtatDisponibleSurFond = Color(0xFFBFEFD1);
+  /// 6.97:1 sur [darkSurface].
+  static const Color darkEtatDisponible = darkPrimary;
 
-  static const Color darkEtatAbsent = Color(0xFFFFB4A6);
-  static const Color darkEtatAbsentFilet = Color(0xFFFF9D8C);
-  static const Color darkEtatAbsentFond = Color(0xFF4A1B15);
-  static const Color darkEtatAbsentSurFond = Color(0xFFFFDAD4);
+  /// Remplissage de la case cochée, de nuit : 7.31:1 sous le glyphe blanc,
+  /// 2.50:1 sur [darkSurface].
+  static const Color darkEtatDisponiblePlein = Color(0xFF5840BC);
+  static const Color darkEtatDisponibleFond = darkPrimaryContainer;
+
+  /// 9.07:1 sur [darkEtatDisponibleFond].
+  static const Color darkEtatDisponibleSurFond = darkOnPrimaryContainer;
+
+  /// 7.44:1 sur [darkSurface].
+  static const Color darkEtatAbsent = darkError;
+
+  /// Filet porteur d'état sur le bloc rose : 4.39:1 sur [darkEtatAbsentFond].
+  static const Color darkEtatAbsentFilet = darkError;
+  static const Color darkEtatAbsentFond = darkErrorContainer;
+
+  /// 8.24:1 sur [darkEtatAbsentFond].
+  static const Color darkEtatAbsentSurFond = darkOnErrorContainer;
 
   static const Color darkEtatNonSaisi = Color(0xFFA4B1B9);
   static const Color darkEtatNonSaisiFilet = Color(0xFF6E7D87);
 
-  static const Color darkEtatAttente = Color(0xFFF0C46A);
-  static const Color darkEtatAttenteFond = Color(0xFF4A3400);
-  static const Color darkEtatAttenteSurFond = Color(0xFFFFE0A3);
+  /// 8.08:1 sur [darkSurface].
+  static const Color darkEtatAttente = darkTertiary;
+  static const Color darkEtatAttenteFond = darkTertiaryContainer;
+
+  /// 9.10:1 sur [darkEtatAttenteFond].
+  static const Color darkEtatAttenteSurFond = darkOnTertiaryContainer;
 
   static const Color darkEtatNeutre = Color(0xFFC4CFD6);
   static const Color darkEtatNeutreFond = Color(0xFF222C33);
 
-  static const Color darkEtatInfo = Color(0xFF7FD0EC);
-  static const Color darkEtatInfoFond = Color(0xFF0B4C66);
+  /// 6.72:1 sur [darkSurface].
+  static const Color darkEtatInfo = darkSecondary;
+  static const Color darkEtatInfoFond = darkSecondaryContainer;
 
-  /// Encre lisible posée sur [darkEtatInfoFond] : `dark-on-secondary-container`
-  /// de `DESIGN.md`, réemployé tel quel pour les pastilles bleues pleines.
+  /// Encre lisible posée sur [darkEtatInfoFond] : `dark-on-secondary-container`,
+  /// réemployé tel quel pour les pastilles vertes pleines. 8.67:1.
   static const Color darkEtatInfoSurFond = darkOnSecondaryContainer;
 
   /// « Archivé » en sombre : encre atténuée sur un cran de surface.

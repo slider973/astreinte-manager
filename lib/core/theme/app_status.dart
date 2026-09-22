@@ -157,6 +157,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
     required this.syncs,
     required this.filetEtat,
     required this.filetDecoratif,
+    required this.accentTexte,
   });
 
   final Map<DisponibiliteEtat, StatusDescriptor> disponibilites;
@@ -171,6 +172,15 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
 
   /// Réglure décorative du registre. Ne porte jamais d'information.
   final Color filetDecoratif;
+
+  /// L'indigo **en texte** : lien, libellé d'accent, « toi » dans une liste.
+  ///
+  /// Ce n'est pas `colorScheme.primary`. Depuis le ticket 061, `primary` est
+  /// l'indigo vif, fait pour remplir un bloc sous du blanc (4.72:1) ; posé en
+  /// texte il tombe à 3.96:1 sur le fond de grille. L'indigo lisible partout
+  /// est celui-ci — 5.86:1 au pire cran de surface en clair. En sombre les
+  /// deux coïncident, le fond ayant changé de côté.
+  final Color accentTexte;
 
   StatusDescriptor disponibilite(DisponibiliteEtat etat) =>
       disponibilites[etat]!;
@@ -203,6 +213,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
   static const AppStatusColors clair = AppStatusColors(
     filetEtat: AppColors.etatNonSaisiFilet,
     filetDecoratif: AppColors.outlineVariant,
+    accentTexte: AppColors.accentTexte,
     disponibilites: <DisponibiliteEtat, StatusDescriptor>{
       // Case pleine : le triplet du registre commence par « cochée ».
       DisponibiliteEtat.disponible: StatusDescriptor(
@@ -247,10 +258,13 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       ),
     },
     attributions: <AttributionEtat, StatusDescriptor>{
+      // L'encre du bloc orange est celle du registre, pas l'orange :
+      // `etatAttente` sur `etatAttenteFond` ne fait que 4.22:1 depuis le
+      // ticket 061. Il reste le filet, où 3:1 suffit.
       AttributionEtat.propose: StatusDescriptor(
         icone: Icons.hourglass_top,
         libelle: AppStrings.attributionPropose,
-        encre: AppColors.etatAttente,
+        encre: AppColors.etatAttenteSurFond,
         fond: AppColors.etatAttenteFond,
         filet: AppColors.etatAttente,
       ),
@@ -317,7 +331,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         fond: AppColors.etatInfoFond,
         filet: AppColors.etatInfo,
       ),
-      // Le verrouillage n'est pas une erreur : gris-encre, jamais rouge.
+      // Le verrouillage n'est pas une erreur : gris-encre, jamais rose.
       PeriodeEtat.verrouillee: StatusDescriptor(
         icone: Icons.lock,
         libelle: AppStrings.periodeVerrouillee,
@@ -354,7 +368,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       SyncEtat.horsLigne: StatusDescriptor(
         icone: Icons.cloud_off,
         libelle: AppStrings.horsLigne,
-        encre: AppColors.etatAttente,
+        encre: AppColors.etatAttenteSurFond,
         fond: AppColors.etatAttenteFond,
       ),
     },
@@ -367,6 +381,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
   static const AppStatusColors sombre = AppStatusColors(
     filetEtat: AppColors.darkEtatNonSaisiFilet,
     filetDecoratif: AppColors.darkOutlineVariant,
+    accentTexte: AppColors.darkAccentTexte,
     disponibilites: <DisponibiliteEtat, StatusDescriptor>{
       DisponibiliteEtat.disponible: StatusDescriptor(
         icone: Icons.check_box,
@@ -530,6 +545,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
     Map<SyncEtat, StatusDescriptor>? syncs,
     Color? filetEtat,
     Color? filetDecoratif,
+    Color? accentTexte,
   }) {
     return AppStatusColors(
       disponibilites: disponibilites ?? this.disponibilites,
@@ -540,6 +556,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       syncs: syncs ?? this.syncs,
       filetEtat: filetEtat ?? this.filetEtat,
       filetDecoratif: filetDecoratif ?? this.filetDecoratif,
+      accentTexte: accentTexte ?? this.accentTexte,
     );
   }
 
@@ -555,6 +572,7 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
       syncs: _lerpMap(syncs, other.syncs, t),
       filetEtat: Color.lerp(filetEtat, other.filetEtat, t)!,
       filetDecoratif: Color.lerp(filetDecoratif, other.filetDecoratif, t)!,
+      accentTexte: Color.lerp(accentTexte, other.accentTexte, t)!,
     );
   }
 

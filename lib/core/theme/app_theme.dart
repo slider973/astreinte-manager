@@ -59,6 +59,7 @@ abstract final class AppTheme {
     ),
     statuts: AppStatusColors.clair,
     pression: AppColors.pressionSombre,
+    accentTexte: AppColors.accentTexte,
   );
 
   /// Thème sombre — la salle de garde à 3 h du matin. La relation s'inverse :
@@ -103,6 +104,7 @@ abstract final class AppTheme {
     ),
     statuts: AppStatusColors.sombre,
     pression: AppColors.pressionClaire,
+    accentTexte: AppColors.darkAccentTexte,
   );
 
   static ThemeData _construire({
@@ -110,6 +112,7 @@ abstract final class AppTheme {
     required ColorScheme scheme,
     required AppStatusColors statuts,
     required Color pression,
+    required Color accentTexte,
   }) {
     final textTheme = AppTextStyles.textTheme(
       scheme.onSurface,
@@ -200,10 +203,13 @@ abstract final class AppTheme {
           textStyle: textTheme.labelLarge,
         ),
       ),
+      // Un libellé de bouton est du texte : il prend l'indigo de texte, pas
+      // l'indigo de remplissage. Sur un panneau teinté, `primary` tomberait
+      // sous 4.5:1 (ticket 061).
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: _styleBouton(
           fond: scheme.surface,
-          encre: scheme.primary,
+          encre: accentTexte,
           desactiveFond: scheme.surfaceContainerHighest,
           desactiveEncre: scheme.outline,
           textStyle: textTheme.labelLarge,
@@ -212,7 +218,7 @@ abstract final class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: scheme.primary,
+          foregroundColor: accentTexte,
           textStyle: textTheme.labelLarge,
           minimumSize: const Size(AppTouch.cible, AppTouch.cible),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
