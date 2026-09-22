@@ -32,7 +32,7 @@ Déploiement (.github/workflows/deploy.yml)
       ├─ 3. configuration supabase config diff  puis  config push
       │                   gabarits de courriel, serveur d'envoi, plafonds, redirections
       ├─ 4. PWA           scripts/build_web.sh env/prod.json
-      │                   puis vercel deploy --prebuilt --prod
+      │                   puis scripts/deployer_pwa.py — l'API Vercel, pas sa ligne de commande
       └─ 5. vérification  scripts/verifier_production.sh — le dépôt contre la production
 ```
 
@@ -70,10 +70,26 @@ mise en ligne, PWA comprise, pour protéger la seule base.
 |---|---|
 | **Project ID** | Projet → Settings → General, champ « Project ID » (`prj_…`) |
 | **Team ID / Org ID** | Équipe → Settings → General, champ « Team ID » (`team_…`). En compte personnel, c'est l'« User ID » |
-| **Token** | [vercel.com/account/tokens](https://vercel.com/account/tokens) → « Create Token », portée = l'équipe du projet, expiration au choix |
+| **Token** | [vercel.com/account/tokens](https://vercel.com/account/tokens) → « Create Token », **portée = le projet `astreinte-manager`**, expiration au choix |
 
 Le token donne le droit de déployer : il se traite comme un mot de passe et ne va **que** dans les
 secrets GitHub.
+
+**Le jeton attendu est un jeton de projet, préfixe `vcp_`.** C'est ce que Vercel crée quand on
+choisit le projet pour portée sur la page des jetons du compte, et c'est celui qu'il faut : il ne
+donne de droit que sur ce projet.
+
+Un tel jeton **n'a pas de contexte utilisateur**, et la ligne de commande Vercel commence par
+charger l'utilisateur : `vercel pull`, `vercel build` et `vercel deploy` répondent tous
+
+```
+Not able to load user because of unexpected error: User not found. (404)
+```
+
+Ce n'est pas un défaut du jeton — deux jetons créés le 21 septembre 2026 ont donné exactement le
+même résultat. C'est pourquoi le déploiement passe par l'**API** Vercel, avec
+`scripts/deployer_pwa.py`, qui accepte ce jeton (ticket 060). Rien à demander de plus : ni jeton de
+compte, ni portée d'équipe.
 
 ## 3. Les secrets GitHub
 
@@ -94,7 +110,7 @@ alors qu'ils sont bien posés. Cela vaut pour les deux `SUPABASE_*` obligatoires
 |---|---|---|
 | `SUPABASE_ACCESS_TOKEN` | un jeton personnel, [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) | la base et les fonctions ne partent pas ; le workflow s'arrête et nomme le secret |
 | `SUPABASE_PROJECT_REF` | la référence du projet, 20 lettres (`https://<ref>.supabase.co`) | idem |
-| `VERCEL_TOKEN` | le token créé au § 2 | le workflow s'arrête et nomme le secret manquant |
+| `VERCEL_TOKEN` | le jeton de projet `vcp_…` créé au § 2 | le workflow s'arrête et nomme le secret manquant |
 | `VERCEL_ORG_ID` | `team_…` (ou l'User ID) | idem |
 | `VERCEL_PROJECT_ID` | `prj_…` | idem |
 
@@ -104,10 +120,13 @@ Vérifié le 21 septembre 2026 contre le projet de production. Si une version fu
 redemandait, le message nommerait `SUPABASE_DB_PASSWORD` ; il se trouve alors dans
 **Project Settings → Database → Database password**, et il se pose comme les autres.
 
-**Le jeton Vercel doit être un jeton de compte**, créé depuis les réglages personnels
-([vercel.com/account/tokens](https://vercel.com/account/tokens)), et non un jeton lié au projet :
-ce dernier fait répondre « User not found » à la ligne de commande, et la mise en ligne de la PWA
-échoue à l'étape « Mettre en ligne sur Vercel ». Seul le propriétaire du compte peut le créer.
+**Le jeton Vercel est un jeton de projet, `vcp_…`**, créé depuis la page des jetons du compte
+([vercel.com/account/tokens](https://vercel.com/account/tokens)) avec le projet pour portée — § 2.
+C'est le seul type demandé, et il suffit : la mise en ligne passe par l'API Vercel, que ce jeton
+autorise. Seul le propriétaire du compte peut le créer.
+
+Il n'y a **pas** de secret `VERCEL_SCOPE` : il ne servait qu'à la ligne de commande, qui n'est plus
+utilisée. S'il traîne encore dans les secrets du dépôt, il peut être supprimé.
 
 ### Le serveur d'envoi de courriels
 
@@ -191,19 +210,27 @@ export SUPABASE_PROJECT_REF=…        # facultatif si le projet est lié
 scripts/verifier_production.sh
 ```
 
-**Depuis un poste, en dépannage.** Les trois commandes `vercel` sont exactement celles du
-workflow ; `vercel build` ne reconstruit rien, il empaquette `build/web` avec les en-têtes et les
-réécritures de `vercel.json`. Le répertoire `.vercel/` qu'elles créent n'est pas versionné.
+**Depuis un poste, en dépannage.** Les deux commandes sont exactement celles du workflow. La
+ligne de commande Vercel n'est pas utilisée : le jeton du dépôt est un jeton de projet et elle le
+refuse (§ 2). `scripts/deployer_pwa.py` parle à l'API, n'a aucune dépendance hors bibliothèque
+standard, et attend l'état `READY` avant de rendre la main.
 
 ```sh
 cp env/prod.json.example env/prod.json   # puis remplir — le fichier n'est pas versionné
 scripts/build_web.sh env/prod.json
 
-export VERCEL_ORG_ID=team_…  VERCEL_PROJECT_ID=prj_…
-npx vercel pull --yes --environment=production --token=<token>
-npx vercel build --prod --token=<token>
-npx vercel deploy --prebuilt --prod --token=<token>
+export VERCEL_TOKEN=vcp_…  VERCEL_ORG_ID=team_…  VERCEL_PROJECT_ID=prj_…
+scripts/deployer_pwa.py --dry-run     # ce qui partirait, sans rien envoyer
+scripts/deployer_pwa.py               # envoi, déploiement de production, attente de READY
 ```
+
+Le script envoie `vercel.json` **avec** la construction, à la racine du déploiement, et range
+`build/web` sous le chemin que ce fichier déclare en `outputDirectory`. Ce n'est pas un détail :
+un déploiement par l'API qui n'envoie pas `vercel.json` ne reçoit **ni les en-têtes, ni la
+réécriture vers `index.html`**. C'est ce qui était arrivé aux mises en ligne manuelles des 21 et
+22 septembre 2026 — la production rendait 404 sur `/install` comme sur `/admin/planning`, et le
+`Cache-Control: public, max-age=0, must-revalidate` qu'on y lisait était celui de Vercel par
+défaut, pas le nôtre. La vérification 5 du § 6 le prend désormais en faute.
 
 **Regarder la construction avant de l'envoyer.** Un serveur statique ordinaire ne convient pas :
 il ne pose pas `Content-Encoding: br` sur les polices et le moteur pré-compressés. Les polices
@@ -240,10 +267,23 @@ curl -sI https://<domaine>/flutter_service_worker.js | grep -i cache-control
 curl -so /dev/null -w '%{http_code}\n' https://<domaine>/install
 curl -so /dev/null -w '%{http_code}\n' https://<domaine>/admin/planning
 # attendu : 200, deux fois
+
+# 5. Les en-têtes de vercel.json sont bien appliqués. Vercel n'en pose aucun
+#    de lui-même : s'ils sont là, c'est que la configuration est partie avec
+#    la construction (§ 5).
+curl -sI https://<domaine>/ | grep -i -e x-content-type-options -e x-frame-options -e referrer-policy
+# attendu : nosniff / SAMEORIGIN / strict-origin-when-cross-origin
+
+# 6. C'est bien la construction du commit qui est servie.
+#    `--compressed` défait la compression de transport : on compare les octets.
+curl -s --compressed https://<domaine>/main.dart.js | shasum -a 1
+shasum -a 1 build/web/main.dart.js
+# attendu : la même empreinte deux fois
 ```
 
-Le workflow fait lui-même les vérifications 1 à 3 après chaque mise en ligne et **échoue** si elles
-ne passent pas. La raison est dans `assets/fonts/README.md` : une police qui n'est pas décodée
+Le workflow fait lui-même les vérifications 1 à 6 après chaque mise en ligne et **échoue** si elles
+ne passent pas — les trois premières à l'étape « Vérifier les en-têtes servis », les trois autres à
+l'étape « Vérifier la PWA servie ». La raison est dans `assets/fonts/README.md` : une police qui n'est pas décodée
 échoue **en silence**, et l'application retombe alors sur un Roboto téléchargé chez Google. Le
 moteur, lui, échoue bruyamment — `WebAssembly.compileStreaming(): expected magic word` — et la page
 reste blanche. Mieux vaut une mise en ligne rouge qu'une PWA muette ou qui appelle gstatic.
@@ -261,7 +301,7 @@ Puis, sur un téléphone :
 
 | Règle | Raison |
 |---|---|
-| `outputDirectory: build/web`, `buildCommand` réduit à un `echo` | la construction a déjà eu lieu dans Actions ; `vercel build` ne fait qu'empaqueter |
+| `outputDirectory: build/web`, `buildCommand` et `installCommand` réduits à un `echo` | la construction a déjà eu lieu dans Actions. `scripts/deployer_pwa.py` envoie `vercel.json` à la racine du déploiement et `build/web` sous le chemin que ce fichier déclare : Vercel ne fait alors que les deux `echo`, puis sert ce qu'il a reçu, en appliquant les en-têtes et les réécritures ci-dessous |
 | Réécriture de tout vers `/index.html` | `go_router` résout les routes côté client, et depuis le ticket 046 elles vivent dans le **chemin** de l'adresse : sans cette règle, un rechargement sur `/admin/planning` — ou l'ouverture d'un lien d'invitation — rendrait 404 avant même que l'application démarre. C'est la contrepartie obligatoire des adresses sans dièse |
 | Aucune redirection | `/install` est une route comme les autres depuis le ticket 046. La redirection `/install` → `/#/install` du ticket 032 n'a plus d'objet : elle enverrait sur une adresse que le routeur ne sait plus lire |
 | `Cache-Control: max-age=0, must-revalidate` presque partout | c'est le service worker de Flutter qui gère les versions, par empreinte de contenu. Un cache HTTP long figerait l'application sur les téléphones déjà installés. La revalidation coûte une requête conditionnelle, et seulement au premier chargement : ensuite, le service worker sert tout hors ligne |
@@ -372,9 +412,21 @@ export SUPABASE_AUTH_SMTP_PASSWORD=re_…            # clé d'API Resend, sinon 
 supabase config diff --project-ref "$SUPABASE_PROJECT_REF"   # à lire avant
 supabase config push --project-ref "$SUPABASE_PROJECT_REF"
 
-# 4. Vérifier.
+# 4. La PWA. La ligne de commande Vercel ne marche pas avec le jeton de projet (§ 2) :
+#    c'est l'API, et le script envoie vercel.json avec la construction — sans lui, la
+#    production perd ses en-têtes et sa réécriture vers index.html.
+export VERCEL_TOKEN=vcp_…  VERCEL_ORG_ID=team_…  VERCEL_PROJECT_ID=prj_…
+scripts/build_web.sh env/prod.json
+scripts/deployer_pwa.py --dry-run     # à lire avant : ce qui partirait
+scripts/deployer_pwa.py               # rend l'identifiant, l'adresse, et attend READY
+
+# 5. Vérifier.
 scripts/verifier_production.sh
 ```
+
+`scripts/verifier_production.sh` ne regarde que Supabase. Pour la PWA, les six commandes du § 6
+sont la vérification — la cinquième et la sixième disent en une seconde si la configuration et le
+code servis sont ceux du dépôt.
 
 **L'adresse du répartiteur de notifications** est posée par l'étape 1 :
 `[remotes.production.db.vault]` de `supabase/config.toml` la déclare, et `db push` met à jour les
