@@ -34,18 +34,26 @@ class TexteInvitation extends StatelessWidget {
 /// Pas de roue au milieu de l'écran (`DESIGN.md § Don't`) : l'ossature du
 /// texte attendu, et une phrase qui dit ce qui se passe.
 class AttenteInvitation extends StatelessWidget {
-  const AttenteInvitation({super.key});
+  const AttenteInvitation({
+    super.key,
+    this.phrase = AppStrings.invitationVerification,
+  });
+
+  /// Ce qui est annoncé pendant l'attente. Le lien vérifie un jeton, « Aucune
+  /// caserne » vérifie des invitations : même forme, même squelette, deux
+  /// phrases — il n'y a aucune raison d'en dessiner une seconde.
+  final String phrase;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       liveRegion: true,
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          TexteInvitation(AppStrings.invitationVerification, principal: true),
-          SizedBox(height: AppSpacing.xl),
-          LoadingSkeleton(
+          TexteInvitation(phrase, principal: true),
+          const SizedBox(height: AppSpacing.xl),
+          const LoadingSkeleton(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[

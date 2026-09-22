@@ -1003,6 +1003,72 @@ retire pas. Sans ce verrou, un admin lirait le token en RPC PostgREST — celui-
 `0008` a retiré de son `grant` de `select`.
 
 
+#### Les invitations en attente, vues par l'invité *(migration `0036`, ticket 051)*
+
+`invite-member` fait naître le compte, `accept_invitation` fait naître l'appartenance. Entre
+les deux vit un compte **sans caserne**, et l'écran « Aucune caserne » lui affirmait qu'il
+n'était attendu nulle part — sans l'avoir jamais vérifié. C'est faux dès qu'on se connecte
+sans passer par le lien du courriel, c'est-à-dire par le chemin le plus court entre
+l'invitation et l'application.
+
+Un compte sans appartenance n'a, par construction, aucun droit de lecture sur `invitations` :
+`invitations_select_admin` (§ 4) l'ouvre à l'administrateur de la caserne et à personne
+d'autre. **La RLS d'`invitations` n'est pas touchée** — l'élargir à « l'adresse invitée »
+donnerait un `select` libre, filtres et colonnes choisis par l'appelant, sur la table d'une
+caserne où il n'est pas encore entré. Deux fonctions, à la place.
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `my_pending_invitations` | `() returns table (id uuid, station_name text, invited_by_name text, expires_at timestamptz, status text)` `security definer` `stable`, **ouverte à `authenticated`** | Les invitations non acceptées adressées à l'adresse de la session. Tri par `expires_at` **décroissant** — les encore valables d'abord, les expirées en dernier —, **au plus dix lignes**. Zéro ligne à qui n'a rien, jamais une exception |
+| `accept_invitation_by_id` | `(p_invitation uuid, p_user_id uuid, p_email text) returns jsonb` `security definer`, **réservée à `service_role`** | Confronte l'adresse de la session à celle de l'invitation **avant tout le reste**, résout le jeton en base et rejoue `accept_invitation` : mêmes contrôles, même transaction, mêmes six codes |
+
+**`my_pending_invitations()` n'a pas de paramètre, et c'est la contrainte principale.**
+L'adresse vient de `auth.jwt() ->> 'email'`, jamais d'un argument. Une fonction qui accepterait
+une adresse serait un oracle d'énumération : n'importe quel compte connecté saurait, adresse
+par adresse, qui est invité où. La comparaison se fait sur `lower(email)`, comme l'index
+partiel `invitations_pending_uniq`, et le filtre est `accepted_at is null`. Une revendication
+`email_verified` **explicitement fausse** (au premier niveau du jeton ou dans `user_metadata`)
+rend zéro ligne ; absente, elle ne bloque rien — avec la connexion par code à six chiffres elle
+est vraie par construction, et l'exiger sur un projet dont GoTrue ne la pose pas remettrait
+l'écran à mentir.
+
+Les cinq champs, et la raison de chacun :
+
+| Champ | Pourquoi |
+|---|---|
+| `id` | Désigner **laquelle** on rejoint, et la passer à l'acceptation. Ce n'est pas un porteur de droits : seul le compte dont l'adresse correspond peut en faire quelque chose, et `accept_invitation_by_id` le revérifie |
+| `station_name` | Le point focal de l'écran. Personne ne rejoint « une caserne », on rejoint le CS Maurepas |
+| `invited_by_name` | Prénom et nom de l'invitant, recomposés côté serveur comme dans l'objet `inviter` d'`accept_invitation`. `null` quand le profil n'a pas de nom (les deux colonnes sont `not null default ''`) — **jamais** un repli sur son adresse |
+| `expires_at` | « Expire le 5 octobre » / « Expirée le 1er octobre » |
+| `status` | `pending` ou `expired`, **tranché par le serveur**. L'horloge d'un appareil dérive, et celle d'un téléphone de caserne prêté davantage. C'est aussi la garantie que l'écran et `accept_invitation` placent la frontière au même endroit |
+
+Ce qu'elle ne rend pas : `token` (porteur de droits retiré du `grant` de select par `0008` —
+une fonction `security definer` qui le rendrait rouvrirait par la fenêtre la porte que la
+migration a fermée), `station_id` (une prise sur un tenant dont l'invité n'est pas membre),
+`role` (aucun geste n'en dépend sur cet écran), l'adresse invitée (c'est celle de la session),
+`email_sent_at` / `email_error` (le diagnostic de l'administrateur, `0035`), `first_name` /
+`last_name` de l'invitation (`0034`), l'état d'abonnement de la caserne (refusé à
+l'acceptation, avec sa propre fin de parcours) et `created_at`.
+
+**`accept_invitation_by_id` ne crée pas un second vocabulaire.** Elle délègue à
+`accept_invitation` après avoir résolu le jeton, qui ne quitte donc jamais la base. Un
+identifiant inconnu et l'identifiant de l'invitation de quelqu'un d'autre rendent **la même
+chose** — `{"ok": false, "code": "email_mismatch"}`, sans `station`, sans `inviter`, sans
+`invited_email_masked` : les distinguer ferait de la fonction un oracle d'existence, et
+l'adresse masquée n'a pas lieu d'être ici. Elle existe sur le chemin du jeton parce qu'un lien
+se transfère et que son porteur doit reconnaître de quelle boîte il s'agit ; un identifiant,
+lui, n'a été donné qu'à la session qu'il concerne.
+
+Le contrôle d'adresse est **doublé**, pas remplacé : ici sur la ligne résolue, puis à nouveau
+dans `accept_invitation` (`p_email`). Et un identifiant est au moins aussi sûr qu'un jeton : le
+jeton est un porteur transférable, il circule par courriel et se copie ; une session dont
+l'adresse a été vérifiée par un code à six chiffres, non.
+
+Une invitation adressée à quelqu'un dont l'appartenance à cette même caserne est `disabled`
+est rendue comme les autres : elle est réelle et actionnable, et `accept_invitation` réactive
+la ligne. La rétention ne bouge pas : `prune_retention` purge les invitations **30 jours après
+expiration** (`0030`), ce qui laisse largement la place à l'affichage « expirée ».
+
 #### Le plafond de débit *(migration `0032`, ticket 038)*
 
 `create_invitation` contrôlait **qui** invite, jamais **combien de fois**. Or elle fait naître
@@ -1137,7 +1203,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `stations` | membre de la caserne | admin de la caserne (update), pas d'insert, pas de delete — *(migration `0025`, ticket 031 : le super-admin a perdu ses trois branches ; il lisait toute la table, `settings` compris, et pouvait renommer ou reconfigurer une caserne dont il n'est pas membre, sans trace. Il passe désormais par les fonctions du § 3, qui journalisent)* |
 | `profiles` | soi-même ; les profils des membres **actifs** de ses casernes ; et, pour un **admin**, ceux de tous les membres de sa caserne quel que soit leur statut (migration `0010` : sans cette branche, un membre désactivé disparaissait de l'écran « Membres » et ne pouvait plus être réactivé) | soi-même |
 | `memberships` | membre de la caserne, et toujours ses propres lignes (un compte `invited` ou `disabled` doit pouvoir constater son état) | admin de la caserne, sauf son propre rôle. Aucune politique d'update pour un membre sur sa propre ligne : elle ouvrirait une escalade de privilèges |
-| `invitations` | admin de la caserne, **sauf `token`** (retiré du grant de select : c'est un porteur de droits, réservé au service role). Ne jamais faire `select *` sur cette table — et une colonne ajoutée n'hérite pas du grant, elle se donne explicitement (`0034`, puis `0035` pour la trace d'envoi) | admin de la caserne |
+| `invitations` | admin de la caserne, **sauf `token`** (retiré du grant de select : c'est un porteur de droits, réservé au service role). Ne jamais faire `select *` sur cette table — et une colonne ajoutée n'hérite pas du grant, elle se donne explicitement (`0034`, puis `0035` pour la trace d'envoi). **L'invité, lui, ne lit pas la table** : la politique reste « admin de la caserne », et `my_pending_invitations()` (`0036`) lui rend cinq champs de ses propres invitations | admin de la caserne |
 | `periods` | membre | admin |
 | `availabilities` | membre : les siennes ; admin : toutes celles de la caserne | membre : les siennes si période `open` et caserne writable ; admin : toutes |
 | `availability_preferences` | idem availabilities | idem |
@@ -1570,7 +1636,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 | `reassign-shift` | app admin | Appelle `reassign_shift` (SQL, atomique) : l'ancienne attribution est marquée `replaced` ou reste `declined`, la nouvelle est créée `proposed` et horodatée, `replaced_by` relie les deux, et **une seule** notification part — au nouveau membre, plus l'ancien si sa garde était acceptée (ticket 020, contrat dans `supabase/functions/README.md`). L'annulation, elle, est une RPC (`cancel_assignment`) et non une Edge Function |
 | `auto-propose` | app admin | **Applique** un remplissage automatique du brouillon, il ne le compose pas : le plan — une liste ordonnée de couples (créneau, pompier) — est calculé dans l'application avec le **tri des candidats du ticket 017**, celui que l'administrateur lit dans le panneau d'un créneau, pour que le récapitulatif qu'il valide soit exactement ce qui part. `apply_auto_proposal` (SQL, atomique) revérifie chaque ligne — membre actif, disponibilité déclarée, plafonds d'astreintes et de weekends, effectif requis, doublons — et **écarte** celles qui ne passent pas avec leur motif au lieu de tout refuser. Aucune notification : un brouillon ne sort pas du bureau (ticket 018, contrat dans `supabase/functions/README.md`) |
 | `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`). **Plafonnée en débit** (ticket 038) : `create_invitation` compte les envois par caserne et par heure et refuse avec le code `rate_limited` ; la fonction compose la phrase française qui dit **quand réessayer**, court-circuite les adresses restantes du lot — le budget est épuisé pour toutes — et rend `429` quand aucune adresse n'est passée. **Trace l'envoi sur l'invitation** (ticket 048) : `email_sent_at` / `email_error` (§ 2.4), écrites au retour de `sendMail`, en création comme en renvoi |
-| `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006) |
+| `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006). **Deux entrées, exactement l'une des deux** (ticket 051) : `{ "token": … }`, le lien du courriel, ou `{ "invitation_id": … }`, l'identifiant rendu par `my_pending_invitations()` à l'écran « Aucune caserne ». Le second passe par `accept_invitation_by_id` (`0036`), qui contrôle l'adresse puis rejoue le premier : mêmes codes, mêmes statuts, mêmes phrases françaises, et le jeton ne traverse pas le réseau |
 | `stripe-webhook` | Stripe | **Vérifie la signature de l'événement** (HMAC-SHA256 du corps brut, lu sous un plafond d'un mégaoctet, fenêtre de cinq minutes), puis applique les cinq événements de l'abonnement par `subscription_sync`. Un événement non signé, mal signé ou hors de la fenêtre est refusé en 4xx ; un événement **déjà traité** est reconnu par `stripe_events` et n'est pas réappliqué ; sans secret configuré, **tout** est refusé en 503 (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `create-checkout` | app admin | Trois actions pour l'écran « Abonnement » : `state` (statut, tarifs, configuration — **répond même sans compte Stripe**), `checkout` (crée le client si besoin, ouvre la session, rend l'adresse) et `portal` (portail de gestion). Rôle d'administrateur revérifié en base (ticket 029, contrat dans `supabase/functions/README.md`) |
 | `ics-feed` | GET **public**, jeton par membre dans l'URL (`/ics-feed/<jeton>.ics` ou `?token=`) | Sert le flux calendrier d'un membre en `text/calendar` : ses astreintes **acceptées**, heures tirées des paramètres de sa caserne, à partir de 90 jours en arrière. `verify_jwt = false` — un agenda ne sait pas porter de jeton d'accès, c'est le secret dans l'URL qui authentifie, comme la signature pour `stripe-webhook`. Le contenu est décidé en base par `ics_feed_events` : rien d'un collègue, rien d'une autre caserne, rien d'une appartenance désactivée. Jeton inconnu ou régénéré : `404`, indistinguables. Un membre sans astreinte reçoit un calendrier **vide**, jamais une erreur (ticket 028, contrat dans `supabase/functions/README.md`) |
@@ -1718,7 +1784,8 @@ charge utile de `postgres_changes` porte toutes les colonnes publiées. Les poli
 filtrent les *lignes*, pas les *colonnes* — le `grant` de colonne qui cache
 `invitations.token` au rôle `authenticated` (`0008`) ne s'applique pas à ce canal. Publier
 cette table distribuerait le jeton d'invitation à tous les admins à l'écoute. La liste des
-invitations en attente se relit donc par requête (après une action, au retour sur l'écran).
+invitations en attente se relit donc par requête (après une action, au retour sur l'écran),
+côté administrateur comme côté invité — pour ce dernier par `my_pending_invitations()` (`0036`).
 
 ## 10. Migrations
 
@@ -1781,6 +1848,10 @@ Ordre proposé :
     antérieures à partir de `notifications`. Aucune fonction SQL modifiée : la trace naît de
     `sendMail`, donc après la transaction de `create_invitation`, et c'est `invite-member`
     qui l'écrit)
+36. `0036_invitations_en_attente.sql` (ticket 051 : `my_pending_invitations()`, ouverte à
+    `authenticated`, et `accept_invitation_by_id()`, réservée à `service_role`. **Aucune
+    politique RLS touchée**, aucune colonne ajoutée : l'invité lit par une fonction, jamais
+    par la table)
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
@@ -1820,7 +1891,9 @@ et `0022` par `supabase/tests/notifications_test.sql`, les rappels de saisie de 
 `0032` par `supabase/tests/limite_debit_invitations_test.sql`, l'heure locale d'envoi de `0033`
 par `supabase/tests/heure_locale_notifications_test.sql` et le nom porté par l'invitation de `0034`
 par `supabase/tests/import_membres_test.sql`, la trace d'envoi de `0035` par
-`supabase/tests/trace_envoi_invitation_test.sql`, joués par le même script. La logique pure
+`supabase/tests/trace_envoi_invitation_test.sql` et les invitations en attente vues par
+l'invité de `0036` par `supabase/tests/invitations_en_attente_test.sql`, joués par le même
+script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
 demande ni base ni réseau et tourne en CI. La couche HTTP des Edge

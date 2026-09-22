@@ -11,6 +11,7 @@ import '../../features/auth/presentation/connexion_screen.dart';
 import '../../features/demarrage/presentation/configuration_absente_screen.dart';
 import '../../features/demarrage/presentation/demarrage_screen.dart';
 import '../../features/dev/presentation/dev_components_screen.dart';
+import '../../features/invitation/domain/acceptation.dart';
 import '../../features/invitation/presentation/invitation_screen.dart';
 import '../../features/legal/presentation/document_legal_screen.dart';
 import '../../features/membres/presentation/importer_screen.dart';
@@ -168,6 +169,26 @@ abstract final class AppRoutes {
 
   /// Le chemin d'un jeton donné, tel que le construit l'Edge Function.
   static String cheminInvitation(String jeton) => '$prefixeInvitation$jeton';
+
+  /// **La seconde entrée d'une invitation** (ticket 051) : l'identifiant rendu
+  /// par `my_pending_invitations()`, depuis « Aucune caserne ».
+  ///
+  /// Jamais un jeton — l'écran n'en a jamais vu, et c'est le point : le jeton
+  /// est un porteur transférable, il circule par courriel et se copie, tandis
+  /// qu'un identifiant n'a été donné qu'à la session qu'il concerne.
+  ///
+  /// Comme `/invite/`, elle est **exemptée de la redirection** de
+  /// `redirectionAuth` : sans quoi elle serait renvoyée sur « Aucune caserne »
+  /// avant d'avoir affiché quoi que ce soit, puis arrachée vers l'accueil à la
+  /// seconde où l'acceptation réussit.
+  static const String rejoindre = '/rejoindre/:$parametreInvitation';
+  static const String rejoindreName = 'rejoindre';
+  static const String parametreInvitation = 'invitation';
+  static const String prefixeRejoindre = '/rejoindre/';
+
+  /// Le chemin d'une invitation donnée, par son identifiant.
+  static String cheminRejoindre(String invitation) =>
+      '$prefixeRejoindre$invitation';
 
   /// L'accueil d'un nouveau membre : profil, guide, aide à l'installation,
   /// puis la proposition d'activer les notifications (ticket 024). Dans cet
@@ -464,7 +485,20 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.invitation,
         name: AppRoutes.invitationName,
         builder: (context, state) => InvitationScreen(
-          jeton: state.pathParameters[AppRoutes.parametreJeton] ?? '',
+          entree: EntreeInvitation.jeton(
+            state.pathParameters[AppRoutes.parametreJeton] ?? '',
+          ),
+        ),
+      ),
+      // Le même écran, la même chaîne « Bienvenue → profil → guide », la même
+      // Edge Function : seule la porte d'entrée change.
+      GoRoute(
+        path: AppRoutes.rejoindre,
+        name: AppRoutes.rejoindreName,
+        builder: (context, state) => InvitationScreen(
+          entree: EntreeInvitation.identifiant(
+            state.pathParameters[AppRoutes.parametreInvitation] ?? '',
+          ),
         ),
       ),
       GoRoute(

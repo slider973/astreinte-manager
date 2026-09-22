@@ -17,19 +17,29 @@ import '../domain/acceptation.dart';
 import '../domain/invitation_providers.dart';
 import 'widgets/panneau_invitation.dart';
 
-/// L'écran du lien d'invitation : `/invite/<jeton>`.
+/// L'écran d'une invitation, **par ses deux entrées**.
 ///
-/// Le lien ne porte **que** le jeton : ni l'adresse invitée, ni le nom de la
-/// caserne. Un lien transféré ne révèle donc rien, et c'est le serveur qui
-/// confronte l'adresse de la session à celle de l'invitation.
+/// - `/invite/<jeton>` : le lien reçu par courriel (ticket 006). Le lien ne
+///   porte **que** le jeton — ni l'adresse invitée, ni le nom de la caserne —,
+///   donc un lien transféré ne révèle rien, et c'est le serveur qui confronte
+///   l'adresse de la session à celle de l'invitation.
+/// - `/rejoindre/<identifiant>` : l'invitation choisie sur « Aucune caserne »
+///   (ticket 051). Aucun jeton n'a été lu, ni affiché, ni transmis.
 ///
-/// Séquence : lien → cet écran → connexion par code → retour ici → acceptation.
-/// Le retour est fait par le routeur, qui garde le jeton en mémoire
-/// (`core/session/jeton_invitation.dart`).
+/// **Un seul écran, et c'est la décision du ticket 051.** Les six fins de
+/// parcours d'`ErreurAcceptation`, la page « Bienvenue » qui nomme la caserne,
+/// puis le profil et le guide : tout cela existe déjà, une seule fois, et pend
+/// sous cet écran. En dessiner un second ferait deux vocabulaires pour les
+/// mêmes échecs.
+///
+/// Séquence du lien : lien → cet écran → connexion par code → retour ici →
+/// acceptation. Le retour est fait par le routeur, qui garde le jeton en
+/// mémoire (`core/session/jeton_invitation.dart`). L'entrée par identifiant,
+/// elle, ne mémorise rien : elle part d'une session déjà ouverte.
 class InvitationScreen extends ConsumerStatefulWidget {
-  const InvitationScreen({required this.jeton, super.key});
+  const InvitationScreen({required this.entree, super.key});
 
-  final String jeton;
+  final EntreeInvitation entree;
 
   @override
   ConsumerState<InvitationScreen> createState() => _InvitationScreenState();
@@ -42,18 +52,25 @@ class _InvitationScreenState extends ConsumerState<InvitationScreen> {
     // Un provider ne se modifie pas pendant la construction de l'arbre.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(jetonInvitationProvider.notifier).memoriser(widget.jeton);
+      // Seul le jeton se mémorise : il n'existe que dans l'URL reçue par
+      // courriel, et le routeur doit pouvoir y ramener après la connexion. Un
+      // identifiant, lui, vient d'une session déjà ouverte — rien à garder.
+      if (widget.entree.mode == ModeInvitation.jeton) {
+        ref
+            .read(jetonInvitationProvider.notifier)
+            .memoriser(widget.entree.valeur);
+      }
       _tenter();
     });
   }
 
   void _tenter() {
-    if (widget.jeton.trim().isEmpty) return;
+    if (widget.entree.vide) return;
     if (ref.read(sessionProvider).value == null) return;
     if (!ref.read(acceptationControllerProvider).auRepos) return;
 
     unawaited(
-      ref.read(acceptationControllerProvider.notifier).accepter(widget.jeton),
+      ref.read(acceptationControllerProvider.notifier).accepter(widget.entree),
     );
   }
 
@@ -73,7 +90,7 @@ class _InvitationScreenState extends ConsumerState<InvitationScreen> {
     final session = ref.watch(sessionProvider);
     final etat = ref.watch(acceptationControllerProvider);
 
-    if (widget.jeton.trim().isEmpty) {
+    if (widget.entree.vide) {
       return const _EcranErreur(
         echec: EchecAcceptation(ErreurAcceptation.jetonManquant),
       );

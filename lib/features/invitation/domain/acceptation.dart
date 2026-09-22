@@ -3,6 +3,51 @@ import 'package:flutter/foundation.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/appartenance.dart';
 
+/// Par où l'on entre dans une invitation.
+///
+/// Deux chemins, une seule Edge Function (`accept-invitation`), **exactement
+/// l'un des deux** dans le corps de la requête : les deux ensemble ne sont pas
+/// une requête plus riche, c'est une requête ambiguë, et le serveur la refuse
+/// (`supabase/functions/_shared/invitation_entree.ts`).
+enum ModeInvitation {
+  /// Le jeton du lien reçu par courriel (ticket 006). Un porteur de droits,
+  /// transférable : il ne vit que dans l'URL.
+  jeton,
+
+  /// L'identifiant rendu par `my_pending_invitations()` (ticket 051), depuis
+  /// l'écran « Aucune caserne ». Il ne désigne rien pour qui n'est pas la
+  /// personne invitée : le serveur confronte l'adresse avant tout le reste.
+  identifiant,
+}
+
+/// Ce qu'on présente au serveur pour entrer dans une caserne.
+///
+/// Le type porte la règle : une entrée est un jeton **ou** un identifiant,
+/// donc le corps envoyé ne peut pas contenir les deux.
+@immutable
+class EntreeInvitation {
+  const EntreeInvitation.jeton(this.valeur) : mode = ModeInvitation.jeton;
+
+  const EntreeInvitation.identifiant(this.valeur)
+    : mode = ModeInvitation.identifiant;
+
+  final ModeInvitation mode;
+  final String valeur;
+
+  String get valeurNettoyee => valeur.trim();
+  bool get vide => valeurNettoyee.isEmpty;
+
+  @override
+  bool operator ==(Object other) =>
+      other is EntreeInvitation && other.mode == mode && other.valeur == valeur;
+
+  @override
+  int get hashCode => Object.hash(mode, valeur);
+
+  @override
+  String toString() => 'EntreeInvitation(${mode.name})';
+}
+
 /// La caserne qui invite, telle que la renvoie `accept-invitation`.
 @immutable
 class CaserneInvitation {
@@ -149,8 +194,22 @@ class EchecAcceptation implements Exception {
 
   String get message {
     if (erreur != ErreurAcceptation.mauvaisCompte) return erreur.texte;
+
+    // **Entrée par identifiant** (ticket 051) : le serveur ne rend alors ni la
+    // caserne ni l'adresse masquée, et c'est volontaire — les rendre ferait
+    // un oracle d'existence, et l'adresse masquée n'a pas lieu d'être ici
+    // (`docs/SCHEMA.md § 3`). Elle existe sur le chemin du jeton parce qu'un
+    // lien se transfère et que son porteur doit reconnaître de quelle boîte il
+    // s'agit ; un identifiant n'a été donné qu'à la session qu'il concerne.
+    final masquee = adresseInviteeMasquee;
+    if (masquee == null) {
+      return AppStrings.invitationMauvaisCompteTexteSansAdresse(
+        adresseCourante ?? AppStrings.valueUndefined,
+      );
+    }
+
     return AppStrings.invitationMauvaisCompteTexte(
-      adresseInvitee: adresseInviteeMasquee ?? AppStrings.valueUndefined,
+      adresseInvitee: masquee,
       adresseCourante: adresseCourante ?? AppStrings.valueUndefined,
     );
   }

@@ -3,6 +3,7 @@ import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/theme/app_theme.dart';
 import 'package:astreinte_sp/core/widgets/app_divider.dart';
 import 'package:astreinte_sp/core/widgets/barre_actions_basse.dart';
+import 'package:astreinte_sp/core/widgets/ecran_simple.dart';
 import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +39,29 @@ void main() {
       final action = tester.getRect(find.byKey(_action));
       expect(action.width, 390 - 2 * AppSpacing.pageCompact);
       expect(action.left, AppSpacing.pageCompact);
+    });
+
+    testWidgets('elle suit la colonne d\'un écran sans navigation', (
+      tester,
+    ) async {
+      // Un écran sans navigation lit à 420, pas à 720 : son pied aussi, sans
+      // quoi le bouton du bas flotte sous une colonne deux fois plus étroite.
+      await monter(
+        tester,
+        const BarreActionsBasse(
+          largeurMax: EcranSimple.colonneLecture,
+          child: PrimaryButton(
+            key: _action,
+            libelle: 'Se déconnecter',
+            onPressed: _rien,
+          ),
+        ),
+        taille: const Size(1280, 900),
+      );
+
+      final action = tester.getRect(find.byKey(_action));
+      expect(action.width, EcranSimple.colonneLecture);
+      expect(action.center.dx, 1280 / 2);
     });
 
     testWidgets('la marge de page suit la classe de fenêtre', (tester) async {

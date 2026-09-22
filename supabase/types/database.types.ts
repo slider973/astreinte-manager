@@ -1073,6 +1073,10 @@ export type Database = {
         Args: { p_email: string; p_token: string; p_user_id: string }
         Returns: Json
       }
+      accept_invitation_by_id: {
+        Args: { p_email: string; p_invitation: string; p_user_id: string }
+        Returns: Json
+      }
       apply_auto_proposal: {
         Args: { p_actor: string; p_picks: Json; p_schedule: string }
         Returns: Json
@@ -1215,6 +1219,16 @@ export type Database = {
       jours_feries_fr: { Args: { p_annee: number }; Returns: string[] }
       mask_email: { Args: { p_email: string }; Returns: string }
       my_ics_token: { Args: never; Returns: string }
+      my_pending_invitations: {
+        Args: never
+        Returns: {
+          expires_at: string
+          id: string
+          invited_by_name: string
+          station_name: string
+          status: string
+        }[]
+      }
       notification_outbox_recipients_valides: {
         Args: { p_recipients: Json }
         Returns: boolean
