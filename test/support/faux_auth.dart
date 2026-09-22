@@ -69,6 +69,7 @@ import 'faux_caserne.dart';
 import 'faux_dispos.dart';
 import 'faux_export.dart';
 import 'faux_fichier.dart';
+import 'faux_invitations.dart';
 import 'faux_notifications.dart';
 import 'faux_planning.dart';
 import 'faux_planning_caserne.dart';
@@ -323,8 +324,14 @@ Future<AppMontee> monterApp(
         membershipRepositoryProvider.overrideWithValue(memberships),
         if (membres != null)
           membresRepositoryProvider.overrideWithValue(membres),
-        if (invitations != null)
-          invitationRepositoryProvider.overrideWithValue(invitations),
+        // **Toujours faux, même quand le test n'y touche pas** : « Aucune
+        // caserne » cherche désormais une invitation en attente dès qu'il
+        // s'affiche (ticket 051), et sans faux il toucherait un client
+        // Supabase qui n'existe pas en test. Par défaut, il ne rend rien : un
+        // compte sans caserne et sans invitation voit le texte du ticket 006.
+        invitationRepositoryProvider.overrideWithValue(
+          invitations ?? FauxInvitationRepository(),
+        ),
         // Le profil est lu par le réglage des notifications, présent sur
         // l'onglet « Profil » : sans faux, il toucherait un client Supabase
         // qui n'existe pas en test.
