@@ -5,7 +5,7 @@
 - **Dépend de** : 004, 016, 017
 - **Branche** : `feat/061-monde-visuel-admin`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-22
 
 ## Contexte
 
