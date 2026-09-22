@@ -64,6 +64,13 @@
 # s'ouvre, et dit « Application non configurée » ou « notifications
 # indisponibles » au lieu de planter : c'est l'état voulu tant que la base
 # distante, Firebase et Stripe ne sont pas branchés.
+#
+# **La mise en ligne passe par l'API Vercel, pas par sa ligne de commande.** Le
+# jeton du dépôt est un jeton de projet (`vcp_…`), qui n'a pas de contexte
+# utilisateur : `vercel pull`, `vercel build` et `vercel deploy` échouent tous
+# sur « User not found (404) », quel que soit le jeton de ce type. Le détail est
+# à l'étape « Mettre en ligne sur Vercel » et dans `scripts/deployer_pwa.py`
+# (ticket 060).
 name: Déploiement
 
 on:
@@ -75,9 +82,9 @@ on:
   workflow_dispatch:
 
 # Une seule mise en ligne à la fois, et c'est la dernière qui gagne. Elle n'est
-# **pas** annulable en vol : couper `vercel deploy` au milieu laisserait un
-# déploiement à moitié téléversé, et couper `db push` au milieu laisserait la
-# base entre deux migrations.
+# **pas** annulable en vol : couper le téléversement de la PWA au milieu
+# laisserait un déploiement à moitié envoyé, et couper `db push` au milieu
+# laisserait la base entre deux migrations.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -374,14 +381,14 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
-      # Le jeton doit être un jeton **de compte** (réglages personnels Vercel),
-      # pas un jeton lié au projet : ce dernier fait répondre « User not found »
-      # à la ligne de commande, et la mise en ligne échoue ici, exprès et tout de
-      # suite (docs/DEPLOIEMENT.md § 2).
+      # Le jeton attendu est un jeton **de projet** (`vcp_…`), créé depuis la
+      # page des jetons du compte avec le projet pour portée. C'est celui que le
+      # propriétaire a posé, et la mise en ligne passe par l'API pour cette
+      # raison même — voir le commentaire de l'étape « Mettre en ligne » et
+      # docs/DEPLOIEMENT.md § 2.
       - name: Vérifier les jetons de l'hébergeur
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_SCOPE: ${{ secrets.VERCEL_SCOPE }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
@@ -460,32 +467,54 @@ jobs:
       - name: Construire la PWA
         run: scripts/build_web.sh env/prod.json
 
+      # **L'API, et pas la ligne de commande.** Le jeton posé en secret est un
+      # jeton de projet (`vcp_…`) : il autorise l'API de déploiement mais n'a
+      # aucun contexte utilisateur, et `vercel pull`, `vercel build` comme
+      # `vercel deploy` commencent tous par charger l'utilisateur. Les trois
+      # répondaient donc, à chaque exécution depuis le 21 septembre 2026 :
+      #
+      #     Not able to load user because of unexpected error: User not found. (404)
+      #
+      # Le propriétaire en a créé deux, même résultat : c'est le type de jeton
+      # qui veut ça, pas le jeton. Demander un jeton de compte reviendrait à
+      # confier à un workflow un droit sur tout le compte pour déployer un seul
+      # projet ; `scripts/deployer_pwa.py` fait les trois appels d'API que les
+      # mises en ligne manuelles des 21 et 22 septembre faisaient déjà avec ce
+      # jeton-là (ticket 060).
+      #
+      # Le script envoie `vercel.json` **avec** les fichiers construits : c'est
+      # la condition pour que les en-têtes et la réécriture vers `index.html`
+      # soient appliqués. Les mises en ligne manuelles ne l'envoyaient pas, et la
+      # production répondait 404 sur `/install` comme sur `/admin/planning` sans
+      # que personne le voie. Les deux étapes de vérification qui suivent le
+      # regardent maintenant à chaque fois.
       - name: Mettre en ligne sur Vercel
         id: mise_en_ligne
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_SCOPE: ${{ secrets.VERCEL_SCOPE }}
         run: |
-          # `vercel build` ne reconstruit rien : `vercel.json` porte un
-          # `buildCommand` qui ne fait qu'un `echo`. Il empaquette `build/web`
-          # dans `.vercel/output` avec les en-têtes et les réécritures, que
-          # `--prebuilt` téléverse tels quels.
-          # `--scope` est indispensable avec un jeton limité à une équipe :
-          # sans lui, le client cherche un contexte utilisateur qu'un tel jeton
-          # n'a pas, et échoue sur « Could not retrieve Project Settings ».
-          portee=(); if [ -n "${VERCEL_SCOPE:-}" ]; then portee=(--scope "$VERCEL_SCOPE"); fi
-          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN" "${portee[@]}"
-          npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN" "${portee[@]}"
-          url="$(npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN" "${portee[@]}")"
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Mis en ligne : $url" >> "$GITHUB_STEP_SUMMARY"
+          set -o pipefail
+          python3 scripts/deployer_pwa.py --attente 600 2>&1 | tee /tmp/vercel.txt
+          {
+            echo "### PWA — mise en ligne"
+            echo ""
+            echo '```'
+            cat /tmp/vercel.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # Le piège numéro un de ce déploiement : un CDN qui recompresserait ce
       # qui l'est déjà, ou qui oublierait l'en-tête. Pour les polices, Flutter
       # échoue au décodage **en silence** ; pour le moteur, il ne démarre pas
       # du tout et la page reste blanche. Mieux vaut une mise en ligne rouge.
+      #
+      # L'adresse vérifiée est le **domaine de production**, pas l'adresse propre
+      # au déploiement : celle-ci peut être derrière la protection de
+      # déploiement de l'équipe, qui rendrait 401 à `curl` et ferait échouer une
+      # mise en ligne pourtant bonne. `deployer_pwa.py` rend l'alias qui n'est
+      # pas en `.vercel.app`.
       - name: Vérifier les en-têtes servis
         env:
           URL: ${{ steps.mise_en_ligne.outputs.url }}
@@ -514,6 +543,67 @@ jobs:
             echo "::error::flutter_service_worker.js est mis en cache : les téléphones déjà installés ne verront plus aucune mise à jour."
             exit 1
           }
+          echo "$sw" | grep -q 'service-worker-allowed: /' || {
+            echo "::error::Service-Worker-Allowed absent : vercel.json n'a pas été appliqué par le déploiement (voir scripts/deployer_pwa.py)."
+            exit 1
+          }
+
+      # **La preuve que `vercel.json` a été appliqué**, et que ce qui est servi
+      # est bien ce que l'exécuteur vient de construire. Les deux manquaient :
+      # les 21 et 22 septembre 2026, la production mise en ligne à la main
+      # rendait 404 sur `/install` et sur `/admin/planning` sans qu'aucune étape
+      # le voie — aucune ne rechargeait une route profonde.
+      - name: Vérifier la PWA servie
+        env:
+          URL: ${{ steps.mise_en_ligne.outputs.url }}
+        run: |
+          set -o pipefail
+
+          # 1. Le domaine de production répond, et ses en-têtes de sécurité sont
+          #    ceux de vercel.json — Vercel n'en pose aucun de lui-même.
+          entetes="$(curl -sSIL "$URL/")"
+          echo "$entetes"
+          echo "$entetes" | grep -qiE '^http/[0-9.]+ 200' || {
+            echo "::error::$URL ne rend pas 200."
+            exit 1
+          }
+          for entete in 'x-content-type-options: nosniff' 'referrer-policy:' 'x-frame-options:'; do
+            echo "$entetes" | grep -qi "$entete" || {
+              echo "::error::En-tête « $entete » absent : les en-têtes de vercel.json ne sont pas servis."
+              exit 1
+            }
+          done
+
+          # 2. La réécriture vers index.html. Sans elle, un lien d'invitation ou
+          #    un simple rechargement sur /admin/planning rend 404 avant que
+          #    l'application démarre (docs/DEPLOIEMENT.md § 7).
+          for route in /install /admin/planning; do
+            code="$(curl -so /dev/null -w '%{http_code}' "$URL$route")"
+            echo "$route → $code"
+            [ "$code" = "200" ] || {
+              echo "::error::$route rend $code : la réécriture vers index.html de vercel.json n'est pas appliquée."
+              exit 1
+            }
+          done
+
+          # 3. Le code servi est celui qu'on vient de construire. `--compressed`
+          #    défait la compression de transport de Vercel : on compare les
+          #    octets de `main.dart.js`, pas ceux du transport.
+          attendu="$(sha1sum build/web/main.dart.js | cut -d' ' -f1)"
+          servi="$(curl -sS --compressed "$URL/main.dart.js" | sha1sum | cut -d' ' -f1)"
+          echo "main.dart.js construit : $attendu"
+          echo "main.dart.js servi     : $servi"
+          [ "$attendu" = "$servi" ] || {
+            echo "::error::La PWA servie n'est pas celle de ce commit (empreintes différentes)."
+            exit 1
+          }
+          {
+            echo "### PWA — vérifiée en ligne"
+            echo ""
+            echo "- $URL rend 200, en-têtes de \`vercel.json\` servis"
+            echo "- \`/install\` et \`/admin/planning\` rendent 200 (réécriture appliquée)"
+            echo "- \`main.dart.js\` servi : \`$servi\` — identique à la construction"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------
   # 5. Le dernier mot : le dépôt et la production disent-ils la même chose ?
