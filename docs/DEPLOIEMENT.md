@@ -190,6 +190,11 @@ Une fois le domaine connu, deux choses le suivent :
    `APP_SUBSCRIPTION_PATH` — restent sur leur valeur par défaut, **sans dièse** (ticket 046). S'ils
    ont été posés avant, les retirer : ils fabriqueraient des liens morts.
 
+**Le domaine n'est écrit qu'une fois dans le dépôt**, en `site_url` de `[remotes.production.auth]`
+(point 1). C'est de là que `scripts/deployer_pwa.py` le lit pour attendre son alias et pour donner
+au workflow l'adresse à vérifier (§ 6) : changer de domaine, c'est changer cette ligne, et rien
+d'autre côté dépôt.
+
 ## 5. Mettre en ligne
 
 **Cas nominal.** Fusionner une PR dans `main`. La CI passe, le déploiement part tout seul — base,
@@ -213,7 +218,8 @@ scripts/verifier_production.sh
 **Depuis un poste, en dépannage.** Les deux commandes sont exactement celles du workflow. La
 ligne de commande Vercel n'est pas utilisée : le jeton du dépôt est un jeton de projet et elle le
 refuse (§ 2). `scripts/deployer_pwa.py` parle à l'API, n'a aucune dépendance hors bibliothèque
-standard, et attend l'état `READY` avant de rendre la main.
+standard, attend l'état `READY`, **puis attend que le domaine de production figure dans les alias
+du déploiement** avant de rendre la main (§ 6).
 
 ```sh
 cp env/prod.json.example env/prod.json   # puis remplir — le fichier n'est pas versionné
@@ -280,6 +286,17 @@ curl -s --compressed https://<domaine>/main.dart.js | shasum -a 1
 shasum -a 1 build/web/main.dart.js
 # attendu : la même empreinte deux fois
 ```
+
+**L'adresse vérifiée est toujours le domaine de production**, jamais une adresse `*.vercel.app` :
+`scripts/deployer_pwa.py` le lit dans `supabase/config.toml`
+(`[remotes.production.auth].site_url`, la seule écriture du domaine dans le dépôt), attend après
+`READY` qu'il figure dans les alias du déploiement — au plus 120 s, sinon la mise en ligne échoue,
+un déploiement prêt sans son alias de production n'en étant pas une — et le rend au workflow, qui
+n'a donc aucun alias à choisir. Les alias `*.vercel.app` du projet sont derrière la protection de
+déploiement de l'équipe : les interroger rend un 302 vers `vercel.com/sso-api` et fait lire les
+en-têtes de vercel.com au lieu de ceux de l'application, ce qui a fait échouer le déploiement du
+22 septembre 2026 (ticket 062). Chacune des deux étapes réessaie jusqu'à trois fois, espacées de
+cinq secondes, et affiche l'adresse interrogée à chaque tentative.
 
 Le workflow fait lui-même les vérifications 1 à 6 après chaque mise en ligne et **échoue** si elles
 ne passent pas — les trois premières à l'étape « Vérifier les en-têtes servis », les trois autres à
@@ -418,7 +435,7 @@ supabase config push --project-ref "$SUPABASE_PROJECT_REF"
 export VERCEL_TOKEN=vcp_…  VERCEL_ORG_ID=team_…  VERCEL_PROJECT_ID=prj_…
 scripts/build_web.sh env/prod.json
 scripts/deployer_pwa.py --dry-run     # à lire avant : ce qui partirait
-scripts/deployer_pwa.py               # rend l'identifiant, l'adresse, et attend READY
+scripts/deployer_pwa.py               # attend READY, puis l'alias du domaine, et rend l'adresse
 
 # 5. Vérifier.
 scripts/verifier_production.sh

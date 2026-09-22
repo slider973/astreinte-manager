@@ -510,100 +510,178 @@ jobs:
       # échoue au décodage **en silence** ; pour le moteur, il ne démarre pas
       # du tout et la page reste blanche. Mieux vaut une mise en ligne rouge.
       #
-      # L'adresse vérifiée est le **domaine de production**, pas l'adresse propre
-      # au déploiement : celle-ci peut être derrière la protection de
-      # déploiement de l'équipe, qui rendrait 401 à `curl` et ferait échouer une
-      # mise en ligne pourtant bonne. `deployer_pwa.py` rend l'alias qui n'est
-      # pas en `.vercel.app`.
+      # **L'adresse vérifiée est le domaine de production**, et rien d'autre.
+      # `deployer_pwa.py` le lit dans `supabase/config.toml`
+      # (`[remotes.production.auth].site_url`, la seule écriture du domaine dans
+      # le dépôt), attend qu'il figure dans les alias du déploiement, puis le
+      # rend en sortie `url` — il ne choisit plus parmi les alias. Le 22
+      # septembre 2026, ce choix est tombé sur l'alias d'équipe
+      # `astreinte-manager-<équipe>.vercel.app` parce que l'alias du domaine
+      # n'était pas encore posé à l'instant du `READY` ; cet alias est derrière
+      # la protection de déploiement, il rend 302 vers `vercel.com/sso-api`, et
+      # cette étape a lu les en-têtes de vercel.com (run 35768686568, ticket 062).
+      #
+      # Trois tentatives espacées de cinq secondes : l'alias est posé, mais la
+      # propagation du certificat ou du cache de bord peut encore faire rendre
+      # une réponse d'attente à la première requête. Un seul aller-retour raté
+      # ne vaut pas un déploiement rouge ; trois, si.
       - name: Vérifier les en-têtes servis
         env:
           URL: ${{ steps.mise_en_ligne.outputs.url }}
         run: |
-          police="$URL/assets/assets/fonts/AtkinsonHyperlegibleNext-Regular.ttf"
-          entetes="$(curl -sSIL -H 'Accept-Encoding: br' "$police" | tr 'A-Z' 'a-z')"
-          echo "$entetes"
-          echo "$entetes" | grep -q 'content-encoding: br' || {
-            echo "::error::Les polices ne sont pas servies en brotli : Flutter retombera sur Roboto depuis fonts.gstatic.com."
+          set -o pipefail
+          [ -n "$URL" ] || {
+            echo "::error::Aucune adresse à vérifier : scripts/deployer_pwa.py n'a rendu aucune sortie « url »."
             exit 1
           }
 
-          # Auto-hébergé depuis le ticket 037 : c'est cette compression qui
-          # rend l'opération neutre en octets face au CDN de Google.
-          moteur="$URL/canvaskit/chromium/canvaskit.wasm"
-          entetes="$(curl -sSIL -H 'Accept-Encoding: br' "$moteur" | tr 'A-Z' 'a-z')"
-          echo "$entetes"
-          echo "$entetes" | grep -q 'content-encoding: br' || {
-            echo "::error::Le moteur CanvasKit n'est pas servi en brotli : l'application ne démarrera pas (« expected magic word »)."
-            exit 1
+          echec=""
+
+          entetes_de() {
+            curl -sSIL "$@" | tr '[:upper:]' '[:lower:]'
           }
 
-          sw="$(curl -sSIL "$URL/flutter_service_worker.js" | tr 'A-Z' 'a-z')"
-          echo "$sw"
-          echo "$sw" | grep -q 'must-revalidate' || {
-            echo "::error::flutter_service_worker.js est mis en cache : les téléphones déjà installés ne verront plus aucune mise à jour."
-            exit 1
+          verifier() {
+            echec=""
+
+            police="$URL/assets/assets/fonts/AtkinsonHyperlegibleNext-Regular.ttf"
+            if ! lu="$(entetes_de -H 'Accept-Encoding: br' "$police")"; then
+              echec="aucune réponse de $police"
+              return 1
+            fi
+            echo "$lu"
+            if ! echo "$lu" | grep -q 'content-encoding: br'; then
+              echec="Les polices ne sont pas servies en brotli : Flutter retombera sur Roboto depuis fonts.gstatic.com."
+              return 1
+            fi
+
+            # Auto-hébergé depuis le ticket 037 : c'est cette compression qui
+            # rend l'opération neutre en octets face au CDN de Google.
+            moteur="$URL/canvaskit/chromium/canvaskit.wasm"
+            if ! lu="$(entetes_de -H 'Accept-Encoding: br' "$moteur")"; then
+              echec="aucune réponse de $moteur"
+              return 1
+            fi
+            echo "$lu"
+            if ! echo "$lu" | grep -q 'content-encoding: br'; then
+              echec="Le moteur CanvasKit n'est pas servi en brotli : l'application ne démarrera pas (« expected magic word »)."
+              return 1
+            fi
+
+            if ! sw="$(entetes_de "$URL/flutter_service_worker.js")"; then
+              echec="aucune réponse de $URL/flutter_service_worker.js"
+              return 1
+            fi
+            echo "$sw"
+            if ! echo "$sw" | grep -q 'must-revalidate'; then
+              echec="flutter_service_worker.js est mis en cache : les téléphones déjà installés ne verront plus aucune mise à jour."
+              return 1
+            fi
+            if ! echo "$sw" | grep -q 'service-worker-allowed: /'; then
+              echec="Service-Worker-Allowed absent : vercel.json n'a pas été appliqué par le déploiement (voir scripts/deployer_pwa.py)."
+              return 1
+            fi
+            return 0
           }
-          echo "$sw" | grep -q 'service-worker-allowed: /' || {
-            echo "::error::Service-Worker-Allowed absent : vercel.json n'a pas été appliqué par le déploiement (voir scripts/deployer_pwa.py)."
-            exit 1
-          }
+
+          for tentative in 1 2 3; do
+            echo "→ tentative $tentative/3 — en-têtes servis par $URL"
+            if verifier; then
+              echo "En-têtes conformes sur $URL."
+              exit 0
+            fi
+            echo "tentative $tentative sur $URL : $echec"
+            [ "$tentative" -eq 3 ] || sleep 5
+          done
+          echo "::error::$echec (adresse vérifiée : $URL, après 3 tentatives espacées de 5 s)"
+          exit 1
 
       # **La preuve que `vercel.json` a été appliqué**, et que ce qui est servi
       # est bien ce que l'exécuteur vient de construire. Les deux manquaient :
       # les 21 et 22 septembre 2026, la production mise en ligne à la main
       # rendait 404 sur `/install` et sur `/admin/planning` sans qu'aucune étape
       # le voie — aucune ne rechargeait une route profonde.
+      #
+      # Même adresse que l'étape précédente — le domaine de production, rendu
+      # par `deployer_pwa.py` — et les mêmes trois tentatives espacées de cinq
+      # secondes.
       - name: Vérifier la PWA servie
         env:
           URL: ${{ steps.mise_en_ligne.outputs.url }}
         run: |
           set -o pipefail
-
-          # 1. Le domaine de production répond, et ses en-têtes de sécurité sont
-          #    ceux de vercel.json — Vercel n'en pose aucun de lui-même.
-          entetes="$(curl -sSIL "$URL/")"
-          echo "$entetes"
-          echo "$entetes" | grep -qiE '^http/[0-9.]+ 200' || {
-            echo "::error::$URL ne rend pas 200."
+          [ -n "$URL" ] || {
+            echo "::error::Aucune adresse à vérifier : scripts/deployer_pwa.py n'a rendu aucune sortie « url »."
             exit 1
           }
-          for entete in 'x-content-type-options: nosniff' 'referrer-policy:' 'x-frame-options:'; do
-            echo "$entetes" | grep -qi "$entete" || {
-              echo "::error::En-tête « $entete » absent : les en-têtes de vercel.json ne sont pas servis."
-              exit 1
-            }
-          done
 
-          # 2. La réécriture vers index.html. Sans elle, un lien d'invitation ou
-          #    un simple rechargement sur /admin/planning rend 404 avant que
-          #    l'application démarre (docs/DEPLOIEMENT.md § 7).
-          for route in /install /admin/planning; do
-            code="$(curl -so /dev/null -w '%{http_code}' "$URL$route")"
-            echo "$route → $code"
-            [ "$code" = "200" ] || {
-              echo "::error::$route rend $code : la réécriture vers index.html de vercel.json n'est pas appliquée."
-              exit 1
-            }
-          done
+          echec=""
+          servi=""
 
-          # 3. Le code servi est celui qu'on vient de construire. `--compressed`
-          #    défait la compression de transport de Vercel : on compare les
-          #    octets de `main.dart.js`, pas ceux du transport.
-          attendu="$(sha1sum build/web/main.dart.js | cut -d' ' -f1)"
-          servi="$(curl -sS --compressed "$URL/main.dart.js" | sha1sum | cut -d' ' -f1)"
-          echo "main.dart.js construit : $attendu"
-          echo "main.dart.js servi     : $servi"
-          [ "$attendu" = "$servi" ] || {
-            echo "::error::La PWA servie n'est pas celle de ce commit (empreintes différentes)."
-            exit 1
+          verifier() {
+            echec=""
+
+            # 1. Le domaine de production répond, et ses en-têtes de sécurité
+            #    sont ceux de vercel.json — Vercel n'en pose aucun de lui-même.
+            if ! entetes="$(curl -sSIL "$URL/")"; then
+              echec="aucune réponse de $URL/"
+              return 1
+            fi
+            echo "$entetes"
+            if ! echo "$entetes" | grep -qiE '^http/[0-9.]+ 200'; then
+              echec="$URL ne rend pas 200."
+              return 1
+            fi
+            for entete in 'x-content-type-options: nosniff' 'referrer-policy:' 'x-frame-options:'; do
+              if ! echo "$entetes" | grep -qi "$entete"; then
+                echec="En-tête « $entete » absent : les en-têtes de vercel.json ne sont pas servis."
+                return 1
+              fi
+            done
+
+            # 2. La réécriture vers index.html. Sans elle, un lien d'invitation
+            #    ou un simple rechargement sur /admin/planning rend 404 avant
+            #    que l'application démarre (docs/DEPLOIEMENT.md § 7).
+            for route in /install /admin/planning; do
+              code="$(curl -so /dev/null -w '%{http_code}' "$URL$route" || echo 000)"
+              echo "$URL$route → $code"
+              if [ "$code" != "200" ]; then
+                echec="$route rend $code : la réécriture vers index.html de vercel.json n'est pas appliquée."
+                return 1
+              fi
+            done
+
+            # 3. Le code servi est celui qu'on vient de construire.
+            #    `--compressed` défait la compression de transport de Vercel :
+            #    on compare les octets de `main.dart.js`, pas ceux du transport.
+            attendu="$(sha1sum build/web/main.dart.js | cut -d' ' -f1)"
+            servi="$(curl -sS --compressed "$URL/main.dart.js" | sha1sum | cut -d' ' -f1)"
+            echo "main.dart.js construit : $attendu"
+            echo "main.dart.js servi     : $servi"
+            if [ "$attendu" != "$servi" ]; then
+              echec="La PWA servie n'est pas celle de ce commit (empreintes différentes)."
+              return 1
+            fi
+            return 0
           }
-          {
-            echo "### PWA — vérifiée en ligne"
-            echo ""
-            echo "- $URL rend 200, en-têtes de \`vercel.json\` servis"
-            echo "- \`/install\` et \`/admin/planning\` rendent 200 (réécriture appliquée)"
-            echo "- \`main.dart.js\` servi : \`$servi\` — identique à la construction"
-          } >> "$GITHUB_STEP_SUMMARY"
+
+          for tentative in 1 2 3; do
+            echo "→ tentative $tentative/3 — PWA servie par $URL"
+            if verifier; then
+              {
+                echo "### PWA — vérifiée en ligne"
+                echo ""
+                echo "- $URL rend 200, en-têtes de \`vercel.json\` servis"
+                echo "- \`/install\` et \`/admin/planning\` rendent 200 (réécriture appliquée)"
+                echo "- \`main.dart.js\` servi : \`$servi\` — identique à la construction"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "tentative $tentative sur $URL : $echec"
+            [ "$tentative" -eq 3 ] || sleep 5
+          done
+          echo "::error::$echec (adresse vérifiée : $URL, après 3 tentatives espacées de 5 s)"
+          exit 1
 
   # ---------------------------------------------------------------------------
   # 5. Le dernier mot : le dépôt et la production disent-ils la même chose ?
