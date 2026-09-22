@@ -6,7 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 061 | [Un nouveau monde visuel, à partir de l'écran de l'admin](in-progress/061-monde-visuel-admin.md) | P1 | 004 016 017 | — |
+| 061 | [Un nouveau monde visuel, à partir de l'écran de l'admin](in-progress/061-monde-visuel-admin.md) | P1 | 004 016 017 | https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a) |
 
 ## À faire
 

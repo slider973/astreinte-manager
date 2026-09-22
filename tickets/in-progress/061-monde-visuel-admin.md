@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 004, 016, 017
 - **Branche** : `feat/061-monde-visuel-admin`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a)
 - **Statut** : en cours depuis 2026-09-22
 
 ## Contexte
