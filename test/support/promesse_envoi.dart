@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// garde-fou qui exclut d'avance le mot qui ment ne garde rien.
 ///
 /// Le motif prend donc « envoyée », « envoyées », « renvoyée » et
-/// « renvoyées » partout où ils apparaissent. Plus aucun libellé de ces deux
+/// « renvoyées » partout où ils apparaissent. Plus aucun libellé de ces
 /// écrans ne les contient : une relance dont le courriel est parti se dit
 /// « Relancée » (`AppStrings.resultatRelancee`), ce qui est le même fait dit
 /// sans le mot interdit. Seul [AppStrings.invitationsResume] peut encore
@@ -27,9 +27,12 @@ final RegExp _promesseDEnvoi = RegExp('envoyée', caseSensitive: false);
 /// formulaire d'invitation portait la même contradiction, à une adresse près,
 /// puis la portait encore par son statut.
 ///
-/// Elle vaut donc pour les deux écrans, et pour toute phrase qu'ils rendent :
-/// dès qu'un courriel est resté à quai, plus rien à l'écran n'a le droit de
-/// dire « envoyée ».
+/// Elle vaut donc pour les trois écrans qui invitent — l'import, le
+/// formulaire d'invitation, et celui de l'éditeur, branché au ticket 050 —,
+/// et pour toute phrase qu'ils rendent : dès qu'un courriel est resté à quai,
+/// plus rien à l'écran n'a le droit de dire « envoyée ». L'écran de l'éditeur
+/// n'avait pas été branché au 048, et il a porté la phrase corrigée ailleurs
+/// un ticket de plus : un garde-fou ne garde que les écrans qui l'appellent.
 ///
 /// **Ce que « rendent » veut dire.** Les [Text] affichés, et aussi les
 /// étiquettes de [Semantics] : le compte rendu pose ses lignes en
