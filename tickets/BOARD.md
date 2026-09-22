@@ -8,6 +8,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main
 |---|---|---|---|---|
 | 050 | [L'écran super-admin annonce un envoi sans preuve](in-progress/050-envoi-annonce-sans-preuve-superadmin.md) | P2 | 048 | — |
 | 051 | [Une invitation en attente reste invisible pour qui vient de se connecter](in-progress/051-invitation-en-attente-ignoree.md) | P1 | 006 | — |
+| 053 | [L'écran super-admin n'offre aucune déconnexion](in-progress/053-superadmin-sans-deconnexion.md) | P2 | 031 | — |
 
 ## À faire
 
@@ -15,7 +16,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main
 |---|---|---|---|---|
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
-| 053 | [L'écran super-admin n'offre aucune déconnexion](backlog/053-superadmin-sans-deconnexion.md) | P2 | 031 | — |
 
 ## Terminés
 
