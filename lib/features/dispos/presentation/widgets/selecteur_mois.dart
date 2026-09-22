@@ -70,8 +70,10 @@ class _Bouton extends StatelessWidget {
     final statuts = context.statuts;
     final descripteur = statuts.periode(periode.statut);
 
+    // Le mois choisi porte la pastille indigo de la sélection (ticket 061) :
+    // le vert est réservé à l'accepté et au couvert.
     final encre = choisi
-        ? theme.colorScheme.onSecondaryContainer
+        ? theme.colorScheme.onPrimaryContainer
         : theme.colorScheme.onSurface;
 
     return Semantics(
@@ -92,12 +94,12 @@ class _Bouton extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: choisi
-                  ? theme.colorScheme.secondaryContainer
+                  ? theme.colorScheme.primaryContainer
                   : theme.colorScheme.surface,
               borderRadius: AppRadius.controleRadius,
               border: Border.all(
                 color: choisi
-                    ? theme.colorScheme.secondary
+                    ? theme.colorScheme.primary
                     : statuts.filetDecoratif,
                 width: choisi ? AppStroke.etat : AppStroke.filet,
               ),

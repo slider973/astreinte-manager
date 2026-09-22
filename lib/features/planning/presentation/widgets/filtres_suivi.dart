@@ -27,8 +27,6 @@ class FiltresSuiviBarre extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -47,7 +45,6 @@ class FiltresSuiviBarre extends StatelessWidget {
                 inerte:
                     filtre != FiltreSuivi.tous && (comptes[filtre] ?? 0) == 0,
                 onBasculer: onBasculer,
-                style: theme.textTheme.labelMedium,
               ),
             ),
         ],
@@ -63,7 +60,6 @@ class _Puce extends StatelessWidget {
     required this.choisie,
     required this.inerte,
     required this.onBasculer,
-    required this.style,
   });
 
   final FiltreSuivi filtre;
@@ -71,7 +67,6 @@ class _Puce extends StatelessWidget {
   final bool choisie;
   final bool inerte;
   final ValueChanged<FiltreSuivi> onBasculer;
-  final TextStyle? style;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +74,9 @@ class _Puce extends StatelessWidget {
       selected: choisie,
       onSelected: inerte ? null : (bool _) => onBasculer(filtre),
       showCheckmark: false,
-      labelStyle: style,
+      // Pas de `labelStyle` ici : la puce choisie prend l'encre indigo du
+      // thème (`chipTheme`, ticket 061). L'écrire sur place la figerait à
+      // l'encre du registre et la sélection perdrait son accent.
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -87,9 +84,9 @@ class _Puce extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           // Le compte est une donnée, pas une décoration : chiffres tabulaires
           // pour qu'il change en place sans déplacer la puce suivante.
-          Text('$compte', style: AppTextStyles.nombrePetit.copyWith(
-            color: style?.color,
-          )),
+          // Sans couleur : le chiffre hérite de celle du libellé, choisie ou
+          // non.
+          Text('$compte', style: AppTextStyles.nombrePetit),
         ],
       ),
     );

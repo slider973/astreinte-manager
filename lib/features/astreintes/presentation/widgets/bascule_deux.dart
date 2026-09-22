@@ -31,7 +31,8 @@ class SegmentBascule {
 /// `DESIGN.md § Shapes` proscrit la pastille sur un contrôle, et le
 /// `SegmentedButton` Material est en `StadiumBorder`. La composition est celle
 /// du sélecteur de mois du ticket 011 : deux blocs à rayon `controle`, le
-/// choisi en `secondary-container`.
+/// choisi en `primary-container` — la pastille indigo de la sélection
+/// (ticket 061), et non le vert, qui dit « accepté, couvert, publié ».
 ///
 /// Trois signaux pour l'état choisi — la coche, le fond, `Semantics(selected:)`
 /// — jamais la couleur seule.
@@ -118,7 +119,7 @@ class _Bouton extends StatelessWidget {
     final encre = inerte
         ? theme.colorScheme.outline
         : choisi
-        ? theme.colorScheme.onSecondaryContainer
+        ? theme.colorScheme.onPrimaryContainer
         : theme.colorScheme.onSurface;
 
     return Semantics(
@@ -130,7 +131,7 @@ class _Bouton extends StatelessWidget {
         color: inerte
             ? theme.colorScheme.surfaceContainerHighest
             : choisi
-            ? theme.colorScheme.secondaryContainer
+            ? theme.colorScheme.primaryContainer
             : theme.colorScheme.surface,
         borderRadius: AppRadius.controleRadius,
         child: InkWell(
@@ -143,7 +144,7 @@ class _Bouton extends StatelessWidget {
               borderRadius: AppRadius.controleRadius,
               border: Border.all(
                 color: choisi && !inerte
-                    ? theme.colorScheme.onSecondaryContainer
+                    ? theme.colorScheme.onPrimaryContainer
                     : theme.colorScheme.outline,
                 width: choisi && !inerte ? AppStroke.etat : AppStroke.filet,
               ),

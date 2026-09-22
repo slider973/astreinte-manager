@@ -317,11 +317,13 @@ class _BoutonJour extends StatelessWidget {
         borderRadius: AppRadius.controleRadius,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: choisi ? theme.colorScheme.secondaryContainer : null,
+            // Pastille indigo : le jour choisi est une sélection, pas un
+            // état couvert (ticket 061).
+            color: choisi ? theme.colorScheme.primaryContainer : null,
             borderRadius: AppRadius.controleRadius,
             border: Border.all(
               color: choisi
-                  ? theme.colorScheme.secondary
+                  ? theme.colorScheme.primary
                   : context.statuts.filetDecoratif,
               width: choisi ? AppStroke.etat : AppStroke.filet,
             ),
