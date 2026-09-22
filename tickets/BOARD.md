@@ -16,6 +16,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 055 | [Un refus annonce « ton chef de centre est prévenu » sans preuve](backlog/055-refus-prevenu-sans-preuve.md) | P2 | 050 | — |
 | 056 | [L'éditeur sans caserne perd sa destination au démarrage à froid](backlog/056-superadmin-destination-perdue-a-froid.md) | P2 | 045 053 | — |
+| 057 | [Le jeton d'appareil des notifications n'est pas branché sur l'oubli](backlog/057-jeton-appareil-hors-oubli.md) | P2 | 024 053 | — |
 
 ## Terminés
 
