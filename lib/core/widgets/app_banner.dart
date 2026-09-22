@@ -126,9 +126,15 @@ class AppBanner extends StatelessWidget {
         Icons.lock,
         true,
       ),
+      // Les deux thèmes prennent l'encre « sur fond » : depuis le ticket 061,
+      // l'orange `etatAttente` ne fait plus que 4.22:1 sur son propre fond.
+      // Il reste la teinte du texte **sur blanc** et des filets, pas celle
+      // d'un texte posé dans le bloc.
       AppBannerVariante.attention => (
         sombre ? AppColors.darkEtatAttenteFond : AppColors.etatAttenteFond,
-        sombre ? AppColors.darkEtatAttenteSurFond : AppColors.etatAttente,
+        sombre
+            ? AppColors.darkEtatAttenteSurFond
+            : AppColors.etatAttenteSurFond,
         Icons.schedule,
         false,
       ),
@@ -175,9 +181,7 @@ class AppBanner extends StatelessWidget {
                           texte,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: encre,
-                            fontWeight: detail == null
-                                ? null
-                                : FontWeight.w600,
+                            fontWeight: detail == null ? null : FontWeight.w600,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,

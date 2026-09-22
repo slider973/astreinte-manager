@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/l10n/format_date.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../abonnement/presentation/widgets/etat_abonnement_bloc.dart';
@@ -265,7 +266,7 @@ class _ActionCaserne extends StatelessWidget {
             label: Text(libelle),
             style: TextButton.styleFrom(
               foregroundColor: proeminent
-                  ? theme.colorScheme.primary
+                  ? context.statuts.accentTexte
                   : theme.colorScheme.onSurfaceVariant,
               textStyle: proeminent
                   ? theme.textTheme.labelLarge?.copyWith(

@@ -4,8 +4,11 @@ import 'package:astreinte_sp/core/theme/app_typography.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Les trois graisses embarquées, dans l'ordre de `pubspec.yaml`.
+/// Les trois graisses de texte embarquées, dans l'ordre de `pubspec.yaml`.
 const List<String> _graisses = <String>['Regular', 'SemiBold', 'Bold'];
+
+/// Les deux graisses de titre embarquées (Archivo, ticket 061).
+const List<String> _graissesTitre = <String>['SemiBold', 'Bold'];
 
 bool _chargees = false;
 
@@ -24,13 +27,21 @@ bool _chargees = false;
 Future<void> chargerPolicesDuProduit() async {
   if (_chargees) return;
 
-  final loader = FontLoader(AppFonts.texte);
-  for (final graisse in _graisses) {
-    final octets = File(
-      'assets/fonts/${AppFonts.texte}-$graisse.ttf',
-    ).readAsBytesSync();
-    loader.addFont(Future<ByteData>.value(ByteData.sublistView(octets)));
+  Future<void> charger(String famille, List<String> graisses) async {
+    final loader = FontLoader(famille);
+    for (final graisse in graisses) {
+      final octets = File(
+        'assets/fonts/$famille-$graisse.ttf',
+      ).readAsBytesSync();
+      loader.addFont(Future<ByteData>.value(ByteData.sublistView(octets)));
+    }
+    await loader.load();
   }
-  await loader.load();
+
+  await charger(AppFonts.texte, _graisses);
+  // Les titres ont leur propre famille depuis le ticket 061 : sans elle, une
+  // mesure de titre composerait avec la police d'essai carrée, c'est-à-dire
+  // avec autre chose que ce que le produit livre.
+  await charger(AppFonts.titre, _graissesTitre);
   _chargees = true;
 }

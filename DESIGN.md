@@ -1,24 +1,29 @@
 ---
 name: Astreinte SP
-description: Le registre de garde de la caserne, porté à l'écran — structure imprimée, états lisibles au soleil et avec des gants.
+description: Le registre de garde de la caserne, porté à l'écran — structure imprimée, accent indigo, états lisibles au soleil et avec des gants.
 colors:
   # — Rôles Material 3, thème clair
-  primary: "#16212A"
+  primary: "#7655FA"
   on-primary: "#FFFFFF"
-  primary-container: "#D6DEE4"
-  on-primary-container: "#0B141A"
-  secondary: "#0F5C7A"
+  primary-container: "#E4DDFE"
+  on-primary-container: "#4D37A2"
+  accent-texte: "#5840BC"
+  secondary: "#097C69"
   on-secondary: "#FFFFFF"
-  secondary-container: "#CDE7F2"
-  on-secondary-container: "#052B3B"
-  tertiary: "#7A5200"
+  secondary-container: "#CEE5E1"
+  on-secondary-container: "#065144"
+  tertiary: "#9F6224"
   on-tertiary: "#FFFFFF"
-  tertiary-container: "#FFE6B0"
-  on-tertiary-container: "#2A1C00"
-  error: "#A3231A"
+  tertiary-container: "#FDEAD7"
+  on-tertiary-container: "#131C23"
+  orange-vif: "#F59638"
+  error: "#BB285D"
   on-error: "#FFFFFF"
-  error-container: "#FCDDD8"
-  on-error-container: "#3E0A05"
+  error-container: "#FED7E5"
+  on-error-container: "#131C23"
+  rose-vif: "#F9357C"
+  accent-decoratif: "#B142E8"
+  accent-decoratif-fond: "#EFD9FA"
   surface: "#FFFFFF"
   on-surface: "#131C23"
   on-surface-variant: "#45535C"
@@ -32,25 +37,28 @@ colors:
   outline-variant: "#C3CDD3"
   inverse-surface: "#222C33"
   on-inverse-surface: "#EDF1F3"
-  inverse-primary: "#D8E2E8"
+  inverse-primary: "#A690FC"
   shadow: "#0B141A"
   # — Rôles Material 3, thème sombre
-  dark-primary: "#D8E2E8"
-  dark-on-primary: "#16212A"
-  dark-primary-container: "#3A454C"
-  dark-on-primary-container: "#E7EFF4"
-  dark-secondary: "#7FD0EC"
-  dark-on-secondary: "#00344A"
-  dark-secondary-container: "#0B4C66"
-  dark-on-secondary-container: "#C8E9F7"
-  dark-tertiary: "#F0C46A"
-  dark-on-tertiary: "#402C00"
-  dark-tertiary-container: "#4A3400"
-  dark-on-tertiary-container: "#FFE0A3"
-  dark-error: "#FFB4A6"
-  dark-on-error: "#5C0F07"
-  dark-error-container: "#7E1A12"
-  dark-on-error-container: "#FFDAD4"
+  dark-primary: "#A690FC"
+  dark-on-primary: "#131C23"
+  dark-primary-container: "#3A2B73"
+  dark-on-primary-container: "#E4DDFE"
+  dark-accent-texte: "#A690FC"
+  dark-secondary: "#5FAA9E"
+  dark-on-secondary: "#131C23"
+  dark-secondary-container: "#14423B"
+  dark-on-secondary-container: "#CDE8E2"
+  dark-tertiary: "#F59638"
+  dark-on-tertiary: "#131C23"
+  dark-tertiary-container: "#613305"
+  dark-on-tertiary-container: "#FDEBD8"
+  dark-error: "#FB7CAA"
+  dark-on-error: "#131C23"
+  dark-error-container: "#6F203D"
+  dark-on-error-container: "#FED7E5"
+  dark-accent-decoratif: "#CC84F0"
+  dark-accent-decoratif-fond: "#522768"
   dark-surface: "#0F161B"
   dark-on-surface: "#E2E8EC"
   dark-on-surface-variant: "#B3C0C8"
@@ -62,41 +70,62 @@ colors:
   dark-surface-container-highest: "#2C373E"
   dark-outline: "#7E8D96"
   dark-outline-variant: "#3A454C"
+  dark-inverse-surface: "#E2E8EC"
+  dark-on-inverse-surface: "#131C23"
+  dark-inverse-primary: "#5840BC"
+  dark-shadow: "#000000"
   # — Encres d'état (clair)
-  etat-disponible: "#145C31"
-  etat-disponible-plein: "#1A6B3A"
-  etat-disponible-fond: "#CFE9D8"
-  etat-disponible-sur-fond: "#05321A"
-  etat-absent: "#A3231A"
-  etat-absent-fond: "#FBDED9"
-  etat-absent-sur-fond: "#3E0A05"
+  etat-disponible: "#5840BC"
+  etat-disponible-plein: "#7655FA"
+  etat-disponible-fond: "#E4DDFE"
+  etat-disponible-sur-fond: "#131C23"
+  etat-absent: "#BB285D"
+  etat-absent-fond: "#FED7E5"
+  etat-absent-sur-fond: "#131C23"
   etat-non-saisi: "#52626C"
   etat-non-saisi-filet: "#73828B"
-  etat-attente: "#7A5200"
-  etat-attente-fond: "#FFE9BF"
-  etat-attente-sur-fond: "#2A1C00"
+  etat-attente: "#9F6224"
+  etat-attente-fond: "#FDEAD7"
+  etat-attente-sur-fond: "#131C23"
   etat-neutre: "#45535C"
   etat-neutre-fond: "#E7EBEE"
-  etat-info: "#0F5C7A"
-  etat-info-fond: "#CDE7F2"
+  etat-info: "#086959"
+  etat-info-fond: "#CEE5E1"
+  etat-info-sur-fond: "#065144"
+  etat-accepte: "#086959"
+  etat-accepte-fond: "#CEE5E1"
+  etat-accepte-sur-fond: "#065144"
+  etat-annule: "#2A343A"
+  etat-archive: "#4A5860"
+  etat-archive-fond: "#EEF1F3"
+  etat-verrouille: "#3A464E"
+  etat-verrouille-fond: "#DDE3E7"
   # — Encres d'état (sombre)
-  dark-etat-disponible: "#7ADB9F"
-  dark-etat-disponible-plein: "#2F7E4E"
-  dark-etat-disponible-fond: "#0C4A28"
-  dark-etat-disponible-sur-fond: "#BFEFD1"
-  dark-etat-absent: "#FFB4A6"
-  dark-etat-absent-filet: "#FF9D8C"
-  dark-etat-absent-fond: "#4A1B15"
-  dark-etat-absent-sur-fond: "#FFDAD4"
+  dark-etat-disponible: "#A690FC"
+  dark-etat-disponible-plein: "#5840BC"
+  dark-etat-disponible-fond: "#3A2B73"
+  dark-etat-disponible-sur-fond: "#E4DDFE"
+  dark-etat-absent: "#FB7CAA"
+  dark-etat-absent-filet: "#FB7CAA"
+  dark-etat-absent-fond: "#6F203D"
+  dark-etat-absent-sur-fond: "#FED7E5"
   dark-etat-non-saisi: "#A4B1B9"
   dark-etat-non-saisi-filet: "#6E7D87"
-  dark-etat-attente: "#F0C46A"
-  dark-etat-attente-fond: "#4A3400"
-  dark-etat-attente-sur-fond: "#FFE0A3"
+  dark-etat-attente: "#F59638"
+  dark-etat-attente-fond: "#613305"
+  dark-etat-attente-sur-fond: "#FDEBD8"
   dark-etat-neutre: "#C4CFD6"
   dark-etat-neutre-fond: "#222C33"
-  dark-etat-info: "#7FD0EC"
-  dark-etat-info-fond: "#0B4C66"
+  dark-etat-info: "#5FAA9E"
+  dark-etat-info-fond: "#14423B"
+  dark-etat-info-sur-fond: "#CDE8E2"
+  dark-etat-accepte: "#5FAA9E"
+  dark-etat-accepte-fond: "#14423B"
+  dark-etat-accepte-sur-fond: "#CDE8E2"
+  dark-etat-archive: "#A4B1B9"
+  dark-etat-archive-fond: "#182127"
+  dark-etat-verrouille: "#B3C0C8"
+  dark-etat-verrouille-fond: "#222C33"
 typography:
   display-nombre:
     fontFamily: "Atkinson Hyperlegible Mono, ui-monospace, monospace"
@@ -105,23 +134,23 @@ typography:
     lineHeight: 1.13
     letterSpacing: "-0.01em"
   titre-ecran:
-    fontFamily: "Atkinson Hyperlegible Next, system-ui, sans-serif"
+    fontFamily: "Archivo, Atkinson Hyperlegible Next, system-ui, sans-serif"
     fontSize: "28px"
     fontWeight: 700
     lineHeight: 1.29
-    letterSpacing: "-0.01em"
+    letterSpacing: "-0.02em"
   titre-section:
-    fontFamily: "Atkinson Hyperlegible Next, system-ui, sans-serif"
+    fontFamily: "Archivo, Atkinson Hyperlegible Next, system-ui, sans-serif"
     fontSize: "22px"
     fontWeight: 700
     lineHeight: 1.27
-    letterSpacing: "normal"
+    letterSpacing: "-0.02em"
   titre-bloc:
-    fontFamily: "Atkinson Hyperlegible Next, system-ui, sans-serif"
+    fontFamily: "Archivo, Atkinson Hyperlegible Next, system-ui, sans-serif"
     fontSize: "18px"
     fontWeight: 600
     lineHeight: 1.33
-    letterSpacing: "normal"
+    letterSpacing: "-0.01em"
   corps:
     fontFamily: "Atkinson Hyperlegible Next, system-ui, sans-serif"
     fontSize: "16px"
@@ -200,7 +229,7 @@ components:
     height: "52px"
   bouton-secondaire:
     backgroundColor: "{colors.surface}"
-    textColor: "{colors.primary}"
+    textColor: "{colors.accent-texte}"
     typography: "{typography.libelle-action}"
     rounded: "{rounded.controle}"
     padding: "14px 24px"
@@ -251,6 +280,7 @@ components:
     height: "72px"
 ---
 
+
 # Design System: Astreinte SP
 
 ## Overview
@@ -272,11 +302,7 @@ Ce que cette direction refuse explicitement :
   une grille dense de 62 cases.
 - Le violet Material par défaut (`#6750A4`) : un thème Flutter non configuré se reconnaît à ça.
 
-**La thèse.** L'accent de l'application est **l'encre elle-même** : le bouton principal est un bloc
-noir-encre, pas un bloc coloré. Conséquence directe et voulue : **la seule couleur saturée à l'écran
-est une couleur d'état.** Si quelque chose est vert, c'est un état. Si quelque chose est rouge,
-c'est un état. Un pompier qui jette un œil à son téléphone entre deux activités n'a jamais à se
-demander si une tache de couleur est une marque ou une information.
+**La thèse.** L'accent de l'application est **l'indigo `#7655FA`** : le bouton principal est un bloc indigo à glyphe blanc (4,72:1), la sélection une pastille indigo pâle, et l'encre reste le texte, les titres et les chiffres. Conséquence voulue : **une couleur saturée dit un état ou un choix, jamais un décor** : indigo pour disponible et choisi, vert pour accepté, orange pour l'attente, rose pour le refus.
 
 **La scène d'usage décide du reste.** Dehors, en plein soleil, souvent avec des gants, parfois à
 3 h du matin dans la salle de garde. D'où : thème clair par défaut (le soleil gagne contre un fond
@@ -295,70 +321,50 @@ dans la PR et reporté ici.
 
 ## Colors
 
-Stratégie : **Restrained** (neutres + un accent), l'accent étant l'encre. Mode Impeccable :
-Operate. Aucune surface n'est « drenchée » de couleur ; la couleur est un porteur d'information.
+Stratégie : **Restrained**, neutres plus un accent, et l'accent est désormais l'indigo. Mode Impeccable : Operate. Monde visuel de remplacement décidé au ticket 061, à partir d'une référence et d'une charte fournies par le propriétaire (Archivo, indigo, vert, orange, rose, violet). La couleur reste un porteur d'information, jamais un décor, et aucun état n'est porté par la couleur seule : icône et libellé partout.
 
-### Primary — l'encre
+### Primary — l'indigo, l'accent
+`primary #7655FA` sur `on-primary #FFFFFF` → **4,72:1**. Boutons principaux, élément de navigation choisi, focus, jour courant, filet de sélection, case « disponible » pleine. `primary-container #E4DDFE` sur `on-primary-container #4D37A2` → **6,74:1** : la pastille de sélection de tout composant Material (barre et rail de navigation, tiroir, boutons segmentés, puces). En texte sur blanc, l'indigo vif est trop juste sur le papier : le texte indigo utilise `accent-texte #5840BC` → 7,31:1 sur blanc, 6,92:1 sur le papier `#F7F9FA`. L'encre `#131C23` reste la couleur du texte, des titres et des chiffres ; elle n'est plus celle des boutons.
+En sombre : `dark-primary #A690FC` sur `dark-surface #0F161B` → 6,97:1, sur `dark-on-primary #131C23` → 6,58:1 ; `dark-primary-container #3A2B73` sur `dark-on-primary-container #E4DDFE` → 9,07:1.
 
-`primary #16212A` sur `on-primary #FFFFFF` → **16.34:1**. C'est le noir-encre bleuté du registre,
-jamais le noir pur. Il porte : bouton principal, titre de barre d'application, indicateur de
-navigation sélectionnée, filet du jour courant, focus.
+### Secondary — le vert, l'accepté
+`secondary #097C69` sur blanc → **5,12:1**. Accepté, validé, publié, période ouverte, couvert, information. Texte vert sur blanc : `etat-accepte #086959` → 6,61:1. `secondary-container #CEE5E1` sur `on-secondary-container #065144` → 7,02:1.
+En sombre : `dark-secondary #5FAA9E` → 6,72:1 ; `dark-secondary-container #14423B` sur `#CDE8E2` → 8,67:1.
+Une mesure à connaître : `primary-container` et `etat-accepte-fond` ont la même luminance (1,01:1 entre eux). En niveaux de gris, « choisi » et « accepté » sont le même gris ; l'icône et le libellé les séparent, jamais la teinte. C'est écrit et testé.
 
-En sombre, la relation s'inverse comme un registre sous la lampe de garde :
-`dark-primary #D8E2E8` (papier) sur `dark-on-primary #16212A` → **12.42:1**.
+### Tertiary — l'orange, l'attente
+L'orange de la charte, `orange-vif #F59638`, ne fait que 2,26:1 sur blanc : il ne sert **jamais** de texte, seulement de remplissage de bloc ou de barre. En texte, l'orange est assombri : `tertiary #9F6224` → 4,94:1 sur blanc. `tertiary-container #FDEAD7` sur `on-tertiary-container #131C23` → 14,72:1. Proposé, à pourvoir, en attente de réponse, bannière hors ligne et attention.
+En sombre, l'orange vif redevient du texte : `dark-tertiary #F59638` → 8,08:1 ; `dark-tertiary-container #613305` sur `#FDEBD8` → 9,10:1.
 
-### Secondary — le bleu de réglure
+### Error — le rose, le refus
+`rose-vif #F9357C` fait 3,60:1 sur blanc : remplissage seulement. En texte, `error #BB285D` → 5,87:1. `error-container #FED7E5` sur `on-error-container #131C23` → 13,19:1. Refusé, absent, conflit, erreur.
+En sombre : `dark-error #FB7CAA` → 7,44:1 ; `dark-error-container #6F203D` sur `#FED7E5` → 8,24:1.
 
-`secondary #0F5C7A` sur blanc → **7.41:1**. Information neutre, liens, état « publié » et
-« période ouverte », sélection dans les listes denses. En sombre `#7FD0EC` sur `#0F161B` → 10.54:1.
-
-### Tertiary — l'ocre d'attente
-
-`tertiary #7A5200` sur blanc → **6.92:1**. Tout ce qui attend une action humaine : proposition en
-attente, mois bientôt verrouillé, hors ligne. En sombre `#F0C46A` sur `#0F161B` → 11.13:1.
-
-### Error — le vermillon
-
-`error #A3231A` sur blanc → **7.47:1**. Absent, refusé, échec. En sombre `#FFB4A6` → 10.71:1.
+### Accent décoratif — le violet
+`accent-decoratif #B142E8` (4,36:1 sur blanc) et `accent-decoratif-fond #EFD9FA`. Marque, illustration d'état vide, rien d'autre : jamais du texte, jamais un état. En sombre `dark-accent-decoratif #CC84F0`, fond `#522768`. Un test refuse que ce token, `orange-vif` ou `rose-vif` atteignent le seuil du texte : tant qu'ils échouent à 4,5:1, personne ne peut les glisser dans un style de texte en croyant bien faire.
 
 ### Neutral — le papier et l'encre
-
-Le gris est légèrement froid (teinte bleu-vert), jamais neutre pur : c'est le papier de registre,
-pas le carton crème.
-
-| Rôle | Clair | Sombre | Usage |
-|---|---|---|---|
-| `surface` | `#FFFFFF` | `#0F161B` | fond d'écran, case « jour » |
-| `surface-container-low` | `#F7F9FA` | `#141C22` | barre de navigation, champs |
-| `surface-container` | `#F1F4F6` | `#182127` | feuilles, panneaux |
-| `surface-container-high` | `#E9EDF0` | `#222C33` | case « nuit », en-têtes collants |
-| `surface-container-highest` | `#E2E7EA` | `#2C373E` | contrôle désactivé |
-| `surface-dim` | `#E7ECEE` | `#0A1015` | fond de grille derrière les cases |
-| `on-surface` | `#131C23` (17.24:1) | `#E2E8EC` (14.76:1) | texte |
-| `on-surface-variant` | `#45535C` (7.94:1) | `#B3C0C8` (9.81:1) | texte secondaire, icônes |
-| `outline` | `#6E7D87` | `#7E8D96` | bordure de contrôle (≥ 3:1) |
-| `outline-variant` | `#C3CDD3` | `#3A454C` | **filet de réglure**, décoratif |
-
-> Deux filets, deux rôles. `outline-variant` est la réglure décorative du registre (1.62:1, elle ne
-> porte aucune information). Tout filet **qui porte un état** — le contour tireté d'une case non
-> saisie, le contour d'une case sélectionnée — utilise `#73828B` en clair (3.33:1 sur le fond de
-> grille) et `#6E7D87` en sombre (4.30:1). Ne jamais confondre les deux.
+Inchangés depuis le ticket 004 : `surface #FFFFFF`, `on-surface #131C23`, `on-surface-variant #45535C`, les crans de surface `#F7F9FA`, `#F1F4F6`, `#E9EDF0`, `#E2E7EA`, `outline #6E7D87`, `outline-variant #C3CDD3`, et leurs équivalents sombres.
 
 ### Named Rules — la sémantique des états
-
-**Règle absolue : jamais la couleur seule.** Chaque état s'écrit `marque + icône + libellé`, et la
-couleur arrive en quatrième. Un état rendu uniquement par une teinte est un défaut bloquant en revue.
+- **Disponible** : famille indigo. Texte `etat-disponible #5840BC`, case pleine `etat-disponible-plein #7655FA` (4,72:1 sous un glyphe blanc, le ratio le plus bas des paires de texte du système clair), fond `etat-disponible-fond #E4DDFE`, texte sur fond encre.
+- **Accepté, validé, publié, période ouverte, couvert, information** : famille verte. Texte `etat-accepte #086959`, fond `etat-accepte-fond #CEE5E1`, texte sur fond `#065144`.
+- **Proposé, à pourvoir, en attente** : famille orange. Texte `etat-attente #9F6224`, fond `etat-attente-fond #FDEAD7`, texte sur fond encre.
+- **Absent, refusé, conflit** : famille rose. Texte `etat-absent #BB285D`, fond `etat-absent-fond #FED7E5`, texte sur fond encre.
+- **Non saisi, neutre, annulé, archivé, verrouillé** : gris inchangés.
+- **Sélection** : `primary-container` sur `on-primary-container`, pour tout composant Material qui exprime un choix, réglé dans `app_theme.dart`. Le vert ne dit jamais « choisi ».
+- Texte coloré sur blanc : indigo `accent-texte`, vert `etat-accepte`, et les deux teintes assombries `tertiary #9F6224` (4,94:1) et `error #BB285D` (5,87:1) pour un libellé d'état qui doit être lu. Les teintes vives `orange-vif`, `rose-vif` et `accent-decoratif`, jamais : un test les y refuse (§ Écarts, ticket 061).
 
 #### Disponibilité — la grammaire de la case
 
 | État | Marque | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|---|
-| **disponible** | case pleine | `Icons.check_box` (`check` dans la grille) | « Disponible » | fond `#1A6B3A`, glyphe `#FFFFFF` (6.55:1) | fond `#2F7E4E`, glyphe `#FFFFFF` (4.98:1) |
-| **absent** | case hachurée à 45°, bord 2 dp | `Icons.disabled_by_default` (`close` dans la grille) | « Absent » | fond `#FBDED9`, bord et hachures `#A3231A` (7.47:1 sur blanc) | fond `#4A1B15`, bord `#FF9D8C` (7.17:1) |
+| **disponible** | case pleine | `Icons.check_box` (`check` dans la grille) | « Disponible » | fond `#7655FA`, glyphe `#FFFFFF` (4.72:1) | fond `#5840BC`, glyphe `#FFFFFF` (7.31:1) |
+| **absent** | case hachurée à 45°, bord 2 dp | `Icons.disabled_by_default` (`close` dans la grille) | « Absent » | fond `#FED7E5`, bord et hachures `#BB285D` (4,49:1 sur son fond #FED7E5, 5,87:1 sur blanc) | fond `#6F203D`, bord `#FB7CAA` (4.39:1) |
 | **non saisi** | case vide, filet tireté 3/3 | `Icons.check_box_outline_blank` (`remove` dans la grille) | « Non saisi » | fond `surface`, filet `#73828B`, glyphe `#52626C` (6.32:1) | filet `#6E7D87`, glyphe `#A4B1B9` (8.31:1) |
 
 Le triplet vient du registre lui-même : cochée / barrée / vide. Il tient en niveaux de gris
-(luminance relative 0.11 / 0.78 hachurée de 0.09 / 1.00) et il tient à 40 cm au soleil.
+(luminance relative 0.17 / 0.75 hachurée de 0.13 / 1.00) et il tient à 40 cm au soleil.
 
 #### Créneau — jour et nuit
 
@@ -376,13 +382,12 @@ L'écart de valeur jour/nuit est volontairement faible (1.18:1) : c'est un repè
 
 | État | Marque | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|---|
-| **proposé** | contour 2 dp, fond ocre pâle | `Icons.hourglass_top` | « En attente de ta réponse » / « En attente » | `#7A5200` sur `#FFE9BF` (5.82:1) | `#FFE0A3` sur `#4A3400` (9.23:1) |
-| **accepté** | plein, tampon | `Icons.task_alt` | « Accepté » | `#05321A` sur `#CFE9D8` (11.03:1) | `#BFEFD1` sur `#0C4A28` (8.14:1) |
-| **refusé** | barré | `Icons.cancel` | « Refusé » | `#3E0A05` sur `#FBDED9` (13.24:1) | `#FFDAD4` sur `#7E1A12` (7.94:1) |
+| **proposé** | contour 2 dp, fond ocre pâle | `Icons.hourglass_top` | « En attente de ta réponse » / « En attente » | `#131C23` sur `#FDEAD7` (14.72:1) | `#FDEBD8` sur `#613305` (9.10:1) |
+| **accepté** | plein, tampon | `Icons.task_alt` | « Accepté » | `#065144` sur `#CEE5E1` (7.02:1) | `#CDE8E2` sur `#14423B` (8.67:1) |
+| **refusé** | barré | `Icons.cancel` | « Refusé » | `#131C23` sur `#FED7E5` (13.19:1) | `#FED7E5` sur `#6F203D` (8.24:1) |
 | **annulé** | barré, atténué | `Icons.block` | « Annulé » | `#2A343A` sur `#E7EBEE` (10.61:1) | `#C4CFD6` sur `#222C33` (8.97:1) |
 
-`accepté` et `disponible` partagent le vert mais jamais l'icône (`task_alt` ≠ `check_box`) ni
-l'écran. `refusé` et `absent` partagent le vermillon mais jamais l'icône (`cancel` ≠
+`accepté` est vert, `disponible` est indigo : deux familles distinctes, et l'icône plus le libellé les séparent en niveaux de gris. `refusé` et `absent` partagent le rose `#BB285D` mais jamais l'icône (`cancel` ≠
 `disabled_by_default`). « Annulé » ne se supprime pas : il se barre et reste lisible (principe
 produit 5).
 
@@ -391,15 +396,15 @@ produit 5).
 | État | Marque | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|---|
 | **brouillon** | contour tireté | `Icons.edit_note` | « Brouillon » | `#45535C` sur `#E7EBEE` (6.62:1) | `#C4CFD6` sur `#222C33` (8.97:1) |
-| **publié** | plein, bleu de réglure | `Icons.campaign` | « Publié » | `#052B3B` sur `#CDE7F2` (11.52:1) | `#C8E9F7` sur `#0B4C66` (7.35:1) |
-| **validé** | tampon | `Icons.verified` | « Validé » | `#05321A` sur `#CFE9D8` (11.03:1) | `#BFEFD1` sur `#0C4A28` (8.14:1) |
+| **publié** | plein, filet vert | `Icons.campaign` | « Publié » | `#065144` sur `#CEE5E1` (7.02:1) | `#CDE8E2` sur `#14423B` (8.67:1) |
+| **validé** | tampon | `Icons.verified` | « Validé » | `#065144` sur `#CEE5E1` (7.02:1) | `#CDE8E2` sur `#14423B` (8.67:1) |
 | **archivé** | atténué | `Icons.inventory_2` | « Archivé » | `#4A5860` sur `#EEF1F3` (6.48:1) | `#A4B1B9` sur `#182127` (7.44:1) |
 
 #### Période de saisie
 
 | État | Marque | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|---|
-| **ouverte** | filet bleu en marge | `Icons.lock_open` | « Saisie ouverte jusqu'au {date} » | `#052B3B` sur `#CDE7F2` (11.52:1) | `#C8E9F7` sur `#0B4C66` (7.35:1) |
+| **ouverte** | filet vert en marge | `Icons.lock_open` | « Saisie ouverte jusqu'au {date} » | `#065144` sur `#CEE5E1` (7.02:1) | `#CDE8E2` sur `#14423B` (8.67:1) |
 | **verrouillée** | fond hachuré gris, cases non interactives | `Icons.lock` | « Mois verrouillé » | `#3A464E` sur `#DDE3E7` (7.49:1) | `#B3C0C8` sur `#222C33` (7.65:1) |
 
 Le verrouillage **n'est pas une erreur** : il est gris-encre, jamais rouge. C'est un fait, pas une
@@ -411,10 +416,10 @@ grille entière pour que l'état soit compris sans lire la bannière.
 | État | Icône | Libellé | Encre clair | Encre sombre |
 |---|---|---|---|---|
 | **au repos** | `Icons.cloud_done_outlined` | « À jour » | `on-surface-variant` sur `surface` (7.94:1) | `#B3C0C8` sur `#0F161B` (9.81:1) |
-| **hors ligne** | `Icons.cloud_off` | « Hors ligne — tes modifications partiront au retour du réseau » | ocre `#7A5200` sur `#FFE9BF` (5.82:1) | `#FFE0A3` sur `#4A3400` (9.23:1) |
+| **hors ligne** | `Icons.cloud_off` | « Hors ligne — tes modifications partiront au retour du réseau » | encre sur fond orange `#131C23` sur `#FDEAD7` (14.72:1) | `#FDEBD8` sur `#613305` (9.10:1) |
 | **enregistrement** | `Icons.sync` | « Enregistrement… » | `on-surface-variant` sur `surface` | `#B3C0C8` sur `#0F161B` |
-| **enregistré** | `Icons.cloud_done` | « Enregistré » | `#145C31` sur `surface` (8.06:1) | `#7ADB9F` sur `#0F161B` (10.83:1) |
-| **échec** | `Icons.error_outline` | « Non enregistré » + action « Réessayer » | `error` sur `surface` (7.47:1) | `#FFB4A6` sur `#0F161B` (10.71:1) |
+| **enregistré** | `Icons.cloud_done` | « Enregistré » | `#086959` sur `surface` (6.61:1) | `#5FAA9E` sur `#0F161B` (6.72:1) |
+| **échec** | `Icons.error_outline` | « Non enregistré » + action « Réessayer » | `#BB285D` sur `surface` (5.87:1) | `#FB7CAA` sur `#0F161B` (7.44:1) |
 
 Un cinquième état, **au repos**, a été ajouté à l'implémentation : `SaveIndicator` doit pouvoir
 exister sur un écran où rien n'est en cours, sans disparaître ni mentir. Les encres sombres de cette
@@ -423,41 +428,39 @@ document ; aucune valeur nouvelle n'a été inventée.
 
 ## Typography
 
-**Une famille : Atkinson Hyperlegible Next**, dessinée par le Braille Institute pour maximiser la
-distinction entre caractères en basse vision. Elle est choisie pour une raison de brief, pas de
-goût : public de tous âges, aisance numérique variable, lecture au soleil et en mouvement, et des
-écrans pleins de chiffres (dates, codes à 6 chiffres, quotas) où confondre `1`/`l`/`I` ou `0`/`O`
-coûte cher. Licence SIL OFL.
+**Trois fontes, chacune à sa place, décidées au ticket 061.** **Archivo** (SIL OFL, embarquée dans `assets/fonts/`, graisses 600 et 700) porte les trois styles de titre à 28, 22 et 18 points, avec un interlettrage au plus de −0,02 em : c'est là que se voit le caractère de la référence choisie par le propriétaire, et là où la confusion de glyphes n'a pas d'enjeu. **Atkinson Hyperlegible Next** garde tout le texte à 16 points et moins, pour la raison de brief du ticket 004 : distinction `1`/`l`/`I` et `0`/`O`, lecture au soleil et en mouvement, public de tous âges. **Atkinson Hyperlegible Mono** garde tous les chiffres.
 
 **Un second cut pour les nombres : Atkinson Hyperlegible Mono**, même famille, chasse fixe. Tout
 nombre qui s'aligne verticalement ou qui change en place — compteurs jour/nuit/weekend, quotas
 « 2/3 », en-têtes de jours de la matrice, code OTP, dates — le prend. C'est de la mesure, pas un
 costume technique.
 
-- **Les deux fontes sont embarquées dans `assets/fonts/`**, jamais chargées depuis un CDN : la PWA
+- **Les trois fontes sont embarquées dans `assets/fonts/`**, jamais chargées depuis un CDN : la PWA
   doit s'ouvrir vite en 4G rurale, et un FOUT sur une grille d'états est un défaut de lecture.
-- Si le cut Mono ne peut pas être obtenu, repli explicite : même famille + `FontFeature.tabularFigures()`
+- Si une fonte manque, repli explicite : même famille + `FontFeature.tabularFigures()`
   sur tous les styles numériques, écart à signaler dans la PR. **Ce repli n'a pas été nécessaire :
-  les deux familles sont disponibles.**
+  les trois familles sont disponibles.**
 - `FontFeature.tabularFigures()` est appliqué **en plus** sur les styles `nombre*` dans tous les cas.
-- Repli système : `system-ui, -apple-system, Segoe UI, Roboto, sans-serif`.
+- Repli système : `system-ui, -apple-system, Segoe UI, sans-serif`.
 
-**Fichiers retenus au ticket 004.** Source : dépôt officiel Google Fonts, `ofl/atkinsonhyperlegiblenext`
-et `ofl/atkinsonhyperlegiblemono`, publiés par le Braille Institute sous licence SIL OFL 1.1. Les deux
-familles n'existent en amont que sous forme **variable** (axe `wght` 200–800) ; l'application embarque
+**Fichiers retenus aux tickets 004 et 061.** Source : dépôt officiel Google Fonts, `ofl/atkinsonhyperlegiblenext`
+et `ofl/atkinsonhyperlegiblemono`, publiés par le Braille Institute sous licence SIL OFL 1.1. Les familles Atkinson n'existent en amont que sous forme **variable** (axe `wght` 200–800) ; Archivo vient de `ofl/archivo` avec son axe de largeur figé. L'application embarque
 des **instances statiques sous-ensemblées** au latin et aux diacritiques français, produites avec
 `fontTools` (procédure reproductible dans `assets/fonts/README.md`) :
 
 | Fichier | Graisse | Poids |
 |---|---|---|
-| `AtkinsonHyperlegibleNext-Regular.ttf` | 400 | 42 Ko |
-| `AtkinsonHyperlegibleNext-SemiBold.ttf` | 600 | 42 Ko |
-| `AtkinsonHyperlegibleNext-Bold.ttf` | 700 | 42 Ko |
+| `AtkinsonHyperlegibleNext-Regular.ttf` | 400 | 43 Ko |
+| `AtkinsonHyperlegibleNext-SemiBold.ttf` | 600 | 43 Ko |
+| `AtkinsonHyperlegibleNext-Bold.ttf` | 700 | 43 Ko |
 | `AtkinsonHyperlegibleMono-SemiBold.ttf` | 600 | 30 Ko |
 | `AtkinsonHyperlegibleMono-Bold.ttf` | 700 | 30 Ko |
-| **Total ajouté au bundle web** | | **188 Ko** |
+| `AtkinsonHyperlegibleNext-Repli.ttf` | — | 10 Ko |
+| `Archivo-SemiBold.ttf` | 600 | 58 Ko |
+| `Archivo-Bold.ttf` | 700 | 58 Ko |
+| **Total** | | **316 Ko** |
 
-C'est conforme au budget de ~180 Ko annoncé au brief. Les italiques ne sont pas embarquées
+316 Ko sur disque (315 720 octets), huit fichiers ; 41 Ko de plus au démarrage une fois compressés en brotli. Le budget de 180 Ko du ticket 004 est dépassé sciemment au ticket 061, pour deux graisses d'Archivo sur les titres. `AtkinsonHyperlegibleNext-Repli.ttf` est un repli déclaré sous la famille Roboto pour désamorcer le chargement système. Les italiques ne sont pas embarquées
 (l'italique est proscrit comme moyen de hiérarchie) et les graisses 200, 300, 500 et 800 non plus
 (l'échelle n'utilise que 400, 600 et 700).
 
@@ -511,7 +514,7 @@ constant et un titre qui rétrécit dans un panneau est pire, pas mieux.
   tableaux et grilles n'y sont pas soumis.
 - Pas de graisse sous 400. Le gras (600/700) est le seul moyen d'emphase avec la taille ; pas
   d'italique pour hiérarchiser, pas de MAJUSCULES sauf `etiquette`.
-- Une seule famille : aucune fonte d'affichage, jamais, y compris sur les écrans de connexion.
+- Trois fontes, une ligne de partage : 18 points et au-dessus en Archivo, 16 points et en dessous en Atkinson Hyperlegible Next, tout chiffre en Atkinson Hyperlegible Mono. Aucune autre fonte, nulle part, y compris sur les écrans de connexion.
 
 ## Layout
 
@@ -638,7 +641,7 @@ Hachures : trait 1.5 dp à 45°, pas de 6 dp, opacité 28 % de l'encre de l'éta
 | Variante | Fond | Texte | Bordure |
 |---|---|---|---|
 | `primaire` | `primary` | `on-primary` | — |
-| `secondaire` | `surface` | `primary` | 1 dp `outline` |
+| `secondaire` | `surface` | `accent-texte` | 1 dp `outline` |
 | `danger` | `error` | `on-error` | — |
 
 - États obligatoires : normal, pressé (`primary` + 8 % d'`on-primary` en surimpression), focus
@@ -711,6 +714,7 @@ sûres. Destinations, dans cet ordre :
   et double le chiffre d'un libellé de semantics (« 3 propositions en attente »).
 - Le bouton retour du navigateur et le geste retour iOS restent fonctionnels : chaque écran est une
   route nommée, jamais un état local.
+- L'élément choisi porte `primary-container` et `on-primary-container`, en barre, en rail, en tiroir et en boutons segmentés : la sélection est toujours indigo.
 
 ### [Signature Component] — La bannière de contexte, `AppBanner`
 
@@ -720,9 +724,9 @@ faits qui changent tout ce qui est en dessous, et qu'on doit comprendre sans lir
 | Variante | Fond / encre | Icône | Exemple |
 |---|---|---|---|
 | `verrouille` | `#DDE3E7` / `#3A464E`, fond hachuré | `lock` | « Mois verrouillé depuis le 15 septembre. Contacte ton chef de centre. » |
-| `information` | `etat-info-fond` / `etat-info` | `info_outline` | « Saisie ouverte jusqu'au 15 septembre. » |
-| `attention` | `etat-attente-fond` / `etat-attente` | `schedule` | « Plus que 2 jours pour saisir octobre. » |
-| `hors-ligne` | `etat-attente-fond` / `etat-attente` | `cloud_off` | « Hors ligne. Tes modifications partiront au retour du réseau. » |
+| `information` | `etat-info-fond` / `etat-info-sur-fond` | `info_outline` | « Saisie ouverte jusqu'au 15 septembre. » |
+| `attention` | `etat-attente-fond` / `etat-attente-sur-fond` | `schedule` | « Plus que 2 jours pour saisir octobre. » |
+| `hors-ligne` | `etat-attente-fond` / `etat-attente-sur-fond` | `cloud_off` | « Hors ligne. Tes modifications partiront au retour du réseau. » |
 | `lecture-seule` | `etat-neutre-fond` / `etat-neutre`, fond hachuré | `visibility` | « Caserne suspendue : lecture seule. » |
 | `erreur` | `error-container` / `on-error-container` | `error_outline` | « Impossible d'enregistrer. » + action « Réessayer » |
 
@@ -744,6 +748,7 @@ persistant.
 - Tutoyer le membre, vouvoyer personne, faire des phrases courtes.
 - Écrire chaque chaîne dans `AppStrings`, jamais dans un widget.
 - Traiter « verrouillé », « suspendu », « annulé » comme des faits gris, pas comme des alarmes rouges.
+- Régler dans `app_theme.dart` tout composant Material qui exprime une sélection, sinon il retombe sur le vert de Material et dit « accepté » au lieu de « choisi ».
 
 ### Don't:
 
@@ -762,6 +767,7 @@ persistant.
 - Pas de `CircularProgressIndicator` au milieu d'un écran : squelette à la forme du contenu attendu.
 - Pas d'état vide muet : un état vide explique et propose une action.
 - Pas de séquence d'animation au chargement, pas de mouvement qui ne dit pas un changement d'état.
+- Mettre `orange-vif`, `rose-vif` ou `accent-decoratif` dans un style de texte.
 
 ## Écarts d'implémentation (ticket 004)
 
@@ -867,8 +873,8 @@ navigateur, avec la matrice réelle et ses en-têtes collants.
 | Destination 3 | `groups` / `groups_outlined`, « Planning », route `/planning` | `event_available_outlined` / `event_available`, **« Astreintes »**, route `astreintes` — elle porte « Mes astreintes » | Le brief du ticket 004 notait que la place de cet écran serait à revoir à l'usage. Le compte reste à cinq, l'ordre ne bouge pas, et l'icône cesse de promettre « les autres » sur une destination qui, tant qu'un planning reste `published`, ne montre que soi. « Quand suis-je d'astreinte » (027) et « qui est d'astreinte » (023) lisent la **même** table sous la **même** politique : ce sont deux filtres d'une vue, pas deux écrans, et le ticket 023 s'y rangera derrière un sélecteur à deux segments. D'où « Astreintes », qui couvre les deux (`design/027 § 4`). |
 | Bannière `hors-ligne` | « Hors ligne. Tes modifications partiront au retour du réseau. » | sur un écran de consultation : « Hors ligne. » + seconde ligne « Dernière mise à jour : il y a 2 h. » Même variante, même ocre, même icône | Cet écran **n'écrit rien**. Promettre l'envoi de modifications inexistantes serait faux ; ce qu'il faut dire, c'est l'âge de ce qu'on lit. Une seconde phrase, `attention`, couvre le cas « en ligne mais lecture ratée » : rien n'est cassé, c'est juste vieux. |
 | Grille calendaire en compact | écart du ticket 011 : « le calendrier à sept colonnes reprend dès `expanded` » | le calendrier existe **aussi en compact**, derrière une bascule explicite, avec une marge de grille ramenée à 8 et un écart de 4 | L'écart du 011 vise une grille dont **les 62 cases** se touchent : `7 × 48 + 6 × 8 = 384 dp` contre 328. Ici trois ou quatre cases par mois sont actionnables et les autres sont du texte ; à marge 8 et écart 4, une case fait 45,7 dp sur un téléphone de 360. La liste reste la vue par défaut, et au-delà de ×1,6 d'échelle de texte le calendrier cède la place à la liste, le bouton désactivé disant pourquoi. |
-| Contrôle à deux choix | non traité ; `§ Shapes` proscrit la pastille sur un contrôle | la bascule « Liste » / « Calendrier » est faite de **deux blocs à rayon `controle`**, le choisi en `secondary-container` avec `Icons.check` en tête — jamais un `SegmentedButton` | Le segmenté Material est en gélule (`StadiumBorder`). La composition du sélecteur de mois du ticket 011 existe déjà et tient les trois signaux : la coche, le fond, `Semantics(selected:)`. |
-| Marque d'un jour d'astreinte | `§ Attribution` : « accepté » = `#05321A` sur `#CFE9D8` | la case du calendrier prend l'encre de **`etat-disponible-plein`** (`#1A6B3A`, glyphe blanc) et porte l'**icône du créneau** | Le vert pâle d'« accepté » ne tient pas en niveaux de gris (0,78 contre 1,00 pour une case vide), et c'est la lecture signature de l'écran. L'encre est prise pour sa **valeur**, pas pour son sens : sur cet écran « accepté » est universel et ne distingue rien — c'est le créneau qui porte l'information, par son glyphe et par la phrase annoncée. La règle « jamais la couleur seule » reste tenue par quatre signaux. |
+| Contrôle à deux choix | non traité ; `§ Shapes` proscrit la pastille sur un contrôle | la bascule « Liste » / « Calendrier » est faite de **deux blocs à rayon `controle`**, le choisi en `primary-container` avec `Icons.check` en tête — jamais un `SegmentedButton` | Le segmenté Material est en gélule (`StadiumBorder`). La composition du sélecteur de mois du ticket 011 existe déjà et tient les trois signaux : la coche, le fond, `Semantics(selected:)`. |
+| Marque d'un jour d'astreinte | au ticket 004, `§ Attribution` : « accepté » = `#05321A` sur `#CFE9D8` | la case du calendrier prend l'encre de **`etat-disponible-plein`** (`#7655FA`, glyphe blanc) et porte l'**icône du créneau** | Le vert pâle d'« accepté » ne tient pas en niveaux de gris (0,78 contre 1,00 pour une case vide), et c'est la lecture signature de l'écran. L'encre est prise pour sa **valeur**, pas pour son sens : sur cet écran « accepté » est universel et ne distingue rien — c'est le créneau qui porte l'information, par son glyphe et par la phrase annoncée. La règle « jamais la couleur seule » reste tenue par quatre signaux. |
 | Raison d'un contrôle désactivé | « une raison affichée à côté du contrôle » | pour les deux flèches de mois du calendrier, la raison est le **nom accessible** de la flèche et son info-bulle | Une phrase permanente sous la barre de mois coûterait 20 dp de grille pour redire ce qu'une flèche grise dit déjà. Le nom porte la raison : un lecteur d'écran annonce « Tu n'as pas d'astreinte avant ce mois, bouton, désactivé ». La règle tient pour les boutons de `PrimaryButton`, qui gardent leur phrase. |
 | Restauration de session | non traitée | **la caserne du membre est gardée sur l'appareil** (`core/session/appartenances_locales.dart`), et `appartenancesProvider` y retombe **quand, et seulement quand, `memberships` échoue sur le transport**. Ce qui revient du stockage est **toujours un simple membre** (`Appartenance.commeMembre`, appliqué dans le provider) | Sans ce repli, un démarrage à froid sans réseau s'arrête sur « Pas de connexion » avant d'atteindre le moindre écran : la session se restaure toute seule, la caserne non. Aucun cache de données ne servait donc dans la seule scène qui les justifie. Le repli est borné au réseau : masquer un refus ferait croire à un membre retiré de sa caserne qu'il y appartient encore. Et un rôle qu'on n'a pas pu revérifier n'accorde aucun privilège — même règle que `RoleMembre.depuisSql` ; conséquence assumée : hors ligne, un chef de centre perd l'onglet « Admin », qui ne lui ouvrirait que des listes vides (écart du ticket 024). |
 | Déconnexion | « garder [la destination en attente] à la déconnexion rejouerait l'écran d'un chef de centre pour le pompier suivant » (écart du ticket 024), dit de la seule destination | la règle vaut pour **tout ce que l'appareil garde** : `DeconnexionController` efface les deux caches — la caserne et l'instantané des astreintes — **avant** de fermer la session | Le second document porte les **noms des autres membres du créneau** : des données de tiers. Avant la fermeture, parce qu'après, ni l'identifiant du membre ni celui de la caserne ne sont plus lisibles, et une clé qu'on ne sait plus composer ne s'efface pas. Les pannes de stockage restent avalées : un effacement qui échoue ne retient personne dans une session qu'il veut quitter. Tout nouveau cache local devra être branché ici. |
@@ -880,7 +886,7 @@ navigateur, avec la matrice réelle et ses en-têtes collants.
 | Deuxième contrôle à deux choix | `§ Écarts, ticket 027` : la bascule « Liste » / « Calendrier » est faite de deux blocs à rayon `controle`, jamais un `SegmentedButton` | la composition est **extraite** dans `BasculeDeux`, et les deux bascules de l'écran — « Moi » / « La caserne » et « Liste » / « Calendrier » — en sont deux instances | Le ticket 023 en demandait une seconde. Deux copies auraient divergé au premier réglage de contraste, et c'est exactement ce que le système existe pour empêcher. Les trois signaux de l'état choisi — coche, fond, `Semantics(selected:)` — vivent désormais à un seul endroit. |
 | Deux bascules empilées | non traité | la bascule de vue **appartient à la portée « Moi »** et vit dans son sous-arbre ; « La caserne » n'a qu'une forme, donc pas de seconde rangée | Deux rangées de 48 dp coûteraient 128 dp de chrome sur un téléphone de 844, pour deux questions qui ne sont pas du même ordre. Le chrome reste comparable des deux côtés : portée + vue à gauche, portée + mois à droite. |
 | Un fait qui décrit le contenu, pas l'écran | `§ Signature Component` : une seule `AppBanner` à la fois, par ordre de priorité | « Planning publié, pas encore validé » est un **bloc réglé dans le contenu**, premier élément de la liste, pas une bannière | La bannière ne porte qu'un fait à la fois : un pompier hors ligne aurait perdu exactement l'explication dont il a besoin. Et ce fait ne décrit pas l'écran, il décrit **le mois affiché** — il se déplace donc avec lui. Ocre d'attente et `Icons.hourglass_top` de l'état **proposé** (`§ Attribution`), sans filet coloré à gauche (`§ Écarts, ticket 020`). |
-| Liste de personnes | non traité ; `§ Chips` décrit la case du registre, pas une personne | les noms d'un créneau sont **du texte qui s'enroule**, séparés par un point médian, jamais des pastilles | Douze pastilles de 28 dp mangeraient trois hauteurs d'écran pour une information qui se lit d'un coup. Le lecteur lui-même est en tête, marqué par `Icons.person` plein, l'encre `primary` et le mot « Toi » — trois signaux, et la phrase annoncée dit « avec toi et … ». |
+| Liste de personnes | non traité ; `§ Chips` décrit la case du registre, pas une personne | les noms d'un créneau sont **du texte qui s'enroule**, séparés par un point médian, jamais des pastilles | Douze pastilles de 28 dp mangeraient trois hauteurs d'écran pour une information qui se lit d'un coup. Le lecteur lui-même est en tête, marqué par `Icons.person` plein, l'encre `accent-texte` et le mot « Toi » — trois signaux, et la phrase annoncée dit « avec toi et … ». |
 | Barre de mois | `§ Écarts, ticket 027` : la raison d'une flèche désactivée est son nom accessible et son info-bulle | la barre est **extraite** dans `BarreMois`, partagée par le calendrier de « Mes astreintes » et le registre de la caserne, chacun fournissant ses libellés | Même composant, mêmes cibles de 48 dp, deux jeux de raisons : « Tu n'as pas d'astreinte avant ce mois » d'un côté, « Aucun planning publié avant ce mois » de l'autre. Le sélecteur de la caserne marche **de planning en planning** et non de mois en mois : un mois sans planning n'est pas une destination. |
 | Un état vide qui n'en est pas un | `§ Don't` : pas d'état vide muet | **un échec de lecture ne devient jamais un état vide** : la condition porte sur le contenu (`mois.isEmpty`) et non sur `hasValue`, et une liste vide encore en chargement ne décide d'aucune redirection dans `etatAuthProvider` | `AsyncValue` garde la valeur du calcul précédent à côté d'une erreur ou d'un chargement. Sans ces deux gardes, une caserne parfaitement organisée s'affichait « Aucun planning publié », et un membre parfaitement rattaché « Aucune caserne » — sur un écran qui ne propose que la déconnexion. Vu dans Chrome, API arrêtée (`design/023 § 10`). |
 | Caches locaux | `§ Écarts, ticket 027` : « tout nouveau cache local devra être branché ici » | `CachePlanningCaserne` est effacé par `DeconnexionController`, **avant** la fermeture de session, et son effacement balaie **tout le préfixe** du couple caserne/membre | Il range **une entrée par mois visité** : effacer une clé en laisserait cinq. C'est le cache le plus chargé en données de tiers du produit — il porte les noms de toute la caserne. Il ne décide d'aucun droit : un mois gardé alors que le planning n'était que publié ne contient que les créneaux du lecteur, il ne peut donc pas révéler ce que la base refusait. |
@@ -919,3 +925,8 @@ navigateur, avec la matrice réelle et ses en-têtes collants.
 | Pages de texte long | non traité | la politique de confidentialité et les mentions légales sont **des routes** (`/legal/confidentialite`, `/legal/mentions`), joignables dans les quatre états d'authentification, et leur contenu est une **donnée** (`features/legal/domain/documents_legaux.dart`) que le widget se contente de rendre | Une politique de confidentialité doit se lire **sans compte** — par une mairie, par un candidat à l'invitation — et avoir une URL qu'on colle dans une délibération. Quatre pages de texte dans un `Column` ne se relisent pas et contrediraient « chaque chaîne dans `AppStrings` » ; en données, la liste des sections se lit comme un sommaire et un diff nomme le paragraphe qui change. |
 | Ce qui n'est pas décidé | non traité | chaque mention qui relève du propriétaire — raison sociale, adresse, hébergeur contractuel, durées légales — s'affiche dans un bloc réglé `surface-container-high`, icône `edit_note` + libellé « À compléter avant mise en service » | Le produit est destiné à des casernes françaises. Une mention légale inventée se croit ; une mention trouée se corrige. Le bloc est porté par icône + libellé, la couleur en quatrième (`§ Do's`), et il ne se ferme pas. |
 | Deux liens en pied de bloc | `§ Cibles tactiles` : 48 dp, 8 dp d'écart | « Confidentialité » et « Mentions légales » sont deux `TextButton` de 48 dp dans un `Wrap`, jamais deux mots collés dans un `RichText` | Un lien de la taille d'un mot n'est pas une cible avec des gants. Le `Wrap` les fait passer l'un sous l'autre à grande échelle de texte, au lieu de déborder. |
+
+## Écarts d'implémentation (ticket 061)
+
+Le monde visuel du ticket 004, bleu nuit sur blanc et Atkinson seule, est remplacé au ticket 061 par le monde décrit ci-dessus : accent indigo, vert pour l'accepté, orange pour l'attente, rose pour le refus, violet décoratif, Archivo sur les titres. Tous les écrans ont changé d'apparence par les tokens, sans changement de structure. Neuf endroits lisaient une teinte qui a changé de métier et ont été rebranchés : le texte d'attente sur son propre bloc (4,22:1, sous le seuil) passe sur le texte sur fond ; le texte en `primary` sur le fond de grille (3,96:1) passe sur `accent-texte`. Les états « accepté », « validé » et « enregistré » avaient suivi « disponible » vers l'indigo par cascade de tokens ; ils sont revenus au vert, avec des tokens nommés `etat-accepte-*`. Les boutons segmentés et les puces sélectionnaient en vert, le défaut de Material ; ils sélectionnent en indigo. Les mesures sont dans `test/core/theme/contraste_test.dart` et `test/core/theme/selection_et_accepte_test.dart`.
+Un écart au brief, assumé : le brief écrit « orange et rose, jamais en texte ». Le code introduit deux versions assombries, `tertiary #9F6224` (4,94:1) et `error #BB285D` (5,87:1), pour les libellés d'état qui doivent être lus ; les teintes vives de la charte, `orange-vif` et `rose-vif`, restent réservées aux remplissages.

@@ -62,8 +62,10 @@ class _SectionTypographie extends StatelessWidget {
     return DevSection(
       titre: 'Typographie',
       note:
-          'Atkinson Hyperlegible Next et Mono, embarquées. La ligne d\'échantillon '
-          'contient les paires que la police sépare : I l 1, O 0.',
+          'Archivo sur les trois titres, Atkinson Hyperlegible Next en dessous '
+          'de 18 points, Atkinson Mono sur tout chiffre — les trois embarquées. '
+          'La ligne d\'échantillon contient les paires que la police sépare : '
+          'I l 1, O 0.',
       children: <Widget>[
         for (final (nom, style) in <(String, TextStyle?)>[
           ('titre-ecran / headlineMedium', theme.textTheme.headlineMedium),

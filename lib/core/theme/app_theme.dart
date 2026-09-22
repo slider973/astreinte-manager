@@ -59,6 +59,7 @@ abstract final class AppTheme {
     ),
     statuts: AppStatusColors.clair,
     pression: AppColors.pressionSombre,
+    accentTexte: AppColors.accentTexte,
   );
 
   /// Thème sombre — la salle de garde à 3 h du matin. La relation s'inverse :
@@ -103,6 +104,7 @@ abstract final class AppTheme {
     ),
     statuts: AppStatusColors.sombre,
     pression: AppColors.pressionClaire,
+    accentTexte: AppColors.darkAccentTexte,
   );
 
   static ThemeData _construire({
@@ -110,6 +112,7 @@ abstract final class AppTheme {
     required ColorScheme scheme,
     required AppStatusColors statuts,
     required Color pression,
+    required Color accentTexte,
   }) {
     final textTheme = AppTextStyles.textTheme(
       scheme.onSurface,
@@ -200,10 +203,13 @@ abstract final class AppTheme {
           textStyle: textTheme.labelLarge,
         ),
       ),
+      // Un libellé de bouton est du texte : il prend l'indigo de texte, pas
+      // l'indigo de remplissage. Sur un panneau teinté, `primary` tomberait
+      // sous 4.5:1 (ticket 061).
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: _styleBouton(
           fond: scheme.surface,
-          encre: scheme.primary,
+          encre: accentTexte,
           desactiveFond: scheme.surfaceContainerHighest,
           desactiveEncre: scheme.outline,
           textStyle: textTheme.labelLarge,
@@ -212,12 +218,59 @@ abstract final class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: scheme.primary,
+          foregroundColor: accentTexte,
           textStyle: textTheme.labelLarge,
           minimumSize: const Size(AppTouch.cible, AppTouch.cible),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
           shape: const RoundedRectangleBorder(
             borderRadius: AppRadius.controleRadius,
+          ),
+        ),
+      ),
+      // Choisir parmi des options, c'est une sélection : pastille indigo,
+      // texte indigo, comme l'indicateur de navigation. Material 3
+      // sélectionnerait en `secondary-container`, qui dit désormais
+      // « accepté, couvert, publié » (ticket 061) : la même teinte ne peut
+      // pas dire à la fois « ce créneau est couvert » et « ce bouton est
+      // celui que tu as choisi ». Et pas de gélule : rayon 8, comme les
+      // autres boutons.
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
+              return scheme.surfaceContainerHighest;
+            }
+            return states.contains(WidgetState.selected)
+                ? scheme.primaryContainer
+                : scheme.surface;
+          }),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => _encreSegment(scheme, states),
+          ),
+          iconColor: WidgetStateProperty.resolveWith(
+            (states) => _encreSegment(scheme, states),
+          ),
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) return pression;
+            if (states.contains(WidgetState.focused) ||
+                states.contains(WidgetState.hovered)) {
+              return scheme.primary.withValues(alpha: 0.08);
+            }
+            return null;
+          }),
+          textStyle: WidgetStatePropertyAll<TextStyle?>(textTheme.labelLarge),
+          side: WidgetStateProperty.resolveWith(
+            (states) => BorderSide(
+              color: states.contains(WidgetState.disabled)
+                  ? scheme.outlineVariant
+                  : scheme.outline,
+            ),
+          ),
+          minimumSize: const WidgetStatePropertyAll<Size>(
+            Size(AppTouch.cible, AppTouch.bouton),
+          ),
+          shape: const WidgetStatePropertyAll<OutlinedBorder>(
+            RoundedRectangleBorder(borderRadius: AppRadius.controleRadius),
           ),
         ),
       ),
@@ -306,6 +359,33 @@ abstract final class AppTheme {
           color: scheme.onSurfaceVariant,
         ),
       ),
+      // La colonne de navigation du grand écran (ticket 061b) : même pastille
+      // indigo que la barre et le rail. Réglée ici pour qu'aucune
+      // destination sélectionnée ne reparte sur le vert de Material.
+      navigationDrawerTheme: NavigationDrawerThemeData(
+        backgroundColor: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: scheme.primaryContainer,
+        indicatorShape: const RoundedRectangleBorder(
+          borderRadius: AppRadius.controleRadius,
+        ),
+        elevation: 0,
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => textTheme.labelLarge?.copyWith(
+            color: states.contains(WidgetState.selected)
+                ? scheme.onSurface
+                : scheme.onSurfaceVariant,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: AppTouch.icone + 4,
+            color: states.contains(WidgetState.selected)
+                ? scheme.onPrimaryContainer
+                : scheme.onSurfaceVariant,
+          ),
+        ),
+      ),
 
       // --- Surfaces qui flottent vraiment -------------------------------
       bottomSheetTheme: BottomSheetThemeData(
@@ -364,11 +444,28 @@ abstract final class AppTheme {
       ),
 
       // --- Puces et contrôles -------------------------------------------
+      //
+      // Une puce choisie est une sélection : même pastille indigo que le
+      // bouton segmenté et que la navigation. `secondarySelectedColor` est
+      // réglé avec `selectedColor` : sans lui, un `ChoiceChip` repartirait
+      // sur le vert par défaut de Material.
       chipTheme: ChipThemeData(
         backgroundColor: scheme.surfaceContainer,
         selectedColor: scheme.primaryContainer,
+        secondarySelectedColor: scheme.primaryContainer,
+        checkmarkColor: scheme.onPrimaryContainer,
         disabledColor: scheme.surfaceContainerHighest,
-        labelStyle: textTheme.labelMedium,
+        labelStyle: textTheme.labelMedium?.copyWith(
+          color: WidgetStateColor.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? scheme.onPrimaryContainer
+                : scheme.onSurface,
+          ),
+        ),
+        secondaryLabelStyle: textTheme.labelMedium?.copyWith(
+          color: scheme.onPrimaryContainer,
+        ),
+        iconTheme: IconThemeData(color: scheme.onSurfaceVariant),
         side: BorderSide(color: scheme.outlineVariant),
         shape: const RoundedRectangleBorder(
           borderRadius: AppRadius.caseRegistreRadius,
@@ -403,6 +500,14 @@ abstract final class AppTheme {
         ),
       ),
     );
+  }
+
+  /// L'encre d'un segment : indigo quand il est choisi, encre sinon.
+  static Color _encreSegment(ColorScheme scheme, Set<WidgetState> states) {
+    if (states.contains(WidgetState.disabled)) return scheme.outline;
+    return states.contains(WidgetState.selected)
+        ? scheme.onPrimaryContainer
+        : scheme.onSurface;
   }
 
   static ButtonStyle _styleBouton({

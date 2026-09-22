@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 
-/// Les deux familles embarquées.
+/// Les trois familles embarquées.
 ///
 /// Atkinson Hyperlegible a été dessinée par le Braille Institute pour
 /// maximiser la distinction entre caractères en basse vision. Elle est choisie
 /// pour une raison de brief : public de tous âges, lecture au soleil et en
 /// mouvement, écrans pleins de chiffres où confondre `1`/`l`/`I` ou `0`/`O`
 /// coûte une garde non couverte.
+///
+/// Archivo (ticket 061) n'entre que par les titres, à 18 points et plus, où la
+/// confusion de glyphes n'a pas d'enjeu et où le caractère du monde visuel se
+/// voit. Le partage est une ligne fixe : **18 points et au-dessus en Archivo,
+/// 16 points et en dessous en Atkinson, tout chiffre en Atkinson Mono.**
 abstract final class AppFonts {
   /// Famille de texte. Provenance et sous-ensemble : `assets/fonts/README.md`.
   static const String texte = 'AtkinsonHyperlegibleNext';
+
+  /// Famille des titres — et **seulement** des trois styles de titre.
+  static const String titre = 'Archivo';
 
   /// Famille à chasse fixe, pour tout nombre qui s'aligne ou change en place.
   static const String nombre = 'AtkinsonHyperlegibleMono';
@@ -33,6 +41,11 @@ abstract final class AppFonts {
     'Segoe UI',
     'sans-serif',
   ];
+
+  /// Replis des titres. **L'Atkinson passe devant les polices système** : si
+  /// Archivo manquait — fichier absent, chargement interrompu — un titre doit
+  /// retomber sur la police du produit, pas sur celle de la plateforme.
+  static const List<String> replisTitre = <String>[texte, ...replis];
 }
 
 /// Styles typographiques du système.
@@ -50,32 +63,42 @@ abstract final class AppTextStyles {
 
   // --- Texte -----------------------------------------------------------
 
-  /// Titre d'écran (« Octobre 2026 »). 28 / 36 / 700.
+  /// Titre d'écran (« Octobre 2026 »). 28 / 36 / 700 Archivo, −0.02em.
+  ///
+  /// L'interlettrage négatif s'arrête à −0.02em : le plancher du fini est
+  /// −0.04em, et resserrer davantage un titre lu dehors avec des gants ferme
+  /// les contre-formes.
   static const TextStyle titreEcran = TextStyle(
-    fontFamily: AppFonts.texte,
-    fontFamilyFallback: AppFonts.replis,
+    fontFamily: AppFonts.titre,
+    fontFamilyFallback: AppFonts.replisTitre,
     fontSize: 28,
     height: 36 / 28,
     fontWeight: FontWeight.w700,
-    letterSpacing: -0.28,
+    letterSpacing: -0.56,
   );
 
-  /// Barre d'application, titre de feuille. 22 / 28 / 700.
+  /// Barre d'application, titre de feuille. 22 / 28 / 700 Archivo, −0.02em.
   static const TextStyle titreSection = TextStyle(
-    fontFamily: AppFonts.texte,
-    fontFamilyFallback: AppFonts.replis,
+    fontFamily: AppFonts.titre,
+    fontFamilyFallback: AppFonts.replisTitre,
     fontSize: 22,
     height: 28 / 22,
     fontWeight: FontWeight.w700,
+    letterSpacing: -0.44,
   );
 
-  /// En-tête de groupe, nom de membre. 18 / 24 / 600.
+  /// En-tête de groupe, nom de membre. 18 / 24 / 600 Archivo, −0.01em.
+  ///
+  /// Le dernier style en Archivo : en dessous, à 16 points, on repasse en
+  /// Atkinson. Moins resserré que les deux grands titres — à 18 points un
+  /// nom propre se lit lettre à lettre, pas en silhouette.
   static const TextStyle titreBloc = TextStyle(
-    fontFamily: AppFonts.texte,
-    fontFamilyFallback: AppFonts.replis,
+    fontFamily: AppFonts.titre,
+    fontFamilyFallback: AppFonts.replisTitre,
     fontSize: 18,
     height: 24 / 18,
     fontWeight: FontWeight.w600,
+    letterSpacing: -0.18,
   );
 
   /// Texte de base. **Jamais plus petit pour une information nécessaire.**
@@ -180,9 +203,20 @@ abstract final class AppTextStyles {
           displayLarge: displayNombre.copyWith(fontSize: 44, height: 48 / 44),
           displayMedium: displayNombre.copyWith(fontSize: 38, height: 42 / 38),
           displaySmall: displayNombre,
-          headlineLarge: titreEcran.copyWith(fontSize: 32, height: 40 / 32),
+          // L'interlettrage est réécrit à chaque taille dérivée : recopié tel
+          // quel, le −0.56 du 28 vaudrait −0.023em à 24 points, au-delà de la
+          // limite que le brief pose pour les titres.
+          headlineLarge: titreEcran.copyWith(
+            fontSize: 32,
+            height: 40 / 32,
+            letterSpacing: -0.64,
+          ),
           headlineMedium: titreEcran,
-          headlineSmall: titreEcran.copyWith(fontSize: 24, height: 32 / 24),
+          headlineSmall: titreEcran.copyWith(
+            fontSize: 24,
+            height: 32 / 24,
+            letterSpacing: -0.48,
+          ),
           titleLarge: titreSection,
           titleMedium: titreBloc,
           titleSmall: libelleChamp,

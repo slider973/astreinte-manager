@@ -74,11 +74,7 @@ class JourneeCaserneBloc extends StatelessWidget {
         ),
         const AppDivider(),
         for (final creneau in journee.creneaux) ...<Widget>[
-          _LigneCreneau(
-            date: journee.date,
-            creneau: creneau,
-            heures: heures,
-          ),
+          _LigneCreneau(date: journee.date, creneau: creneau, heures: heures),
           const AppDivider(),
         ],
       ],
@@ -192,19 +188,20 @@ class _Noms extends StatelessWidget {
       runSpacing: AppSpacing.xs,
       children: <Widget>[
         // **Moi, en tête et marqué.** Trois signaux : l'icône pleine, l'encre
-        // `primary`, et la phrase annoncée qui dit « toi ». Jamais la couleur
-        // seule.
+        // d'accent, et la phrase annoncée qui dit « toi ». Jamais la couleur
+        // seule. L'encre est `accentTexte` et non `primary` : la journée
+        // marquée a un fond `surfaceDim`, où l'indigo vif tombe à 3.96:1.
         if (creneau.moi) ...<Widget>[
           Icon(
             Icons.person,
             size: AppTouch.iconePetite,
-            color: theme.colorScheme.primary,
+            color: context.statuts.accentTexte,
           ),
           const SizedBox(width: AppSpacing.xs),
           Text(
             AppStrings.planningCaserneToi,
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.primary,
+              color: context.statuts.accentTexte,
               fontWeight: FontWeight.w700,
             ),
           ),
