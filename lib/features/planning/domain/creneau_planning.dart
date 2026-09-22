@@ -95,6 +95,7 @@ class Attribution {
     required this.id,
     required this.creneauId,
     required this.userId,
+    this.etat = AttributionEtat.propose,
     this.etaitDisponible = true,
     this.auteurId,
     this.locale = false,
@@ -104,6 +105,7 @@ class Attribution {
     id: ligne['id']! as String,
     creneauId: ligne['shift_id']! as String,
     userId: ligne['user_id']! as String,
+    etat: AttributionSql.depuisSql(ligne['status'] as String?),
     etaitDisponible: (ligne['was_available'] as bool?) ?? true,
     auteurId: ligne['created_by'] as String?,
   );
@@ -114,6 +116,16 @@ class Attribution {
   final String id;
   final String creneauId;
   final String userId;
+
+  /// L'état de l'attribution, tel que la base le rend.
+  ///
+  /// **La colonne `status` était déjà lue et jetée** : le dépôt ne charge que
+  /// les attributions actives (`proposed` et `accepted`), et en brouillon
+  /// elles valent toutes `proposed`. Elle devient nécessaire au bandeau du
+  /// mois (ticket 061b), qui compte les réponses en attente une fois le
+  /// planning publié. Valeur par défaut `propose` : c'est ce qu'une
+  /// attribution posée à l'écran vaut tant que rien n'est parti.
+  final AttributionEtat etat;
 
   /// Faux quand le membre a été attribué hors de ses disponibilités.
   /// **Posé par la base**, jamais par le client : la trace ne se choisit pas
@@ -134,13 +146,21 @@ class Attribution {
           other.id == id &&
           other.creneauId == creneauId &&
           other.userId == userId &&
+          other.etat == etat &&
           other.etaitDisponible == etaitDisponible &&
           other.auteurId == auteurId &&
           other.locale == locale;
 
   @override
-  int get hashCode =>
-      Object.hash(id, creneauId, userId, etaitDisponible, auteurId, locale);
+  int get hashCode => Object.hash(
+    id,
+    creneauId,
+    userId,
+    etat,
+    etaitDisponible,
+    auteurId,
+    locale,
+  );
 }
 
 /// Le planning d'un mois : sa ligne `schedules`, sans ses créneaux.

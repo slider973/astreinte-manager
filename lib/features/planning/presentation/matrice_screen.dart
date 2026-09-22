@@ -12,6 +12,7 @@ import '../../../core/l10n/format_date.dart';
 import '../../../core/preferences/reperes_locaux.dart';
 import '../../../core/reseau/connectivite.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_status.dart';
@@ -23,6 +24,8 @@ import '../../../core/widgets/slot_chip.dart';
 import '../../dispos/domain/dispos_providers.dart';
 import '../../dispos/domain/periode_saisie.dart';
 import '../../membres/domain/membres_providers.dart';
+import '../../notifications/presentation/widgets/bouton_notifications.dart';
+import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../data/matrice_repository.dart';
 import '../data/planning_repository.dart';
 import '../data/suivi_repository.dart';
@@ -35,10 +38,15 @@ import '../domain/planning_mois.dart';
 import '../domain/planning_providers.dart';
 import '../domain/proposition_automatique.dart';
 import '../domain/recapitulatif_publication.dart';
+import '../domain/resume_mois.dart';
 import '../domain/suivi_providers.dart';
+import 'widgets/bande_semaine.dart';
+import 'widgets/bandeau_mois.dart';
 import 'widgets/barre_commande_matrice.dart';
 import 'widgets/confirmation_hors_dispo.dart';
 import 'widgets/confirmation_saisie_admin.dart';
+import 'widgets/defilement_jour.dart';
+import 'widgets/geometrie_matrice.dart';
 import 'widgets/grille_matrice.dart';
 import 'widgets/panneau_creneau.dart';
 import 'widgets/recapitulatif_proposition.dart';
@@ -61,6 +69,44 @@ class MatriceScreen extends ConsumerStatefulWidget {
   /// L'échelle de texte au-delà de laquelle la matrice change de forme.
   static const double seuilVueJour = 1.6;
 
+  /// Ce qu'il faut laisser à la grille pour qu'elle dise encore quelque
+  /// chose : quatre lignes de membres, 128 points.
+  ///
+  /// **Son bloc épinglé se sert le premier** dans cette réserve — 84 points
+  /// sans planning, 112 avec la ligne des créneaux. À 1280 × 720 il n'en
+  /// reste donc qu'une ligne et demie de membres ; les quatre lignes entières
+  /// ne se lisent qu'à partir de 420 points de place, c'est-à-dire sur une
+  /// fenêtre de 800. C'est le prix du seuil ci-dessous, et il est assumé.
+  static const double placeGrilleUtile = GeoMatrice.hauteurLigne * 4;
+
+  /// La hauteur qu'il faut, **sous la barre de commande**, pour le bandeau
+  /// complet et la bande de semaine : leurs 206 points mesurés — 134 pour le
+  /// bloc resserré, 72 pour la bande — plus ce qui reste dû à la grille.
+  ///
+  /// **La barre de répartition se voit à 720.** C'était le prix du seuil
+  /// précédent, fixé au jugé à 440 : mesuré, un portable de 13 pouces avec sa
+  /// barre d'adresse ne laisse que 341 points sous la barre de commande, et
+  /// la barre du mois — un livrable du chantier 061b — ne s'affichait jamais.
+  /// Le bloc resserré et le seuil recalculé la ramènent à 334, donc à 720.
+  ///
+  /// **La matrice garde la main pour autant** : en dessous du seuil le
+  /// bandeau se réduit à sa ligne de chiffres, puis s'efface avec la bande.
+  /// Un résumé qui laisserait deux lignes de grille aurait remplacé l'écran
+  /// qu'il surplombe.
+  ///
+  /// Ce qui mange vraiment la hauteur de cet écran n'est pas ce bloc : la
+  /// barre de commande coûte 230 à 266 points à elle seule, et le fil
+  /// « Publier » 70 de plus dès que le planning existe — 271 points de place
+  /// seulement à 1280 × 720, où le bandeau retombe alors à sa ligne de
+  /// chiffres. C'est de ce côté-là qu'un chantier suivant trouvera de quoi
+  /// rendre la grille respirable.
+  static const double placeBandeauComplet =
+      BandeauMois.hauteurComplet + BandeSemaine.hauteur + placeGrilleUtile;
+
+  /// En dessous, la ligne de trois chiffres seule ; puis plus rien.
+  static const double placeBandeauReduit =
+      BandeauMois.hauteurReduit + BandeSemaine.hauteur + placeGrilleUtile;
+
   /// Le mois porté par l'URL (`?mois=AAAA-MM`), s'il y en a un.
   final String? mois;
 
@@ -70,6 +116,16 @@ class MatriceScreen extends ConsumerStatefulWidget {
 
 class _MatriceScreenState extends ConsumerState<MatriceScreen> {
   static const String _routeAdmin = 'admin';
+
+  /// Ce que la bande de semaine vise. La matrice s'y rend avec **son**
+  /// défilement horizontal : la bande n'en ouvre pas un second.
+  final DefilementJour _defilement = DefilementJour();
+
+  /// Le jour que la bande a demandé et que la matrice montre, en base 1.
+  ///
+  /// Il vit ici et non dans la bande : c'est le défilement de la grille qui
+  /// le défait, et la grille est de l'autre côté de l'écran.
+  int? _jourVise;
 
   @override
   void initState() {
@@ -87,6 +143,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_touche);
+    _defilement.dispose();
     super.dispose();
   }
 
@@ -547,6 +604,10 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
 
     return AppScaffold(
       titre: AppStrings.matriceTitre,
+      // Sur grand écran, l'en-tête de la zone de travail porte le nom de la
+      // caserne : le titre de l'écran, lui, est le mois, et il vit dans le
+      // bandeau juste en dessous (`design/061 § 5`).
+      caserne: ref.watch(appartenanceCouranteProvider)?.nomCaserne,
       destinations: destinations,
       indexSelectionne: indexAdmin < 0 ? 0 : indexAdmin,
       onDestination: (int index) => _versDestination(index, destinations),
@@ -559,6 +620,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
           tooltip: AppStrings.matriceRafraichir,
         ),
       ],
+      actionsEnTete: const <Widget>[BoutonNotifications(), BoutonCompte()],
       banniere: _banniere(etat, asynchrone),
       // Le panneau du créneau prend la place que le brief du 016 lui avait
       // réservée ; `filActions` reçoit enfin le bouton « Publier » que le 016
@@ -687,8 +749,18 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
             ),
     );
 
+    // Les trois chiffres du mois, comptés sur les créneaux et les
+    // attributions **déjà en mémoire** : aucune lecture de plus (ticket 061b).
+    final bandeau = ResumeMois.construire(
+      planning: planning,
+      nombreDeJours: etat.periode.nombreDeJours,
+    );
+
     // La vue par jour porte la barre de commande **dans son défilement** : un
-    // téléphone n'a pas la hauteur pour deux blocs fixes.
+    // téléphone n'a pas la hauteur pour deux blocs fixes. Le bandeau la suit,
+    // réduit à sa ligne de chiffres ; la bande de semaine, elle, n'a pas
+    // d'objet — la vue par jour a déjà son ruban, et il n'y a pas de matrice
+    // à faire défiler.
     if (!matriceVisible && visibles.isNotEmpty) {
       return _zoneSaisie(
         arme: etat.modeArme,
@@ -696,7 +768,13 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
           etat,
           visibles,
           filtres,
-          barre,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              barre,
+              BandeauMois(resume: bandeau, compact: true),
+            ],
+          ),
           planning,
           creneauChoisi,
         ),
@@ -708,18 +786,52 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       children: <Widget>[
         barre,
         Expanded(
-          child: visibles.isEmpty
-              ? _aucunResultat(filtres)
-              : _zoneSaisie(
-                  arme: etat.modeArme,
-                  enfant: _matrice(
-                    etat,
-                    visibles,
-                    filtres,
-                    planning,
-                    creneauChoisi,
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints contraintes) {
+              final place = contraintes.maxHeight;
+              // **L'état vide prend toute la place.** Un filtre qui ne rend
+              // rien ouvre un message avec une sortie : la coincer sous deux
+              // cents points de résumé, c'est la rendre inatteignable.
+              final resume = visibles.isNotEmpty;
+              final complet =
+                  resume && place >= MatriceScreen.placeBandeauComplet;
+              final reduit =
+                  resume &&
+                  !complet &&
+                  place >= MatriceScreen.placeBandeauReduit;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  if (complet || reduit)
+                    BandeauMois(resume: bandeau, compact: reduit),
+                  if (complet || reduit)
+                    BandeSemaine(
+                      annee: etat.periode.annee,
+                      mois: etat.periode.mois,
+                      nombreDeJours: etat.periode.nombreDeJours,
+                      aujourdhui: DateTime.now(),
+                      jourVise: _jourVise,
+                      onJour: _viser,
+                    ),
+                  Expanded(
+                    child: visibles.isEmpty
+                        ? _aucunResultat(filtres)
+                        : _zoneSaisie(
+                            arme: etat.modeArme,
+                            enfant: _matrice(
+                              etat,
+                              visibles,
+                              filtres,
+                              planning,
+                              creneauChoisi,
+                            ),
+                          ),
                   ),
-                ),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -731,19 +843,23 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     FiltresMatrice filtres,
     PlanningMois planning,
     String? creneauChoisi,
-  ) => GrilleMatrice(
-    matrice: etat.matrice,
-    lignes: visibles,
-    annee: etat.periode.annee,
-    mois: etat.periode.mois,
-    commentaires: filtres.commentaires,
-    aujourdhui: DateTime.now(),
-    erreurs: etat.erreurs,
-    saisieActive: _saisieActive(etat, matrice: true),
-    onCase: _basculer,
-    planning: planning,
-    creneauSelectionne: creneauChoisi,
-    onCreneau: _ouvrirCreneau,
+  ) => NotificationListener<ScrollNotification>(
+    onNotification: _suivreDefilement,
+    child: GrilleMatrice(
+      defilementJour: _defilement,
+      matrice: etat.matrice,
+      lignes: visibles,
+      annee: etat.periode.annee,
+      mois: etat.periode.mois,
+      commentaires: filtres.commentaires,
+      aujourdhui: DateTime.now(),
+      erreurs: etat.erreurs,
+      saisieActive: _saisieActive(etat, matrice: true),
+      onCase: _basculer,
+      planning: planning,
+      creneauSelectionne: creneauChoisi,
+      onCreneau: _ouvrirCreneau,
+    ),
   );
 
   Widget _vueJour(
@@ -795,6 +911,34 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
   );
 
   void _basculer(CleCellule cle) => unawaited(_controleur.basculer(cle));
+
+  /// Une pastille touchée : la matrice s'y rend, et la bande marque le jour.
+  void _viser(int jour) {
+    _defilement.viser(jour);
+    if (_jourVise != jour) setState(() => _jourVise = jour);
+  }
+
+  /// La marque du jour visé **s'efface quand la grille s'en va**.
+  ///
+  /// Elle dit « voilà où la matrice est posée » : la laisser après un
+  /// défilement à la main désignerait une colonne que plus personne ne voit.
+  /// Le décalage vient de la grille elle-même, à la molette comme au doigt ;
+  /// le saut que la bande commande, lui, amène la colonne au bord gauche,
+  /// donc bien à l'intérieur de la fenêtre, et ne se défait pas tout seul.
+  bool _suivreDefilement(ScrollNotification notification) {
+    final jour = _jourVise;
+    if (jour == null) return false;
+    final metriques = notification.metrics;
+    if (metriques.axis != Axis.horizontal) return false;
+    if (notification is! ScrollUpdateNotification) return false;
+
+    final gauche = (jour - 1) * GeoMatrice.largeurJour;
+    final visible =
+        gauche + GeoMatrice.largeurJour > metriques.pixels &&
+        gauche < metriques.pixels + metriques.viewportDimension;
+    if (!visible) setState(() => _jourVise = null);
+    return false;
+  }
 
   /// Vrai quand une case répond au clic : le mode est armé, la caserne est
   /// modifiable, le réseau est là, et la densité employée est actionnable

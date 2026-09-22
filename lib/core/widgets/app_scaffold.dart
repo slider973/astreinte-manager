@@ -5,6 +5,8 @@ import '../theme/app_breakpoints.dart';
 import '../theme/app_spacing.dart';
 import 'app_banner.dart';
 import 'app_divider.dart';
+import 'colonne_navigation.dart';
+import 'entete_travail.dart';
 
 /// Une destination de premier niveau.
 ///
@@ -80,6 +82,32 @@ class AppDestination {
         route: 'admin',
       ),
   ];
+
+  /// La place de « Profil » dans la liste, admin ou non : « Admin » vient
+  /// après lui, donc l'indice ne bouge pas d'un rôle à l'autre.
+  static const int indexProfil = 3;
+
+  /// Le glyphe de la destination, avec sa pastille chiffrée s'il y en a une.
+  ///
+  /// La barre, le rail et la colonne le construisent tous les trois de la
+  /// même façon : une pastille qui ne serait chiffrée qu'à deux endroits sur
+  /// trois serait un compte qui change de valeur selon la largeur de fenêtre.
+  Widget glyphe({required bool selectionnee}) {
+    final dessin = Icon(selectionnee ? iconeSelectionnee : icone);
+    final compte = pastille ?? 0;
+    if (compte == 0) return dessin;
+
+    // La pastille chiffrée est plafonnée à « 9+ », et doublée d'un libellé
+    // annoncé : « 3 propositions en attente ».
+    return Badge.count(
+      count: compte,
+      maxCount: 9,
+      child: Semantics(
+        label: AppStrings.navPropositionsBadge(compte),
+        child: dessin,
+      ),
+    );
+  }
 }
 
 /// L'ossature de tout écran de premier niveau.
@@ -92,8 +120,10 @@ class AppDestination {
 /// - `compact` : `NavigationBar` en bas, libellés toujours visibles, hauteur
 ///   72 dp + `viewPadding.bottom` (barre d'accueil iOS) ;
 /// - `medium` : `NavigationRail` à gauche, icônes et libellés ;
-/// - `expanded` et `large` : rail étendu, plus un [panneauLateral] permanent
-///   en `large` — un détail de créneau s'y ouvre, **jamais dans une modale**.
+/// - `expanded` et `large` : [ColonneNavigation] à gauche, [EnTeteTravail] en
+///   tête de la zone de travail **à la place de la barre d'application**, plus
+///   un [panneauLateral] permanent en `large` — un détail de créneau s'y
+///   ouvre, **jamais dans une modale**.
 class AppScaffold extends StatelessWidget {
   const AppScaffold({
     required this.titre,
@@ -106,6 +136,8 @@ class AppScaffold extends StatelessWidget {
     this.banniere,
     this.panneauLateral,
     this.filActions,
+    this.caserne,
+    this.actionsEnTete = const <Widget>[],
   });
 
   final String titre;
@@ -129,6 +161,19 @@ class AppScaffold extends StatelessWidget {
   /// Barre d'actions collée en bas du contenu (bouton principal pleine
   /// largeur sur téléphone).
   final Widget? filActions;
+
+  /// Le nom de la caserne. Sur grand écran, c'est lui qui titre la zone de
+  /// travail : l'endroit où l'on est se dit alors par la destination choisie
+  /// dans la colonne, et le titre de l'écran vit dans son contenu
+  /// (`design/061 § 5`). `null` : le [titre] de l'écran reste.
+  final String? caserne;
+
+  /// La cloche et le compte, à droite de l'en-tête de la zone de travail.
+  ///
+  /// **Ignorées hors grand écran** : en `compact` et en `medium`, la barre
+  /// d'application n'a pas la largeur de deux actions de plus, et la cloche y
+  /// vit déjà dans [actions] des écrans qui la portent.
+  final List<Widget> actionsEnTete;
 
   @override
   Widget build(BuildContext context) {
@@ -193,15 +238,47 @@ class AppScaffold extends StatelessWidget {
       );
     }
 
+    if (!classe.supporteDeuxVolets) {
+      return Scaffold(
+        appBar: _barre(context),
+        body: SafeArea(
+          top: false,
+          child: Row(
+            children: <Widget>[
+              _rail(context),
+              const AppDivider.vertical(),
+              Expanded(child: contenu),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Grand écran : la navigation passe à côté du contenu, et l'en-tête avec
+    // elle. Plus de barre d'application pleine largeur au-dessus des deux.
     return Scaffold(
-      appBar: _barre(context),
       body: SafeArea(
-        top: false,
         child: Row(
           children: <Widget>[
-            _rail(context, etendu: classe.supporteDeuxVolets),
+            ColonneNavigation(
+              destinations: destinations,
+              indexSelectionne: indexSelectionne,
+              onDestination: onDestination,
+            ),
             const AppDivider.vertical(),
-            Expanded(child: contenu),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  EnTeteTravail(
+                    titre: caserne ?? titre,
+                    actions: <Widget>[...?actions, ...actionsEnTete],
+                  ),
+                  const AppDivider(),
+                  Expanded(child: contenu),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -225,8 +302,8 @@ class AppScaffold extends StatelessWidget {
             destinations: <Widget>[
               for (final destination in destinations)
                 NavigationDestination(
-                  icon: _icone(destination, selectionnee: false),
-                  selectedIcon: _icone(destination, selectionnee: true),
+                  icon: destination.glyphe(selectionnee: false),
+                  selectedIcon: destination.glyphe(selectionnee: true),
                   label: destination.libelle,
                   tooltip: _tooltip(destination),
                 ),
@@ -237,7 +314,7 @@ class AppScaffold extends StatelessWidget {
     );
   }
 
-  Widget _rail(BuildContext context, {required bool etendu}) {
+  Widget _rail(BuildContext context) {
     // Le rail n'est pas défilant par défaut : sur un téléphone en paysage
     // (600 × 360) ou à grande échelle de texte, cinq destinations ne tiennent
     // pas. On le rend défilant sans qu'il perde sa hauteur pleine.
@@ -245,23 +322,21 @@ class AppScaffold extends StatelessWidget {
       builder: (context, contraintes) => SingleChildScrollView(
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: contraintes.maxHeight),
-          child: IntrinsicHeight(child: _railNu(etendu: etendu)),
+          child: IntrinsicHeight(child: _railNu()),
         ),
       ),
     );
   }
 
-  Widget _railNu({required bool etendu}) {
+  Widget _railNu() {
     return NavigationRail(
-      extended: etendu,
-      minExtendedWidth: 180,
       selectedIndex: indexSelectionne,
       onDestinationSelected: onDestination,
       destinations: <NavigationRailDestination>[
         for (final destination in destinations)
           NavigationRailDestination(
-            icon: _icone(destination, selectionnee: false),
-            selectedIcon: _icone(destination, selectionnee: true),
+            icon: destination.glyphe(selectionnee: false),
+            selectedIcon: destination.glyphe(selectionnee: true),
             label: Text(destination.libelle),
           ),
       ],
@@ -273,24 +348,5 @@ class AppScaffold extends StatelessWidget {
     return compte == 0
         ? destination.libelle
         : AppStrings.navPropositionsBadge(compte);
-  }
-
-  Widget _icone(AppDestination destination, {required bool selectionnee}) {
-    final icone = Icon(
-      selectionnee ? destination.iconeSelectionnee : destination.icone,
-    );
-    final compte = destination.pastille ?? 0;
-    if (compte == 0) return icone;
-
-    // La pastille chiffrée est plafonnée à « 9+ », et doublée d'un libellé
-    // annoncé : « 3 propositions en attente ».
-    return Badge.count(
-      count: compte,
-      maxCount: 9,
-      child: Semantics(
-        label: AppStrings.navPropositionsBadge(compte),
-        child: icone,
-      ),
-    );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/supabase/enums.dart';
 import '../../../core/theme/app_status.dart';
 import 'creneau_planning.dart';
 
@@ -151,13 +152,11 @@ class AttributionSuivi {
   /// libellé : « Remplacé » dit que la garde a changé de main, « Annulé » dit
   /// qu'elle n'existe plus. Un statut inconnu se lit comme annulé : le côté sûr
   /// est celui qui ne compte pas dans la couverture.
-  static AttributionEtat etatDepuisSql(String? valeur) => switch (valeur) {
-    'proposed' => AttributionEtat.propose,
-    'accepted' => AttributionEtat.accepte,
-    'declined' => AttributionEtat.refuse,
-    'replaced' => AttributionEtat.remplace,
-    _ => AttributionEtat.annule,
-  };
+  /// La traduction vit dans `core/supabase/enums.dart` depuis le ticket 061b,
+  /// le planning en brouillon la lisant lui aussi. Ce raccourci reste : le
+  /// suivi et le superviseur l'appellent par ce nom depuis le 019.
+  static AttributionEtat etatDepuisSql(String? valeur) =>
+      AttributionSql.depuisSql(valeur);
 
   static DateTime? _instant(Object? valeur) =>
       valeur is String ? DateTime.tryParse(valeur)?.toLocal() : null;

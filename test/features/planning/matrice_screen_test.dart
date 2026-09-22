@@ -171,8 +171,10 @@ void main() {
         findsOneWidget,
       );
 
-      // Le mois affiché est celui du sélecteur.
-      expect(find.text(_libelleMois(0)), findsWidgets);
+      // Le mois affiché est celui du sélecteur, et **il n'est écrit qu'une
+      // fois** : le sélecteur le porte avec l'état de la période, le bandeau
+      // du mois juste dessous ne le répète pas.
+      expect(find.text(_libelleMois(0)), findsOneWidget);
     });
 
     testWidgets('une case saisie par un admin porte sa marque, et elle '

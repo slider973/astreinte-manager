@@ -2217,6 +2217,43 @@ abstract final class AppStrings {
   static String planningCreeTexte(String mois, int creneaux) =>
       'Planning ${moisAvecDe(mois)} créé : $creneaux créneaux.';
 
+  // -------------------------------------------------------------------
+  // Le compte, le bandeau du mois et la bande de semaine (ticket 061b)
+  // -------------------------------------------------------------------
+
+  static const String compteOuvrir = 'Mon profil';
+
+  /// « Mon profil — Marie L. » : sur un poste de caserne partagé, la première
+  /// question est de savoir qui est connecté.
+  static String compteOuvrirNomme(String nom) => '$compteOuvrir — $nom';
+
+  // --- Les trois chiffres du mois ---------------------------------------
+
+  static const String bandeauCouverts = 'Créneaux couverts';
+  static const String bandeauAPourvoir = 'À pourvoir';
+  static const String bandeauEnAttente = 'Réponses en attente';
+
+  // --- La barre de répartition et sa légende ----------------------------
+
+  /// Les quatre familles de la barre ne reprennent **pas** les mots des trois
+  /// chiffres : « À pourvoir », le chiffre, compte ce qui manque de monde,
+  /// d'où que cela vienne ; la barre, elle, sépare ce qui n'a jamais été
+  /// pourvu de ce qu'un refus a rouvert. Deux fois le même mot dans le même
+  /// bloc, pour deux comptes différents, serait un piège.
+  static const String bandeauPartCouverts = 'Couverts';
+  static const String bandeauPartARemplir = 'À remplir';
+  static const String bandeauPartAReattribuer = 'À réattribuer';
+  static const String bandeauPartNonSaisis = 'Sans astreinte requise';
+
+  /// Ce que la légende annonce : « Couverts : 48 créneaux sur 62 ». La barre,
+  /// elle, ne dit rien — une longueur n'est pas un état.
+  static String bandeauPartSemantique(String libelle, int n, int total) =>
+      '$libelle : $n créneau${n > 1 ? 'x' : ''} sur $total';
+
+  // --- La bande de semaine ----------------------------------------------
+
+  static const String bandeAllerAuJour = 'Appuie pour voir ce jour';
+
   // --- La ligne des créneaux --------------------------------------------
 
   static const String planningLigneCreneaux = 'Créneaux';
