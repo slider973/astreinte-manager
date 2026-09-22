@@ -5,7 +5,7 @@
 - **Dépend de** : 031
 - **Branche** : `feat/053-superadmin-sans-deconnexion`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-22
+- **Statut** : terminé le 2026-09-22 (PR créée)
 
 ## Contexte
 
