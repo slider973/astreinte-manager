@@ -14,8 +14,9 @@ Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main
 |---|---|---|---|---|
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
-| 050 | [L'écran super-admin annonce un envoi sans preuve](backlog/050-envoi-annonce-sans-preuve-superadmin.md) | P2 | 048 | — |
-| 053 | [L'écran super-admin n'offre aucune déconnexion](backlog/053-superadmin-sans-deconnexion.md) | P2 | 031 | — |
+| 055 | [Un refus annonce « ton chef de centre est prévenu » sans preuve](backlog/055-refus-prevenu-sans-preuve.md) | P2 | 050 | — |
+| 056 | [L'éditeur sans caserne perd sa destination au démarrage à froid](backlog/056-superadmin-destination-perdue-a-froid.md) | P2 | 045 053 | — |
+| 057 | [Le jeton d'appareil des notifications n'est pas branché sur l'oubli](backlog/057-jeton-appareil-hors-oubli.md) | P2 | 024 053 | — |
 
 ## Terminés
 
@@ -67,6 +68,8 @@ Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main
 | 047 | [Importer les membres d'une caserne depuis un fichier](done/047-import-membres.md) | P0 | 006 009 038 | https://github.com/slider973/astreinte-manager/pull/43 |
 | 048 | [Finition de l'écran d'import des membres](done/048-finition-import-membres.md) | P1 | 047 | https://github.com/slider973/astreinte-manager/pull/45 |
 | 049 | [Mettre la base et les Edge Functions en ligne avec la PWA](done/049-deploiement-base-et-fonctions.md) | P0 | 032 | https://github.com/slider973/astreinte-manager/pull/46 |
+| 050 | [L'écran super-admin annonce un envoi sans preuve](done/050-envoi-annonce-sans-preuve-superadmin.md) | P2 | 048 | https://github.com/slider973/astreinte-manager/pull/49 |
 | 052 | [Le centre de notifications n'a pas de retour](done/052-centre-notifications-sans-retour.md) | P1 | 026 | https://github.com/slider973/astreinte-manager/pull/47 |
+| 053 | [L'écran super-admin n'offre aucune déconnexion](done/053-superadmin-sans-deconnexion.md) | P2 | 031 | https://github.com/slider973/astreinte-manager/pull/50 |
 | 054 | [Le déploiement automatique des fonctions ignore la carte d'imports](done/054-deploiement-fonctions-carte-imports.md) | P0 | 049 | https://github.com/slider973/astreinte-manager/pull/48 |
 

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/session/deconnexion.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
+import '../../../core/widgets/app_divider.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/primary_button.dart';
@@ -27,6 +29,13 @@ import 'widgets/feuille_saisie.dart';
 /// (migration `0025`). Cet écran n'est donc **jamais** la seule protection :
 /// quand le droit revient faux, il affiche une phrase sobre le temps que le
 /// routeur reprenne la main, et rien d'autre.
+///
+/// **Il porte sa sortie** (ticket 053). N'avoir ni barre de navigation ni
+/// profil lui avait coûté la déconnexion : la garde le dispense justement
+/// d'« Aucune caserne », le seul écran qui la lui offrait
+/// (`core/router/auth_redirection.dart`). Le compte le plus sensible du
+/// produit était donc le seul dont on ne pouvait pas sortir sans vider le
+/// stockage du navigateur.
 class SuperAdminScreen extends ConsumerWidget {
   const SuperAdminScreen({super.key});
 
@@ -48,10 +57,21 @@ class SuperAdminScreen extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: switch (autorise) {
-          AsyncData<bool>(value: false) => const _Reserve(),
-          _ => const _Liste(),
-        },
+        child: Column(
+          children: <Widget>[
+            Expanded(
+              child: switch (autorise) {
+                AsyncData<bool>(value: false) => const _Reserve(),
+                _ => const _Liste(),
+              },
+            ),
+            // **Hors de la liste, donc visible sans défilement**, et présent
+            // dans les quatre états de l'écran — squelette, erreur, liste
+            // vide, droit refusé. Un écran dont la liste échoue doit rester
+            // quittable.
+            const _PiedDeconnexion(),
+          ],
+        ),
       ),
     );
   }
@@ -70,6 +90,34 @@ class _Reserve extends StatelessWidget {
       texte: AppStrings.superAdminReserveTexte,
       icone: Icons.lock_outline,
     ),
+  );
+}
+
+/// La sortie de l'écran : même bouton et même place que sur « Aucune
+/// caserne » — ancrée en bas, pleine largeur, à la marge de page.
+///
+/// `BoutonDeconnexion` et lui seul : c'est lui qui passe par `OubliLocal`
+/// avant de fermer la session (`core/session/deconnexion.dart`), et la règle
+/// des caches locaux vaut ici plus qu'ailleurs — une session d'éditeur laissée
+/// sur un téléphone prêté ouvre le parc entier.
+///
+/// Le filet est celui de la barre de navigation basse (`core/widgets/
+/// app_scaffold.dart`) : décoratif, 1 dp, il dit seulement où s'arrête ce qui
+/// défile. Sans lui, la dernière ligne de caserne glisserait sous le bouton
+/// sans limite lisible.
+class _PiedDeconnexion extends StatelessWidget {
+  const _PiedDeconnexion();
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      const AppDivider(),
+      Padding(
+        padding: EdgeInsets.all(AppWindowClass.of(context).margePage),
+        child: const BoutonDeconnexion(),
+      ),
+    ],
   );
 }
 

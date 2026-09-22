@@ -3380,8 +3380,26 @@ abstract final class AppStrings {
   static const String superAdminChampEmailExemple = 'chef@caserne.fr';
   static const String superAdminInviterValider = 'Envoyer l\'invitation';
 
-  static String superAdminInvitationEnvoyee(String email) =>
-      'Invitation envoyée à $email.';
+  /// Le compte rendu d'une invitation de l'éditeur, en une phrase.
+  ///
+  /// **Elle ne décide de rien.** [libelle] vient de
+  /// [ResultatInvitation.libelle] et [detail] de [ResultatInvitation.detail] :
+  /// la règle qui interdit d'annoncer un envoi tant que le courriel n'est pas
+  /// sorti vit là-bas, une seule fois, pour les trois écrans qui invitent
+  /// (ticket 048, puis 050). Écrire ici « envoyée si … » en serait une
+  /// quatrième copie, et c'est leur duplication tacite qui a fait dire trois
+  /// fois le même mensonge.
+  ///
+  /// Une seule adresse, donc le compte rendu de la caserne ne convient pas :
+  /// « 1 invitation envoyée, 0 échec. » compte ce qu'on voit déjà. Il reste
+  /// l'ordre de la ligne du compte rendu — le sort, puis l'adresse, puis ce
+  /// qui manque —, et les quatre sorts possibles s'y disent tels quels :
+  /// « Invitée », « Relancée », « Créée », « Déjà en attente ».
+  static String superAdminResultatInvitation({
+    required String email,
+    required String libelle,
+    String? detail,
+  }) => detail == null ? '$libelle : $email.' : '$libelle : $email. $detail';
 
   static const String superAdminEchecInvitation =
       'L\'invitation n\'est pas partie. Réessaie dans un instant.';
