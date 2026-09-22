@@ -6,7 +6,7 @@ Deno / TypeScript, une fonction par dossier, la liste de référence est la sect
 | Fonction            | Ticket | Rôle                                                                                                                                                                                                                  |
 | ------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `invite-member`     | 006    | Un admin invite une ou plusieurs adresses dans sa caserne : ligne `invitations`, compte `auth.users` si l'adresse est inconnue, courriel d'invitation, **plafond horaire** (038), **noms et rôle par personne** (047) |
-| `accept-invitation` | 006    | L'invité connecté échange son jeton contre une `memberships` active                                                                                                                                                   |
+| `accept-invitation` | 006    | L'invité connecté échange son jeton — ou l'identifiant de son invitation (051) — contre une `memberships` active                                                                                                      |
 | `publish-schedule`  | 019    | Publie un planning : statut, `proposed_at` de chaque attribution, puis **une** notification par membre                                                                                                                |
 | `reassign-shift`    | 020    | Réattribue un créneau d'un planning publié : nouvelle attribution proposée, ancienne remplacée, **une** notification au nouveau membre                                                                                |
 | `auto-propose`      | 018    | Applique un remplissage automatique du brouillon : le plan vient de l'application (tri du ticket 017), la base revérifie chaque ligne et écarte celles qui ne passent pas                                             |
@@ -357,6 +357,28 @@ Content-Type: application/json
 { "token": "<jeton du lien d'invitation>" }
 ```
 
+**Deux entrées, exactement l'une des deux** _(ticket 051)_ :
+
+| Corps                           | D'où il vient                                                                             |
+| ------------------------------- | ----------------------------------------------------------------------------------------- |
+| `{ "token": "…" }`              | Le lien du courriel, écran `/invite/:jeton` (ticket 006)                                  |
+| `{ "invitation_id": "<uuid>" }` | L'identifiant rendu par `my_pending_invitations()`, écran « Aucune caserne » (ticket 051) |
+
+Les deux ensemble ne sont pas une requête plus riche, c'est une requête ambiguë : `400`
+`invalid_body`. Un `invitation_id` qui n'est pas un UUID est refusé de la même façon — un corps
+malformé n'est pas une panne serveur.
+
+L'entrée par identifiant passe par `accept_invitation_by_id` (migration `0036`), qui confronte
+l'adresse de la session à celle de l'invitation **avant tout le reste**, résout le jeton en base et
+rejoue `accept_invitation`. Conséquences, qui sont le contrat :
+
+- **la réponse est la même**, succès comme échec : mêmes clés, mêmes codes, mêmes statuts HTTP,
+  mêmes phrases françaises. L'écran d'invitation traite les deux entrées sans les distinguer ;
+- **le jeton ne traverse pas le réseau** et n'apparaît dans aucune réponse ;
+- un identifiant inconnu et l'identifiant de l'invitation de quelqu'un d'autre rendent **la même
+  chose** : `403` `email_mismatch`, **sans** `station` ni `invited_email_masked`. Les distinguer
+  ferait de la fonction un oracle d'existence.
+
 Réponse `200` :
 
 ```jsonc
@@ -383,17 +405,17 @@ Réponse `200` :
 
 Erreurs :
 
-| Statut | `code`                        | Détails joints à `error`                           |
-| ------ | ----------------------------- | -------------------------------------------------- |
-| 400    | `invalid_body`                | —                                                  |
-| 401    | `unauthenticated`             | —                                                  |
-| 403    | `email_mismatch`              | `invited_email_masked`, `current_email`, `station` |
-| 403    | `station_suspended`           | `station`, `inviter`                               |
-| 404    | `invitation_not_found`        | —                                                  |
-| 409    | `invitation_already_accepted` | `accepted_at`, `station`, `inviter`                |
-| 409    | `profile_missing`             | —                                                  |
-| 410    | `invitation_expired`          | `expires_at`, `station`, `inviter`                 |
-| 500    | `internal_error`              | —                                                  |
+| Statut | `code`                        | Détails joints à `error`                                                                                            |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 400    | `invalid_body`                | — (ni `token` ni `invitation_id`, les deux à la fois, ou identifiant mal formé)                                     |
+| 401    | `unauthenticated`             | —                                                                                                                   |
+| 403    | `email_mismatch`              | `invited_email_masked`, `current_email`, `station` — **`current_email` seul** quand l'entrée est un `invitation_id` |
+| 403    | `station_suspended`           | `station`, `inviter`                                                                                                |
+| 404    | `invitation_not_found`        | —                                                                                                                   |
+| 409    | `invitation_already_accepted` | `accepted_at`, `station`, `inviter`                                                                                 |
+| 409    | `profile_missing`             | —                                                                                                                   |
+| 410    | `invitation_expired`          | `expires_at`, `station`, `inviter`                                                                                  |
+| 500    | `internal_error`              | —                                                                                                                   |
 
 `station` et `inviter` accompagnent les erreurs qui méritent une sortie de secours : l'écran peut
 nommer la caserne et proposer d'écrire à l'administrateur plutôt que de laisser l'invité dans un

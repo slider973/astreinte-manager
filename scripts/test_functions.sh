@@ -2,6 +2,7 @@
 # Tests de bout en bout des Edge Functions : invitations (ticket 006), envoi de
 # notifications (ticket 025), publication d'un planning (ticket 019),
 # plafond de débit des invitations (ticket 038),
+# invitation rejointe sans courriel (ticket 051),
 # réattribution d'un créneau refusé (ticket 020), remplissage automatique d'un
 # brouillon (ticket 018), ligne interne d'un envoi définitivement abandonné
 # (ticket 040), abonnement par caserne (ticket 029) et flux calendrier (ticket 028).
@@ -93,6 +94,20 @@ appeler() { # appeler <fonction> <jeton|-> <corps json>
   local entetes=(-H "apikey: $ANON_KEY" -H 'content-type: application/json')
   [ "$jeton" != "-" ] && entetes+=(-H "Authorization: Bearer $jeton")
   reponse="$(curl -s -w $'\n%{http_code}' -X POST "$API_URL/functions/v1/$fonction" \
+    "${entetes[@]}" -d "$corps")"
+  STATUT="$(printf '%s' "$reponse" | tail -1)"
+  CORPS="$(printf '%s' "$reponse" | sed '$d')"
+}
+
+# Une RPC PostgREST, appelée comme l'application le fait : clé anon en `apikey`,
+# jeton de session en `Authorization`. C'est par là que passe `my_pending_invitations`
+# (ticket 051) — elle n'est pas une Edge Function, elle est ouverte à `authenticated`.
+rpc() { # rpc <jeton|-> <fonction> [corps json]
+  local jeton="$1" fonction="$2" corps="${3:-}" reponse
+  [ -n "$corps" ] || corps='{}'   # une fonction sans paramètre attend quand même un objet
+  local entetes=(-H "apikey: $ANON_KEY" -H 'content-type: application/json')
+  [ "$jeton" != "-" ] && entetes+=(-H "Authorization: Bearer $jeton")
+  reponse="$(curl -s -w $'\n%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fonction" \
     "${entetes[@]}" -d "$corps")"
   STATUT="$(printf '%s' "$reponse" | tail -1)"
   CORPS="$(printf '%s' "$reponse" | sed '$d')"
@@ -440,6 +455,108 @@ appeler invite-member "$ADMIN_A" "{\"station_id\":\"$STATION_A\",\"email\":\"inv
 verifier "renvoi d'une invitation expirée : resent" "resent" "$(jq -r '.results[0].status' <<<"$CORPS")"
 appeler accept-invitation "$JETON_INVITE2" "{\"token\":\"$TOKEN2\"}"
 verifier "le lien renvoyé fonctionne : 200" "200" "$STATUT"
+
+# ---------------------------------------------------------------------------
+echo ''
+echo "--- 6 bis. Rejoindre depuis « Aucune caserne » : my_pending_invitations et invitation_id (ticket 051)"
+# ---------------------------------------------------------------------------
+# Le parcours du 21 septembre 2026 : l'invité se connecte **sans ouvrir son
+# courriel**. Il n'a donc pas de jeton — il n'a que sa session. Ce qui se vérifie
+# ici est la couche HTTP des deux portes ouvertes par la migration 0036 : la RPC
+# qui lui dit qui l'attend, et l'entrée par identifiant d'accept-invitation.
+appeler invite-member "$ADMIN_A" "{\"station_id\":\"$STATION_A\",\"email\":\"invite-test-9@caserne-a.test\"}"
+verifier "invitation posée pour le parcours sans courriel" "invited" "$(jq -r '.results[0].status' <<<"$CORPS")"
+INV9="$(jq -r '.results[0].invitation_id' <<<"$CORPS")"
+INVITE9_ID="$(sql "select id from profiles where email = 'invite-test-9@caserne-a.test'")"
+curl -s -o /dev/null -X PUT "$API_URL/auth/v1/admin/users/$INVITE9_ID" \
+  -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" \
+  -H 'content-type: application/json' -d "{\"password\":\"$MDP\"}"
+JETON_INVITE9="$(connexion invite-test-9@caserne-a.test)"
+
+rpc "$JETON_INVITE9" my_pending_invitations
+verifier "l'invité interroge ses invitations : 200" "200" "$STATUT"
+verifier "une invitation en attente" "1" "$(jq -r 'length' <<<"$CORPS")"
+verifier "la caserne est nommée" "CIS Saint-Martin" "$(jq -r '.[0].station_name' <<<"$CORPS")"
+verifier "l'invitant est nommé" "Jean Dupont" "$(jq -r '.[0].invited_by_name' <<<"$CORPS")"
+verifier "le serveur tranche l'expiration" "pending" "$(jq -r '.[0].status' <<<"$CORPS")"
+verifier "cinq champs, pas un de plus" "expires_at,id,invited_by_name,station_name,status" \
+  "$(jq -r '.[0] | keys | join(",")' <<<"$CORPS")"
+TOKEN9="$(sql "select token from invitations where email = 'invite-test-9@caserne-a.test'")"
+verifier "aucun jeton dans la réponse" "absent" \
+  "$(grep -q "$TOKEN9" <<<"$CORPS" && echo présent || echo absent)"
+
+# Un autre compte connecté ne voit rien : la fonction n'a pas de paramètre, elle
+# répond à l'adresse de la session.
+rpc "$MEMBRE_A" my_pending_invitations
+verifier "un autre compte ne voit aucune invitation" "0" "$(jq -r 'length' <<<"$CORPS")"
+
+# Sans session — la clé anon seule est un JWT valide et publique : elle ne doit
+# pas ouvrir cette porte.
+rpc - my_pending_invitations
+verifier "la clé anon seule n'appelle pas la fonction" "non" \
+  "$([ "$STATUT" = "200" ] && echo oui || echo non)"
+
+# Les corps refusés, avant même de toucher à la base.
+appeler accept-invitation "$JETON_INVITE9" "{\"token\":\"$TOKEN9\",\"invitation_id\":\"$INV9\"}"
+verifier "jeton et identifiant ensemble : 400" "400" "$STATUT"
+verifier "code invalid_body" "invalid_body" "$(jq -r '.error.code' <<<"$CORPS")"
+
+appeler accept-invitation "$JETON_INVITE9" '{"invitation_id":"pas-un-uuid"}'
+verifier "identifiant mal formé : 400, pas 500" "400" "$STATUT"
+
+# L'identifiant de l'invitation d'un autre : refusé sur l'adresse, et rien n'est
+# appris — ni la caserne, ni l'adresse invitée.
+appeler accept-invitation "$MEMBRE_A" "{\"invitation_id\":\"$INV9\"}"
+verifier "identifiant d'un autre : 403" "403" "$STATUT"
+verifier "code email_mismatch" "email_mismatch" "$(jq -r '.error.code' <<<"$CORPS")"
+verifier "la caserne n'est pas nommée" "absente" "$(jq -r '.error.station // "absente"' <<<"$CORPS")"
+verifier "l'adresse invitée n'est pas masquée, elle est absente" "absente" \
+  "$(jq -r '.error.invited_email_masked // "absente"' <<<"$CORPS")"
+
+# Un identifiant qui n'existe pas rend exactement la même chose.
+appeler accept-invitation "$JETON_INVITE9" '{"invitation_id":"51510000-0000-4000-8000-0000000000ff"}'
+verifier "identifiant inconnu : 403, comme celui d'un autre" "403" "$STATUT"
+verifier "et le même code" "email_mismatch" "$(jq -r '.error.code' <<<"$CORPS")"
+
+# Le cas nominal : une touche, pas de courriel, pas de jeton.
+appeler accept-invitation "$JETON_INVITE9" "{\"invitation_id\":\"$INV9\"}"
+verifier "acceptation par identifiant : 200" "200" "$STATUT"
+verifier "membership active" "active" "$(jq -r '.membership.status' <<<"$CORPS")"
+verifier "la réponse nomme la caserne, comme par le jeton" "CIS Saint-Martin" \
+  "$(jq -r '.station.name' <<<"$CORPS")"
+verifier "aucun jeton dans la réponse d'acceptation" "absent" \
+  "$(grep -q "$TOKEN9" <<<"$CORPS" && echo présent || echo absent)"
+verifier "membership écrite en base" "1" \
+  "$(sql "select count(*) from memberships
+          where user_id = '$INVITE9_ID' and station_id = '$STATION_A' and status = 'active'")"
+
+rpc "$JETON_INVITE9" my_pending_invitations
+verifier "l'invitation acceptée sort de la liste" "0" "$(jq -r 'length' <<<"$CORPS")"
+
+# L'expirée : elle reste **visible**, avec son statut, sinon « expirée »
+# redeviendrait « aucune » — le mensonge que le ticket corrige.
+appeler invite-member "$ADMIN_A" "{\"station_id\":\"$STATION_A\",\"email\":\"invite-test-10@caserne-a.test\"}"
+INV10="$(jq -r '.results[0].invitation_id' <<<"$CORPS")"
+INVITE10_ID="$(sql "select id from profiles where email = 'invite-test-10@caserne-a.test'")"
+curl -s -o /dev/null -X PUT "$API_URL/auth/v1/admin/users/$INVITE10_ID" \
+  -H "apikey: $SERVICE_KEY" -H "Authorization: Bearer $SERVICE_KEY" \
+  -H 'content-type: application/json' -d "{\"password\":\"$MDP\"}"
+JETON_INVITE10="$(connexion invite-test-10@caserne-a.test)"
+sql "update invitations set expires_at = now() - interval '1 day'
+     where email = 'invite-test-10@caserne-a.test'" >/dev/null
+
+rpc "$JETON_INVITE10" my_pending_invitations
+verifier "une invitation expirée reste listée" "1" "$(jq -r 'length' <<<"$CORPS")"
+verifier "et le serveur la dit expirée" "expired" "$(jq -r '.[0].status' <<<"$CORPS")"
+verifier "avec de quoi nommer qui la renverra" "Jean Dupont" "$(jq -r '.[0].invited_by_name' <<<"$CORPS")"
+
+appeler accept-invitation "$JETON_INVITE10" "{\"invitation_id\":\"$INV10\"}"
+verifier "rejoindre une expirée par identifiant : 410" "410" "$STATUT"
+verifier "code invitation_expired, comme par le jeton" "invitation_expired" \
+  "$(jq -r '.error.code' <<<"$CORPS")"
+verifier "de quoi contacter l'admin" "admin@caserne-a.test" "$(jq -r '.error.inviter.email' <<<"$CORPS")"
+verifier "aucune membership créée" "0" \
+  "$(sql "select count(*) from memberships where user_id = '$INVITE10_ID'")"
 
 # ---------------------------------------------------------------------------
 echo ''

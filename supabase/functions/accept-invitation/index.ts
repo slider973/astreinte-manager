@@ -4,13 +4,22 @@
 // POST /functions/v1/accept-invitation
 // En-têtes : Authorization: Bearer <access_token de l'invité>, apikey: <clé anon>
 // Corps    : { "token": "<jeton du lien d'invitation>" }
+//        ou : { "invitation_id": "<uuid>" }   — ticket 051, exactement l'un des deux
 //
 // Deux identités sont confrontées : celle du lien (le jeton, qui se transfère) et
 // celle de la session (le JWT, qui ne se transfère pas). L'adresse de la session
 // doit être celle qui a été invitée. Le contrôle est fait en SQL, dans la même
 // transaction que la création de la membership.
+//
+// L'entrée par identifiant (ticket 051) sert l'écran « Aucune caserne », qui
+// connaît l'identifiant rendu par `my_pending_invitations()` et **jamais** le
+// jeton. `accept_invitation_by_id` (migration 0036) confronte l'adresse de la
+// session à celle de l'invitation avant toute autre chose, résout le jeton en base
+// et rejoue `accept_invitation` : mêmes contrôles, mêmes codes, mêmes réponses. Le
+// jeton ne traverse ni le réseau ni cette fonction.
 
 import { errorResponse, jsonResponse, preflight, readJsonBody } from "../_shared/http.ts";
+import { lireEntreeInvitation } from "../_shared/invitation_entree.ts";
 import { type AdminClient, adminClient, caller } from "../_shared/supabase.ts";
 
 type AcceptResult = {
@@ -78,17 +87,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
   }
 
-  const body = await readJsonBody(req);
-  const token = body && typeof body.token === "string" ? body.token.trim() : "";
-  if (token === "") {
-    return errorResponse(400, "invalid_body", "Le champ token est obligatoire.");
+  const lecture = lireEntreeInvitation(await readJsonBody(req));
+  if (!lecture.ok) {
+    return errorResponse(400, "invalid_body", lecture.message);
   }
 
-  const { data, error } = await admin.rpc("accept_invitation", {
-    p_token: token,
-    p_user_id: utilisateur.id,
-    p_email: utilisateur.email,
-  });
+  // Un seul appel, deux portes d'entrée. Les deux fonctions SQL rendent le même
+  // objet et le même vocabulaire de codes : la suite ne sait pas par où on est
+  // entré, et n'a pas à le savoir.
+  const { data, error } = lecture.entree.mode === "jeton"
+    ? await admin.rpc("accept_invitation", {
+      p_token: lecture.entree.jeton,
+      p_user_id: utilisateur.id,
+      p_email: utilisateur.email,
+    })
+    : await admin.rpc("accept_invitation_by_id", {
+      p_invitation: lecture.entree.identifiant,
+      p_user_id: utilisateur.id,
+      p_email: utilisateur.email,
+    });
 
   if (error) {
     console.error("accept_invitation", error.message);
