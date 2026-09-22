@@ -5,7 +5,7 @@
 - **Dépend de** : 049
 - **Branche** : `feat/054-deploiement-fonctions-carte-imports`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-21
+- **Statut** : terminé le 2026-09-22 (PR créée)
 
 ## Contexte
 
