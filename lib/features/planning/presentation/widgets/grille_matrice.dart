@@ -15,6 +15,7 @@ import '../../domain/cle_cellule.dart';
 import '../../domain/ligne_matrice.dart';
 import '../../domain/matrice_mois.dart';
 import '../../domain/planning_mois.dart';
+import 'defilement_jour.dart';
 import 'entete_dates.dart';
 import 'entete_ligne_membre.dart';
 import 'fond_jour.dart';
@@ -55,6 +56,7 @@ class GrilleMatrice extends StatefulWidget {
     required this.creneauSelectionne,
     required this.onCreneau,
     super.key,
+    this.defilementJour,
   });
 
   /// La matrice entière — c'est elle qui porte les comptes de disponibles,
@@ -87,6 +89,10 @@ class GrilleMatrice extends StatefulWidget {
   final String? creneauSelectionne;
 
   final ValueChanged<String> onCreneau;
+
+  /// La bande de semaine, quand elle est au-dessus : ce qu'elle vise, la
+  /// grille s'y rend, avec son propre défilement horizontal (ticket 061b).
+  final DefilementJour? defilementJour;
 
   @override
   State<GrilleMatrice> createState() => _GrilleMatriceState();
@@ -121,10 +127,20 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
     _lier(_vColonne, _vGrille);
     _lier(_vGrille, _vColonne);
     _hGrille.addListener(_suivreFenetre);
+    widget.defilementJour?.addListener(_viserJour);
+  }
+
+  @override
+  void didUpdateWidget(GrilleMatrice ancien) {
+    super.didUpdateWidget(ancien);
+    if (ancien.defilementJour == widget.defilementJour) return;
+    ancien.defilementJour?.removeListener(_viserJour);
+    widget.defilementJour?.addListener(_viserJour);
   }
 
   @override
   void dispose() {
+    widget.defilementJour?.removeListener(_viserJour);
     _hEntete.dispose();
     _hGrille.dispose();
     _vColonne.dispose();
@@ -150,6 +166,17 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
       if ((position.pixels - vise).abs() > 0.5) cible.jumpTo(vise);
       _synchro = false;
     });
+  }
+
+  /// Amène la colonne du jour visé au bord gauche de la zone qui défile.
+  ///
+  /// **Sans animation** : rien ne s'anime dans la matrice (`DESIGN.md
+  /// § Motion`), et soixante lignes qui glissent sous l'œil coûteraient
+  /// soixante reconstructions pour un déplacement qu'on a demandé.
+  void _viserJour() {
+    final jour = widget.defilementJour?.jour;
+    if (jour == null) return;
+    _allerA((jour - 1) * GeoMatrice.largeurJour);
   }
 
   void _suivreFenetre() {
