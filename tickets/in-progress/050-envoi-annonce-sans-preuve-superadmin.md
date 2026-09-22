@@ -5,7 +5,7 @@
 - **Dépend de** : 048
 - **Branche** : `feat/050-envoi-annonce-sans-preuve-superadmin`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-22
 
 ## Contexte
 
