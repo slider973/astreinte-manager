@@ -3,16 +3,22 @@ import 'package:astreinte_sp/core/l10n/format_date.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
+import 'package:astreinte_sp/core/widgets/barre_actions_basse.dart';
+import 'package:astreinte_sp/core/widgets/ecran_simple.dart';
+import 'package:astreinte_sp/core/widgets/empty_state.dart';
 import 'package:astreinte_sp/core/widgets/loading_skeleton.dart';
 import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/features/auth/presentation/aucune_caserne_screen.dart';
 import 'package:astreinte_sp/features/invitation/domain/invitation_recue.dart';
 import 'package:astreinte_sp/features/invitation/presentation/invitation_screen.dart';
+import 'package:astreinte_sp/features/invitation/presentation/widgets/ligne_invitation_recue.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
 import '../../support/faux_invitations.dart';
+import '../../support/polices.dart';
 
 /// Le 21 septembre 2026 en production : quelqu'un se connecte avec l'adresse
 /// qui vient d'être invitée, sans passer par le lien du courriel, et « Aucune
@@ -344,6 +350,151 @@ void main() {
 
       final banniere = tester.widget<AppBanner>(find.byType(AppBanner));
       expect(banniere.variante, AppBannerVariante.information);
+    });
+  });
+
+  /// Ce que le superviseur a vu sur la vitrine de la branche, et que les
+  /// assertions par `find.text` ne voyaient pas : un texte coupé porte le même
+  /// nom que le texte entier, et un bouton trop large trouve son libellé.
+  group('Le fini, mesuré à l\'écran', () {
+    /// Aucun texte de bannière n'est coupé.
+    ///
+    /// `AppBanner` plafonne à deux lignes et met des points de suspension :
+    /// c'est une règle de `DESIGN.md`, pas un accident, donc c'est à la phrase
+    /// de tenir. Un message d'erreur tronqué ne dit plus ce qui se passe — et
+    /// ici la moitié perdue était la seule qui disait « une invitation
+    /// t'attend peut-être ».
+    void attendreAucuneCoupure(WidgetTester tester) {
+      final textes = find.descendant(
+        of: find.byType(AppBanner),
+        matching: find.byType(RichText),
+      );
+      expect(textes, findsWidgets);
+      for (final element in textes.evaluate()) {
+        final paragraphe = element.renderObject! as RenderParagraph;
+        expect(
+          paragraphe.didExceedMaxLines,
+          isFalse,
+          reason:
+              'coupé à ${paragraphe.size.width} points : '
+              '« ${paragraphe.text.toPlainText()} »',
+        );
+      }
+    }
+
+    testWidgets('390 points : l\'échec se lit en entier, action comprise', (
+      tester,
+    ) async {
+      await chargerPolicesDuProduit();
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        invitations: FauxInvitationRepository(
+          echecLecture: const FormatException('réponse illisible'),
+        ),
+      );
+
+      expect(find.text(AppStrings.invitationsRecuesEchec), findsOneWidget);
+      attendreAucuneCoupure(tester);
+    });
+
+    testWidgets('390 points : le hors-ligne se lit en entier', (tester) async {
+      await chargerPolicesDuProduit();
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        reseau: ConnectiviteMemoire(enLigne: false),
+        invitations: FauxInvitationRepository(
+          echecLecture: const FormatException('pas de réseau'),
+        ),
+      );
+
+      expect(find.text(AppStrings.invitationsRecuesHorsLigne), findsOneWidget);
+      attendreAucuneCoupure(tester);
+    });
+
+    /// Le défaut du ticket 048, d'un cran plus petit : une barre d'actions
+    /// pleine fenêtre sous une colonne bornée.
+    testWidgets('1280 points : « Se déconnecter » a la largeur de la colonne, '
+        'centré', (tester) async {
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        invitations: FauxInvitationRepository(
+          recues: <InvitationRecue>[invitationRecue()],
+        ),
+        taille: const Size(1280, 900),
+      );
+
+      expect(find.byType(BarreActionsBasse), findsOneWidget);
+      final bouton = tester.getRect(
+        find.widgetWithText(PrimaryButton, AppStrings.seDeconnecter),
+      );
+      expect(bouton.width, EcranSimple.colonneLecture);
+      expect(bouton.center.dx, 1280 / 2);
+
+      // Et le corps qu'elle termine est bien cette colonne-là : le pied ne
+      // déborde pas de son écran, l'écran ne déborde pas de son pied.
+      expect(
+        tester.getRect(find.byType(LigneInvitationRecue)).width,
+        lessThanOrEqualTo(EcranSimple.colonneLecture),
+      );
+      expect(
+        tester.getRect(find.byType(LigneInvitationRecue)).center.dx,
+        1280 / 2,
+      );
+    });
+
+    testWidgets('1280 points : l\'état vide garde son centrage sous la barre', (
+      tester,
+    ) async {
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        invitations: FauxInvitationRepository(),
+        taille: const Size(1280, 900),
+      );
+
+      expect(find.byType(EmptyState), findsOneWidget);
+      expect(tester.getRect(find.byType(EmptyState)).center.dx, 1280 / 2);
+
+      final bouton = tester.getRect(
+        find.widgetWithText(PrimaryButton, AppStrings.seDeconnecter),
+      );
+      expect(bouton.width, EcranSimple.colonneLecture);
+      expect(bouton.center.dx, 1280 / 2);
+
+      // La barre reste au-dessous du corps, jamais par-dessus.
+      expect(
+        tester.getRect(find.byType(EmptyState)).bottom,
+        lessThanOrEqualTo(tester.getRect(find.byType(BarreActionsBasse)).top),
+      );
+    });
+
+    testWidgets('pendant la recherche aussi, la sortie garde sa colonne', (
+      tester,
+    ) async {
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        invitations: FauxInvitationRepository(lectureSuspendue: true),
+        taille: const Size(1280, 900),
+        stabiliser: false,
+      );
+      // Assez de trames pour que la transition de route soit finie : mesurer
+      // un écran qui glisse encore mesure la transition, pas la mise en page.
+      // `pumpAndSettle` ne rend jamais la main devant un squelette.
+      for (var i = 0; i < 60; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      expect(find.byType(LoadingSkeleton), findsWidgets);
+      expect(find.text(AppStrings.seDeconnecter), findsOneWidget);
+      final bouton = tester.getRect(
+        find.widgetWithText(PrimaryButton, AppStrings.seDeconnecter),
+      );
+      expect(bouton.width, EcranSimple.colonneLecture);
+      expect(bouton.center.dx, 1280 / 2);
     });
   });
 

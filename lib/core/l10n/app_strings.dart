@@ -407,9 +407,15 @@ abstract final class AppStrings {
   static const String invitationExpireeDemanderSansNom =
       'Demande à l\'administrateur de la caserne de te la renvoyer.';
 
+  /// Deux phrases et pas une de plus : une bannière tient **deux lignes**, et
+  /// à côté de « Réessayer » il reste 218 points sur un téléphone de 390. La
+  /// version longue — « Impossible de vérifier tes invitations. Tu en as
+  /// peut-être une en attente. » — s'y coupait en « …Tu en as peut-être u… »,
+  /// et c'est la seconde phrase qui porte tout : sans elle, la personne croit
+  /// que rien ne l'attend. Le mot « Vérification » reprend celui de
+  /// [aucuneCaserneVerification], que l'écran vient d'afficher.
   static const String invitationsRecuesEchec =
-      'Impossible de vérifier tes invitations. Tu en as peut-être une en '
-      'attente.';
+      'Vérification impossible. Une invitation t\'attend peut-être.';
   static const String invitationsRecuesHorsLigne =
       'Hors ligne. Impossible de vérifier tes invitations.';
 
