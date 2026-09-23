@@ -16,7 +16,8 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `empty_state.dart` | `EmptyState` | Vide, erreur, hors ligne. Jamais muet, toujours une sortie. |
 | `loading_skeleton.dart` | `LoadingSkeleton`, `SkeletonLigne`, `SkeletonBloc`, `SkeletonGrilleMois` | L'ossature du contenu attendu, jamais une roue. |
 | `app_divider.dart` | `AppDivider` | Le filet : le matériau de séparation du système. |
-| `carte_douce.dart` | `CarteDouce`, `CarteDouceSliver` | **La carte du monde du pompier** (ticket 064c) : `surface` sur le papier doux, rayon `carte` = 20, filet `outline-variant`, aucune ombre. `CarteDouce.nue` quand l'enfant porte ses propres marges ; `CarteDouceSliver` autour d'un groupe de slivers, pour une grille de soixante-deux lignes qui ne peut pas entrer dans une boîte. Elle **ne s'imbrique jamais** : ce qui vit dans une carte est un contrôle, pas une seconde carte. |
+| `carre_creneau.dart` | `CarreCreneau` | **Le carré d'initiale des lignes de liste du pompier** (ticket 064d) : 40 × 40, rayon `feuille` = 12, l'icône du créneau et sa lettre en `on-primary-container` sur `primary-container`, `attenue` pour une astreinte passée. Toujours décoratif (`ExcludeSemantics`) : la ligne qui le porte dit « Nuit » en toutes lettres. Il existait en **deux copies privées** avant le 064d — `CarteProposition`, qui sert l'accueil et la Boîte, et `LigneDAstreinte`. |
+| `carte_douce.dart` | `CarteDouce`, `CarteDouceSliver` | **La carte du monde du pompier** (ticket 064c) : `surface` sur le papier doux, rayon `carte` = 20, filet `outline-variant`, aucune ombre. `CarteDouce.nue` quand l'enfant porte ses propres marges ; `CarteDouceSliver` autour d'un groupe de slivers, pour une grille de soixante-deux lignes qui ne peut pas entrer dans une boîte. `CarteDouce.filet` rend le trait à qui dessine la même carte autrement — le sliver, et la carte fantôme du squelette des astreintes. Elle **ne s'imbrique jamais** : ce qui vit dans une carte est un contrôle, pas une seconde carte. |
 | `entete_section.dart` | `EnteteSection` | Le titre d'une section, son compte, et le filet qui ouvre la liste. `discret` est la forme du monde du pompier (ticket 064c) : `titleMedium` au lieu de `titleLarge`, et **pas de filet** — une liste de cartes se sépare toute seule. |
 | `count_stat.dart` | `CountStat` | Un compteur en chiffres tabulaires, avec ou sans plafond. |
 | `save_indicator.dart` | `SaveIndicator` | Où en est l'enregistrement automatique. |
@@ -44,6 +45,12 @@ Depuis le chantier 064c, ce rayon-là ne s'écrit plus à la main : `CarteDouce`
 papier et son filet, pour les trois écrans du pompier. Un écran qui écrirait un `Material` à
 rayon 20 aurait deux chances sur trois d'oublier le filet — et un cran de cette palette ne vaut
 que 1,06:1, donc la carte disparaîtrait.
+
+Deux formes ne peuvent pas passer par ce widget : `CarteDouceSliver`, qui enroule un groupe de
+slivers, et la carte fantôme du squelette des astreintes, qui dessine la carte en creux. Elles
+prennent `CarteDouce.filet` — un `BorderSide` à l'épaisseur nommée `AppStroke.filet`, et non le
+`1.0` par défaut de `Border.all`, qui vaut la même chose aujourd'hui et cesserait de la valoir le
+jour où le trait du système bouge.
 
 ## La règle qui a produit `BoutonRetour`
 

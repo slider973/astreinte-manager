@@ -10,10 +10,12 @@ import '../../../../core/widgets/app_banner.dart';
 import '../../../../core/widgets/app_divider.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/bouton_retour.dart';
+import '../../../../core/widgets/carre_creneau.dart';
 import '../../../../core/widgets/carte_douce.dart';
 import '../../../../core/widgets/count_stat.dart';
 import '../../../../core/widgets/day_cell.dart';
 import '../../../../core/widgets/empty_state.dart';
+import '../../../../core/widgets/entete_section.dart';
 import '../../../../core/widgets/loading_skeleton.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/save_indicator.dart';
@@ -39,6 +41,7 @@ class DevCatalogue extends StatelessWidget {
         _SectionCases(),
         _SectionJours(),
         _SectionCartes(),
+        _SectionLignesPompier(),
         _SectionBadges(),
         _SectionBannieres(),
         _SectionEtatsVides(),
@@ -533,6 +536,63 @@ class _SectionCartes extends StatelessWidget {
                   padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   child: Text('  Les weekends · La semaine · Tout le mois'),
                 ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/// Les deux marques qui rangent les listes du monde du pompier : le carré
+/// d'initiale à gauche de chaque ligne, et l'en-tête discret qui ouvre un
+/// paquet de cartes.
+class _SectionLignesPompier extends StatelessWidget {
+  const _SectionLignesPompier();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DevSection(
+      titre: 'CarreCreneau · EnteteSection',
+      note:
+          'Le carré de 40 à rayon 12 qui ouvre chaque ligne de liste du '
+          'pompier, et le titre de section «discret» qui ouvre un paquet de '
+          'cartes : titleMedium, sans filet.',
+      children: <Widget>[
+        const DevSpecimen(
+          nom:
+              'créneau : jour, nuit, et la forme atténuée d\'une astreinte '
+              'passée',
+          child: DevRangee(
+            children: <Widget>[
+              CarreCreneau(creneau: CreneauType.jour),
+              CarreCreneau(creneau: CreneauType.nuit),
+              CarreCreneau(creneau: CreneauType.jour, attenue: true),
+              CarreCreneau(creneau: CreneauType.nuit, attenue: true),
+            ],
+          ),
+        ),
+        DevSpecimen(
+          nom: 'en-tête de section : la forme du registre, puis la discrète',
+          child: ColoredBox(
+            color: theme.colorScheme.surfaceContainerLow,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  EnteteSection(
+                    titre: 'Membres',
+                    compte: '9 membres actifs',
+                    premiere: true,
+                  ),
+                  EnteteSection(titre: 'Octobre 2026', discret: true),
+                ],
               ),
             ),
           ),

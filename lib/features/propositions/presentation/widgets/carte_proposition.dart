@@ -4,6 +4,7 @@ import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/l10n/format_date.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
+import '../../../../core/widgets/carre_creneau.dart';
 import '../../../../core/widgets/carte_douce.dart';
 import '../../../astreintes/domain/astreinte.dart';
 import '../../domain/proposition.dart';
@@ -38,9 +39,6 @@ class CarteProposition extends StatelessWidget {
     required this.onOuvrir,
     super.key,
   });
-
-  /// Côté du carré d'initiale.
-  static const double carre = 40;
 
   final Proposition proposition;
   final HeuresAffichage heures;
@@ -82,10 +80,7 @@ class CarteProposition extends StatelessWidget {
           hauteurMin: AppTouch.cible,
           child: Row(
             children: <Widget>[
-              _CarreCreneau(
-                initiale: creneau.libelle.characters.first.toUpperCase(),
-                icone: creneau.icone,
-              ),
+              CarreCreneau(creneau: proposition.creneau),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -121,56 +116,6 @@ class CarteProposition extends StatelessWidget {
               ],
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Le carré d'initiale : « J » ou « N », et l'icône du créneau à côté.
-///
-/// L'initiale seule serait une lettre sans système — « J » et « N » ne se
-/// devinent pas. L'icône du créneau la double, à la taille où elle se lit
-/// encore, et la phrase annoncée de la ligne dit « Jour » ou « Nuit » en
-/// toutes lettres.
-class _CarreCreneau extends StatelessWidget {
-  const _CarreCreneau({required this.initiale, required this.icone});
-
-  final String initiale;
-  final IconData icone;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Container(
-      width: CarteProposition.carre,
-      height: CarteProposition.carre,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: AppRadius.feuilleCarreeRadius,
-      ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              icone,
-              size: AppTouch.iconePetite,
-              color: scheme.onPrimaryContainer,
-            ),
-            const SizedBox(width: AppSpacing.xxs),
-            Text(
-              initiale,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
-              maxLines: 1,
-            ),
-          ],
         ),
       ),
     );

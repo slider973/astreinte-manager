@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/carte_douce.dart';
 import '../../../../core/widgets/loading_skeleton.dart';
 
 /// Le squelette de « Mes astreintes » : **à la forme du contenu attendu**,
@@ -52,7 +53,9 @@ class _CarteFantome extends StatelessWidget {
     padding: const EdgeInsets.all(AppSpacing.md),
     decoration: BoxDecoration(
       borderRadius: AppRadius.carteRadius,
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      border: Border.fromBorderSide(
+        CarteDouce.filet(Theme.of(context).colorScheme),
+      ),
     ),
     child: const Row(
       children: <Widget>[
