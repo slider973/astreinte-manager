@@ -23,7 +23,8 @@ Expo et Appwrite.
 
 - **Sapeur-pompier volontaire (membre)** : ouvre l'application sur un **tableau de bord** qui lui
   dit sa prochaine astreinte, ce qu'on lui demande et s'il a saisi ses disponibilités ; saisit son
-  mois dans l'onglet « Calendrier », répond aux propositions, consulte ses astreintes. Usage sur
+  mois dans l'onglet « Calendrier », répond aux propositions dans la **Boîte**, qui réunit derrière
+  trois onglets ce qu'on lui demande et ce qu'on lui annonce, consulte ses astreintes. Usage sur
   téléphone, en quelques secondes, entre deux activités, parfois en extérieur ou avec des gants.
   Tous âges, aisance numérique variable.
 - **Admin de caserne** (chef de centre ou adjoint) : construit le planning du mois à partir des

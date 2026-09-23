@@ -22,11 +22,27 @@ class EtatCentre {
 
   bool get vide => notifications.isEmpty;
 
-  /// Le nombre porté par la pastille.
+  /// Les lignes de l'onglet « Rappels » de la Boîte : tout ce qui n'est pas
+  /// une proposition (`NotificationInterne.estRappel`).
+  List<NotificationInterne> get rappels => <NotificationInterne>[
+    for (final notification in notifications)
+      if (notification.estRappel) notification,
+  ];
+
+  /// **Le nombre porté par la cloche, par la pastille de la barre et par le
+  /// titre de la Boîte** — un seul compte, une seule définition.
+  ///
+  /// Il ne compte que les **rappels** non lus depuis le chantier 064b. Les
+  /// deux types que la Boîte n'affiche pas en rappel — l'astreinte proposée
+  /// et sa relance — ne peuvent donc pas gonfler une pastille que plus aucun
+  /// écran ne saurait vider : elles sont dites par la ligne de proposition,
+  /// qui, elle, se répond. La question qu'elles posaient n'est pas perdue,
+  /// elle est écrite en toutes lettres sur l'accueil (« Propositions · 3 »)
+  /// et dans l'onglet qui la porte.
   int get nonLues {
     var compte = 0;
     for (final notification in notifications) {
-      if (!notification.lue) compte++;
+      if (!notification.lue && notification.estRappel) compte++;
     }
     return compte;
   }
@@ -152,7 +168,8 @@ centreNotificationsProvider =
       CentreNotificationsController.new,
     );
 
-/// Le nombre de non-lues, pour la pastille de la cloche.
+/// Le nombre de rappels non lus, pour la cloche, la pastille de la barre et
+/// le titre de la Boîte. Voir [EtatCentre.nonLues] pour ce qu'il compte.
 ///
 /// Un provider dérivé plutôt qu'un `select` sur place : la barre
 /// d'application ne se reconstruit que quand le **compte** change, pas à

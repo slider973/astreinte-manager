@@ -1,8 +1,9 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
+import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:astreinte_sp/features/notifications/domain/notification_interne.dart';
-import 'package:astreinte_sp/features/notifications/presentation/notifications_screen.dart';
 import 'package:astreinte_sp/features/notifications/presentation/widgets/ligne_notification.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,7 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/faux_auth.dart';
 import '../../support/faux_notifications.dart';
 
-const String _chemin = '/notifications';
+/// L'onglet « Rappels » de la Boîte, où vit le centre du ticket 026 depuis le
+/// chantier 064b. `/notifications` y mène toujours, par un renvoi.
+final String _chemin = AppRoutes.boiteOnglet(OngletBoite.rappels);
 
 /// Un écran haut : quelques lignes tiennent sans défiler, et la composition
 /// reste celle du téléphone.
@@ -32,8 +35,18 @@ Future<void> _ouvrirCentre(
   await ouvrirRoute(tester, _chemin, stabiliser: stabiliser);
 }
 
+/// Le titre de la barre d'application. « Boîte » tout court s'écrit aussi
+/// dans la barre du bas : le chercher par `find.text` en trouverait deux.
+String _titre(WidgetTester tester) => tester
+    .widget<Text>(
+      find
+          .descendant(of: find.byType(AppBar), matching: find.byType(Text))
+          .first,
+    )
+    .data!;
+
 void main() {
-  group('NotificationsScreen — rendu', () {
+  group('La Boîte, onglet Rappels — rendu', () {
     testWidgets('liste les notifications, la plus récente en premier', (
       tester,
     ) async {
@@ -58,7 +71,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(NotificationsScreen), findsOneWidget);
+      expect(find.byType(BoiteScreen), findsOneWidget);
       expect(find.byType(LigneNotification), findsNWidgets(2));
 
       // L'ordre : la plus récente est au-dessus de l'autre.
@@ -70,9 +83,10 @@ void main() {
       );
       expect(recente.dy, lessThan(ancienne.dy));
 
-      // Le compte de l'en-tête dit combien de lignes suivent, et combien
-      // restent à lire.
-      expect(find.text(AppStrings.centreCompte(2, 1)), findsOneWidget);
+      // Le compte a quitté l'en-tête de liste pour le **titre** de l'écran
+      // (`design/064 § 3.4`) : « Boîte · 1 non lue ». Il n'est plus écrit
+      // deux fois à trente points d'écart.
+      expect(_titre(tester), AppStrings.boiteTitre(1));
     });
 
     testWidgets('une non-lue se distingue autrement que par la couleur', (
@@ -125,8 +139,8 @@ void main() {
     ) async {
       await _ouvrirCentre(tester, depot: FauxNotificationsRepository());
 
-      expect(find.text(AppStrings.centreVideTitre), findsOneWidget);
-      expect(find.text(AppStrings.centreVideTexte), findsOneWidget);
+      expect(find.text(AppStrings.boiteVideRappelsTitre), findsOneWidget);
+      expect(find.text(AppStrings.boiteVideRappelsTexte), findsOneWidget);
       expect(find.byType(LigneNotification), findsNothing);
 
       // Rien à marquer, donc pas de bouton.
@@ -176,7 +190,7 @@ void main() {
     });
   });
 
-  group('NotificationsScreen — marquage', () {
+  group('La Boîte, onglet Rappels — marquage', () {
     testWidgets('une touche marque la ligne lue et ouvre la destination', (
       tester,
     ) async {
@@ -286,14 +300,14 @@ void main() {
       );
       await _ouvrirCentre(tester, depot: depot);
 
-      expect(find.text(AppStrings.centreCompte(3, 2)), findsOneWidget);
+      expect(_titre(tester), AppStrings.boiteTitre(2));
 
       await tester.tap(find.text(AppStrings.centreToutMarquerLu));
       await tester.pumpAndSettle();
 
       expect(depot.marquagesGlobaux, 1);
       expect(depot.notifications.every((n) => n.lue), isTrue);
-      expect(find.text(AppStrings.centreCompte(3, 0)), findsOneWidget);
+      expect(_titre(tester), AppStrings.boiteTitre(0));
       expect(find.text(AppStrings.centreToutMarqueLuConfirmation),
           findsOneWidget);
 
@@ -314,7 +328,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(AppStrings.centreEchecLecture), findsOneWidget);
-      expect(find.text(AppStrings.centreCompte(1, 1)), findsOneWidget);
+      expect(_titre(tester), AppStrings.boiteTitre(1));
     });
   });
 }

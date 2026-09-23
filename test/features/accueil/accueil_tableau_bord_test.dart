@@ -9,13 +9,14 @@ import 'package:astreinte_sp/features/accueil/domain/tableau_bord.dart';
 import 'package:astreinte_sp/features/accueil/presentation/widgets/bande_semaine.dart';
 import 'package:astreinte_sp/features/accueil/presentation/widgets/bloc_dispos.dart';
 import 'package:astreinte_sp/features/accueil/presentation/widgets/carte_jour.dart';
-import 'package:astreinte_sp/features/accueil/presentation/widgets/ligne_proposition_accueil.dart';
 import 'package:astreinte_sp/features/astreintes/data/astreintes_repository.dart';
 import 'package:astreinte_sp/features/astreintes/domain/astreinte.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
+import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
-import 'package:astreinte_sp/features/propositions/presentation/propositions_screen.dart';
+import 'package:astreinte_sp/features/propositions/presentation/widgets/carte_proposition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -221,10 +222,13 @@ void main() {
       await tester.tap(repondre);
       await tester.pumpAndSettle();
 
-      // Le même écran qu'aujourd'hui, avec ses deux boutons : la réponse ne
-      // se dédouble pas.
-      expect(find.byType(PropositionsScreen), findsOneWidget);
-      expect(emplacementCourant(tester), AppRoutes.propositions);
+      // Le même parcours qu'aujourd'hui : la Boîte, onglet « Propositions ».
+      // La réponse ne se dédouble pas.
+      expect(find.byType(BoiteScreen), findsOneWidget);
+      expect(
+        emplacementCourant(tester),
+        AppRoutes.boiteOnglet(OngletBoite.propositions),
+      );
     });
 
     testWidgets('« Tout voir » mène aux astreintes, et se nomme', (
@@ -262,7 +266,7 @@ void main() {
         find.text(AppStrings.accueilVidePropositionsTitre),
         findsOneWidget,
       );
-      expect(find.byType(LignePropositionAccueil), findsNothing);
+      expect(find.byType(CarteProposition), findsNothing);
     });
 
     testWidgets('trois au plus, dans l\'ordre du calendrier', (tester) async {
@@ -277,13 +281,13 @@ void main() {
       );
 
       final lignes = tester
-          .widgetList<LignePropositionAccueil>(
-            find.byType(LignePropositionAccueil),
+          .widgetList<CarteProposition>(
+            find.byType(CarteProposition),
           )
           .toList(growable: false);
       expect(lignes, hasLength(3));
       expect(
-        lignes.map((LignePropositionAccueil l) => l.proposition.id).toList(),
+        lignes.map((CarteProposition l) => l.proposition.id).toList(),
         <String>['a-1', 'a-2', 'a-3'],
       );
       // Le compte, lui, les compte toutes.
@@ -304,9 +308,13 @@ void main() {
         propositions: <Proposition>[_proposition('a-1', 16)],
       );
 
-      await tester.tap(find.byType(LignePropositionAccueil));
+      await tester.tap(find.byType(CarteProposition));
       await tester.pumpAndSettle();
-      expect(find.byType(PropositionsScreen), findsOneWidget);
+      expect(find.byType(BoiteScreen), findsOneWidget);
+      expect(
+        emplacementCourant(tester),
+        AppRoutes.boiteOnglet(OngletBoite.propositions),
+      );
     });
 
     testWidgets('la bande de semaine montre sept jours et leurs points', (
@@ -465,7 +473,7 @@ void main() {
 
       // Et ce qui a été lu reste à l'écran : la section des propositions est
       // juste, elle n'a pas à disparaître parce que sa voisine est tombée.
-      expect(find.byType(LignePropositionAccueil), findsOneWidget);
+      expect(find.byType(CarteProposition), findsOneWidget);
       expect(find.byType(BandeSemaine), findsOneWidget);
     });
 

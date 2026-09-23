@@ -6,11 +6,11 @@ import 'package:astreinte_sp/core/widgets/app_scaffold.dart';
 import 'package:astreinte_sp/core/widgets/bouton_retour.dart';
 import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
 import 'package:astreinte_sp/features/astreintes/presentation/astreintes_screen.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
+import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
-import 'package:astreinte_sp/features/notifications/presentation/notifications_screen.dart';
 import 'package:astreinte_sp/features/planning/presentation/matrice_screen.dart';
 import 'package:astreinte_sp/features/profil/presentation/profil_screen.dart';
-import 'package:astreinte_sp/features/propositions/presentation/propositions_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -50,6 +50,12 @@ List<String> _libelles(WidgetTester tester) => tester
     .map((AppDestination d) => d.libelle)
     .toList(growable: false);
 
+/// L'onglet « Propositions » de la Boîte, où mènent les anciennes adresses
+/// des propositions depuis le chantier 064b.
+final String _ongletPropositions = AppRoutes.boiteOnglet(
+  OngletBoite.propositions,
+);
+
 void main() {
   group('La barre du pompier', () {
     testWidgets('quatre entrées pour un membre, dans l\'ordre du brief', (
@@ -88,7 +94,7 @@ void main() {
       const attendu = <String, (String, Type)>{
         AppStrings.navCalendrier: (AppRoutes.calendrier, MoisScreen),
         AppStrings.navAstreintes: (AppRoutes.astreintes, AstreintesScreen),
-        AppStrings.navBoite: (AppRoutes.boite, NotificationsScreen),
+        AppStrings.navBoite: (AppRoutes.boite, BoiteScreen),
         AppStrings.navAdmin: (AppRoutes.planningAdmin, MatriceScreen),
         AppStrings.navAccueil: (AppRoutes.accueil, AccueilScreen),
       };
@@ -176,12 +182,13 @@ void main() {
     ) async {
       // Elles sont parties dans des notifications et dorment dans des
       // historiques de navigateur : aucune ne doit rendre un 404.
-      const heritage = <String, (String, Type)>{
+      final heritage = <String, (String, Type)>{
         '/?onglet=0': (AppRoutes.calendrier, MoisScreen),
-        '/?onglet=1': (AppRoutes.propositions, PropositionsScreen),
+        '/?onglet=1': (_ongletPropositions, BoiteScreen),
         '/?onglet=2': (AppRoutes.astreintes, AstreintesScreen),
         '/?onglet=3': (AppRoutes.profil, ProfilScreen),
-        '/notifications': (AppRoutes.boite, NotificationsScreen),
+        '/notifications': (AppRoutes.boite, BoiteScreen),
+        '/propositions': (_ongletPropositions, BoiteScreen),
       };
 
       for (final lien in heritage.entries) {
@@ -244,7 +251,7 @@ void main() {
   group('La traduction des onglets hérités', () {
     test('elle est pure, et ne touche que ce qui vient de l\'ancienne forme', () {
       expect(ongletHerite(Uri.parse('/')), isNull);
-      expect(ongletHerite(Uri.parse('/?onglet=1')), AppRoutes.propositions);
+      expect(ongletHerite(Uri.parse('/?onglet=1')), _ongletPropositions);
       expect(ongletHerite(Uri.parse('/?onglet=2')), AppRoutes.astreintes);
       expect(ongletHerite(Uri.parse('/?onglet=3')), AppRoutes.profil);
       expect(

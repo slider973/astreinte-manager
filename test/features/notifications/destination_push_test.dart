@@ -1,10 +1,18 @@
+import 'package:astreinte_sp/core/router/app_router.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
 import 'package:astreinte_sp/features/notifications/domain/destination_push.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Liens publics des notifications (WORKFLOWS § 8)', () {
-    test('/proposals ouvre les propositions', () {
-      expect(destinationInterne('/proposals', admin: false), '/propositions');
+    test('/proposals ouvre l\'onglet « Propositions » de la Boîte', () {
+      // Le lien public n'a pas bougé quand l'écran des propositions a disparu
+      // dans la Boîte (chantier 064b) : c'est exactement ce que cette
+      // fonction protège.
+      expect(
+        destinationInterne('/proposals', admin: false),
+        AppRoutes.boiteOnglet(OngletBoite.propositions),
+      );
     });
 
     test('/schedule/<mois> ouvre le planning', () {

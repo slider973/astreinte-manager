@@ -6,14 +6,20 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/widgets/carte_douce.dart';
 import '../../../astreintes/domain/astreinte.dart';
-import '../../../propositions/domain/proposition.dart';
+import '../../domain/proposition.dart';
 
 /// Une proposition en attente, en ligne de liste (`design/064 § 2`).
 ///
 /// Un carré de 40 à rayon 12 portant l'initiale du créneau, un titre, une
 /// ligne de soutien, et à droite l'ancienneté de la proposition. Un appui
-/// ouvre l'écran de réponse — **le même qu'aujourd'hui**, avec ses deux
-/// boutons et sa feuille de refus : la réponse ne se dédouble pas.
+/// ouvre la réponse — **la même des deux côtés** : la feuille de bas d'écran
+/// de la Boîte en `compact`, son volet latéral en `large`. La réponse ne se
+/// dédouble pas.
+///
+/// **Le même objet sur l'accueil et dans la Boîte** (chantier 064b), d'où sa
+/// place ici et non dans `features/accueil` : une seconde copie aurait
+/// divergé au premier réglage, et le pompier aurait lu deux formes de la même
+/// ligne à deux écrans d'intervalle.
 ///
 /// **Ce que cette ligne ne dit pas.** Le brief y met « 1/3 pourvus » à droite.
 /// L'effectif pourvu d'un créneau n'existe nulle part dans ce que le membre a
@@ -24,8 +30,8 @@ import '../../../propositions/domain/proposition.dart';
 /// nouvelles — c'est un ticket, pas un effet de bord d'un chantier de forme.
 /// La place revient à ce qui existe et qui sert : depuis quand la question est
 /// posée.
-class LignePropositionAccueil extends StatelessWidget {
-  const LignePropositionAccueil({
+class CarteProposition extends StatelessWidget {
+  const CarteProposition({
     required this.proposition,
     required this.heures,
     required this.maintenant,
@@ -139,8 +145,8 @@ class _CarreCreneau extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     return Container(
-      width: LignePropositionAccueil.carre,
-      height: LignePropositionAccueil.carre,
+      width: CarteProposition.carre,
+      height: CarteProposition.carre,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: scheme.primaryContainer,
