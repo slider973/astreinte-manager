@@ -116,7 +116,6 @@ class ZonePlanning extends StatelessWidget {
       style: AppTextStyles.mention.copyWith(
         color: theme.colorScheme.onSurfaceVariant,
       ),
-      textAlign: TextAlign.end,
     );
 
     // Une seule rangée : l'état, puis les boutons, sans explication. La
@@ -124,7 +123,6 @@ class ZonePlanning extends StatelessWidget {
     // façon combien de pompiers seront prévenus avant que rien ne parte.
     if (uneRangee) {
       return Wrap(
-        alignment: WrapAlignment.end,
         spacing: AppSpacing.sm,
         runSpacing: AppSpacing.sm,
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -132,13 +130,16 @@ class ZonePlanning extends StatelessWidget {
       );
     }
 
+    // Aligné à gauche, bien que la colonne soit à droite du bandeau :
+    // l'explication doit tomber **sous le bouton qu'elle décrit**. Alignée à
+    // droite, « 19 pompiers seront prévenus. » se lisait sous « Proposer
+    // automatiquement », qui ne prévient personne.
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         if (etat.isNotEmpty) ...<Widget>[
           Wrap(
-            alignment: WrapAlignment.end,
             spacing: AppSpacing.sm,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: etat,
@@ -146,7 +147,6 @@ class ZonePlanning extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
         ],
         Wrap(
-          alignment: WrapAlignment.end,
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
           children: boutons,
