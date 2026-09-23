@@ -14,16 +14,17 @@ import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../astreintes/domain/astreintes_providers.dart';
+import '../../boite/domain/onglet_boite.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../../propositions/domain/propositions_providers.dart';
+import '../../propositions/presentation/widgets/carte_proposition.dart';
 import '../domain/composition_accueil.dart';
 import '../domain/tableau_bord.dart';
 import 'widgets/bande_semaine.dart';
 import 'widgets/bloc_dispos.dart';
 import 'widgets/carte_jour.dart';
 import 'widgets/entete_accueil.dart';
-import 'widgets/ligne_proposition_accueil.dart';
 
 /// **L'accueil du pompier, un tableau de bord** (ticket 064).
 ///
@@ -197,7 +198,7 @@ class _Contenu extends ConsumerWidget {
                 ))
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: LignePropositionAccueil(
+                    child: CarteProposition(
                       key: ValueKey<String>(proposition.id),
                       proposition: proposition,
                       heures: tableau.heures,
@@ -236,12 +237,20 @@ class _Contenu extends ConsumerWidget {
   /// Trois au plus : au-delà, c'est une liste, et la liste a son écran.
   static const int _propositionsMontrees = 3;
 
-  /// **Le parcours de réponse ne se dédouble pas.** L'écran des propositions
-  /// porte les deux boutons, la feuille de refus, la réponse optimiste et le
-  /// rattrapage d'une proposition disparue depuis le ticket 021 ; l'accueil
-  /// l'ouvre, il ne le réécrit pas.
-  static void _ouvrirReponse(BuildContext context) =>
-      unawaited(context.pushNamed<void>(AppRoutes.propositionsName));
+  /// **Le parcours de réponse ne se dédouble pas.** La Boîte porte les deux
+  /// boutons, la feuille de refus, la réponse optimiste et le rattrapage d'une
+  /// proposition disparue depuis le ticket 021 ; l'accueil y mène, il ne le
+  /// réécrit pas.
+  ///
+  /// `goNamed` et non `push` : la Boîte est une destination, et passer d'une
+  /// destination à sa sœur n'est pas une poussée (ticket 063). L'onglet est
+  /// dans l'adresse, d'où le paramètre de requête.
+  static void _ouvrirReponse(BuildContext context) => context.goNamed(
+    AppRoutes.boiteName,
+    queryParameters: <String, String>{
+      AppRoutes.parametreOnglet: OngletBoite.propositions.valeurUrl,
+    },
+  );
 }
 
 /// Le titre d'une rangée, son compte, et sa sortie.

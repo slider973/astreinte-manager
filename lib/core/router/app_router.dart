@@ -9,6 +9,8 @@ import '../../features/astreintes/presentation/astreintes_screen.dart';
 import '../../features/auth/presentation/aucune_caserne_screen.dart';
 import '../../features/auth/presentation/code_screen.dart';
 import '../../features/auth/presentation/connexion_screen.dart';
+import '../../features/boite/domain/onglet_boite.dart';
+import '../../features/boite/presentation/boite_screen.dart';
 import '../../features/demarrage/presentation/configuration_absente_screen.dart';
 import '../../features/demarrage/presentation/demarrage_screen.dart';
 import '../../features/dev/presentation/dev_components_screen.dart';
@@ -21,7 +23,6 @@ import '../../features/membres/presentation/inviter_screen.dart';
 import '../../features/membres/presentation/membres_screen.dart';
 import '../../features/notifications/domain/destination_push.dart';
 import '../../features/notifications/presentation/activation_notifications_screen.dart';
-import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/onboarding/presentation/aide_installation_screen.dart';
 import '../../features/onboarding/presentation/guide_screen.dart';
 import '../../features/onboarding/presentation/installation_screen.dart';
@@ -31,7 +32,6 @@ import '../../features/periodes/presentation/periodes_screen.dart';
 import '../../features/planning/presentation/matrice_screen.dart';
 import '../../features/planning/presentation/suivi_screen.dart';
 import '../../features/profil/presentation/profil_screen.dart';
-import '../../features/propositions/presentation/propositions_screen.dart';
 import '../../features/superadmin/domain/superadmin_providers.dart';
 import '../../features/superadmin/presentation/superadmin_screen.dart';
 import '../env.dart';
@@ -72,11 +72,20 @@ abstract final class AppRoutes {
   static const String astreintes = '/astreintes';
   static const String astreintesName = 'astreintes';
 
-  /// **La boîte** (ticket 064) : le journal de bord. Au chantier 064a elle
-  /// sert l'écran des notifications ; le 064b y fera entrer les propositions
-  /// derrière des onglets.
+  /// **La Boîte** (ticket 064) : le journal de bord et ce à quoi il faut
+  /// répondre, derrière trois onglets depuis le chantier 064b.
+  ///
+  /// L'onglet voyage en `?onglet=` ([parametreOnglet]) : `/boite?onglet=
+  /// propositions` est l'adresse de « Tout voir » de l'accueil, du lien public
+  /// `/proposals` et de l'ancienne route `/propositions`.
   static const String boite = '/boite';
   static const String boiteName = 'boite';
+
+  /// `/boite?onglet=propositions`, déjà composée.
+  static String boiteOnglet(OngletBoite onglet) => Uri(
+    path: boite,
+    queryParameters: <String, String>{parametreOnglet: onglet.valeurUrl},
+  ).toString();
 
   /// **Le profil** (ticket 007), enfin à sa route. Ce n'est pas une
   /// destination : on l'ouvre depuis l'avatar de l'en-tête, **par `push`**, et
@@ -84,9 +93,12 @@ abstract final class AppRoutes {
   static const String profil = '/profil';
   static const String profilName = 'profil';
 
-  /// **Les propositions en attente** (ticket 021), à leur route depuis le
-  /// ticket 064. Écran poussé, pas une destination : le chantier 064b les fera
-  /// entrer dans la Boîte, et cette adresse y mènera alors.
+  /// **Les propositions en attente** (ticket 021), **devenue un renvoi** vers
+  /// l'onglet « Propositions » de la Boîte au chantier 064b.
+  ///
+  /// Elle ne disparaît pas : elle a été l'adresse de l'écran pendant tout le
+  /// chantier 064a, donc elle est dans des historiques de navigateur et dans
+  /// des onglets restaurés.
   static const String propositions = '/propositions';
   static const String propositionsName = 'propositions';
 
@@ -109,11 +121,18 @@ abstract final class AppRoutes {
   static const String aucuneCaserne = '/aucune-caserne';
   static const String aucuneCaserneName = 'aucuneCaserne';
 
-  /// **L'onglet de la coquille d'avant le ticket 064**, gardé pour une seule
-  /// raison : les adresses `/?onglet=1` sont parties dans des notifications et
-  /// dorment dans des historiques de navigateur. La route `/` les traduit vers
-  /// la destination qui a pris la suite ([ongletHerite]) ; rien n'en produit
-  /// plus.
+  /// **L'onglet, à deux endroits et pour deux raisons.**
+  ///
+  /// Sur [boite], c'est l'onglet affiché, nommé par un mot
+  /// (`OngletBoite.valeurUrl`) : c'est le seul endroit où il vit, jamais un
+  /// cache local, pour que « Tout voir » de l'accueil et les liens profonds y
+  /// arrivent.
+  ///
+  /// Sur `/`, c'est **l'onglet de la coquille d'avant le ticket 064**, un
+  /// numéro, gardé pour une seule raison : les adresses `/?onglet=1` sont
+  /// parties dans des notifications et dorment dans des historiques de
+  /// navigateur. La route `/` les traduit vers la destination qui a pris la
+  /// suite ([ongletHerite]) ; rien n'en produit plus.
   static const String parametreOnglet = 'onglet';
 
   /// Le mois affiché par le Calendrier, au format `AAAA-MM` (ticket 011).
@@ -514,8 +533,14 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.boite,
         name: AppRoutes.boiteName,
-        pageBuilder: (context, state) =>
-            pageDestination(state, const NotificationsScreen()),
+        pageBuilder: (context, state) => pageDestination(
+          state,
+          BoiteScreen(
+            onglet: OngletBoite.depuisUrl(
+              state.uri.queryParameters[AppRoutes.parametreOnglet],
+            ),
+          ),
+        ),
       ),
       GoRoute(
         path: AppRoutes.planningAdmin,
@@ -534,11 +559,6 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.profil,
         name: AppRoutes.profilName,
         builder: (context, state) => const ProfilScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.propositions,
-        name: AppRoutes.propositionsName,
-        builder: (context, state) => const PropositionsScreen(),
       ),
       GoRoute(
         path: AppRoutes.suivi,
@@ -628,11 +648,17 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.activationNotificationsName,
         builder: (context, state) => const ActivationNotificationsScreen(),
       ),
-      // L'ancienne adresse du centre, devenue un renvoi vers la Boîte.
+      // Les deux anciennes adresses, devenues des renvois vers la Boîte.
       GoRoute(
         path: AppRoutes.notifications,
         name: AppRoutes.notificationsName,
         redirect: (context, state) => AppRoutes.boite,
+      ),
+      GoRoute(
+        path: AppRoutes.propositions,
+        name: AppRoutes.propositionsName,
+        redirect: (context, state) =>
+            AppRoutes.boiteOnglet(OngletBoite.propositions),
       ),
 
       // Les quatre liens publics des notifications. Ils n'ont pas d'écran à

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/boite/domain/onglet_boite.dart';
 import '../../features/notifications/domain/centre_providers.dart';
 import '../session/session_providers.dart';
 import '../widgets/app_scaffold.dart';
@@ -75,7 +76,7 @@ String? ongletHerite(Uri uri) {
 
   return switch (onglet) {
     '0' => versCalendrier(),
-    '1' => AppRoutes.propositions,
+    '1' => AppRoutes.boiteOnglet(OngletBoite.propositions),
     '2' => AppRoutes.astreintes,
     '3' => AppRoutes.profil,
     // Un onglet inconnu — cinquième onglet d'un admin, valeur bricolée — n'est

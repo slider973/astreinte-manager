@@ -52,10 +52,14 @@ List<ProviderSubscription<Object?> Function(Ref ref)> donneesDEcran(
       AppRoutes.abonnement => <ProviderSubscription<Object?> Function(Ref)>[
         (Ref ref) => ref.listen(abonnementControllerProvider, (_, _) {}),
       ],
-      // La Boîte (ticket 064) : le centre de notifications, à sa route de
-      // destination. `/notifications` n'existe plus que comme renvoi.
+      // La Boîte (chantier 064b) : les rappels **et** les propositions, ses
+      // deux sources. `/notifications` et `/propositions` n'existent plus que
+      // comme renvois. Les deux lectures sont celles que les deux écrans
+      // d'avant faisaient chacun de leur côté : le compte de requêtes d'une
+      // ouverture de Boîte ne bouge pas, il change seulement d'écran.
       AppRoutes.boite => <ProviderSubscription<Object?> Function(Ref)>[
         (Ref ref) => ref.listen(centreNotificationsProvider, (_, _) {}),
+        (Ref ref) => ref.listen(propositionsControllerProvider, (_, _) {}),
       ],
       _ => const <ProviderSubscription<Object?> Function(Ref)>[],
     };

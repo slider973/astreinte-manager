@@ -36,8 +36,9 @@ abstract final class AppStrings {
   /// (`design/027 § 4`).
   static const String navAstreintes = 'Astreintes';
 
-  /// La quatrième destination (ticket 064) : le journal de bord. Elle réunira
-  /// les rappels et les propositions au chantier 064b.
+  /// La quatrième destination (ticket 064) : le journal de bord. Elle réunit
+  /// les rappels et les propositions derrière trois onglets depuis le
+  /// chantier 064b.
   static const String navBoite = 'Boîte';
   static const String navProfil = 'Profil';
   static const String navAdmin = 'Admin';
@@ -2124,6 +2125,54 @@ abstract final class AppStrings {
   static String instantMinutes(int n) => 'il y a $n min';
   static String instantHeures(int n) => 'il y a $n h';
   static String instantJours(int n) => 'il y a $n j';
+
+  // -------------------------------------------------------------------
+  // La Boîte (ticket 064b)
+  // -------------------------------------------------------------------
+
+  /// Le titre de l'écran. Le compte est celui des **rappels non lus** : une
+  /// proposition n'est pas une nouvelle qu'on lit, c'est une question à
+  /// laquelle on répond, et elle est comptée en toutes lettres par l'onglet
+  /// qui la porte.
+  static String boiteTitre(int nonLus) =>
+      nonLus == 0 ? navBoite : '$navBoite · ${boiteNonLus(nonLus)}';
+
+  static String boiteNonLus(int n) =>
+      n <= 1 ? '$n non lue' : '$n non lues';
+
+  static const String boiteOngletTout = 'Tout';
+  static const String boiteOngletPropositions = 'Propositions';
+  static const String boiteOngletRappels = 'Rappels';
+
+  /// Les onglets sont annoncés par leur contenu, pas par leur seul mot :
+  /// « Tout » tout seul ne dit pas de quoi.
+  static const String boiteOngletToutAnnonce =
+      'Tout : propositions et rappels';
+  static const String boiteOngletPropositionsAnnonce =
+      'Propositions à répondre';
+  static const String boiteOngletRappelsAnnonce = 'Rappels et informations';
+
+  static const String boiteRafraichir = 'Relire la Boîte';
+
+  /// L'état vide de l'onglet « Rappels ».
+  static const String boiteVideRappelsTitre = 'Aucun rappel';
+  static const String boiteVideRappelsTexte =
+      'Les infos de ta caserne — mois ouvert, planning publié, créneau '
+      'annulé — arriveront ici, même si ton téléphone ne sonne pas.';
+
+  // --- La feuille de réponse ---------------------------------------------
+
+  /// Le titre annoncé de la feuille ou du volet : on sait à quoi on répond
+  /// avant de lire les deux boutons.
+  static String boiteReponseTitre(String creneau) => 'Répondre : $creneau';
+
+  static const String boiteReponseFermer = 'Fermer la réponse';
+
+  /// L'invitation de l'onglet « Propositions » sur grand écran, quand le
+  /// volet latéral n'a rien à montrer.
+  static const String boiteVoletVideTitre = 'Choisis une proposition';
+  static const String boiteVoletVideTexte =
+      'Touche une ligne à gauche pour l\'accepter ou la refuser.';
 
   // -------------------------------------------------------------------
   // Centre de notifications (ticket 026)

@@ -35,6 +35,22 @@ enum TypeNotification {
   /// (`DESIGN.md § Don't`).
   final IconData icone;
 
+  /// **Vrai pour les deux types que la proposition elle-même dit mieux.**
+  ///
+  /// `assignment_proposed` annonce une astreinte proposée, `assignment_reminder`
+  /// relance celui qui n'a pas répondu : les deux posent la **même question**
+  /// que la ligne de proposition qui vit à côté, dans l'onglet « Propositions »
+  /// de la Boîte — à ceci près que la ligne, elle, porte la réponse. Les
+  /// afficher en rappel aurait posé deux fois la même question, l'une
+  /// répondable et l'autre non (`design/064 § 3.4`, chantier 064b).
+  ///
+  /// `assignment_changed` n'en est pas : une réattribution est un **fait**,
+  /// pas une question, même si son lien public mène aussi aux propositions
+  /// (`supabase/functions/README.md § Liens profonds`). La règle porte donc
+  /// sur le type, jamais sur la route.
+  bool get estProposition =>
+      this == astreinteProposee || this == rappelReponse;
+
   /// Ne lève jamais : un type inconnu est [inconnu].
   static TypeNotification depuisSql(String? valeur) {
     for (final type in values) {
@@ -91,6 +107,10 @@ class NotificationInterne {
   final String? erreur;
 
   bool get lue => lueLe != null;
+
+  /// Vrai quand cette ligne s'affiche dans l'onglet « Rappels » de la Boîte.
+  /// Voir [TypeNotification.estProposition] pour les deux exclues et pourquoi.
+  bool get estRappel => !type.estProposition;
 
   /// Vrai si la ligne trace un envoi qui n'a pas abouti.
   bool get enEchec => erreur != null && erreur!.trim().isNotEmpty;

@@ -8,8 +8,9 @@
 ///   notification : `/proposals`, `/schedule/2026-10`… Il est stable, il ne
 ///   dépend pas de la forme des écrans, et il survivra à leur refonte ;
 /// - **l'emplacement interne**, celui que `go_router` sert aujourd'hui. Chaque
-///   écran a sa route depuis le ticket 064, donc « les propositions » s'écrit
-///   `/propositions` et non plus `/?onglet=1`.
+///   écran a sa route depuis le ticket 064, et « les propositions » sont un
+///   onglet de la Boîte depuis le 064b : `/boite?onglet=propositions`, et non
+///   plus `/propositions` ni `/?onglet=1`.
 ///
 /// Tout est ici, dans une fonction pure et testée : c'est **le seul endroit**
 /// qui a changé quand la coquille d'accueil a éclaté en routes, et les liens
@@ -17,6 +18,7 @@
 library;
 
 import '../../../core/router/app_router.dart';
+import '../../boite/domain/onglet_boite.dart';
 
 /// Une période de saisie, `AAAA-MM`. Rien d'autre n'est accepté : un lien
 /// forgé ne doit pas se promener dans l'URL de l'application.
@@ -41,9 +43,12 @@ String? destinationInterne(String? lien, {required bool admin}) {
   final segments = uri.pathSegments;
   if (segments.isEmpty) return null;
 
-  // `/proposals`
+  // `/proposals` — l'onglet « Propositions » de la Boîte depuis le chantier
+  // 064b. L'écran à qui cette adresse menait n'existe plus ; le lien public,
+  // lui, n'a pas bougé d'un caractère. C'est exactement ce à quoi sert cette
+  // fonction.
   if (segments.length == 1 && segments.first == 'proposals') {
-    return AppRoutes.propositions;
+    return AppRoutes.boiteOnglet(OngletBoite.propositions);
   }
 
   // `/admin/subscription` — l'abonnement de la caserne (ticket 030). Le lien

@@ -336,6 +336,30 @@ abstract final class AppTheme {
           ),
         ),
       ),
+      // Les trois onglets de la Boîte (ticket 064b). Material 3 les rendrait
+      // déjà en indigo, mais deux réglages ne se devinent pas : le libellé en
+      // `labelLarge` (16, pas 14 — `DESIGN.md § Hierarchy`, c'est une action),
+      // et l'indicateur sur toute la largeur de l'onglet plutôt que sous le
+      // seul mot. Un trait de la largeur du mot ferait trois traits de
+      // longueurs différentes, qu'on lirait comme trois importances.
+      tabBarTheme: TabBarThemeData(
+        labelColor: scheme.primary,
+        unselectedLabelColor: scheme.onSurfaceVariant,
+        labelStyle: textTheme.labelLarge,
+        unselectedLabelStyle: textTheme.labelLarge,
+        indicatorColor: scheme.primary,
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: scheme.outlineVariant,
+        dividerHeight: AppStroke.filet,
+        overlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed)) return pression;
+          if (states.contains(WidgetState.focused) ||
+              states.contains(WidgetState.hovered)) {
+            return scheme.primary.withValues(alpha: 0.08);
+          }
+          return null;
+        }),
+      ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: scheme.surfaceContainerLow,
         indicatorColor: scheme.primaryContainer,
