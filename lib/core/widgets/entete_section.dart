@@ -15,6 +15,7 @@ class EnteteSection extends StatelessWidget {
     super.key,
     this.compte,
     this.premiere = false,
+    this.discret = false,
   });
 
   final String titre;
@@ -30,6 +31,16 @@ class EnteteSection extends StatelessWidget {
   /// le titre de l'écran vient juste de le donner.
   final bool premiere;
 
+  /// **L'en-tête du monde du pompier** (ticket 064c) : le titre descend de
+  /// `titleLarge` à `titleMedium`, et le filet s'en va.
+  ///
+  /// Une liste de cartes n'a pas besoin qu'on lui ouvre une réglure : les
+  /// cartes se séparent toutes seules, et un trait de plus au-dessus de la
+  /// première serait le registre de l'admin posé sur le papier doux. Le titre,
+  /// lui, n'a plus à porter l'écran — le mois n'est qu'un repère entre deux
+  /// paquets de dates.
+  final bool discret;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -40,7 +51,12 @@ class EnteteSection extends StatelessWidget {
         SizedBox(height: premiere ? AppSpacing.lg : AppSpacing.auDessusTitre),
         Semantics(
           header: true,
-          child: Text(titre, style: theme.textTheme.titleLarge),
+          child: Text(
+            titre,
+            style: discret
+                ? theme.textTheme.titleMedium
+                : theme.textTheme.titleLarge,
+          ),
         ),
         if (compte != null) ...<Widget>[
           const SizedBox(height: AppSpacing.xs),
@@ -52,7 +68,7 @@ class EnteteSection extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.sm),
-        const AppDivider(),
+        if (!discret) const AppDivider(),
       ],
     );
   }

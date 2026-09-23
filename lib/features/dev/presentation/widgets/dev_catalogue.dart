@@ -10,6 +10,7 @@ import '../../../../core/widgets/app_banner.dart';
 import '../../../../core/widgets/app_divider.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/bouton_retour.dart';
+import '../../../../core/widgets/carte_douce.dart';
 import '../../../../core/widgets/count_stat.dart';
 import '../../../../core/widgets/day_cell.dart';
 import '../../../../core/widgets/empty_state.dart';
@@ -37,6 +38,7 @@ class DevCatalogue extends StatelessWidget {
         _SectionBoutons(),
         _SectionCases(),
         _SectionJours(),
+        _SectionCartes(),
         _SectionBadges(),
         _SectionBannieres(),
         _SectionEtatsVides(),
@@ -460,6 +462,79 @@ class _SectionJours extends StatelessWidget {
                   ),
                 ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+class _SectionCartes extends StatelessWidget {
+  const _SectionCartes();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return DevSection(
+      titre: 'CarteDouce',
+      note:
+          'La carte du monde du pompier : fond «surface» sur le papier doux, '
+          'rayon 20, filet «outline-variant», aucune ombre. Elle ne s\'imbrique '
+          'jamais.',
+      children: <Widget>[
+        DevSpecimen(
+          nom: 'au repos',
+          child: ColoredBox(
+            color: theme.colorScheme.surfaceContainerLow,
+            child: const Padding(
+              padding: EdgeInsets.all(AppSpacing.lg),
+              child: CarteDouce(child: Text('Octobre saisi : 12 jours')),
+            ),
+          ),
+        ),
+        DevSpecimen(
+          nom: 'actionnable, hauteur de cible',
+          child: ColoredBox(
+            color: theme.colorScheme.surfaceContainerLow,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: CarteDouce(
+                onTap: () {},
+                hauteurMin: AppTouch.cible,
+                child: const Text('samedi 17 octobre'),
+              ),
+            ),
+          ),
+        ),
+        DevSpecimen(
+          nom: 'en erreur : filet «error» de 2 dp',
+          child: ColoredBox(
+            color: theme.colorScheme.surfaceContainerLow,
+            child: const Padding(
+              padding: EdgeInsets.all(AppSpacing.lg),
+              child: CarteDouce(
+                enErreur: true,
+                child: Text('Au maximum 40 astreintes : c\'est trop.'),
+              ),
+            ),
+          ),
+        ),
+        DevSpecimen(
+          nom: 'nue : l\'enfant porte ses marges',
+          child: ColoredBox(
+            color: theme.colorScheme.surfaceContainerLow,
+            child: const Padding(
+              padding: EdgeInsets.all(AppSpacing.lg),
+              child: CarteDouce.nue(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: Text('  Les weekends · La semaine · Tout le mois'),
+                ),
+              ),
+            ),
           ),
         ),
       ],
