@@ -11,6 +11,8 @@ import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
 import 'package:astreinte_sp/features/planning/presentation/matrice_screen.dart';
 import 'package:astreinte_sp/features/profil/presentation/profil_screen.dart';
+import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
+import 'package:astreinte_sp/features/propositions/presentation/widgets/carte_proposition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,6 +20,7 @@ import '../../support/faux_auth.dart';
 import '../../support/faux_invitations.dart';
 import '../../support/faux_matrice.dart';
 import '../../support/faux_profil.dart';
+import '../../support/faux_propositions.dart';
 
 const Appartenance _admin = Appartenance(
   id: 'm-a',
@@ -34,6 +37,7 @@ const Size _telephoneLong = Size(420, 1400);
 Future<void> _monter(
   WidgetTester tester, {
   Appartenance appartenance = appartenanceMembre,
+  FauxPropositionsRepository? propositions,
 }) => monterApp(
   tester,
   session: sessionMembre,
@@ -41,8 +45,13 @@ Future<void> _monter(
   matrice: FauxMatriceRepository(),
   membres: FauxMembresRepository(),
   profils: FauxProfilRepository(),
+  propositions: propositions,
   taille: _telephoneLong,
 );
+
+/// L'index de la destination choisie dans la barre du bas.
+int _indexChoisi(WidgetTester tester) =>
+    tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
 
 List<String> _libelles(WidgetTester tester) => tester
     .widget<AppScaffold>(find.byType(AppScaffold))
@@ -255,5 +264,152 @@ void main() {
         expect(ongletHerite(Uri.parse('/?onglet=42')), AppRoutes.accueil);
       },
     );
+  });
+
+  // **La Boîte est une destination, et le retour la quitte.** Le chantier
+  // 064b écrit l'onglet dans l'adresse par `goNamed` : chaque onglet visité
+  // laisse une entrée d'historique, et le bouton précédent recule d'abord
+  // d'un onglet, puis quitte la Boîte pour la destination d'où l'on venait.
+  group('Le retour du navigateur depuis la Boîte', () {
+    testWidgets('il ramène à la destination précédente, barre comprise', (
+      tester,
+    ) async {
+      await _monter(tester);
+      await ouvrirRoute(tester, AppRoutes.astreintes);
+      expect(find.byType(AstreintesScreen), findsOneWidget);
+
+      // On entre dans la Boîte par la barre du bas, comme le pompier.
+      await tester.tap(find.text(AppStrings.navBoite));
+      await tester.pumpAndSettle();
+      expect(find.byType(BoiteScreen), findsOneWidget);
+      expect(_indexChoisi(tester), 3);
+
+      // Puis on change d'onglet : une entrée d'historique de plus.
+      await tester.tap(find.text(AppStrings.boiteOngletRappels));
+      await tester.pumpAndSettle();
+      expect(
+        emplacementCourant(tester),
+        AppRoutes.boiteOnglet(OngletBoite.rappels),
+      );
+
+      // Le navigateur recule : d'abord l'onglet.
+      await retourNavigateur(tester, AppRoutes.boite);
+      expect(find.byType(BoiteScreen), findsOneWidget);
+      expect(_indexChoisi(tester), 3);
+
+      // Puis la Boîte elle-même.
+      await retourNavigateur(tester, AppRoutes.astreintes);
+      expect(find.byType(BoiteScreen), findsNothing);
+      expect(find.byType(AstreintesScreen), findsOneWidget);
+      expect(
+        _indexChoisi(tester),
+        2,
+        reason: 'la barre suit l\'adresse, elle ne garde pas son dernier appui',
+      );
+    });
+  });
+
+  // **Les deux écrans devenus poussés au ticket 064.** Ils vivaient dans
+  // `AppScaffold`, dont la barre de navigation ajoute `viewPadding.bottom` à
+  // sa hauteur. Poussés, ils n'ont plus rien sous eux : sans réserve, les
+  // 34 points de la barre d'accueil d'un iPhone en PWA installée mangent la
+  // fin du contenu — « Se déconnecter » et « Supprimer mon compte ».
+  group('La zone sûre basse des écrans poussés', () {
+    const double barreAccueil = 34;
+
+    Future<void> ouvrirAvecBarre(WidgetTester tester, String route) async {
+      final reserve = FakeViewPadding(
+        bottom: barreAccueil * tester.view.devicePixelRatio,
+      );
+      tester.view
+        ..viewPadding = reserve
+        ..padding = reserve;
+      await _monter(
+        tester,
+        propositions: FauxPropositionsRepository(
+          propositions: <Proposition>[
+            for (var index = 0; index < 28; index++)
+              proposition(
+                id: 'a-$index',
+                creneauId: 'c-$index',
+                jour: DateTime(2026, 10, index + 1),
+              ),
+          ],
+        ),
+      );
+      await ouvrirRoute(tester, route);
+    }
+
+    /// Ce qui reste sous le bas de [cible].
+    ///
+    /// Mesuré contre la **fenêtre**, jamais contre une constante : une taille
+    /// écrite en dur ne mesure plus rien le jour où le test change d'écran,
+    /// et c'est bien la hauteur de fenêtre qui décide de ce qui passe sous la
+    /// barre d'accueil.
+    double sousLeBas(WidgetTester tester, Finder cible) {
+      final hauteur =
+          tester.view.physicalSize.height / tester.view.devicePixelRatio;
+      return hauteur - tester.getBottomLeft(cible.last).dy;
+    }
+
+    /// Amène la liste à son extrémité : c'est là, et nulle part ailleurs, que
+    /// la réserve basse se voit.
+    Future<void> aLaFin(WidgetTester tester) async {
+      final defilement = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      defilement.jumpTo(defilement.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        defilement.maxScrollExtent,
+        greaterThan(0),
+        reason: 'la liste tient dans l\'écran : le bas n\'est pas éprouvé',
+      );
+    }
+
+    testWidgets('le profil garde ses deux sorties au-dessus de la barre', (
+      tester,
+    ) async {
+      await ouvrirAvecBarre(tester, AppRoutes.profil);
+      await aLaFin(tester);
+
+      // La liste elle-même s'arrête au-dessus de la barre d'accueil…
+      expect(
+        sousLeBas(tester, find.byType(ListView)),
+        greaterThanOrEqualTo(barreAccueil),
+        reason: 'la liste du profil descend sous la barre d\'accueil',
+      );
+      // …et donc la dernière chose qu'on y lit aussi.
+      expect(
+        sousLeBas(tester, find.text(AppStrings.legalMentionsLien)),
+        greaterThanOrEqualTo(barreAccueil),
+        reason: 'le dernier lien passe sous la barre d\'accueil',
+      );
+    });
+
+    // **La Boîte, elle, est une destination.** Sa réserve basse n'est plus la
+    // sienne : la barre de navigation ajoute `viewPadding.bottom` à sa propre
+    // hauteur, et la liste s'arrête au-dessus de la barre.
+    testWidgets('la Boîte garde sa dernière ligne au-dessus de la barre', (
+      tester,
+    ) async {
+      await ouvrirAvecBarre(
+        tester,
+        AppRoutes.boiteOnglet(OngletBoite.propositions),
+      );
+      await aLaFin(tester);
+
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(
+        sousLeBas(tester, find.byType(ListView)),
+        greaterThanOrEqualTo(barreAccueil),
+        reason: 'la liste de la Boîte descend sous la barre d\'accueil',
+      );
+      expect(
+        sousLeBas(tester, find.byType(CarteProposition)),
+        greaterThanOrEqualTo(barreAccueil),
+        reason: 'la dernière carte passe sous la barre d\'accueil',
+      );
+    });
   });
 }
