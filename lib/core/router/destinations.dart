@@ -61,10 +61,15 @@ String? ongletHerite(Uri uri) {
   final onglet = parametres[AppRoutes.parametreOnglet];
   final mois = parametres[AppRoutes.parametreMois];
 
-  String versCalendrier() => Uri(
-    path: AppRoutes.calendrier,
-    queryParameters: <String, String>{AppRoutes.parametreMois: ?mois},
-  ).toString();
+  // Sans mois, l'adresse est nue : `Uri` avec une carte de paramètres vide
+  // écrirait « /calendrier? », un point d'interrogation orphelin dans la barre
+  // d'adresse et dans l'historique.
+  String versCalendrier() => mois == null
+      ? AppRoutes.calendrier
+      : Uri(
+          path: AppRoutes.calendrier,
+          queryParameters: <String, String>{AppRoutes.parametreMois: mois},
+        ).toString();
 
   if (onglet == null) return mois == null ? null : versCalendrier();
 

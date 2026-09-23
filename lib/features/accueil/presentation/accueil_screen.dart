@@ -139,7 +139,7 @@ class _Contenu extends ConsumerWidget {
                 onAction: () => context.goNamed(AppRoutes.astreintesName),
               ),
               const SizedBox(height: AppSpacing.md),
-              if (tableau.cartes.isEmpty)
+              if (!tableau.rangeeUtile)
                 EmptyState(
                   titre: AppStrings.accueilVideAstreintesTitre,
                   texte: AppStrings.accueilVideAstreintesTexte,

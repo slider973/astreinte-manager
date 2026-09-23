@@ -842,4 +842,94 @@ void main() {
       }
     });
   });
+
+  group('Contraste — les cartes de l\'accueil (ticket 064)', () {
+    // Trois cartes de 144 × 168, lues à un mètre, au soleil, avec des gants.
+    // Le brief du 064 nomme les deux paires : `onPrimary` sur `primary` pour
+    // l'astreinte acceptée, `onSurface` sur `orangeVif` pour la proposition
+    // en attente. La troisième, le jour libre, est un cran de surface.
+    for (final theme in <(String, AppStatusColors, ColorScheme)>[
+      ('clair', AppStatusColors.clair, AppTheme.clair.colorScheme),
+      ('sombre', AppStatusColors.sombre, AppTheme.sombre.colorScheme),
+    ]) {
+      group(theme.$1, () {
+        final statuts = theme.$2;
+        final scheme = theme.$3;
+        final propose = statuts.attribution(AttributionEtat.propose);
+
+        test('la carte acceptée : encre sur l\'indigo plein', () {
+          verifier('onPrimary/primary', scheme.onPrimary, scheme.primary);
+        });
+
+        test('la carte en attente : encre sur l\'orange vif', () {
+          verifier(
+            'blocEncre/blocFond (propose)',
+            propose.blocEncre,
+            propose.blocFond,
+          );
+        });
+
+        test('la carte libre : encre sur le cran de surface', () {
+          verifier(
+            'onSurface/surfaceContainerHigh',
+            scheme.onSurface,
+            scheme.surfaceContainerHigh,
+          );
+        });
+
+        test('les trois cartes se détachent du fond de page', () {
+          // Un élément non textuel porteur d'information tient 3:1
+          // (WCAG 1.4.11). L'orange ne le tient pas sur le papier : c'est son
+          // contour `etatAttente` qui porte la limite, comme dans la matrice.
+          final page = scheme.surfaceContainerLow;
+          verifier(
+            'primary/surfaceContainerLow',
+            scheme.primary,
+            page,
+            seuil: seuilFilet,
+          );
+          verifier(
+            'filet de la proposition/surfaceContainerLow',
+            propose.filet ?? propose.blocFond,
+            page,
+            seuil: seuilFilet,
+          );
+        });
+
+        test('le carré d\'initiale d\'une ligne de proposition', () {
+          verifier(
+            'onPrimaryContainer/primaryContainer',
+            scheme.onPrimaryContainer,
+            scheme.primaryContainer,
+          );
+        });
+
+        test('la carte d\'appel à saisir ses disponibilités', () {
+          verifier(
+            'onPrimaryContainer/primaryContainer',
+            scheme.onPrimaryContainer,
+            scheme.primaryContainer,
+          );
+        });
+
+        test('les points de la bande de semaine se voient sur le papier', () {
+          final page = scheme.surfaceContainerLow;
+          verifier(
+            'point indigo/surfaceContainerLow',
+            scheme.primary,
+            page,
+            seuil: seuilFilet,
+          );
+          // Le point orange est **doublé par la phrase du jour** : il ne porte
+          // rien tout seul, et c'est la règle du système qui le permet
+          // (`DESIGN.md § Do's`). On mesure quand même ce qu'il vaut.
+          expect(
+            ratio(propose.blocFond, page),
+            greaterThan(1.5),
+            reason: 'le point orange disparaîtrait dans le papier',
+          );
+        });
+      });
+    }
+  });
 }

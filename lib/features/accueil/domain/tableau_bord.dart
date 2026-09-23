@@ -187,8 +187,15 @@ class TableauBord {
   /// `null` quand aucune période n'est ouverte : la section n'existe pas.
   final AppelDispos? dispos;
 
-  bool get vide =>
-      astreintesAVenir == 0 && propositions.isEmpty && dispos == null;
+  /// Vrai quand la rangée a quelque chose à dire.
+  ///
+  /// Sept cartes « Libre » ne sont pas une rangée : c'est un état vide déguisé
+  /// en contenu, et il coûte 168 points de haut pour ne rien apprendre. Dès
+  /// qu'une astreinte est acceptée ou qu'une proposition attend, la rangée
+  /// reprend sa place.
+  bool get rangeeUtile =>
+      astreintesAVenir > 0 ||
+      cartes.any((CarteJour carte) => carte.etat != EtatCarte.libre);
 }
 
 /// Compose le tableau de bord.
