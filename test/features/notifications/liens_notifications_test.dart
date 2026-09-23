@@ -25,9 +25,9 @@ void main() {
       tester,
     ) async {
       const attendu = <String, String>{
-        '/proposals': '/?onglet=1',
-        '/schedule/2026-10': '/?onglet=2',
-        '/availability/2026-10': '/?onglet=0&mois=2026-10',
+        '/proposals': AppRoutes.propositions,
+        '/schedule/2026-10': AppRoutes.astreintes,
+        '/availability/2026-10': '/calendrier?mois=2026-10',
         '/admin/schedule/2026-10': '/admin/suivi?mois=2026-10',
       };
 
@@ -96,7 +96,7 @@ void main() {
         faux.auth.ouvrirSession(sessionMembre);
         await tester.pumpAndSettle();
 
-        expect(emplacementCourant(tester), '/?onglet=0&mois=2026-10');
+        expect(emplacementCourant(tester), '/calendrier?mois=2026-10');
       },
     );
 

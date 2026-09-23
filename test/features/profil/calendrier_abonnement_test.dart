@@ -33,8 +33,7 @@ void main() {
       calendrier: depot,
       pressePapiers: presse,
     );
-    await tester.tap(find.text(AppStrings.navProfil));
-    await tester.pumpAndSettle();
+    await ouvrirProfil(tester);
     await defilerJusqua(tester, find.byType(BlocCalendrier));
     return (depot: depot, presse: presse);
   }

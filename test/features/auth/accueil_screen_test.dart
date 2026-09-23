@@ -5,6 +5,7 @@ import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/aucune_caserne_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/connexion_screen.dart';
 import 'package:astreinte_sp/features/demarrage/presentation/demarrage_screen.dart';
+import 'package:astreinte_sp/features/profil/presentation/profil_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -17,14 +18,7 @@ const Appartenance _adminCaserneA = Appartenance(
   statut: StatutMembre.actif,
 );
 
-/// Ouvre l'onglet « Profil », qui porte l'identité et la sortie depuis que
-/// l'onglet 0 est devenu l'écran « Mon mois » (ticket 011).
-Future<void> ouvrirProfil(WidgetTester tester) async {
-  await tester.tap(find.text(AppStrings.navProfil));
-  await tester.pumpAndSettle();
-}
-
-/// L'onglet « Profil » défile depuis que le réglage des notifications s'y est
+/// L'écran « Profil » défile depuis que le réglage des notifications s'y est
 /// posé (ticket 024) : la sortie est sous la ligne de flottaison.
 Future<void> faireDefilerJusqua(WidgetTester tester, Finder cible) =>
     defilerJusqua(tester, cible);
@@ -111,7 +105,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(AuthErreur.reseau.message), findsOneWidget);
-      expect(find.byType(AccueilScreen), findsOneWidget);
+      // La session est toujours ouverte : on est resté sur le profil, d'où
+      // l'on peut réessayer.
+      expect(find.byType(ProfilScreen), findsOneWidget);
     });
   });
 

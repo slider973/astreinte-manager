@@ -2,19 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/reseau/connectivite.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_status.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_divider.dart';
-import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/banniere_caserne.dart';
+import '../../../core/widgets/bouton_retour.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entete_section.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
@@ -31,28 +33,19 @@ import 'widgets/squelette_propositions.dart';
 /// indicateur de chargement, un écran de détail — coûterait la promesse. C'est
 /// la contrainte qui décide de la forme de l'écran (`design/021 § 2`).
 ///
-/// L'écran vit dans l'onglet 1 de la coquille d'accueil, là où le lien public
-/// `/proposals` mène déjà depuis le ticket 024.
+/// **Un écran poussé depuis le ticket 064**, à la route `/propositions`, où le
+/// lien public `/proposals` mène toujours. Ce n'est plus une destination : les
+/// propositions en attente s'annoncent sur l'accueil, et le chantier 064b les
+/// fera entrer dans la Boîte. D'où `BoutonRetour` — un écran sans ossature de
+/// navigation et sans parent dans le routeur n'a pas d'autre sortie
+/// (`core/widgets/README.md`).
 class PropositionsScreen extends ConsumerStatefulWidget {
-  const PropositionsScreen({
-    required this.destinations,
-    required this.indexSelectionne,
-    required this.onDestination,
-    required this.onVersMonMois,
-    super.key,
-  });
+  const PropositionsScreen({super.key});
 
   /// En dessous de cette largeur restante, les deux boutons retombent sous le
   /// corps de la ligne au lieu de se ranger à sa droite.
   static const double largeurActionsACote = 680;
 
-  final List<AppDestination> destinations;
-  final int indexSelectionne;
-  final ValueChanged<int> onDestination;
-
-  /// L'action de l'état vide : il n'y a rien à répondre, il y a un mois à
-  /// saisir.
-  final VoidCallback onVersMonMois;
 
   @override
   ConsumerState<PropositionsScreen> createState() => _PropositionsScreenState();
@@ -186,31 +179,53 @@ class _PropositionsScreenState extends ConsumerState<PropositionsScreen>
         ref.watch(lectureSeuleCaserneProvider);
     final fait = faitCaserneEcran(context, ref);
 
-    return AppScaffold(
-      titre: AppStrings.propositionsTitre,
-      destinations: widget.destinations,
-      indexSelectionne: widget.indexSelectionne,
-      onDestination: widget.onDestination,
-      actions: <Widget>[
-        // Le geste de tirage n'est jamais le seul chemin : il lui faut son
-        // équivalent visible, au clavier comme à la souris.
-        IconButton(
-          onPressed: _rafraichir,
-          icon: const Icon(Icons.refresh),
-          tooltip: AppStrings.propositionsRafraichir,
-        ),
-        const BoutonNotifications(),
-      ],
-      banniere: _banniere(
-        enLigne: enLigne,
-        lectureSeule: lectureSeule,
-        fait: fait,
+    final banniere = _banniere(
+      enLigne: enLigne,
+      lectureSeule: lectureSeule,
+      fait: fait,
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: const BoutonRetour(),
+        leadingWidth: BoutonRetour.largeur(context),
+        title: const Text(AppStrings.propositionsTitre),
+        actions: <Widget>[
+          // Le geste de tirage n'est jamais le seul chemin : il lui faut son
+          // équivalent visible, au clavier comme à la souris.
+          IconButton(
+            onPressed: _rafraichir,
+            icon: const Icon(Icons.refresh),
+            tooltip: AppStrings.propositionsRafraichir,
+          ),
+          const BoutonNotifications(),
+        ],
       ),
-      child: _corps(
-        etat: etat,
-        raisonBlocage: _raisonBlocage(
-          enLigne: enLigne,
-          lectureSeule: lectureSeule,
+      // **La zone sûre basse d'un écran poussé.** Cet écran vivait dans
+      // `AppScaffold`, dont la barre de navigation ajoutait
+      // `viewPadding.bottom` à sa hauteur ; poussé depuis le ticket 064, il
+      // n'a plus rien sous lui, et les 34 points de la barre d'accueil d'un
+      // iPhone en PWA installée mangeaient les boutons de la dernière
+      // proposition (`core/widgets/README.md`).
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: <Widget>[
+            // La zone de bannière existe toujours, même vide : un enfant
+            // conditionnel décalerait tous les suivants d'un cran à
+            // l'apparition d'une bannière, et la liste y perdrait sa position
+            // de défilement (même raison qu'`AppScaffold`).
+            banniere ?? const SizedBox.shrink(),
+            Expanded(
+              child: _corps(
+                etat: etat,
+                raisonBlocage: _raisonBlocage(
+                  enLigne: enLigne,
+                  lectureSeule: lectureSeule,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -316,7 +331,8 @@ class _PropositionsScreenState extends ConsumerState<PropositionsScreen>
                 titre: AppStrings.videPropositionsTitre,
                 texte: AppStrings.videPropositionsTexte,
                 libelleAction: AppStrings.propositionsVideAction,
-                onAction: widget.onVersMonMois,
+                onAction: () =>
+                    context.goNamed(AppRoutes.calendrierName),
               ),
             ),
           ],

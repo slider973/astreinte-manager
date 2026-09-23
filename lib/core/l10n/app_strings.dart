@@ -18,6 +18,15 @@ abstract final class AppStrings {
   // Navigation
   // -------------------------------------------------------------------
 
+  /// **Le tableau de bord** (ticket 064) : la première destination du
+  /// pompier, celle qui répond aux trois questions qu'il se pose entre deux
+  /// activités.
+  static const String navAccueil = 'Accueil';
+
+  /// La saisie des disponibilités, qui s'appelait « Mon mois » tant qu'elle
+  /// était le premier écran. Elle est devenue le deuxième onglet au
+  /// ticket 064 : c'est un calendrier, et c'est ce que le mot dit.
+  static const String navCalendrier = 'Calendrier';
   static const String navMonMois = 'Mon mois';
   static const String navPropositions = 'Propositions';
 
@@ -26,6 +35,10 @@ abstract final class AppStrings {
   /// caserne (ticket 023), qui sont deux filtres d'une même donnée
   /// (`design/027 § 4`).
   static const String navAstreintes = 'Astreintes';
+
+  /// La quatrième destination (ticket 064) : le journal de bord. Elle réunira
+  /// les rappels et les propositions au chantier 064b.
+  static const String navBoite = 'Boîte';
   static const String navProfil = 'Profil';
   static const String navAdmin = 'Admin';
   static const String navOuvrirMenu = 'Ouvrir le menu';
@@ -445,11 +458,128 @@ abstract final class AppStrings {
   static const String accueilTitre = 'Accueil';
   static const String accueilCaserneLabel = 'Ta caserne';
   static const String accueilRoleLabel = 'Ton rôle';
-  static const String accueilAVenirTitre = 'Écran à venir';
-  static const String accueilAVenirTexte =
-      'Cet écran arrive dans une prochaine version. Pour l\'instant, l\'accueil '
-      'te montre ta caserne et ton rôle.';
   static const String accueilRetour = 'Revenir à l\'accueil';
+
+  // --- Le tableau de bord du pompier (ticket 064) ----------------------
+
+  /// La salutation de l'en-tête. Elle se termine par une virgule : le prénom
+  /// vient à la ligne suivante, en dessous.
+  static const String accueilBonjour = 'Bonjour,';
+  static const String accueilBonsoir = 'Bonsoir,';
+
+  /// La phrase annoncée d'un coup : un lecteur d'écran ne doit pas lire
+  /// « Bonsoir virgule » puis « Marie » comme deux textes sans rapport.
+  static String accueilSalutation(String salutation, String prenom) =>
+      prenom.isEmpty ? salutation : '$salutation $prenom';
+
+  static const String accueilMesAstreintes = 'Mes astreintes';
+  static const String accueilPropositionsSection = 'Propositions';
+  static const String accueilDisponibilites = 'Disponibilités';
+
+  /// « Mes astreintes · 4 ». Le compte est une donnée : il dit combien il y en
+  /// a en tout, là où la rangée n'en montre que ce qui tient.
+  static String accueilSectionCompte(String titre, int compte) =>
+      '$titre · $compte';
+
+  static const String accueilToutVoir = 'Tout voir';
+
+  /// Un lecteur d'écran annonce la destination, pas seulement « Tout voir » —
+  /// deux boutons du même nom sur un écran ne se distinguent pas à l'oreille.
+  static const String accueilToutVoirAstreintes = 'Voir toutes mes astreintes';
+  static const String accueilToutVoirPropositions =
+      'Voir toutes les propositions';
+
+  static const String accueilAujourdhui = 'Aujourd\'hui';
+  static const String accueilLibre = 'Libre';
+  static const String accueilRepondre = 'Répondre';
+
+  /// La phrase annoncée d'une carte : la date, le créneau, l'état.
+  /// « mar. 24, nuit, 19:00 → 07:00, astreinte acceptée, Caserne de Meaux ».
+  static String accueilCarteSemantique({
+    required String date,
+    required String etat,
+    String? creneau,
+    String? heures,
+    String? caserne,
+  }) => <String>[
+    date,
+    ?creneau,
+    ?heures,
+    etat,
+    ?caserne,
+  ].where((String part) => part.isNotEmpty).join(', ');
+
+  static const String accueilEtatAcceptee = 'Astreinte acceptée';
+  static const String accueilEtatProposition = 'Proposition à répondre';
+  static const String accueilEtatLibre = 'Jour libre';
+
+  /// La phrase annoncée d'un jour de la bande de semaine. Les points ne
+  /// s'entendent pas : ce sont ces mots qui les portent.
+  static String accueilJourSemantique({
+    required String date,
+    required bool aujourdhui,
+    required bool astreinte,
+    required bool proposition,
+  }) => <String>[
+    date,
+    if (aujourdhui) accueilAujourdhui,
+    if (astreinte) accueilEtatAcceptee,
+    if (proposition) accueilEtatProposition,
+    if (!astreinte && !proposition) accueilEtatLibre,
+  ].join(', ');
+
+  /// « Proposée il y a 2 h ».
+  static String accueilProposeeDepuis(String instant) => 'Proposée $instant';
+
+  /// « Saisir mes disponibilités d'octobre ». Trois mois s'élident — avril,
+  /// août, octobre —, les neuf autres prennent « de ».
+  static String accueilSaisirMois(String nomMois) =>
+      'Saisir mes disponibilités ${_elision(nomMois)}';
+
+  /// Ce qu'il reste avant la date limite. À zéro jour, ce n'est plus un
+  /// décompte : c'est le dernier jour, et le mot le dit.
+  static String accueilResteJours(int jours) => switch (jours) {
+    <= 0 => 'Dernier jour',
+    1 => 'Plus qu\'un jour',
+    _ => 'Reste $jours jours',
+  };
+
+  /// « Octobre saisi : 12 jours, 4 nuits ».
+  static String accueilMoisSaisi(String libelleMois, int jours, int nuits) =>
+      '$libelleMois saisi : ${_pluriel(jours, 'jour', 'jours')}, '
+      '${_pluriel(nuits, 'nuit', 'nuits')}';
+
+  static const String accueilVideAstreintesTitre = 'Aucune astreinte à venir';
+  static const String accueilVideAstreintesTexte =
+      'Rien ne t\'attend pour l\'instant. Saisis tes disponibilités : c\'est '
+      'comme ça que le chef de centre sait sur qui compter.';
+  static const String accueilVideAstreintesAction =
+      'Saisir mes disponibilités';
+
+  static const String accueilVidePropositionsTitre =
+      'Aucune proposition en attente';
+  static const String accueilVidePropositionsTexte =
+      'Tu as répondu à tout. Les prochaines arriveront par notification.';
+
+  static const String accueilErreurTexte =
+      'Impossible de lire tes astreintes et tes propositions. Vérifie ta '
+      'connexion, puis réessaie.';
+
+  /// Quand **une seule** des deux sources est tombée. L'écran reste, l'autre
+  /// section est juste, et celle-ci dit ce qu'elle n'a pas pu lire plutôt que
+  /// d'affirmer qu'il n'y a rien.
+  static const String accueilErreurAstreintes =
+      'Impossible de lire tes astreintes. Ce que tu vois plus bas reste juste.';
+  static const String accueilErreurPropositions =
+      'Impossible de lire tes propositions. Ce que tu vois plus haut reste '
+      'juste.';
+
+  /// « d'octobre » ou « de janvier ».
+  static String _elision(String nomMois) =>
+      RegExp('^[aeiouâàéèêîôûù]', caseSensitive: false).hasMatch(nomMois)
+      ? 'd\'$nomMois'
+      : 'de $nomMois';
+
   static const String accueilTexte =
       'Ta connexion fonctionne. La saisie des disponibilités et le planning '
       'arrivent dans les prochaines versions.';
@@ -2987,7 +3117,13 @@ abstract final class AppStrings {
 
   static const String astreintesVueLabel = 'Vue de mes astreintes';
   static const String astreintesVueListe = 'Liste';
-  static const String astreintesVueCalendrier = 'Calendrier';
+
+  /// **« Mois » et non « Calendrier » depuis le ticket 064** : la deuxième
+  /// destination de la barre s'appelle « Calendrier », et deux fois le même
+  /// mot sur un même écran pour deux gestes différents — changer de vue, ou
+  /// changer d'écran — est un piège, avec des gants et au soleil. La forme,
+  /// elle, ne change pas : c'est bien la grille du mois.
+  static const String astreintesVueCalendrier = 'Mois';
 
   /// Au-delà de ×1,6, le calendrier **change de forme** plutôt que de rogner
   /// son texte (`DESIGN.md § Typography — Named Rules`). Un bouton désactivé
@@ -2999,12 +3135,21 @@ abstract final class AppStrings {
 
   // --- La ligne et le créneau ---------------------------------------------
 
-  /// « 19:00 → 07:00 ». Les heures viennent des paramètres de la caserne
+  /// « 19:00 – 07:00 ». Les heures viennent des paramètres de la caserne
   /// (`docs/SCHEMA.md § 2.1`), jamais d'un 7 h – 19 h écrit en dur.
+  ///
+  /// **Un tiret demi-cadratin, et non une flèche** (ticket 064a). La flèche
+  /// `→` (U+2192) n'existe dans aucune des quatre coupes Atkinson embarquées —
+  /// seulement dans Archivo, qui ne porte que les titres. Les heures étant
+  /// composées en Atkinson Mono, elle s'affichait comme un carré vide, vu à
+  /// l'écran sur la carte indigo de l'accueil. Le tiret `–` (U+2013), lui, est
+  /// présent dans les six coupes ; `test/core/l10n/glyphes_couverts_test.dart`
+  /// interdit à quiconque de remettre un glyphe que les polices ne portent
+  /// pas.
   static String astreintesIntervalle(String debut, String fin) =>
-      '$debut → $fin';
+      '$debut – $fin';
 
-  /// La même chose, dite : la flèche ne se lit pas à voix haute.
+  /// La même chose, dite : le tiret ne se lit pas à voix haute.
   static String astreintesIntervalleDit(String debut, String fin) =>
       'de $debut à $fin';
 

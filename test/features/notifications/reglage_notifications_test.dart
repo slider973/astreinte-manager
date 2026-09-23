@@ -41,8 +41,7 @@ Future<AppMontee> _ouvrirProfil(
     messagerie: messagerie,
     profils: profils,
   );
-  await tester.tap(find.text(AppStrings.navProfil));
-  await tester.pumpAndSettle();
+  await ouvrirProfil(tester);
   // **Vers l'interrupteur, pas vers le titre du bloc.** L'écran de profil s'est
   // allongé au ticket 034 (export, liens légaux) : amener le titre à l'écran ne
   // garantit plus que la cible tactile y soit aussi, et un `tap` qui manque sa
@@ -58,9 +57,7 @@ void main() {
     ) async {
       await _ouvrirProfil(
         tester,
-        messagerie: FauxMessageriePush(
-          etatPermission: PermissionPush.accordee,
-        ),
+        messagerie: FauxMessageriePush(etatPermission: PermissionPush.accordee),
       );
 
       expect(find.text(AppStrings.notifReglageTitre), findsOneWidget);
@@ -74,9 +71,7 @@ void main() {
       final profils = FauxProfilRepository();
       await _ouvrirProfil(
         tester,
-        messagerie: FauxMessageriePush(
-          etatPermission: PermissionPush.accordee,
-        ),
+        messagerie: FauxMessageriePush(etatPermission: PermissionPush.accordee),
         profils: profils,
       );
 
@@ -142,9 +137,7 @@ void main() {
       final profils = FauxProfilRepository();
       await _ouvrirProfil(
         tester,
-        messagerie: FauxMessageriePush(
-          etatPermission: PermissionPush.accordee,
-        ),
+        messagerie: FauxMessageriePush(etatPermission: PermissionPush.accordee),
         profils: profils,
       );
 

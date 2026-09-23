@@ -92,11 +92,11 @@ void main() {
       await monterApp(tester);
       await ouvrirRoute(tester, AppRoutes.confidentialite);
 
+      expect(find.text(DocumentsLegaux.confidentialite.titre), findsWidgets);
       expect(
-        find.text(DocumentsLegaux.confidentialite.titre),
-        findsWidgets,
+        find.text(DocumentsLegaux.confidentialite.version),
+        findsOneWidget,
       );
-      expect(find.text(DocumentsLegaux.confidentialite.version), findsOneWidget);
       // Le premier titre de section, sans défilement : la page commence par le
       // sujet, pas par un sommaire.
       expect(
@@ -120,15 +120,16 @@ void main() {
   });
 
   group('Pages légales — routes', () {
-    testWidgets('« Confidentialité » s\'ouvre depuis le profil', (tester) async {
+    testWidgets('« Confidentialité » s\'ouvre depuis le profil', (
+      tester,
+    ) async {
       await monterApp(
         tester,
         session: sessionMembre,
         appartenances: const <Appartenance>[appartenanceMembre],
       );
 
-      await tester.tap(find.text(AppStrings.navProfil));
-      await tester.pumpAndSettle();
+      await ouvrirProfil(tester);
       await defilerJusqua(
         tester,
         find.text(AppStrings.legalConfidentialiteLien),

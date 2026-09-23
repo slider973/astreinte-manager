@@ -77,8 +77,7 @@ Future<Decor> _ouvrirProfil(
     caserneChoisie: caserneChoisie,
   );
 
-  await tester.tap(find.text(AppStrings.navProfil));
-  await tester.pumpAndSettle();
+  await ouvrirProfil(tester);
   await defilerJusqua(tester, find.text(AppStrings.profilSupprimerCompte));
 
   return (

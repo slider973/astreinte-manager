@@ -1,17 +1,20 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
-import 'package:astreinte_sp/core/widgets/app_scaffold.dart';
 import 'package:astreinte_sp/core/widgets/empty_state.dart';
 import 'package:astreinte_sp/core/widgets/entete_section.dart';
 import 'package:astreinte_sp/core/widgets/loading_skeleton.dart';
 import 'package:astreinte_sp/core/widgets/primary_button.dart';
+import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
+import 'package:astreinte_sp/features/propositions/domain/propositions_providers.dart';
 import 'package:astreinte_sp/features/propositions/presentation/widgets/ligne_proposition.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -92,13 +95,12 @@ Finder _refuser() => find.widgetWithText(
   AppStrings.propositionsRefuser,
 );
 
-/// Le nombre porté par la pastille de l'onglet « Propositions », lu là où il
-/// est réellement posé : sur la destination de la coquille, que la barre du
-/// bas et le rail latéral partagent.
-int _pastille(WidgetTester tester) {
-  final coquille = tester.widget<AppScaffold>(find.byType(AppScaffold));
-  return coquille.destinations[1].pastille ?? 0;
-}
+/// Le nombre de propositions en attente, lu **depuis l'accueil** : c'est là
+/// qu'il s'affiche depuis le ticket 064, en tête de la section, et il vient
+/// de la liste elle-même — jamais d'une seconde requête.
+int _comptePropositions(WidgetTester tester) => ProviderScope.containerOf(
+  tester.element(find.byType(AccueilScreen)),
+).read(propositionsEnAttenteProvider);
 
 void main() {
   group('Les propositions — l\'ouverture depuis une notification', () {
@@ -109,7 +111,7 @@ void main() {
 
       // Le lien public est traduit par la liste blanche du ticket 024 : rien
       // n'a été dupliqué ici.
-      expect(emplacementCourant(tester), '/?onglet=1');
+      expect(emplacementCourant(tester), AppRoutes.propositions);
       expect(find.byType(LigneDeProposition), findsNWidgets(3));
     });
 
@@ -245,7 +247,7 @@ void main() {
       expect(find.byType(LigneDeProposition), findsNothing);
     });
 
-    testWidgets('son action ramène sur « Mon mois »', (tester) async {
+    testWidgets('son action ramène sur le Calendrier', (tester) async {
       await _ouvrir(
         tester,
         depot: _depot(propositions: const <Proposition>[]),
@@ -254,7 +256,7 @@ void main() {
       await tester.tap(find.text(AppStrings.propositionsVideAction));
       await tester.pumpAndSettle();
 
-      expect(find.text(AppStrings.navMonMois), findsWidgets);
+      expect(emplacementCourant(tester), AppRoutes.calendrier);
       expect(find.text(AppStrings.videPropositionsTitre), findsNothing);
     });
   });
@@ -522,51 +524,49 @@ void main() {
     });
   });
 
-  group('Les propositions — la pastille de l\'onglet', () {
-    testWidgets('elle porte le nombre en attente, et il est annoncé', (
+  group('Les propositions — le compte en attente', () {
+    testWidgets('l\'accueil l\'affiche, et il vient de la liste', (
       tester,
     ) async {
       await _ouvrir(tester);
+      await ouvrirRoute(tester, AppRoutes.accueil);
 
-      expect(_pastille(tester), 3);
+      expect(_comptePropositions(tester), 3);
+      // Le compte est écrit à côté du titre de la section : un nombre sans
+      // son nom ne dit rien.
       expect(
-        find.descendant(of: find.byType(Badge), matching: find.text('3')),
+        find.text(
+          AppStrings.accueilSectionCompte(
+            AppStrings.accueilPropositionsSection,
+            3,
+          ),
+        ),
         findsOneWidget,
       );
-      // Le chiffre est doublé d'un libellé : une pastille muette ne se lit
-      // pas au lecteur d'écran.
-      expect(find.byTooltip(AppStrings.navPropositionsBadge(3)), findsWidgets);
     });
 
-    testWidgets('elle baisse d\'un à chaque réponse', (tester) async {
+    testWidgets('il baisse d\'un à chaque réponse', (tester) async {
       await _ouvrir(tester);
 
       await tester.tap(_accepter().first);
       await tester.pumpAndSettle();
+      await ouvrirRoute(tester, AppRoutes.accueil);
 
-      expect(_pastille(tester), 2);
+      expect(_comptePropositions(tester), 2);
     });
 
-    testWidgets('elle disparaît quand il ne reste rien', (tester) async {
+    testWidgets('il tombe à zéro quand il ne reste rien', (tester) async {
       await _ouvrir(
         tester,
         depot: _depot(propositions: const <Proposition>[]),
       );
+      await ouvrirRoute(tester, AppRoutes.accueil);
 
-      expect(_pastille(tester), 0);
-      expect(find.byType(Badge), findsNothing);
-    });
-
-    testWidgets('elle est visible depuis « Mon mois »', (tester) async {
-      await _ouvrir(tester);
-
-      await tester.tap(find.text(AppStrings.navMonMois).last);
-      await tester.pumpAndSettle();
-
-      // La coquille construit les destinations une fois : « Mon mois » porte
-      // la même pastille sans rien savoir des propositions.
-      expect(find.text(AppStrings.navMonMois), findsWidgets);
-      expect(_pastille(tester), 3);
+      expect(_comptePropositions(tester), 0);
+      expect(
+        find.text(AppStrings.accueilVidePropositionsTitre),
+        findsOneWidget,
+      );
     });
   });
 }

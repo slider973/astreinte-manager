@@ -9,16 +9,13 @@ import 'helpers.dart';
 
 Widget _ossature({
   bool admin = false,
-  int propositions = 0,
+  int nonLues = 0,
   AppBanner? banniere,
   ValueChanged<int>? onDestination,
 }) {
   return AppScaffold(
     titre: 'Octobre 2026',
-    destinations: AppDestination.pour(
-      admin: admin,
-      propositionsEnAttente: propositions,
-    ),
+    destinations: AppDestination.pour(admin: admin, boiteNonLues: nonLues),
     indexSelectionne: 0,
     onDestination: onDestination ?? (_) {},
     banniere: banniere,
@@ -37,10 +34,10 @@ void main() {
       expect(
         AppDestination.pour(admin: true).map((d) => d.libelle).toList(),
         <String>[
-          AppStrings.navMonMois,
-          AppStrings.navPropositions,
+          AppStrings.navAccueil,
+          AppStrings.navCalendrier,
           AppStrings.navAstreintes,
-          AppStrings.navProfil,
+          AppStrings.navBoite,
           AppStrings.navAdmin,
         ],
       );
@@ -101,8 +98,8 @@ void main() {
         NavigationBarTheme.of(barre).labelBehavior,
         NavigationDestinationLabelBehavior.alwaysShow,
       );
-      expect(find.text(AppStrings.navMonMois), findsOneWidget);
-      expect(find.text(AppStrings.navPropositions), findsOneWidget);
+      expect(find.text(AppStrings.navAccueil), findsOneWidget);
+      expect(find.text(AppStrings.navCalendrier), findsOneWidget);
     });
 
     testWidgets('la bannière se place entre la barre et le contenu', (
@@ -158,7 +155,7 @@ void main() {
     });
 
     testWidgets('une pastille chiffrée à trois', (tester) async {
-      await monterEcran(tester, _ossature(propositions: 3));
+      await monterEcran(tester, _ossature(nonLues: 3));
 
       expect(find.byType(Badge), findsWidgets);
       expect(find.text('3'), findsWidgets);
@@ -168,14 +165,14 @@ void main() {
       tester,
     ) async {
       final handle = tester.ensureSemantics();
-      await monterEcran(tester, _ossature(propositions: 12));
+      await monterEcran(tester, _ossature(nonLues: 12));
 
       expect(find.text('9+'), findsWidgets);
       // Le libellé complet est fusionné dans la destination : on le cherche
       // dans le nœud, pas en égalité stricte.
       expect(
         find.bySemanticsLabel(
-          RegExp(RegExp.escape(AppStrings.navPropositionsBadge(12))),
+          RegExp(RegExp.escape(AppStrings.centreNonLuesBadge(12))),
         ),
         findsWidgets,
       );

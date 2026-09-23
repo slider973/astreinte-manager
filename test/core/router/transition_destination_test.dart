@@ -1,14 +1,16 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
-import 'package:astreinte_sp/core/widgets/app_scaffold.dart';
+import 'package:astreinte_sp/core/widgets/colonne_navigation.dart';
+import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
+import 'package:astreinte_sp/features/astreintes/presentation/astreintes_screen.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
 import 'package:astreinte_sp/features/membres/presentation/inviter_screen.dart';
 import 'package:astreinte_sp/features/membres/presentation/membres_screen.dart';
+import 'package:astreinte_sp/features/notifications/presentation/notifications_screen.dart';
 import 'package:astreinte_sp/features/planning/domain/ligne_matrice.dart';
 import 'package:astreinte_sp/features/planning/presentation/matrice_screen.dart';
-import 'package:astreinte_sp/features/profil/presentation/profil_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -42,7 +44,7 @@ final Finder _glissement = find.byWidgetPredicate(
   description: 'une transition de glissement',
 );
 
-/// Le poste d'un administrateur, ouvert sur « Mon mois ».
+/// Le poste d'un administrateur, ouvert sur l'accueil.
 Future<void> _ouvrirLePoste(WidgetTester tester) async {
   await monterApp(
     tester,
@@ -80,7 +82,15 @@ Future<void> _toucherEtRegarder(
   String libelle,
   void Function(int image) regard,
 ) async {
-  await tester.tap(find.text(libelle));
+  // **Dans la colonne, et nulle part ailleurs.** « Astreintes » est aussi le
+  // libellé d'un compteur de la barre du Calendrier : un `find.text` nu en
+  // trouve deux et ne sait pas lequel toucher.
+  await tester.tap(
+    find.descendant(
+      of: find.byType(ColonneNavigation),
+      matching: find.text(libelle),
+    ),
+  );
   for (var image = 0; image < 60; image++) {
     await tester.pump(const Duration(milliseconds: 16));
     regard(image);
@@ -90,7 +100,7 @@ Future<void> _toucherEtRegarder(
 void main() {
   group('Passer d\'une destination à l\'autre', () {
     testWidgets(
-      'aucun glissement entre « Admin », « Profil » et « Mon mois »',
+      'aucun glissement entre les cinq destinations',
       (tester) async {
         await _ouvrirLePoste(tester);
         expect(_glissement, findsNothing);
@@ -112,33 +122,56 @@ void main() {
 
         await _toucherEtRegarder(
           tester,
-          AppStrings.navProfil,
+          AppStrings.navAccueil,
           (int image) => expect(
             _glissement,
             findsNothing,
-            reason: 'vers « Profil », image $image',
+            reason: 'vers « Accueil », image $image',
           ),
         );
-        expect(
-          emplacementCourant(tester),
-          '${AppRoutes.accueil}?onglet=${AppDestination.indexProfil}',
-        );
-        expect(find.byType(ProfilScreen), findsOneWidget);
+        expect(emplacementCourant(tester), AppRoutes.accueil);
+        expect(find.byType(AccueilScreen), findsOneWidget);
 
         await _toucherEtRegarder(
           tester,
-          AppStrings.navMonMois,
+          AppStrings.navCalendrier,
           (int image) => expect(
             _glissement,
             findsNothing,
-            reason: 'vers « Mon mois », image $image',
+            reason: 'vers « Calendrier », image $image',
           ),
         );
-        // Les quatre premiers onglets partagent la route `/` : revenir sur
-        // « Mon mois » change l'écran sans changer d'adresse — l'onglet reste
-        // dans la chaîne de requête de la dernière navigation.
+        // Chaque destination a sa route depuis le ticket 064 : l'adresse
+        // change, la page ne glisse pas.
         expect(find.byType(MoisScreen), findsOneWidget);
-        expect(emplacementCourant(tester), startsWith(AppRoutes.accueil));
+        expect(emplacementCourant(tester), AppRoutes.calendrier);
+
+        // Les deux dernières entrées de la barre, pour que le parcours les
+        // couvre toutes les cinq : une seule qui glisserait suffirait à
+        // rouvrir la plainte.
+        await _toucherEtRegarder(
+          tester,
+          AppStrings.navAstreintes,
+          (int image) => expect(
+            _glissement,
+            findsNothing,
+            reason: 'vers « Astreintes », image $image',
+          ),
+        );
+        expect(find.byType(AstreintesScreen), findsOneWidget);
+        expect(emplacementCourant(tester), AppRoutes.astreintes);
+
+        await _toucherEtRegarder(
+          tester,
+          AppStrings.navBoite,
+          (int image) => expect(
+            _glissement,
+            findsNothing,
+            reason: 'vers « Boîte », image $image',
+          ),
+        );
+        expect(find.byType(NotificationsScreen), findsOneWidget);
+        expect(emplacementCourant(tester), AppRoutes.boite);
       },
       variant: const TargetPlatformVariant(<TargetPlatform>{
         TargetPlatform.iOS,

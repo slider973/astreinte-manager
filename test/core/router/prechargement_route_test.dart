@@ -50,6 +50,12 @@ void main() {
       expect(donneesDEcran(AppRoutes.suivi), hasLength(2));
     });
 
+    test('l\'accueil en réveille deux : les astreintes et les propositions', () {
+      // Les deux lectures du tableau de bord (ticket 064). Rien ne les
+      // abonnait avant que l'écran ne se construise.
+      expect(donneesDEcran(AppRoutes.accueil), hasLength(2));
+    });
+
     test('chaque écran qui lit la base a sa ligne', () {
       for (final chemin in <String>[
         AppRoutes.planningAdmin,
@@ -58,17 +64,17 @@ void main() {
         AppRoutes.periodes,
         AppRoutes.parametres,
         AppRoutes.abonnement,
-        AppRoutes.notifications,
+        AppRoutes.boite,
+        AppRoutes.accueil,
       ]) {
         expect(donneesDEcran(chemin), isNotEmpty, reason: chemin);
       }
     });
 
     test('un chemin sans requête à lui ne précharge rien', () {
-      // L'accueil est déjà chargé au démarrage ; les pages légales et l'aide à
-      // l'installation ne demandent rien à la base.
+      // L'écran d'attente, les pages légales et l'aide à l'installation ne
+      // demandent rien à la base.
       for (final chemin in <String>[
-        AppRoutes.accueil,
         AppRoutes.demarrage,
         AppRoutes.confidentialite,
         AppRoutes.aideInstallation,

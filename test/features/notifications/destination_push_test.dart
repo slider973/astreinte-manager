@@ -4,23 +4,20 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('Liens publics des notifications (WORKFLOWS § 8)', () {
     test('/proposals ouvre les propositions', () {
-      expect(
-        destinationInterne('/proposals', admin: false),
-        '/?onglet=1',
-      );
+      expect(destinationInterne('/proposals', admin: false), '/propositions');
     });
 
     test('/schedule/<mois> ouvre le planning', () {
       expect(
         destinationInterne('/schedule/2026-10', admin: false),
-        '/?onglet=2',
+        '/astreintes',
       );
     });
 
     test('/availability/<mois> ouvre le mois demandé', () {
       expect(
         destinationInterne('/availability/2026-10', admin: false),
-        '/?onglet=0&mois=2026-10',
+        '/calendrier?mois=2026-10',
       );
     });
 
@@ -44,10 +41,7 @@ void main() {
         destinationInterne('/admin/subscription', admin: true),
         '/admin/abonnement',
       );
-      expect(
-        destinationInterne('/admin/subscription', admin: false),
-        isNull,
-      );
+      expect(destinationInterne('/admin/subscription', admin: false), isNull);
     });
 
     test('un mois mal formé ne devient jamais une URL', () {

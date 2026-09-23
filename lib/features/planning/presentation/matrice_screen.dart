@@ -12,6 +12,7 @@ import '../../../core/l10n/format_date.dart';
 import '../../../core/preferences/reperes_locaux.dart';
 import '../../../core/reseau/connectivite.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/router/destinations.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -119,7 +120,6 @@ class MatriceScreen extends ConsumerStatefulWidget {
 }
 
 class _MatriceScreenState extends ConsumerState<MatriceScreen> {
-  static const String _routeAdmin = 'admin';
 
   @override
   void initState() {
@@ -575,13 +575,6 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     return null;
   }
 
-  void _versDestination(int index, List<AppDestination> destinations) {
-    if (destinations[index].route == _routeAdmin) return;
-    context.goNamed(
-      AppRoutes.accueilName,
-      queryParameters: <String, String>{AppRoutes.parametreOnglet: '$index'},
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -609,10 +602,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     final asynchrone = ref.watch(matriceControllerProvider);
     final etat = asynchrone.value;
     final panneau = ref.watch(panneauCandidatsProvider);
-    final destinations = AppDestination.pour(admin: admin);
-    final indexAdmin = destinations.indexWhere(
-      (AppDestination d) => d.route == _routeAdmin,
-    );
+    final destinations = ref.watch(destinationsProvider);
     final compact = AppWindowClass.of(context).estCompact;
 
     return AppScaffold(
@@ -622,8 +612,12 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       // bandeau juste en dessous (`design/061 § 5`).
       caserne: ref.watch(appartenanceCouranteProvider)?.nomCaserne,
       destinations: destinations,
-      indexSelectionne: indexAdmin < 0 ? 0 : indexAdmin,
-      onDestination: (int index) => _versDestination(index, destinations),
+      indexSelectionne: indexDestination(
+        destinations,
+        AppRoutes.planningAdminName,
+      ),
+      onDestination: (int index) =>
+          allerVersDestination(context, destinations, index),
       actions: <Widget>[
         if (admin && compact) const _MenuAdmin(),
         if (admin && !compact) ..._liensAdmin(),

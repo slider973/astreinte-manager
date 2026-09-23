@@ -5,12 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../../features/abonnement/domain/abonnement_providers.dart';
 import '../../features/abonnement/presentation/abonnement_screen.dart';
 import '../../features/accueil/presentation/accueil_screen.dart';
+import '../../features/astreintes/presentation/astreintes_screen.dart';
 import '../../features/auth/presentation/aucune_caserne_screen.dart';
 import '../../features/auth/presentation/code_screen.dart';
 import '../../features/auth/presentation/connexion_screen.dart';
 import '../../features/demarrage/presentation/configuration_absente_screen.dart';
 import '../../features/demarrage/presentation/demarrage_screen.dart';
 import '../../features/dev/presentation/dev_components_screen.dart';
+import '../../features/dispos/presentation/mois_screen.dart';
 import '../../features/invitation/domain/acceptation.dart';
 import '../../features/invitation/presentation/invitation_screen.dart';
 import '../../features/legal/presentation/document_legal_screen.dart';
@@ -28,6 +30,8 @@ import '../../features/parametres/presentation/parametres_screen.dart';
 import '../../features/periodes/presentation/periodes_screen.dart';
 import '../../features/planning/presentation/matrice_screen.dart';
 import '../../features/planning/presentation/suivi_screen.dart';
+import '../../features/profil/presentation/profil_screen.dart';
+import '../../features/propositions/presentation/propositions_screen.dart';
 import '../../features/superadmin/domain/superadmin_providers.dart';
 import '../../features/superadmin/presentation/superadmin_screen.dart';
 import '../env.dart';
@@ -38,6 +42,7 @@ import '../session/session_providers.dart';
 import '../supabase/supabase_bootstrap.dart';
 import 'auth_redirection.dart';
 import 'destination_initiale.dart';
+import 'destinations.dart';
 import 'prechargement_route.dart';
 
 /// Chemins et noms de routes de l'application.
@@ -50,9 +55,40 @@ import 'prechargement_route.dart';
 /// Toujours naviguer par nom (`context.goNamed`) pour ne pas dupliquer les
 /// chemins.
 abstract final class AppRoutes {
-  /// L'accueil, une fois connecté et rattaché à une caserne.
+  /// **Le tableau de bord du pompier** (ticket 064), une fois connecté et
+  /// rattaché à une caserne. Il portait « Mon mois » jusque-là : les anciennes
+  /// adresses `/?onglet=N` sont redirigées par [ongletHerite].
   static const String accueil = '/';
   static const String accueilName = 'accueil';
+
+  /// **La saisie des disponibilités** (ticket 011), deuxième destination
+  /// depuis le ticket 064. Le mois voyage en `?mois=AAAA-MM`
+  /// ([parametreMois]).
+  static const String calendrier = '/calendrier';
+  static const String calendrierName = 'calendrier';
+
+  /// **La consultation** (ticket 027) : mes astreintes et celles de la
+  /// caserne.
+  static const String astreintes = '/astreintes';
+  static const String astreintesName = 'astreintes';
+
+  /// **La boîte** (ticket 064) : le journal de bord. Au chantier 064a elle
+  /// sert l'écran des notifications ; le 064b y fera entrer les propositions
+  /// derrière des onglets.
+  static const String boite = '/boite';
+  static const String boiteName = 'boite';
+
+  /// **Le profil** (ticket 007), enfin à sa route. Ce n'est pas une
+  /// destination : on l'ouvre depuis l'avatar de l'en-tête, **par `push`**, et
+  /// on en revient par `BoutonRetour`.
+  static const String profil = '/profil';
+  static const String profilName = 'profil';
+
+  /// **Les propositions en attente** (ticket 021), à leur route depuis le
+  /// ticket 064. Écran poussé, pas une destination : le chantier 064b les fera
+  /// entrer dans la Boîte, et cette adresse y mènera alors.
+  static const String propositions = '/propositions';
+  static const String propositionsName = 'propositions';
 
   /// Écran d'attente : session en cours de restauration.
   static const String demarrage = '/demarrage';
@@ -73,16 +109,17 @@ abstract final class AppRoutes {
   static const String aucuneCaserne = '/aucune-caserne';
   static const String aucuneCaserneName = 'aucuneCaserne';
 
-  /// L'onglet à ouvrir sur l'accueil, quand on y revient depuis un écran de
-  /// premier niveau qui a sa propre route (« Admin »).
+  /// **L'onglet de la coquille d'avant le ticket 064**, gardé pour une seule
+  /// raison : les adresses `/?onglet=1` sont parties dans des notifications et
+  /// dorment dans des historiques de navigateur. La route `/` les traduit vers
+  /// la destination qui a pris la suite ([ongletHerite]) ; rien n'en produit
+  /// plus.
   static const String parametreOnglet = 'onglet';
 
-  /// Le mois affiché par « Mon mois », au format `AAAA-MM` (ticket 011).
+  /// Le mois affiché par le Calendrier, au format `AAAA-MM` (ticket 011).
   ///
   /// L'URL porte l'état : le retour du navigateur et le geste retour iOS
-  /// ramènent au mois précédemment consulté, jamais à un état perdu. La route
-  /// dédiée `/mois` annoncée dans `DESIGN.md § Navigation` attend que la
-  /// coquille d'accueil éclate en routes.
+  /// ramènent au mois précédemment consulté, jamais à un état perdu.
   static const String parametreMois = 'mois';
 
   /// Tout ce qui est réservé aux administrateurs de la caserne. La garde est
@@ -204,11 +241,12 @@ abstract final class AppRoutes {
       '$prefixeBienvenue/notifications';
   static const String activationNotificationsName = 'activationNotifications';
 
-  /// Le centre de notifications (ticket 026).
+  /// L'ancienne adresse du centre de notifications (ticket 026), **devenue un
+  /// renvoi** vers [boite] au ticket 064.
   ///
-  /// **Pas une destination de navigation** : `DESIGN.md § Navigation` en fixe
-  /// cinq au maximum et un admin les a toutes. On y va par la cloche de la
-  /// barre d'application, et le retour du navigateur ramène d'où l'on vient.
+  /// Elle ne disparaît pas : elle a été poussée par la cloche pendant six
+  /// tickets, donc elle est dans des historiques de navigateur et dans des
+  /// onglets restaurés.
   static const String notifications = '/notifications';
   static const String notificationsName = 'notifications';
 
@@ -275,8 +313,8 @@ abstract final class AppRoutes {
 /// La page d'une **destination de premier niveau** : elle prend la place de
 /// la précédente sans transition (ticket 063).
 ///
-/// Passer d'une destination à sa sœur — « Admin », puis « Profil » — n'est pas
-/// une poussée : il n'y a ni avant ni après, rien d'où revenir. Or le thème
+/// Passer d'une destination à sa sœur — « Accueil », puis « Calendrier » —
+/// n'est pas une poussée : il n'y a ni avant ni après, rien d'où revenir. Or le thème
 /// (`core/theme/app_theme.dart`) donne à toute page par défaut la transition
 /// de la plateforme, un glissement de droite à gauche sur iOS et macOS. Sur
 /// une coquille qui ne bouge pas — colonne de navigation, en-tête, barre du
@@ -285,17 +323,19 @@ abstract final class AppRoutes {
 /// Pas de fondu non plus : deux coquilles identiques qui se croisent en
 /// opacité font clignoter la colonne.
 ///
-/// Les écrans qu'on **pousse** et dont on revient (inviter, importer, le
-/// centre de notifications, les autres écrans d'administration) gardent la
-/// page par défaut et donc la transition du thème. Seules les routes servies
-/// par `AppDestination` passent par ici : `/` et `/admin/planning`. `/admin/
-/// suivi` n'en est pas une — on y va par la barre d'application, la coquille
-/// n'y mène jamais comme destination.
+/// Les écrans qu'on **pousse** et dont on revient — le profil, les
+/// propositions, inviter, importer, les pages légales, les autres écrans
+/// d'administration — gardent la page par défaut et donc la transition du
+/// thème. Seules les cinq routes servies par `AppDestination` passent par
+/// ici : `/`, `/calendrier`, `/astreintes`, `/boite` et `/admin/planning`.
+/// `/admin/suivi` n'en est pas une — on y va par la barre d'application, la
+/// coquille n'y mène jamais comme destination.
 ///
 /// Les trois attributs recopient ce que `go_router` donne à une page bâtie
-/// depuis un `builder` (`go_router/src/builder.dart`) : même clé, donc même
-/// `State` d'un changement de chaîne de requête à l'autre — c'est ce dont
-/// `AccueilScreen.didUpdateWidget` dépend pour suivre `?onglet=`.
+/// depuis un `builder` (`go_router/src/builder.dart`). La clé est celle de
+/// l'emplacement : un changement de chaîne de requête — le mois du
+/// Calendrier, `?mois=AAAA-MM` — garde donc le même `State`, et l'écran suit
+/// l'URL sans être reconstruit.
 Page<void> pageDestination(GoRouterState state, Widget enfant) =>
     NoTransitionPage<void>(
       key: state.pageKey,
@@ -446,22 +486,36 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: <RouteBase>[
-      // **Les deux routes que la coquille sert comme destinations** : elles
+      // **Les cinq routes que la coquille sert comme destinations** : elles
       // changent sans transition (ticket 063, voir [pageDestination]).
       GoRoute(
         path: AppRoutes.accueil,
         name: AppRoutes.accueilName,
+        // Les adresses de la coquille d'avant le ticket 064 — `/?onglet=1`,
+        // `/?mois=2026-10` — mènent à la destination qui a pris la suite.
+        redirect: (context, state) => ongletHerite(state.uri),
+        pageBuilder: (context, state) =>
+            pageDestination(state, const AccueilScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.calendrier,
+        name: AppRoutes.calendrierName,
         pageBuilder: (context, state) => pageDestination(
           state,
-          AccueilScreen(
-            ongletInitial:
-                int.tryParse(
-                  state.uri.queryParameters[AppRoutes.parametreOnglet] ?? '',
-                ) ??
-                0,
-            mois: state.uri.queryParameters[AppRoutes.parametreMois],
-          ),
+          MoisScreen(mois: state.uri.queryParameters[AppRoutes.parametreMois]),
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.astreintes,
+        name: AppRoutes.astreintesName,
+        pageBuilder: (context, state) =>
+            pageDestination(state, const AstreintesScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.boite,
+        name: AppRoutes.boiteName,
+        pageBuilder: (context, state) =>
+            pageDestination(state, const NotificationsScreen()),
       ),
       GoRoute(
         path: AppRoutes.planningAdmin,
@@ -472,6 +526,19 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             mois: state.uri.queryParameters[AppRoutes.parametreMois],
           ),
         ),
+      ),
+
+      // **Les deux écrans qu'on pousse** : ils gardent la page par défaut,
+      // donc la transition du thème, et ils portent `BoutonRetour`.
+      GoRoute(
+        path: AppRoutes.profil,
+        name: AppRoutes.profilName,
+        builder: (context, state) => const ProfilScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.propositions,
+        name: AppRoutes.propositionsName,
+        builder: (context, state) => const PropositionsScreen(),
       ),
       GoRoute(
         path: AppRoutes.suivi,
@@ -561,10 +628,11 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.activationNotificationsName,
         builder: (context, state) => const ActivationNotificationsScreen(),
       ),
+      // L'ancienne adresse du centre, devenue un renvoi vers la Boîte.
       GoRoute(
         path: AppRoutes.notifications,
         name: AppRoutes.notificationsName,
-        builder: (context, state) => const NotificationsScreen(),
+        redirect: (context, state) => AppRoutes.boite,
       ),
 
       // Les quatre liens publics des notifications. Ils n'ont pas d'écran à

@@ -8,6 +8,7 @@ import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/router/destinations.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
@@ -178,35 +179,13 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
       );
   }
 
-  void _versDestination(int index, List<AppDestination> destinations) {
-    final destination = destinations[index];
-    if (destination.route == _routeAdmin) {
-      // « Admin » ouvre la matrice du mois (ticket 016) : sans cela, la
-      // destination ne ferait rien depuis un écran admin, et la vue centrale
-      // serait inatteignable autrement que par la barre d'application.
-      context.goNamed(AppRoutes.planningAdminName);
-      return;
-    }
 
-    // Les autres destinations vivent encore dans l'accueil (ticket 005) :
-    // on y retourne en disant quel onglet ouvrir, pour ne pas ramener
-    // quelqu'un sur « Mon mois » quand il a demandé « Planning ».
-    context.goNamed(
-      AppRoutes.accueilName,
-      queryParameters: <String, String>{AppRoutes.parametreOnglet: '$index'},
-    );
-  }
-
-  static const String _routeAdmin = 'admin';
 
   @override
   Widget build(BuildContext context) {
     final admin = ref.watch(estAdminCaserneProvider);
     final etat = ref.watch(membresControllerProvider);
-    final destinations = AppDestination.pour(admin: admin);
-    final indexAdmin = destinations.indexWhere(
-      (AppDestination d) => d.route == _routeAdmin,
-    );
+    final destinations = ref.watch(destinationsProvider);
 
     final donnees = etat.value;
     final enErreur = etat.hasError;
@@ -216,8 +195,12 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
     return AppScaffold(
       titre: AppStrings.membresTitre,
       destinations: destinations,
-      indexSelectionne: indexAdmin < 0 ? 0 : indexAdmin,
-      onDestination: (int index) => _versDestination(index, destinations),
+      indexSelectionne: indexDestination(
+        destinations,
+        AppRoutes.planningAdminName,
+      ),
+      onDestination: (int index) =>
+          allerVersDestination(context, destinations, index),
       actions: <Widget>[
         if (admin)
           IconButton(

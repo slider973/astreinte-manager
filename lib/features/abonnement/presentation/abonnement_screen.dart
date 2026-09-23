@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/router/destinations.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
@@ -40,7 +41,6 @@ class AbonnementScreen extends ConsumerStatefulWidget {
 }
 
 class _AbonnementScreenState extends ConsumerState<AbonnementScreen> {
-  static const String _routeAdmin = 'admin';
 
   /// Le retour n'est pris en compte qu'une fois : relire à chaque
   /// reconstruction ferait boucler l'écran sur lui-même.
@@ -109,33 +109,24 @@ class _AbonnementScreenState extends ConsumerState<AbonnementScreen> {
       );
   }
 
-  void _versDestination(int index, List<AppDestination> destinations) {
-    if (destinations[index].route == _routeAdmin) {
-      context.goNamed(AppRoutes.planningAdminName);
-      return;
-    }
-    context.goNamed(
-      AppRoutes.accueilName,
-      queryParameters: <String, String>{AppRoutes.parametreOnglet: '$index'},
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final admin = ref.watch(estAdminCaserneProvider);
     final asynchrone = ref.watch(abonnementControllerProvider);
-    final destinations = AppDestination.pour(admin: admin);
-    final indexAdmin = destinations.indexWhere(
-      (AppDestination d) => d.route == _routeAdmin,
-    );
+    final destinations = ref.watch(destinationsProvider);
 
     final vue = asynchrone.value;
 
     return AppScaffold(
       titre: AppStrings.abonnementTitre,
       destinations: destinations,
-      indexSelectionne: indexAdmin < 0 ? 0 : indexAdmin,
-      onDestination: (int index) => _versDestination(index, destinations),
+      indexSelectionne: indexDestination(
+        destinations,
+        AppRoutes.planningAdminName,
+      ),
+      onDestination: (int index) =>
+          allerVersDestination(context, destinations, index),
       actions: <Widget>[
         if (admin)
           IconButton(

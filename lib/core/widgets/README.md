@@ -6,7 +6,7 @@ montre tous, dans tous leurs états, en clair et en sombre.
 
 | Fichier | Widget | Rôle |
 |---|---|---|
-| `app_scaffold.dart` | `AppScaffold`, `AppDestination` | Ossature d'écran : barre, bannière, contenu, navigation. Barre basse en compact, rail au-delà, panneau latéral en large. |
+| `app_scaffold.dart` | `AppScaffold`, `AppDestination` | Ossature d'écran : barre, bannière, contenu, navigation. Barre basse en compact, rail au-delà, panneau latéral en large. Les destinations sont **quatre** pour un pompier depuis le ticket 064 — Accueil, Calendrier, Astreintes, Boîte — et cinq pour un admin ; leur `route` est un **nom** de route `go_router`, et `core/router/destinations.dart` porte le provider partagé, l'index courant et le geste. `sansBarreApplication` efface la barre sous `expanded` pour le seul écran qui porte son propre en-tête, l'accueil. |
 | `app_banner.dart` | `AppBanner` | **Composant signature.** Les faits qui changent tout ce qui est en dessous. Une seule à la fois, par ordre de priorité. |
 | `primary_button.dart` | `PrimaryButton` | Bloc à rayon 8, hauteur 52, libellé 16 sp. Un bouton désactivé **doit** dire pourquoi. |
 | `slot_chip.dart` | `SlotChip` | **Composant signature.** La case du registre. Trois densités, trois remplissages. |
@@ -28,14 +28,32 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `avatar_initiales.dart` | `AvatarInitiales` | Un disque d'initiales. Pas de photo : ce serait une donnée personnelle de plus, et les pompiers n'en ont pas dans ce produit. Toujours décoratif (`ExcludeSemantics`) : le nom à côté est le seul libellé. Les lettres rétrécissent plutôt que d'être coupées quand le disque est petit (24 dans la matrice) ou le texte grand. |
 | `bouton_retour.dart` | `BoutonRetour` | La sortie d'un écran sans ossature ni parent dans le routeur. Flèche seule quand il y a une pile à dépiler, flèche **suivie du mot « Accueil »** quand il n'y en a pas (ticket 052). |
 
+## Les rayons, et lequel prendre
+
+`AppRadius` porte cinq rayons et **deux mondes**. Le registre de l'admin est fait de cases à
+rayon 4 et de blocs à rayon 8 ; les écrans du pompier sont faits de **cartes à rayon 20**
+(`AppRadius.carte`, ticket 064) posées sur un fond `surface-container-low`. Le rayon `carte` est
+réservé à ces cartes : un bouton ou un champ à 20 serait une gélule, que `DESIGN.md § Shapes`
+proscrit. `feuilleCarreeRadius` est le rayon `feuille` sur les quatre coins — le carré d'initiale
+des lignes de liste —, là où `feuilleRadius` ne porte que les deux coins hauts d'une feuille de
+bas d'écran.
+
 ## La règle qui a produit `BoutonRetour`
 
 Un écran atteint par une navigation depuis un autre écran, déclaré au premier niveau du routeur et
 sans barre de navigation, n'a **par construction aucune sortie** : sur iPhone en PWA plein écran il
 n'y a pas de barre d'adresse, et la personne est enfermée. À vérifier pour toute nouvelle route :
 
-> *Un écran qui ne porte ni `AppScaffold` ni un parent dans le routeur s'ouvre par `push` et porte
-> une flèche à repli.*
+> *Un écran qui ne porte ni `AppScaffold` ni un parent dans le routeur s'ouvre par `push`, porte
+> une flèche à repli, **et réserve lui-même la zone sûre basse**.*
+
+La seconde moitié de la règle est arrivée au ticket 064a, avec le profil et les propositions : ils
+vivaient dans `AppScaffold`, dont la barre de navigation ajoute `viewPadding.bottom` à sa hauteur.
+Poussés, ils n'ont plus rien sous eux, et les 34 points de la barre d'accueil d'un iPhone en PWA
+installée mangent la fin du contenu — « Se déconnecter » et « Supprimer mon compte ». La forme est
+celle de `DocumentLegalScreen`, l'écran poussé à liste qui l'avait déjà : `body: SafeArea(top:
+false, …)`. Pas de widget commun : les écrans poussés ne partagent pas d'ossature, seulement cette
+règle et cette forme.
 
 ## Ce qu'aucun de ces widgets ne fait
 

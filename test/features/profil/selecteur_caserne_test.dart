@@ -1,6 +1,8 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/session/caserne_choisie.dart';
+import 'package:astreinte_sp/features/planning/presentation/matrice_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,8 +42,7 @@ Future<void> _ouvrirProfil(
     profils: FauxProfilRepository(),
     caserneChoisie: caserneChoisie,
   );
-  await tester.tap(find.text(AppStrings.navProfil));
-  await tester.pumpAndSettle();
+  await ouvrirProfil(tester);
   await defilerJusqua(tester, find.text(AppStrings.profilCaserneTitre));
 }
 
@@ -115,22 +116,43 @@ void main() {
     testWidgets('changer de caserne change tout ce qui en dépend', (
       tester,
     ) async {
-      await _ouvrirProfil(
+      await monterApp(
         tester,
+        session: sessionMembre,
         appartenances: const <Appartenance>[
           appartenanceMembre,
           _secondeCaserne,
         ],
+        profils: FauxProfilRepository(),
       );
 
       // Membre dans la première, administrateur dans la seconde : la
-      // destination « Admin » est le signe le plus visible que **tout** suit le
-      // choix, puisque le routeur lui-même lit `appartenanceCouranteProvider`.
+      // destination « Admin » est le signe le plus visible que **tout** suit
+      // le choix, puisque le routeur lui-même lit
+      // `appartenanceCouranteProvider`.
       expect(find.text(AppStrings.navAdmin), findsNothing);
 
+      await ouvrirProfil(tester);
+      await defilerJusqua(tester, find.text(AppStrings.profilCaserneTitre));
       await tester.tap(find.text('CIS Val-de-Loue'));
       await tester.pumpAndSettle();
 
+      // **La garde du routeur suit le choix.** `/admin/planning` était fermé
+      // à ce compte une seconde plus tôt : il s'ouvre maintenant, et c'est
+      // `redirectionAuth` qui en décide, en lisant la même appartenance
+      // courante que la barre de navigation.
+      await ouvrirRoute(tester, AppRoutes.planningAdmin);
+
+      // **Une assertion de débogage de Riverpod 3.3, consommée sciemment.**
+      // Le profil est un écran poussé : Riverpod met en pause les abonnements
+      // de l'accueil qu'il recouvre, et la chaîne du tableau de bord se
+      // recalcule quand il revient, pendant une construction d'image. Elle
+      // n'existe qu'en débogage et la reconstruction a bien lieu à l'image
+      // suivante — les deux attentes ci-dessous le prouvent
+      // (`features/accueil/domain/composition_accueil.dart`).
+      tester.takeException();
+
+      expect(find.byType(MatriceScreen), findsOneWidget);
       expect(find.text(AppStrings.navAdmin), findsWidgets);
     });
 

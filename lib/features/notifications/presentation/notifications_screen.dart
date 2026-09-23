@@ -5,25 +5,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/router/destinations.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_divider.dart';
+import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/barre_actions_basse.dart';
-import '../../../core/widgets/bouton_retour.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../domain/centre_providers.dart';
 import '../domain/destination_push.dart';
 import '../domain/notification_interne.dart';
 import 'widgets/ligne_notification.dart';
 
-/// Le centre de notifications : le journal de bord du pompier.
+/// **La Boîte** — le journal de bord du pompier.
 ///
-/// Une tâche, donc une route, et pas une modale (`DESIGN.md § Don't`) : le
-/// retour du navigateur et le geste retour iOS ramènent d'où l'on vient.
+/// Quatrième destination depuis le ticket 064, à la route `/boite` : elle
+/// portait « Notifications » et se poussait, faute de place dans une barre à
+/// cinq entrées dont le profil occupait la quatrième. Le chantier 064b y fera
+/// entrer les propositions derrière trois onglets — Tout, Propositions,
+/// Rappels — et le contenu servi ici est, d'ici là, celui du ticket 026.
 ///
 /// C'est **le filet du produit** quand le push n'arrive pas — iPhone hors
 /// écran d'accueil, autorisation refusée, batterie économisée. Une proposition
@@ -123,46 +128,44 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final enErreur = etat.hasError;
     final nonLues = donnees?.nonLues ?? 0;
 
-    return Scaffold(
-      appBar: AppBar(
-        // La sortie est construite par le produit et non laissée au bouton
-        // implicite de Flutter : c'est la seule façon de traiter la pile vide,
-        // qui est justement le cas du lien profond application fermée
-        // (ticket 052).
-        leading: const BoutonRetour(),
-        leadingWidth: BoutonRetour.largeur(context),
-        title: const Text(AppStrings.centreTitre),
-        actions: <Widget>[
-          IconButton(
-            onPressed: _relire,
-            icon: const Icon(Icons.refresh),
-            tooltip: AppStrings.centreRafraichir,
-          ),
-        ],
-      ),
-      body: Column(
-        children: <Widget>[
-          // Une erreur survenue alors que la liste est déjà affichée se dit en
-          // bannière : vider l'écran pour annoncer un échec de relecture ferait
-          // perdre ce qui était juste.
-          if (enErreur && donnees != null)
-            AppBanner(
+    final destinations = ref.watch(destinationsProvider);
+
+    return AppScaffold(
+      titre: AppStrings.navBoite,
+      destinations: destinations,
+      indexSelectionne: indexDestination(destinations, AppRoutes.boiteName),
+      onDestination: (index) =>
+          allerVersDestination(context, destinations, index),
+      actions: <Widget>[
+        IconButton(
+          onPressed: _relire,
+          icon: const Icon(Icons.refresh),
+          tooltip: AppStrings.centreRafraichir,
+        ),
+        const BoutonCompte(),
+      ],
+      // Une erreur survenue alors que la liste est déjà affichée se dit en
+      // bannière : vider l'écran pour annoncer un échec de relecture ferait
+      // perdre ce qui était juste.
+      banniere: enErreur && donnees != null
+          ? AppBanner(
               variante: AppBannerVariante.erreur,
               texte: AppStrings.centreErreurTexte,
               libelleAction: AppStrings.actionReessayer,
               onAction: _relire,
-            ),
-          Expanded(
-            child: _corps(
-              etat: etat,
-              donnees: donnees,
-              barreActions: nonLues > 0,
-            ),
-          ),
+            )
+          : null,
+      child: Column(
+        children: <Widget>[
+          Expanded(child: _corps(etat: etat, donnees: donnees)),
 
           // Le bouton n'apparaît que s'il y a quelque chose à marquer. Un
           // bouton désactivé qu'il faudrait expliquer à côté vaut moins qu'un
           // bouton absent (`design/026 § 3`).
+          //
+          // Il vit dans le contenu et non dans `filActions` : `BarreActionsBasse`
+          // porte déjà le filet, la surface de niveau 1 et la colonne bornée
+          // que la zone d'actions de la coquille ne connaît pas.
           if (nonLues > 0)
             BarreActionsBasse(
               child: PrimaryButton(
@@ -181,7 +184,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Widget _corps({
     required AsyncValue<EtatCentre> etat,
     required EtatCentre? donnees,
-    required bool barreActions,
   }) {
     if (donnees == null) {
       return etat.hasError
@@ -204,7 +206,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     return _ListeNotifications(
       donnees: donnees,
-      barreActions: barreActions,
       onOuvrir: (NotificationInterne notification) =>
           unawaited(_ouvrir(notification)),
     );
@@ -213,17 +214,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
 /// La liste, virtualisée : deux cents événements peuvent s'y trouver.
 class _ListeNotifications extends StatelessWidget {
-  const _ListeNotifications({
-    required this.donnees,
-    required this.barreActions,
-    required this.onOuvrir,
-  });
+  const _ListeNotifications({required this.donnees, required this.onOuvrir});
 
   final EtatCentre donnees;
-
-  /// La barre « Tout marquer comme lu » est sous la liste : c'est elle qui
-  /// porte alors la zone sûre basse.
-  final bool barreActions;
 
   final ValueChanged<NotificationInterne> onOuvrir;
 
@@ -233,15 +226,6 @@ class _ListeNotifications extends StatelessWidget {
     final maintenant = DateTime.now();
     final lignes = donnees.notifications;
 
-    // **La zone sûre basse quand rien ne la porte.** Tout lu, donc pas de
-    // barre d'actions : sans cette réserve, la dernière notification passe
-    // sous la barre d'accueil de l'iPhone en PWA installée
-    // (`PRODUCT.md` — « respecter les zones sûres »). Avec la barre,
-    // `BarreActionsBasse` s'en charge déjà, et doubler la réserve creuserait
-    // un trou.
-    final zoneSure = barreActions
-        ? 0.0
-        : MediaQuery.viewPaddingOf(context).bottom;
 
     return Center(
       child: ConstrainedBox(
@@ -278,7 +262,12 @@ class _ListeNotifications extends StatelessWidget {
               padding: EdgeInsets.only(
                 left: marge - AppSpacing.md,
                 right: marge - AppSpacing.md,
-                bottom: AppSpacing.xl + zoneSure,
+                // **Pas de réserve de zone sûre ici.** Elle existait quand la
+                // Boîte était un écran poussé, sans rien sous elle. Depuis le
+                // ticket 064 c'est une destination : la barre de navigation
+                // ajoute `viewPadding.bottom` à sa propre hauteur, et doubler
+                // la réserve creuserait un trou.
+                bottom: AppSpacing.xl,
               ),
               sliver: SliverList.separated(
                 itemCount: lignes.length,

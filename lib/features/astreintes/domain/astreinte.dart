@@ -47,7 +47,7 @@ class HeuresAffichage {
   /// « 19:00 ».
   final String finJour;
 
-  /// « 07:00 → 19:00 » en journée, « 19:00 → 07:00 » la nuit.
+  /// « 07:00 – 19:00 » en journée, « 19:00 – 07:00 » la nuit.
   String intervalle(CreneauType creneau) => creneau == CreneauType.jour
       ? AppStrings.astreintesIntervalle(debutJour, finJour)
       : AppStrings.astreintesIntervalle(finJour, debutJour);

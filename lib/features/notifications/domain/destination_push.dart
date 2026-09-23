@@ -7,21 +7,16 @@
 ///   `notifications.data.route` et que le navigateur ouvre quand on touche la
 ///   notification : `/proposals`, `/schedule/2026-10`… Il est stable, il ne
 ///   dépend pas de la forme des écrans, et il survivra à leur refonte ;
-/// - **l'emplacement interne**, celui que `go_router` sert aujourd'hui. La
-///   coquille d'accueil porte encore trois destinations dans des onglets, donc
-///   « les propositions » s'écrit `/?onglet=1`.
+/// - **l'emplacement interne**, celui que `go_router` sert aujourd'hui. Chaque
+///   écran a sa route depuis le ticket 064, donc « les propositions » s'écrit
+///   `/propositions` et non plus `/?onglet=1`.
 ///
-/// Tout est ici, dans une fonction pure et testée, pour que le jour où les
-/// écrans des tickets 019, 021 et 023 existent, **une seule ligne change** et
-/// les liens déjà partis en notification continuent de fonctionner.
+/// Tout est ici, dans une fonction pure et testée : c'est **le seul endroit**
+/// qui a changé quand la coquille d'accueil a éclaté en routes, et les liens
+/// déjà partis en notification ont continué de fonctionner.
 library;
 
 import '../../../core/router/app_router.dart';
-
-/// Les onglets de la coquille d'accueil (`AppDestination.pour`).
-const int _ongletMonMois = 0;
-const int _ongletPropositions = 1;
-const int _ongletAstreintes = 2;
 
 /// Une période de saisie, `AAAA-MM`. Rien d'autre n'est accepté : un lien
 /// forgé ne doit pas se promener dans l'URL de l'application.
@@ -48,7 +43,7 @@ String? destinationInterne(String? lien, {required bool admin}) {
 
   // `/proposals`
   if (segments.length == 1 && segments.first == 'proposals') {
-    return _accueil(onglet: _ongletPropositions);
+    return AppRoutes.propositions;
   }
 
   // `/admin/subscription` — l'abonnement de la caserne (ticket 030). Le lien
@@ -68,17 +63,19 @@ String? destinationInterne(String? lien, {required bool admin}) {
 
     // `/schedule/<period>` — le planning de la caserne. La destination
     // « Astreintes » porte depuis le ticket 027 « Mes astreintes », et le
-    // ticket 023 y ajoutera la vue de la caserne : le lien mène donc enfin à
-    // un écran. Il n'ouvre toujours pas un mois — le sélecteur de mois est du
-    // ressort du 023.
+    // ticket 023 y a ajouté la vue de la caserne. Elle n'ouvre toujours pas un
+    // mois : le sélecteur de mois de cet écran n'est pas dans l'URL.
     if (segments.first == 'schedule') {
-      return _accueil(onglet: _ongletAstreintes);
+      return AppRoutes.astreintes;
     }
 
     // `/availability/<period>` — la saisie du mois. La seule des quatre qui
-    // mène déjà exactement où il faut.
+    // mène exactement où il faut, mois compris.
     if (segments.first == 'availability') {
-      return _accueil(onglet: _ongletMonMois, mois: periode);
+      return Uri(
+        path: AppRoutes.calendrier,
+        queryParameters: <String, String>{AppRoutes.parametreMois: periode},
+      ).toString();
     }
   }
 
@@ -97,12 +94,4 @@ String? destinationInterne(String? lien, {required bool admin}) {
   }
 
   return null;
-}
-
-String _accueil({required int onglet, String? mois}) {
-  final parametres = <String, String>{
-    AppRoutes.parametreOnglet: '$onglet',
-    AppRoutes.parametreMois: ?mois,
-  };
-  return Uri(path: AppRoutes.accueil, queryParameters: parametres).toString();
 }

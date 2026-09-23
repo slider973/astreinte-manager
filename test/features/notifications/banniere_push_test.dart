@@ -1,6 +1,7 @@
 import 'package:astreinte_sp/core/firebase/firebase_bootstrap.dart';
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/plateforme/contexte_plateforme.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/features/notifications/domain/etat_notifications.dart';
 import 'package:astreinte_sp/features/notifications/domain/message_push.dart';
@@ -74,7 +75,7 @@ void main() {
       await tester.tap(find.text(AppStrings.notifBanniereVoir));
       await tester.pumpAndSettle();
 
-      expect(emplacementCourant(tester), '/?onglet=1');
+      expect(emplacementCourant(tester), AppRoutes.propositions);
       expect(find.text('Astreinte proposée'), findsNothing);
     });
 

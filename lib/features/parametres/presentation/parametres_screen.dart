@@ -8,6 +8,7 @@ import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/router/destinations.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_status.dart';
@@ -42,7 +43,6 @@ class ParametresScreen extends ConsumerStatefulWidget {
 }
 
 class _ParametresScreenState extends ConsumerState<ParametresScreen> {
-  static const String _routeAdmin = 'admin';
 
   ParametresController get _controleur =>
       ref.read(parametresControllerProvider.notifier);
@@ -123,26 +123,12 @@ class _ParametresScreenState extends ConsumerState<ParametresScreen> {
       surcharge.cle,
   };
 
-  void _versDestination(int index, List<AppDestination> destinations) {
-    if (destinations[index].route == _routeAdmin) {
-      // « Admin » ouvre la matrice du mois (ticket 016).
-      context.goNamed(AppRoutes.planningAdminName);
-      return;
-    }
-    context.goNamed(
-      AppRoutes.accueilName,
-      queryParameters: <String, String>{AppRoutes.parametreOnglet: '$index'},
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final admin = ref.watch(estAdminCaserneProvider);
     final asynchrone = ref.watch(parametresControllerProvider);
-    final destinations = AppDestination.pour(admin: admin);
-    final indexAdmin = destinations.indexWhere(
-      (AppDestination d) => d.route == _routeAdmin,
-    );
+    final destinations = ref.watch(destinationsProvider);
 
     final etat = asynchrone.value;
     final echec = etat?.echecServeur;
@@ -150,8 +136,12 @@ class _ParametresScreenState extends ConsumerState<ParametresScreen> {
     return AppScaffold(
       titre: AppStrings.parametresTitre,
       destinations: destinations,
-      indexSelectionne: indexAdmin < 0 ? 0 : indexAdmin,
-      onDestination: (int index) => _versDestination(index, destinations),
+      indexSelectionne: indexDestination(
+        destinations,
+        AppRoutes.planningAdminName,
+      ),
+      onDestination: (int index) =>
+          allerVersDestination(context, destinations, index),
       actions: <Widget>[
         if (etat != null && etat.sync != SyncEtat.repos)
           Padding(

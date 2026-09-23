@@ -134,6 +134,11 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
    concerné en « proposé » et notifie les personnes impactées.
 
 ### 5.5 Consultation
+- **Accueil** : le tableau de bord du pompier, premier écran de l'application (ticket 064).
+  Salutation, rangée des jours qui viennent — prochaine astreinte acceptée, propositions en
+  attente, jours libres —, bande de semaine à points, trois propositions à répondre au plus,
+  et l'appel à saisir le mois ouvert avec son délai. Il ne lit rien que les autres écrans ne
+  lisent déjà.
 - « Mes astreintes » : liste et vue calendrier des astreintes acceptées, mois en cours et
   à venir.
 - « Planning de la caserne » : vue de tous les créneaux du mois avec les noms, visible

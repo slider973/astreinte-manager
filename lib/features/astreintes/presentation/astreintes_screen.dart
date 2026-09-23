@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/reseau/connectivite.dart';
+import '../../../core/router/app_router.dart';
+import '../../../core/router/destinations.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -15,6 +18,7 @@ import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entete_section.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
+import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../domain/astreinte.dart';
 import '../domain/astreintes_providers.dart';
 import '../domain/planning_caserne.dart';
@@ -41,30 +45,17 @@ import 'widgets/vue_planning_caserne.dart';
 /// `design/023 § 2`). D'où un sélecteur en tête, et non une sixième
 /// destination.
 ///
-/// L'écran vit dans l'onglet 2 de la coquille d'accueil, la destination
-/// « Astreintes », où mène déjà le lien public `/schedule/<période>` d'une
+/// L'écran est la destination « Astreintes », à la route `/astreintes` depuis
+/// le ticket 064, où mène le lien public `/schedule/<période>` d'une
 /// notification de planning validé.
 class AstreintesScreen extends ConsumerStatefulWidget {
-  const AstreintesScreen({
-    required this.destinations,
-    required this.indexSelectionne,
-    required this.onDestination,
-    required this.onVersPropositions,
-    super.key,
-  });
+  const AstreintesScreen({super.key});
 
   /// Au-delà de cette échelle de texte, la vue calendrier **change de forme**
   /// plutôt que de rogner : elle cède la place à la liste
   /// (`DESIGN.md § Typography — Named Rules`).
   static const double echelleMaxCalendrier = 1.6;
 
-  final List<AppDestination> destinations;
-  final int indexSelectionne;
-  final ValueChanged<int> onDestination;
-
-  /// L'action de l'état vide : il n'y a rien à consulter, il y a peut-être
-  /// quelque chose à répondre.
-  final VoidCallback onVersPropositions;
 
   @override
   ConsumerState<AstreintesScreen> createState() => _AstreintesScreenState();
@@ -156,6 +147,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
     final portee = ref.watch(porteeAstreintesProvider);
     final caserne = portee == PorteeAstreintes.caserne;
     final enLigne = ref.watch(enLigneProvider).value ?? true;
+    final destinations = ref.watch(destinationsProvider);
 
     return AppScaffold(
       // Le titre suit la portée : la barre d'application est ce qu'un lecteur
@@ -164,9 +156,13 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
       titre: caserne
           ? AppStrings.planningCaserneTitre
           : AppStrings.astreintesTitre,
-      destinations: widget.destinations,
-      indexSelectionne: widget.indexSelectionne,
-      onDestination: widget.onDestination,
+      destinations: destinations,
+      indexSelectionne: indexDestination(
+        destinations,
+        AppRoutes.astreintesName,
+      ),
+      onDestination: (index) =>
+          allerVersDestination(context, destinations, index),
       actions: <Widget>[
         // Le geste de tirage n'est jamais le seul chemin : il lui faut son
         // équivalent visible, au clavier comme à la souris.
@@ -178,6 +174,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
               : AppStrings.astreintesRafraichir,
         ),
         const BoutonNotifications(),
+        const BoutonCompte(),
       ],
       banniere: caserne
           ? _banniereCaserne(enLigne: enLigne)
@@ -369,7 +366,13 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
                   onRafraichir: ref
                       .read(astreintesControllerProvider.notifier)
                       .rafraichir,
-                  onVersPropositions: widget.onVersPropositions,
+                  // Rien à consulter veut dire : il y a peut-être quelque
+                  // chose à répondre. L'état vide mène là où se trouve la
+                  // suite.
+                  onVersPropositions: () =>
+                      unawaited(context.pushNamed<void>(
+                        AppRoutes.propositionsName,
+                      )),
                 ),
         ),
       ],

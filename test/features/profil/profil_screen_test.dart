@@ -22,8 +22,7 @@ Future<FauxProfilRepository> _ouvrirProfil(
     appartenances: appartenances,
     profils: depot,
   );
-  await tester.tap(find.text(AppStrings.navProfil));
-  await tester.pumpAndSettle();
+  await ouvrirProfil(tester);
   return depot;
 }
 

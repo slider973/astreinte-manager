@@ -44,11 +44,14 @@ void main() {
     testWidgets('une destination de membre est tenue', (tester) async {
       await _demarrageAFroid(
         tester,
-        cible: '/?onglet=0&mois=2026-10',
+        cible: '${AppRoutes.calendrier}?mois=2026-10',
         appartenance: appartenanceMembre,
       );
 
-      expect(emplacementCourant(tester), '/?onglet=0&mois=2026-10');
+      expect(
+        emplacementCourant(tester),
+        '${AppRoutes.calendrier}?mois=2026-10',
+      );
     });
 
     // Le correctif ne doit pas rouvrir la boucle fermée au ticket 031 : une
