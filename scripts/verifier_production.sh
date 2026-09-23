@@ -7,6 +7,10 @@
 # et **rien ne le disait**. Le défaut s'est découvert quand un pompier est resté à
 # la porte. Ce script existe pour que l'écart se voie avant l'usager.
 #
+# Depuis le ticket 065 il regarde aussi la PWA servie : le moteur de rendu et
+# les deux en-têtes d'isolation dont il dépend. Ceux-là ne cassent rien en
+# disparaissant — l'application s'ouvre, marche, et redevient lente.
+#
 # Il n'écrit rien : rien que des lectures, un compte rendu, un code de sortie.
 #   0 — le dépôt et la production disent la même chose ;
 #   1 — au moins un écart, chacun nommé et expliqué ;
@@ -63,6 +67,10 @@ dernier_json() { grep -E '^\{.*\}$' | tail -1; }
 command -v supabase >/dev/null || fatal "Le CLI Supabase est absent : https://supabase.com/docs/guides/cli"
 command -v jq >/dev/null || fatal "jq est absent (brew install jq)."
 command -v curl >/dev/null || fatal "curl est absent."
+# La section 5 lit le domaine de production et les en-têtes attendus par
+# `scripts/deployer_pwa.py` et `vercel.json` : sans python3, elle ne saurait ni
+# quelle adresse interroger ni quoi y exiger.
+command -v python3 >/dev/null || fatal "python3 est absent : la PWA servie ne peut pas être vérifiée."
 
 if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
   fatal "SUPABASE_ACCESS_TOKEN absent. En local : \`export SUPABASE_ACCESS_TOKEN=\$(…)\` depuis https://supabase.com/dashboard/account/tokens. En CI : secret GitHub (docs/DEPLOIEMENT.md § 3)."
@@ -362,6 +370,153 @@ else
       ok "Le corps du gabarit magic_link est celui de $gabarit_depot_fichier, ligne pour ligne."
     fi
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# 5. La PWA servie : le moteur de rendu et son isolation
+#
+# Ce que le ticket 065 a posé ne tient à aucune ligne de Dart. Le défilement de
+# la matrice passe de 37 % d'images perdues à 0 % parce que `vercel.json`
+# annonce deux en-têtes et que `build_web.sh` construit en Wasm. Retirer l'un
+# des deux ne **casse** rien : la PWA s'ouvre, se parcourt, et saccade comme
+# avant. C'est la panne qu'on ne voit pas, donc celle qui se vérifie.
+#
+# Comme partout dans ce script, on compare **le dépôt à la production** : les
+# valeurs attendues sont lues dans `vercel.json`, jamais redites ici. Changer
+# un en-tête dans le dépôt change du même coup ce qui est exigé en ligne.
+#
+# L'adresse est celle de `[remotes.production.auth].site_url`, rendue par
+# `scripts/deployer_pwa.py --afficher-domaine` — la seule écriture du domaine
+# dans le dépôt (docs/DEPLOIEMENT.md § 4).
+# ---------------------------------------------------------------------------
+
+titre "5. PWA servie — moteur de rendu et isolation"
+
+domaine="$(python3 scripts/deployer_pwa.py --afficher-domaine 2>/dev/null)"
+if [ -z "$domaine" ]; then
+  ecart "Domaine de production illisible dans supabase/config.toml ([remotes.production.auth].site_url) : la PWA servie n'a pas pu être vérifiée."
+else
+  base="https://$domaine"
+  pwa_en_ecart=0
+
+  # La valeur attendue d'un en-tête, lue dans `vercel.json` : source de la
+  # règle, nom de l'en-tête. Vide si le dépôt ne le déclare plus.
+  attendu_entete() {
+    python3 -c 'import json,sys
+source, cle = sys.argv[1], sys.argv[2].lower()
+valeur = ""
+for regle in json.load(open("vercel.json", encoding="utf-8")).get("headers", []):
+    if regle.get("source") == source:
+        for entete in regle.get("headers", []):
+            if entete.get("key", "").lower() == cle:
+                valeur = entete.get("value", "")
+print(valeur)' "$1" "$2"
+  }
+
+  # `-L` : le domaine peut répondre par une redirection. Tout est replié en
+  # minuscules : les noms d'en-têtes ne sont pas sensibles à la casse et le CDN
+  # ne les rend pas comme le dépôt les écrit.
+  entetes_servis() { curl -sSIL --max-time 20 "$@" | tr '[:upper:]' '[:lower:]'; }
+
+  if ! racine_servie="$(entetes_servis "$base/")"; then
+    ecart "Aucune réponse de $base/ : la PWA servie n'a pas pu être vérifiée."
+    pwa_en_ecart=1
+  else
+    for cle in Cross-Origin-Opener-Policy Cross-Origin-Embedder-Policy; do
+      attendu="$(attendu_entete '/(.*)' "$cle")"
+      if [ -z "$attendu" ]; then
+        ecart "vercel.json ne déclare plus $cle sur /(.*) : sans les deux en-têtes d'isolation, la page n'a pas SharedArrayBuffer et le moteur Wasm rastérise sur un seul fil (ticket 065)."
+        pwa_en_ecart=1
+        continue
+      fi
+      minuscule="$(printf '%s: %s' "$cle" "$attendu" | tr '[:upper:]' '[:lower:]')"
+      if ! printf '%s' "$racine_servie" | grep -q "$minuscule"; then
+        lu="$(printf '%s' "$racine_servie" |
+          grep -i "^$(printf '%s' "$cle" | tr '[:upper:]' '[:lower:]'):" | tail -1)"
+        ecart "$base sert « ${lu:-rien} » au lieu de « $cle: $attendu » : le défilement est retombé sur un seul fil, et aucun écran ne le dit. Rattrapage : redéployer (docs/DEPLOIEMENT.md § 5)."
+        pwa_en_ecart=1
+      fi
+    done
+  fi
+
+  # **Un 404 ne se voit pas ici, et c'est le piège.** `vercel.json` réécrit
+  # toute adresse inconnue vers `index.html` — c'est la contrepartie des routes
+  # sans dièse (ticket 046) : un fichier absent rend donc `200 text/html`, pas
+  # `404`. Le type servi est le seul témoin fiable de la présence du fichier.
+  #
+  # Il l'est deux fois : `nosniff` est posé partout, et avec lui
+  # `WebAssembly.compileStreaming` **refuse** ce qui n'est pas
+  # `application/wasm` — la page reste alors blanche, sans message.
+  #   $1 chemin servi
+  #   $2 type(s) acceptable(s), séparés par `|`
+  #   $3 règle de `vercel.json` qui couvre ce chemin — c'est d'elle que vient
+  #      le `Content-Encoding` attendu, quand elle en déclare un
+  #   $4 ce que sa disparition coûterait, en clair
+  moteur_servi() {
+    local chemin="$1" attendu="$2" source="$3" role="$4" lu type compression
+    if ! lu="$(entetes_servis -H 'Accept-Encoding: br' "$base$chemin")"; then
+      ecart "Aucune réponse de $base$chemin."
+      pwa_en_ecart=1
+      return
+    fi
+    # `curl -I` rend des fins de ligne CRLF : sans le `\r`, la comparaison
+    # échoue sur un type pourtant juste, et le message se lit
+    # « application/wasm au lieu de application/wasm ».
+    type="$(printf '%s' "$lu" | grep -i '^content-type:' | tail -1 |
+      cut -d: -f2- | cut -d';' -f1 | tr -d ' \r')"
+    if [ "$type" = "text/html" ]; then
+      ecart "$base$chemin est absent : la réécriture de vercel.json y sert index.html. $role"
+      pwa_en_ecart=1
+      return
+    fi
+    # `attendu` peut porter plusieurs types séparés par `|` : JavaScript en a
+    # deux noms également valables, et le serveur local de `servir_web.py` ne
+    # choisit pas le même que Vercel. Exiger l'un des deux ferait échouer une
+    # vérification qui n'a rien vu de faux.
+    case "|$attendu|" in
+      *"|$type|"*) ;;
+      *)
+        ecart "$base$chemin est servi en « ${type:-rien} » au lieu de « ${attendu//|/ ou } » : avec X-Content-Type-Options: nosniff, le navigateur le refuse et la page reste blanche."
+        pwa_en_ecart=1
+        ;;
+    esac
+
+    # **La compression de transport, là où le dépôt la déclare.** Les moteurs
+    # et `main.dart.wasm` sont livrés **déjà** compressés par
+    # `scripts/build_web.sh` : l'en-tête n'est pas un gain, c'est la clé de
+    # lecture. Servis sans lui, ce sont des octets brotli présentés comme du
+    # WebAssembly — `WebAssembly.compileStreaming(): expected magic word`, et
+    # la page reste blanche, sans qu'aucun écran le dise. Une règle perdue
+    # dans `vercel.json` suffit, et c'est exactement ce qu'on compare ici.
+    compression="$(attendu_entete "$source" Content-Encoding)"
+    if [ -n "$compression" ] &&
+      ! printf '%s' "$lu" | grep -q "content-encoding: $(printf '%s' "$compression" | tr '[:upper:]' '[:lower:]')"; then
+      ecart "$base$chemin n'est pas servi en « Content-Encoding: $compression » que déclare vercel.json ($source) : le fichier est livré déjà compressé, et sans cet en-tête le navigateur lit des octets brotli comme du WebAssembly — « expected magic word », page blanche."
+      pwa_en_ecart=1
+    fi
+  }
+
+  # Ce qu'un navigateur à jour demande : l'application et son rastériseur.
+  moteur_servi /main.dart.wasm application/wasm '/main.dart.wasm' \
+    "La production ne sert pas de construction Wasm — la PWA retombe sur le moteur JavaScript et saccade (ticket 065)."
+  moteur_servi /canvaskit/skwasm.wasm application/wasm '/canvaskit/(.*)' \
+    "Skwasm n'a pas été déployé : la construction Wasm se charge sans rastériseur."
+
+  # Le repli. Un navigateur sans WasmGC — Safari d'avant 18.2, un vieil
+  # Android — charge `main.dart.js` et CanvasKit. Les deux partent ensemble ou
+  # ne partent pas.
+  #
+  # `main.dart.js` n'est couvert par **aucune** règle de compression : il part
+  # en clair et c'est le CDN qui le comprime à la volée, comme tout le
+  # JavaScript. Sa règle est donc `/(.*)`, qui n'en déclare pas — le contrôle
+  # de `Content-Encoding` se tait de lui-même, sans exception à écrire.
+  moteur_servi /main.dart.js 'application/javascript|text/javascript' '/(.*)' \
+    "Le repli des navigateurs sans WasmGC n'est pas servi : ils resteraient à la porte."
+  moteur_servi /canvaskit/chromium/canvaskit.wasm application/wasm '/canvaskit/(.*)' \
+    "Le moteur du repli n'est pas servi : un navigateur sans WasmGC n'aurait rien pour dessiner."
+
+  [ "$pwa_en_ecart" -eq 0 ] &&
+    ok "$base sert la construction Wasm, isolée, avec son repli JavaScript."
 fi
 
 # ---------------------------------------------------------------------------
