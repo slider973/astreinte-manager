@@ -102,7 +102,7 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
         ),
         const SizedBox(height: AppSpacing.lg),
         SizedBox(
-          height: 320,
+          height: _hauteurPages(context),
           child: PageView.builder(
             controller: _pages,
             itemCount: _etapes.length,
@@ -131,6 +131,24 @@ class _GuideScreenState extends ConsumerState<GuideScreen> {
     );
   }
 }
+
+/// **La fenêtre des étapes grandit avec le texte** (chantier 064d).
+///
+/// Un `PageView` a besoin d'une hauteur imposée, et 320 était celle de la
+/// plus longue étape à l'échelle 1. À ×1,6 — le réglage « Grande » d'iOS —
+/// cette même étape débordait de six points sur un téléphone de 390. Le
+/// glyphe de 48 ne grandit pas, le texte si : c'est lui, et lui seul, que la
+/// hauteur suit.
+double _hauteurPages(BuildContext context) {
+  final echelle = MediaQuery.textScalerOf(context).scale(16) / 16;
+  return _glyphe + (_hauteurAEchelleUn - _glyphe) * echelle;
+}
+
+/// Le glyphe de tête d'une étape : il ne suit pas le texte.
+const double _glyphe = AppSpacing.xxxl;
+
+/// La hauteur de la plus longue étape, à l'échelle 1.
+const double _hauteurAEchelleUn = 320;
 
 class _PageGuide extends StatelessWidget {
   const _PageGuide({required this.etape});
