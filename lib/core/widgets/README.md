@@ -17,6 +17,7 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `app_divider.dart` | `AppDivider` | Le filet : le matériau de séparation du système. |
 | `count_stat.dart` | `CountStat` | Un compteur en chiffres tabulaires, avec ou sans plafond. |
 | `save_indicator.dart` | `SaveIndicator` | Où en est l'enregistrement automatique. |
+| `legende_etats.dart` | `LegendeEtats` | La clé des trois états de la case du registre, avec de vraies `SlotChip` inertes. `espacement` resserre l'écart entre entrées : `lg` dans un bloc, `sm` dans la barre de commande de l'admin, dont la rangée se compte au point près (chantier 061c). |
 | `hachures.dart` | `Hachures`, `HachuresPainter` | Primitive de dessin, pas un composant : le motif à 45° partagé par `SlotChip` et `AppBanner`. |
 | `champ_texte.dart` | `ChampTexte` | Champ rempli M3 : libellé au-dessus, erreur annoncée sous le champ, une ou plusieurs lignes. |
 | `ecran_simple.dart` | `EcranSimple` | L'ossature des écrans sans navigation : connexion, invitation, accueil d'un nouveau membre. |
