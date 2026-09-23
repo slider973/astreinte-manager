@@ -282,9 +282,22 @@ curl -sI https://<domaine>/ | grep -i -e x-content-type-options -e x-frame-optio
 
 # 6. C'est bien la construction du commit qui est servie.
 #    `--compressed` défait la compression de transport : on compare les octets.
+#    `main.dart.js` reste le témoin : c'est le repli, il n'est pas
+#    pré-compressé par la construction, donc ses octets sur disque sont ceux
+#    qu'on demande à l'hébergeur (§ 6 bis).
 curl -s --compressed https://<domaine>/main.dart.js | shasum -a 1
 shasum -a 1 build/web/main.dart.js
 # attendu : la même empreinte deux fois
+
+# 7. Le moteur Wasm est servi, et la page est isolée — sans quoi la PWA
+#    s'ouvre, marche, et saccade comme avant (ticket 065, § 6 bis).
+curl -sI https://<domaine>/ | grep -i cross-origin
+# attendu : cross-origin-opener-policy: same-origin
+#           cross-origin-embedder-policy: require-corp
+curl -sI https://<domaine>/main.dart.wasm | grep -i -e content-type -e content-encoding
+curl -sI https://<domaine>/canvaskit/skwasm.wasm | grep -i content-type
+# attendu : application/wasm, deux fois. `text/html` veut dire que le fichier
+# est absent et que la réécriture a servi index.html : il n'y a pas de 404 ici.
 ```
 
 **L'adresse vérifiée est toujours le domaine de production**, jamais une adresse `*.vercel.app` :
@@ -300,7 +313,8 @@ cinq secondes, et affiche l'adresse interrogée à chaque tentative.
 
 Le workflow fait lui-même les vérifications 1 à 6 après chaque mise en ligne et **échoue** si elles
 ne passent pas — les trois premières à l'étape « Vérifier les en-têtes servis », les trois autres à
-l'étape « Vérifier la PWA servie ». La raison est dans `assets/fonts/README.md` : une police qui n'est pas décodée
+l'étape « Vérifier la PWA servie ». La septième est faite par le travail « Vérification d'écart »,
+qui joue `scripts/verifier_production.sh` (§ 5 du compte rendu). La raison est dans `assets/fonts/README.md` : une police qui n'est pas décodée
 échoue **en silence**, et l'application retombe alors sur un Roboto téléchargé chez Google. Le
 moteur, lui, échoue bruyamment — `WebAssembly.compileStreaming(): expected magic word` — et la page
 reste blanche. Mieux vaut une mise en ligne rouge qu'une PWA muette ou qui appelle gstatic.
@@ -314,6 +328,95 @@ Puis, sur un téléphone :
 3. Chrome de bureau → DevTools → Lighthouse → catégorie « Progressive Web App » : « Installable »
    doit être vert.
 
+## 6 bis. Le moteur de rendu : WebAssembly, son repli, et ses deux en-têtes
+
+Écrit au ticket 065, après un signalement du propriétaire : « le scroll saccade », sur un
+iPhone 17 Pro Max avec la PWA installée.
+
+### Ce que la production sert
+
+`scripts/build_web.sh` construit avec `--wasm`. La construction sort **deux applications dans
+le même répertoire**, et le chargeur Flutter choisit seul à l'ouverture :
+
+| Le navigateur a WasmGC | Il charge | Rendu par | Rastérisation |
+|---|---|---|---|
+| oui — Chrome, Edge, Firefox, **Safari depuis 18.2** | `main.dart.wasm` + `main.dart.mjs` | `canvaskit/skwasm.wasm` | sur un **fil séparé** |
+| oui, mais la page n'est pas isolée | `main.dart.wasm` + `main.dart.mjs` | `canvaskit/skwasm_heavy.wasm` | sur le fil principal |
+| non — Safari d'avant 18.2, vieil Android | `main.dart.js` | `canvaskit/chromium/canvaskit.wasm` | sur le fil principal |
+
+Les trois chemins partent à chaque mise en ligne. Aucun n'est un mode dégradé qu'on découvre :
+`scripts/verifier_production.sh` § 5 vérifie que les quatre fichiers sont servis, avec le bon
+type, après chaque déploiement.
+
+### Les deux en-têtes, et pourquoi `require-corp`
+
+La deuxième ligne du tableau est celle qu'il faut éviter, et elle ne dépend pas de Flutter :
+Skwasm ne rastérise sur un fil séparé que si la page a `SharedArrayBuffer`, que le navigateur
+ne donne qu'à un document **isolé**. D'où, sur toutes les routes de `vercel.json` :
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+`require-corp` refuse toute ressource tierce qui ne s'annonce pas partageable. Les deux seules
+origines que la PWA joint le sont, vérifié le 23 septembre 2026 :
+
+| Origine | Comment elle est chargée | Pourquoi `require-corp` la laisse passer |
+|---|---|---|
+| `<ref>.supabase.co` | `fetch` CORS, par `supabase_flutter` | une réponse CORS satisfait la vérification de COEP sans en-tête de plus |
+| `www.gstatic.com` (SDK Firebase, `<script>` et `importScripts`) | balise de script et service worker | elle répond `cross-origin-resource-policy: cross-origin` |
+
+Google Fonts n'est plus joint depuis le ticket 037 ; Stripe est une **navigation**, pas une
+ressource incorporée, et COEP ne la regarde pas.
+
+**Si un jour une ressource tierce est bloquée**, le symptôme est net dans la console du
+navigateur (`net::ERR_BLOCKED_BY_RESPONSE.NotSameOriginAfterDefaultedToSameOriginByCoep`). La
+porte de secours est de remplacer `require-corp` par `credentialless` dans `vercel.json` : la
+ressource part alors **sans cookie ni identifiant**, ce qui suffit pour un CDN public et ne
+suffit pas pour une ressource privée. L'isolation est conservée, donc Skwasm garde son fil.
+Ce n'est pas le réglage par défaut parce qu'il élargit ce qui peut entrer dans une page isolée
+sans qu'on l'ait demandé — et `test/web/moteur_wasm_test.dart` échoue si on l'y met sans le
+décider.
+
+### Ce que ça change, mesuré
+
+Trois tours, Chrome sans interface, processeur bridé ×4 pour approcher un téléphone,
+défilement tactile scripté de 3 s. Une image « perdue » est un intervalle de plus d'une
+période et demie d'écran : le pompier voit un à-coup.
+
+| Écran | CanvasKit JS | Wasm / Skwasm |
+|---|---|---|
+| Accueil (390 pt) | 0 à 2 images perdues | 0 |
+| Calendrier, mois saisi à moitié (390 pt) | 0 | 0 |
+| Matrice admin, 60 membres (1440 pt) | **50 à 54 perdues, 34 à 41 %** | 0 à 2, ≤ 1 % |
+| Premier défilement de la matrice | à-coup de 67 à 417 ms | 17 à 33 ms |
+
+Le premier défilement est la compilation des shaders. Elle ne disparaît pas — elle cesse
+d'être visible : 417 ms devient 33 ms, soit une image perdue au lieu de vingt-cinq. Aucun
+préchauffage n'a été ajouté : il n'y a plus rien à préchauffer.
+
+### Le plafond que ce ticket ne franchit pas
+
+**Sur un iPhone ProMotion, Safari cadence `requestAnimationFrame` à 60 Hz**, là où le reste du
+téléphone défile à 120 Hz. C'est une décision d'Apple, pas un réglage. Une PWA Flutter y
+paraîtra donc toujours un peu moins fluide qu'une liste native, **même sans aucune image
+perdue** — le mouvement est juste, il est simplement cadencé deux fois moins souvent. Ce que le
+ticket 065 supprime, ce sont les à-coups ; ce qu'il ne peut pas donner, c'est le 120 Hz.
+
+### Ce que ça pèse
+
+Un navigateur ne télécharge qu'un des deux chemins. Tout est pré-compressé par
+`scripts/build_web.sh` et annoncé par `vercel.json` :
+
+| Chemin | Fichiers | Transport |
+|---|---|---|
+| Wasm | `main.dart.wasm` 1,0 Mo + `skwasm.wasm` 1,1 Mo | ~2,1 Mo |
+| Repli JS | `main.dart.js` ~0,9 Mo + `chromium/canvaskit.wasm` 1,5 Mo | ~2,4 Mo |
+
+`main.dart.wasm` est compressé à la construction, comme les moteurs : rien ne garantit qu'un CDN
+comprime `application/wasm` à la volée comme il comprime le JavaScript.
+
 ## 7. Ce que l'hébergeur fait, et pourquoi (`vercel.json`)
 
 | Règle | Raison |
@@ -323,9 +426,11 @@ Puis, sur un téléphone :
 | Aucune redirection | `/install` est une route comme les autres depuis le ticket 046. La redirection `/install` → `/#/install` du ticket 032 n'a plus d'objet : elle enverrait sur une adresse que le routeur ne sait plus lire |
 | `Cache-Control: max-age=0, must-revalidate` presque partout | c'est le service worker de Flutter qui gère les versions, par empreinte de contenu. Un cache HTTP long figerait l'application sur les téléphones déjà installés. La revalidation coûte une requête conditionnelle, et seulement au premier chargement : ensuite, le service worker sert tout hors ligne |
 | `Content-Encoding: br` sur `assets/assets/fonts/*.ttf` | les polices sont **livrées déjà compressées** par `scripts/build_web.sh`. Flutter web ne décode pas le WOFF2 (`assets/fonts/README.md`), le seul levier est la compression de transport : 194 Ko → 88 Ko |
-| `Content-Encoding: br` sur `canvaskit/**` | même mécanique, et c'est elle qui rend l'auto-hébergement du moteur viable (ticket 037) : 5,7 Mo de `.wasm` deviennent 1,6 Mo, exactement ce que servait le CDN de Google. Servi sans cet en-tête, le moteur ne démarre pas |
+| `Content-Encoding: br` sur `canvaskit/**` | même mécanique, et c'est elle qui rend l'auto-hébergement du moteur viable (ticket 037) : 5,7 Mo de `.wasm` deviennent 1,6 Mo, exactement ce que servait le CDN de Google. Servi sans cet en-tête, le moteur ne démarre pas. Depuis le ticket 065, le répertoire porte aussi Skwasm — 3,4 Mo → 1,1 Mo |
+| `Content-Encoding: br` sur `main.dart.wasm` | 3,6 Mo → 1,0 Mo. Rien ne garantit qu'un CDN comprime `application/wasm` à la volée comme il comprime le JavaScript : la compression est faite à la construction et l'en-tête l'annonce. Pas de cache long, même raison que `canvaskit/**` (ticket 065) |
+| `Cross-Origin-Opener-Policy: same-origin` et `Cross-Origin-Embedder-Policy: require-corp` sur **toutes** les routes | c'est la condition pour que la page ait `SharedArrayBuffer`, donc pour que Skwasm rastérise sur un fil séparé. Sans eux, la construction Wasm se charge quand même et retombe sur sa variante à un seul fil : rien ne casse, tout ralentit. Le détail et la porte de secours `credentialless` sont au § 6 bis (ticket 065) |
 | `canvaskit/**` **sans** cache long | auto-hébergé, le chemin n'a plus la révision du moteur dedans. Un `immutable` d'un an figerait la version d'aujourd'hui et la prochaine montée de Flutter servirait un moteur périmé aux téléphones déjà venus. C'est le service worker qui gère les versions, par empreinte |
-| `nosniff`, `Referrer-Policy`, `X-Frame-Options` | le minimum, sans politique de sécurité de contenu : CanvasKit a besoin de `wasm-unsafe-eval` et une CSP mal posée casse l'application en silence |
+| `nosniff`, `Referrer-Policy`, `X-Frame-Options` | le minimum, sans politique de sécurité de contenu : le moteur a besoin de `wasm-unsafe-eval` et une CSP mal posée casse l'application en silence. `nosniff` a une conséquence de plus depuis le ticket 065 : `WebAssembly.compileStreaming` refuse alors tout ce qui n'est pas servi en `application/wasm`, et la page reste blanche sans message |
 
 ## 8. Les trois états de la base, et ce que chacun donne
 
@@ -347,6 +452,7 @@ semaines.
 |---|---|
 | Une **Edge Function** (la passerelle rend 404) | « Impossible de joindre le serveur. Vérifie ta connexion, puis réessaie. » — sur l'invitation, la publication du planning, la réattribution, l'abonnement, l'export RGPD |
 | Une **migration** (colonne ou table absente) | l'écran concerné reste vide ou refuse l'enregistrement, sans explication ; la trace technique n'est visible que dans les journaux du projet |
+| Les **en-têtes d'isolation** (§ 6 bis) | **rien du tout.** L'application s'ouvre, se parcourt, et le défilement de la matrice repasse de 0 % à 37 % d'images perdues. Le seul témoin est `scripts/verifier_production.sh` § 5 |
 | Le secret Vault **`notify_function_url`** mal posé | rien. `cron_dispatch_notifications` réussit toutes les minutes, pousse vers un hôte inexistant, et la file grossit : `select * from notification_outbox where status <> 'sent'` |
 | La **configuration d'authentification** non poussée | le courriel de connexion arrive en anglais, avec un lien au lieu du code à six chiffres. Ouvrir le lien change de page, le jeton d'invitation ne vit qu'en mémoire : l'invitation ne peut plus être acceptée et l'écran dit « Aucune caserne » |
 | Le **plafond d'envoi** resté à celui du plan gratuit | la troisième invitation de l'heure ne part pas, et l'écran annonce un envoi réussi |
@@ -393,9 +499,13 @@ Rend `0` quand le dépôt et la production disent la même chose, `1` en nommant
 commande qui le rattrape, `2` s'il n'a pas pu conclure. Il tourne aussi à chaque mise en ligne et à
 la demande (§ 5).
 
-Il compare quatre choses : les migrations, les Edge Functions (présence, état, `verify_jwt`),
-l'adresse Vault du répartiteur de notifications, et la configuration d'authentification — **sujet
-du courriel de connexion et son corps**. Le corps est lu séparément, par
+Il compare cinq choses : les migrations, les Edge Functions (présence, état, `verify_jwt`),
+l'adresse Vault du répartiteur de notifications, la configuration d'authentification — **sujet
+du courriel de connexion et son corps** — et, depuis le ticket 065, **la PWA servie** : les deux
+en-têtes d'isolation, comparés à ce que `vercel.json` déclare, et les quatre fichiers du moteur
+(`main.dart.wasm`, `canvaskit/skwasm.wasm`, et leur repli `main.dart.js` +
+`canvaskit/chromium/canvaskit.wasm`), reconnus à leur **type servi** et non à leur code HTTP —
+la réécriture vers `index.html` rend `200 text/html` sur un fichier absent, jamais 404. Le corps est lu séparément, par
 `GET /v1/projects/{ref}/config/auth`, champ `mailer_templates_magic_link_content` : `config diff`
 ne le voit pas, `content_path` étant un fichier que `config push` téléverse et non une valeur qu'il
 compare. C'est pourtant le corps qui était en anglais le 21 septembre 2026. Avant de comparer, trois
@@ -441,9 +551,9 @@ scripts/deployer_pwa.py               # attend READY, puis l'alias du domaine, e
 scripts/verifier_production.sh
 ```
 
-`scripts/verifier_production.sh` ne regarde que Supabase. Pour la PWA, les six commandes du § 6
-sont la vérification — la cinquième et la sixième disent en une seconde si la configuration et le
-code servis sont ceux du dépôt.
+`scripts/verifier_production.sh` regarde Supabase, et depuis le ticket 065 le moteur de rendu
+servi. Pour le reste de la PWA, les sept commandes du § 6 sont la vérification — la cinquième et
+la sixième disent en une seconde si la configuration et le code servis sont ceux du dépôt.
 
 **L'adresse du répartiteur de notifications** est posée par l'étape 1 :
 `[remotes.production.db.vault]` de `supabase/config.toml` la déclare, et `db push` met à jour les
@@ -511,7 +621,7 @@ sont couverts par `test/web/aucun_tiers_test.dart` :
 
 | Réglage | Où | Ce qu'il supprime |
 |---|---|---|
-| `canvasKitBaseUrl` + `--no-web-resources-cdn` | `web/flutter_bootstrap.js`, `scripts/build_web.sh` | 1 620 Ko de CanvasKit depuis `www.gstatic.com` |
+| `canvasKitBaseUrl` + `--no-web-resources-cdn` | `web/flutter_bootstrap.js`, `scripts/build_web.sh` | 1 620 Ko de CanvasKit depuis `www.gstatic.com` — et, depuis le ticket 065, Skwasm par le même chemin |
 | famille `Roboto` déclarée | `pubspec.yaml` | 63 Ko de Roboto depuis `fonts.gstatic.com`, à chaque ouverture |
 | `fontFallbackBaseUrl` | `web/flutter_bootstrap.js` | les polices Noto depuis `fonts.gstatic.com`, déclenchées par le texte saisi (`web/polices-de-repli/README.md`) |
 
@@ -525,5 +635,5 @@ Ce qui part encore, et pourquoi :
   requêtes ne part**. Le jour où elle sera posée, ce sera une dépendance tierce assumée, à déclarer
   dans la politique de confidentialité ; elle sort du périmètre du ticket 037.
 
-La compression de `main.dart.js` est faite par Vercel à la volée (3,7 Mo → environ 1,1 Mo en gzip,
-moins en brotli). Rien à configurer.
+La compression de `main.dart.js` est faite par Vercel à la volée (3,9 Mo → environ 0,9 Mo en
+brotli). Rien à configurer. `main.dart.wasm`, lui, est compressé à la construction : voir § 6 bis.
