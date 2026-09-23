@@ -5,7 +5,7 @@
 - **Dépend de** : 061, 063
 - **Branche** : `feat/064-monde-visuel-pompier`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-23
 
 ## Contexte
 
