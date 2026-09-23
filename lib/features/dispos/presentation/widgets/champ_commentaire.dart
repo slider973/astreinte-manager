@@ -24,12 +24,24 @@ class ChampCommentaire extends StatefulWidget {
     required this.onOuvrir,
     required this.onChange,
     super.key,
+    this.libelle = AppStrings.preferencesCommentaireRangee,
+    this.filetHaut = true,
   });
 
   final String texte;
   final bool ouvert;
   final VoidCallback onOuvrir;
   final ValueChanged<String> onChange;
+
+  /// Le nom du champ, replié comme ouvert. Sous la grille, dans sa propre
+  /// carte (chantier 064d), il porte le nom de son destinataire : « Ton
+  /// commentaire pour le chef ».
+  final String libelle;
+
+  /// Le filet qui le détache de ce qui le précède. Faux quand il **est** le
+  /// contenu de sa carte : un trait au premier pixel d'une carte à rayon 20
+  /// serait un trait en travers de son coin.
+  final bool filetHaut;
 
   @override
   State<ChampCommentaire> createState() => _ChampCommentaireState();
@@ -67,11 +79,11 @@ class _ChampCommentaireState extends State<ChampCommentaire> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        const AppDivider(),
+        if (widget.filetHaut) const AppDivider(),
         if (!ouvert)
           Semantics(
             button: true,
-            label: AppStrings.preferencesCommentaireRangee,
+            label: widget.libelle,
             excludeSemantics: true,
             child: InkWell(
               onTap: widget.onOuvrir,
@@ -92,7 +104,7 @@ class _ChampCommentaireState extends State<ChampCommentaire> {
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Text(
-                          AppStrings.preferencesCommentaireRangee,
+                          widget.libelle,
                           style: theme.textTheme.bodyLarge,
                         ),
                       ),
@@ -117,7 +129,7 @@ class _ChampCommentaireState extends State<ChampCommentaire> {
                 Focus(
                   focusNode: _focus,
                   child: ChampTexte(
-                    libelle: AppStrings.preferencesCommentaireRangee,
+                    libelle: widget.libelle,
                     controleur: _controleur,
                     clavier: TextInputType.multiline,
                     texteInvite: AppStrings.preferencesCommentaireInvite,

@@ -1838,6 +1838,32 @@ abstract final class AppStrings {
 
   static const String preferencesModifier = 'Modifier mes maximums';
 
+  /// **Le titre court de la carte des préférences sur téléphone**
+  /// (chantier 064d) : le résumé tient alors sur une seule ligne de 56 points,
+  /// « Au maximum · 8 astreintes, 2 weekends », et la grille remonte d'autant.
+  ///
+  /// « Ce mois, » tombe : le sélecteur de mois est douze points plus haut et
+  /// le dit déjà. Mesurée avec les vraies coupes du produit, la phrase entière
+  /// demande 342 points là où la carte en offre 294 à 390 de large.
+  static const String preferencesTitreCourt = 'Au maximum';
+
+  /// Le séparateur du résumé d'une ligne : un point médian entouré d'espaces,
+  /// la ponctuation de liaison de tout le monde du pompier.
+  static const String preferencesSeparateur = ' · ';
+
+  /// Le résumé d'une ligne, en entier : « Au maximum · 8 astreintes,
+  /// 2 weekends ». Composé ici, et non dans le widget, pour qu'une mesure
+  /// puisse l'attendre mot pour mot.
+  static String preferencesResumeLigne(int? astreintes, int? weekends) =>
+      '$preferencesTitreCourt$preferencesSeparateur'
+      '${preferencesValeurs(astreintes, weekends)}';
+
+  /// **Le commentaire, sous la grille** (chantier 064d). Il porte le nom de
+  /// son destinataire : sous le registre, loin de la carte des maximums, « Un
+  /// mot pour ton chef » ne disait plus pour quel mois ni à qui.
+  static const String preferencesCommentaireCarte =
+      'Ton commentaire pour le chef';
+
   /// **L'écart, et sa raison.** Jamais un avertissement : dépasser son
   /// maximum est ici le résultat recherché, pas une faute
   /// (`docs/PRD.md § 7.4`).

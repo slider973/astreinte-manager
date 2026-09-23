@@ -27,6 +27,7 @@ import 'controllers/saisie_controller.dart';
 import 'widgets/barre_compteurs.dart';
 import 'widgets/barre_raccourcis.dart';
 import 'widgets/bloc_astuce.dart';
+import 'widgets/carte_commentaire.dart';
 import 'widgets/entete_colonnes.dart';
 import 'widgets/grille_calendrier.dart';
 import 'widgets/grille_registre.dart';
@@ -413,6 +414,10 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
             ],
           ),
         ),
+        // **Le commentaire, sous la grille** (chantier 064d) : on l'écrit une
+        // fois par mois, la grille se remplit à chaque ouverture. Sur
+        // `medium` et au-delà, il reste dans la carte des maximums.
+        const SliverToBoxAdapter(child: CarteCommentaire()),
         const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
       ],
     );
@@ -423,9 +428,15 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     // rien à apprendre sur un geste qu'on ne peut pas faire.
     if (!etat.modifiable) return null;
 
+    // **Tant qu'aucune case n'a jamais été cochée ce mois-ci** (chantier
+    // 064d). La leçon du glissement survivait à la première case posée, et
+    // elle coûtait soixante points au-dessus de la grille à quelqu'un qui
+    // venait manifestement de comprendre comment on coche. Les deux lignes
+    // partent donc ensemble, à la première case du mois.
+    final vierge = etat.mois.estVierge;
     final dejaPeint = ref.watch(peintureDejaFaiteProvider).value ?? true;
-    final montrerTouche = etat.mois.estVierge;
-    final montrerGlissement = !dejaPeint;
+    final montrerTouche = vierge;
+    final montrerGlissement = vierge && !dejaPeint;
 
     // Pendant un geste, le bloc garde exactement la forme qu'il avait :
     // c'est la seule façon de ne pas déplacer le document sous le doigt.

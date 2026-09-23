@@ -68,6 +68,22 @@ int compteur(WidgetTester tester, String libelle) =>
 /// écrit aux deux endroits, et c'est voulu — c'est le même chiffre.
 Finder rangee(String libelle) => find.widgetWithText(RangeePlafond, libelle);
 
+/// **Le résumé d'une ligne de la carte repliée** (chantier 064d) : sur
+/// téléphone, le titre et les valeurs sont un seul paragraphe à deux styles,
+/// « Au maximum · 4 astreintes, 1 weekend ». `findRichText` le lit en entier :
+/// la mesure porte donc sur la phrase que le pompier a sous les yeux, pas sur
+/// un fragment de `TextSpan`.
+Finder resume(int? astreintes, int? weekends) => find.text(
+  AppStrings.preferencesResumeLigne(astreintes, weekends),
+  findRichText: true,
+);
+
+/// Ouvre la carte des maximums depuis sa forme repliée.
+Future<void> deplier(WidgetTester tester) async {
+  await tester.tap(find.byType(SectionPreferences));
+  await tester.pumpAndSettle();
+}
+
 int? plafondDe(WidgetTester tester, String libelle) =>
     tester.widget<CountStat>(find.widgetWithText(CountStat, libelle)).plafond;
 
@@ -109,17 +125,38 @@ void main() {
       );
 
       expect(find.byType(SectionPreferences), findsOneWidget);
-      expect(find.text(AppStrings.preferencesTitre), findsOneWidget);
       expect(
-        find.text(AppStrings.preferencesSansLimite),
+        resume(null, null),
         findsOneWidget,
         reason: 'sans ligne enregistrée, le défaut est écrit en toutes lettres',
       );
+      // Sur téléphone, la carte repliée se tient à sa ligne (chantier 064d) :
+      // la leçon est à une touche, dans la forme ouverte, et elle y est.
+      expect(find.text(AppStrings.preferencesLecon), findsNothing);
+      await deplier(tester);
       expect(
         find.text(AppStrings.preferencesLecon),
         findsOneWidget,
         reason: 'la leçon arrive quand elle a du sens',
       );
+      expect(find.text(AppStrings.preferencesTitre), findsOneWidget);
+    });
+
+    // La forme empilée — titre, valeur, leçon, écart — vit en `medium` et
+    // au-delà depuis le chantier 064d : c'est là que ces deux mesures se
+    // font, et elles ne perdent rien en route.
+    testWidgets('en medium, la leçon arrive quand elle a du sens', (
+      tester,
+    ) async {
+      await ouvrir(
+        tester,
+        depot: FauxDisposRepository(disponibilites: tousLesWeekends()),
+        taille: const Size(700, 1100),
+      );
+
+      expect(find.text(AppStrings.preferencesTitre), findsOneWidget);
+      expect(find.text(AppStrings.preferencesSansLimite), findsOneWidget);
+      expect(find.text(AppStrings.preferencesLecon), findsOneWidget);
     });
 
     testWidgets('la leçon disparaît une fois le membre prononcé', (
@@ -136,6 +173,23 @@ void main() {
       );
 
       expect(find.byType(SectionPreferences), findsOneWidget);
+      expect(resume(null, 1), findsOneWidget);
+    });
+
+    testWidgets('en medium, la leçon disparaît une fois le membre prononcé', (
+      tester,
+    ) async {
+      await ouvrir(
+        tester,
+        depot: FauxDisposRepository(
+          disponibilites: tousLesWeekends(),
+          preferences: <String, PreferencesMois>{
+            idOctobre: const PreferencesMois(maxWeekends: 1),
+          },
+        ),
+        taille: const Size(700, 1100),
+      );
+
       expect(find.text(AppStrings.preferencesLecon), findsNothing);
       expect(find.text(AppStrings.preferencesValeurs(null, 1)), findsOneWidget);
     });
@@ -245,8 +299,7 @@ void main() {
       await ouvrir(tester, depot: depot);
 
       // La forme compacte s'ouvre d'une touche sur toute sa largeur.
-      await tester.tap(find.text(AppStrings.preferencesTitre));
-      await tester.pumpAndSettle();
+      await deplier(tester);
       expect(find.byType(RangeePlafond), findsNWidgets(2));
 
       await tester.tap(rangee(AppStrings.preferencesWeekends));
@@ -272,8 +325,7 @@ void main() {
       );
       await ouvrir(tester, depot: depot);
 
-      await tester.tap(find.text(AppStrings.preferencesTitre));
-      await tester.pumpAndSettle();
+      await deplier(tester);
       await tester.tap(rangee(AppStrings.preferencesWeekends));
       await tester.pumpAndSettle();
       // `.last` : la feuille est la route du dessus, et « autant que
@@ -301,8 +353,7 @@ void main() {
         depot: FauxDisposRepository(disponibilites: tousLesWeekends()),
       );
 
-      await tester.tap(find.text(AppStrings.preferencesTitre));
-      await tester.pumpAndSettle();
+      await deplier(tester);
       await tester.tap(rangee(AppStrings.preferencesWeekends));
       await tester.pumpAndSettle();
 
@@ -332,11 +383,9 @@ void main() {
       );
 
       expect(find.byType(SectionPreferences), findsOneWidget);
-      expect(find.text(AppStrings.preferencesValeurs(4, 1)), findsOneWidget);
-      expect(find.text('Garde des enfants.'), findsOneWidget);
+      expect(resume(4, 1), findsOneWidget);
 
-      await tester.tap(find.text(AppStrings.preferencesTitre));
-      await tester.pumpAndSettle();
+      await deplier(tester);
 
       expect(find.text(AppStrings.preferencesVerrouille), findsOneWidget);
       for (final rangee in tester.widgetList<RangeePlafond>(
@@ -349,6 +398,16 @@ void main() {
         findsNothing,
         reason: 'plus rien à apprendre sur un mois qu\'on ne peut pas changer',
       );
+
+      // Le commentaire d'un mois verrouillé se relit **sous la grille**,
+      // dans sa carte (chantier 064d) : il faut défiler jusqu'à lui, et il y
+      // est en entier.
+      await tester.scrollUntilVisible(
+        find.text('Garde des enfants.'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Garde des enfants.'), findsOneWidget);
     });
 
     testWidgets('mois verrouillé sans préférence : rien du tout', (
