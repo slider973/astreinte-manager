@@ -146,6 +146,32 @@ horaires ; les photos d'avatar ; les montants ; le filet coloré en bord gauche 
 
 ---
 
+## 8 bis. Chantier 061c — décisions prises après le 061b
+
+Le 061b est en production (PR 55). Son inspection et sa revue ont rendu deux faits : la bande de semaine et l'en-tête des dates de la matrice écrivent deux fois les numéros de jour, et la barre de commande coûte 230 à 266 points de hauteur là où le bandeau resserré en coûte 134. Le 061c commence par la hauteur, puis fait ce que le découpage lui donnait : lignes, avatars, blocs d'état, panneau des candidats. Il se livre en deux PR.
+
+### 061c-1 — Une seule rangée de dates, une barre de commande de deux rangées
+
+**1. L'en-tête des dates de la matrice prend la forme de la bande de semaine, et la bande disparaît.** Sur grand écran, l'en-tête épinglé de la grille (`EnteteJour`) devient la pastille du 061b : abréviation du jour et numéro sur deux lignes, pastille `primaryContainer` / `onPrimaryContainer` pour aujourd'hui, fond `surfaceDim` et graisse pour le weekend et les fériés, étoile du férié conservée ; la rangée soleil / lune reste en dessous, dans le même en-tête. L'en-tête reste passif : pas de tap, pas de jour visé. La bande de semaine autonome, `DefilementJour` et la marque du jour visé sont retirés avec leurs tests. Raison : la référence n'a qu'une rangée de dates, qui est l'en-tête de sa grille ; la bande du 061b répétait l'en-tête à un pas différent (56 contre 62 points) et sa seule valeur, amener une colonne au bord gauche, déplaçait le contenu sous le pointeur. Hauteur de l'en-tête : 56 aujourd'hui, 64 au plus, mesurée. Écart à consigner dans `DESIGN.md` § 061c, car le brief § 5 promettait une bande qui fait défiler la matrice.
+
+**2. La barre de commande tient en deux rangées dès `expanded`.** Aujourd'hui quatre étages : sélecteur de mois (64), recherche et puces, saisie à la place et création du planning avec son explication, légende ; plus le fil « Publier » quand le planning existe. Cible : deux rangées de contrôles de 48 points, 130 points au plus à 1280 de large, mesurés par un test.
+- Rangée 1 : le sélecteur de mois sur une ligne par mois (« Octobre 2026 · Verrouillé » avec son icône, 48 de haut au lieu de 64), le champ de recherche, les puces « Masquer ceux qui n'ont rien saisi », « Commentaires », « Trier ».
+- Rangée 2 : l'interrupteur « Saisir à la place d'un membre », l'emplacement de l'action de planning (« Créer le planning d'octobre » et son explication sur une ligne ; ou le fil « Publier » quand le planning existe, à la même place), puis la légende poussée au bord droit avec l'indicateur d'enregistrement.
+- Ce qui ne tient pas passe à la ligne par `Wrap`, jamais tronqué. Une explication qui ne tient pas sur une ligne à 1280 est réécrite plus courte dans `AppStrings`, pas coupée.
+- `compact` ne change pas : la barre y vit dans le défilement de la vue par jour.
+
+### 061c-2 — Les lignes, les cases, le panneau
+
+**3. L'attribution se lit dans la case du membre.** Quand le planning du mois existe et qu'un membre porte une attribution sur un créneau, sa case de la matrice montre l'attribution à la place de la disponibilité nue : bloc plein 28 × 28, même rayon que `SlotChip`, fond et encre de la famille d'état (`context.statuts.attribution(etat)` : proposé orange, accepté vert, refusé rose), icône de la famille, jamais la couleur seule. La sémantique dit le membre, le jour, le créneau, l'état de l'attribution et, entre parenthèses, la disponibilité déclarée. Hors mode de saisie, l'appui sur une telle case ouvre le panneau du créneau ; en mode de saisie armé, l'appui garde son comportement (cycle de la disponibilité), le bloc reste affiché. Les cases sans attribution ne changent pas. Raison : la référence montre qui est posé où ; notre grille ne le disait que dans la ligne des créneaux, en chiffres, et dans le panneau. C'est la seule lecture de données nouvelle du chantier : les attributions sont déjà en mémoire (`PlanningMois.attributionsDe`), aucune requête de plus.
+
+**4. Avatar à initiales devant le nom.** `AvatarInitiales` (livré au 061b), 24 points, dans `EnteteLigneMembre`, la hauteur de ligne reste 32 et la colonne figée garde sa largeur ; 32 points dans `LigneCandidat` du panneau, où la cible de 48 laisse la place. Pas dans la vue par jour de `compact`.
+
+**5. Revue du panneau des candidats et de la matrice avec `craft-floor`.** Aucune couleur écrite en dur, sélection en `primaryContainer`, actions en indigo, états par les familles de `app_status.dart`, cibles de 44, rien porté par la couleur seule. Chaque écart est corrigé s'il tient dans le chantier, consigné dans `DESIGN.md` § 061c sinon.
+
+Chaque PR du 061c passe par la revue, puis la fusion en squash ; le ticket 061 reste en cours jusqu'au 061d.
+
+---
+
 ## 9. Ce que ce brief ne décide pas
 
 Les valeurs exactes des teintes claires et sombres dérivées, les tailles de police de chaque style,

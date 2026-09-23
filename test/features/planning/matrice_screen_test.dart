@@ -50,6 +50,13 @@ String _libelleMois(int decalage) {
   return AppStrings.moisNomEtAnnee(jour.month, jour.year);
 }
 
+/// Le bouton du sélecteur sur grand écran : le mois **et** son état sur une
+/// seule ligne, « Octobre 2026 · jusqu'au 15 sept. » (chantier 061c).
+String _libelleBoutonMois(int decalage) {
+  final periode = _ouverte(decalage);
+  return AppStrings.moisEtEtat(periode.libelle, periode.ligneEtatBreve);
+}
+
 /// Le premier jour du mois affiché par défaut (le mois courant).
 DateTime _premierJour() => _mois(0);
 
@@ -174,7 +181,8 @@ void main() {
       // Le mois affiché est celui du sélecteur, et **il n'est écrit qu'une
       // fois** : le sélecteur le porte avec l'état de la période, le bandeau
       // du mois juste dessous ne le répète pas.
-      expect(find.text(_libelleMois(0)), findsOneWidget);
+      expect(find.text(_libelleBoutonMois(0)), findsOneWidget);
+      expect(find.text(_libelleMois(0)), findsNothing);
     });
 
     testWidgets('une case saisie par un admin porte sa marque, et elle '
@@ -335,7 +343,12 @@ void main() {
       await _armer(tester);
       expect(find.text(AppStrings.matriceModeSaisieActif), findsOneWidget);
 
-      await tester.tap(find.text(_libelleMois(1)));
+      // Le sélecteur défile : sur grand écran il ne prend qu'une part de la
+      // première rangée de la barre, et la caserne a toutes ses périodes
+      // dedans (chantier 061c).
+      await tester.ensureVisible(find.text(_libelleBoutonMois(1)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_libelleBoutonMois(1)));
       await tester.pumpAndSettle();
 
       // Le mois quitté ne laisse jamais un écran armé derrière lui.

@@ -16,6 +16,7 @@ import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_status.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -40,12 +41,10 @@ import '../domain/proposition_automatique.dart';
 import '../domain/recapitulatif_publication.dart';
 import '../domain/resume_mois.dart';
 import '../domain/suivi_providers.dart';
-import 'widgets/bande_semaine.dart';
 import 'widgets/bandeau_mois.dart';
 import 'widgets/barre_commande_matrice.dart';
 import 'widgets/confirmation_hors_dispo.dart';
 import 'widgets/confirmation_saisie_admin.dart';
-import 'widgets/defilement_jour.dart';
 import 'widgets/geometrie_matrice.dart';
 import 'widgets/grille_matrice.dart';
 import 'widgets/panneau_creneau.dart';
@@ -53,6 +52,7 @@ import 'widgets/recapitulatif_proposition.dart';
 import 'widgets/recapitulatif_publication.dart';
 import 'widgets/squelette_matrice.dart';
 import 'widgets/vue_jour.dart';
+import 'widgets/zone_planning.dart';
 
 /// **« Planning du mois »** — la vue centrale de l'admin.
 ///
@@ -72,40 +72,35 @@ class MatriceScreen extends ConsumerStatefulWidget {
   /// Ce qu'il faut laisser à la grille pour qu'elle dise encore quelque
   /// chose : quatre lignes de membres, 128 points.
   ///
-  /// **Son bloc épinglé se sert le premier** dans cette réserve — 84 points
-  /// sans planning, 112 avec la ligne des créneaux. À 1280 × 720 il n'en
-  /// reste donc qu'une ligne et demie de membres ; les quatre lignes entières
-  /// ne se lisent qu'à partir de 420 points de place, c'est-à-dire sur une
-  /// fenêtre de 800. C'est le prix du seuil ci-dessous, et il est assumé.
+  /// **Son bloc épinglé se sert le premier** dans cette réserve — 88 points
+  /// sans planning, 116 avec la ligne des créneaux.
   static const double placeGrilleUtile = GeoMatrice.hauteurLigne * 4;
 
   /// La hauteur qu'il faut, **sous la barre de commande**, pour le bandeau
-  /// complet et la bande de semaine : leurs 206 points mesurés — 134 pour le
-  /// bloc resserré, 72 pour la bande — plus ce qui reste dû à la grille.
+  /// complet : ses 134 points mesurés, plus ce qui reste dû à la grille.
   ///
-  /// **La barre de répartition se voit à 720.** C'était le prix du seuil
-  /// précédent, fixé au jugé à 440 : mesuré, un portable de 13 pouces avec sa
-  /// barre d'adresse ne laisse que 341 points sous la barre de commande, et
-  /// la barre du mois — un livrable du chantier 061b — ne s'affichait jamais.
-  /// Le bloc resserré et le seuil recalculé la ramènent à 334, donc à 720.
+  /// **La bande de semaine n'entre plus dans ce compte** (chantier 061c) :
+  /// ses 72 points sont rendus au bandeau et à la grille, et les dates
+  /// vivent désormais dans l'en-tête épinglé de la matrice, qui les portait
+  /// déjà.
   ///
   /// **La matrice garde la main pour autant** : en dessous du seuil le
-  /// bandeau se réduit à sa ligne de chiffres, puis s'efface avec la bande.
-  /// Un résumé qui laisserait deux lignes de grille aurait remplacé l'écran
-  /// qu'il surplombe.
-  ///
-  /// Ce qui mange vraiment la hauteur de cet écran n'est pas ce bloc : la
-  /// barre de commande coûte 230 à 266 points à elle seule, et le fil
-  /// « Publier » 70 de plus dès que le planning existe — 271 points de place
-  /// seulement à 1280 × 720, où le bandeau retombe alors à sa ligne de
-  /// chiffres. C'est de ce côté-là qu'un chantier suivant trouvera de quoi
-  /// rendre la grille respirable.
+  /// bandeau se réduit à sa ligne de chiffres, puis s'efface. Un résumé qui
+  /// laisserait deux lignes de grille aurait remplacé l'écran qu'il
+  /// surplombe.
   static const double placeBandeauComplet =
-      BandeauMois.hauteurComplet + BandeSemaine.hauteur + placeGrilleUtile;
+      BandeauMois.hauteurComplet + placeGrilleUtile;
 
   /// En dessous, la ligne de trois chiffres seule ; puis plus rien.
   static const double placeBandeauReduit =
-      BandeauMois.hauteurReduit + BandeSemaine.hauteur + placeGrilleUtile;
+      BandeauMois.hauteurReduit + placeGrilleUtile;
+
+  /// En dessous encore, le bandeau s'efface mais **pas la décision** : la
+  /// zone du planning reste seule sur sa rangée, tant que la grille garde ses
+  /// quatre lignes. Plus bas que ça, la matrice reprend tout : un écran de
+  /// deux cents points ne sert plus à publier, il sert à lire.
+  static const double placeZonePlanningSeule =
+      AppTouch.cible + AppSpacing.sm * 2 + placeGrilleUtile;
 
   /// Le mois porté par l'URL (`?mois=AAAA-MM`), s'il y en a un.
   final String? mois;
@@ -116,16 +111,6 @@ class MatriceScreen extends ConsumerStatefulWidget {
 
 class _MatriceScreenState extends ConsumerState<MatriceScreen> {
   static const String _routeAdmin = 'admin';
-
-  /// Ce que la bande de semaine vise. La matrice s'y rend avec **son**
-  /// défilement horizontal : la bande n'en ouvre pas un second.
-  final DefilementJour _defilement = DefilementJour();
-
-  /// Le jour que la bande a demandé et que la matrice montre, en base 1.
-  ///
-  /// Il vit ici et non dans la bande : c'est le défilement de la grille qui
-  /// le défait, et la grille est de l'autre côté de l'écran.
-  int? _jourVise;
 
   @override
   void initState() {
@@ -143,7 +128,6 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_touche);
-    _defilement.dispose();
     super.dispose();
   }
 
@@ -169,6 +153,18 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     ref.read(matriceControllerProvider.notifier).armer(arme: false);
     return true;
   }
+
+  /// **La matrice est-elle à l'écran ?** Deux volets, et une échelle de texte
+  /// sous le seuil au-delà duquel la grille change de forme.
+  ///
+  /// C'est la découpe de cet écran, et non la classe de fenêtre : entre les
+  /// deux — tablette portrait, téléphone en paysage, texte à ×1.8 sur un
+  /// poste — il y a la vue par jour, qui n'a ni bandeau de mois ni colonne
+  /// d'actions.
+  bool _matriceVisible(BuildContext context) =>
+      AppWindowClass.of(context).supporteDeuxVolets &&
+      MediaQuery.textScalerOf(context).scale(16) / 16 <=
+          MatriceScreen.seuilVueJour;
 
   MatriceController get _controleur =>
       ref.read(matriceControllerProvider.notifier);
@@ -499,20 +495,26 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     return null;
   }
 
+  /// Le nombre de **téléphones qui vont sonner** si l'on publie : pas le
+  /// nombre d'attributions, mais celui des membres attribués.
+  int _membresAttribues(EtatPlanning etat) => <String>{
+    for (final creneau in etat.planning.creneaux)
+      for (final attribution in etat.planning.attributionsDe(creneau.id))
+        attribution.userId,
+  }.length;
+
   /// La barre d'actions du bas : le bouton « Publier », et rien d'autre.
   ///
-  /// `AppScaffold.filActions` est la seule zone de l'ossature qui ne défile pas
-  /// avec la matrice. Un bouton « Publier » perdu sous soixante-deux colonnes
-  /// serait un bouton qu'on cherche. Le 016 la lui avait réservée, le 017 l'a
-  /// laissée vide : la voici occupée.
+  /// **Sur téléphone seulement** depuis le chantier 061c. `filActions` est la
+  /// seule zone de l'ossature qui ne défile pas avec la vue par jour, et la
+  /// barre de commande y défile : un bouton « Publier » qui s'en irait au
+  /// défilement serait un bouton qu'on cherche. Sur grand écran, la barre de
+  /// commande ne défile pas — « Publier » y prend sa place en seconde rangée
+  /// et rend ces 70 points à la matrice.
   Widget? _filActions(EtatPlanning? etat) {
     if (etat == null || !etat.planning.modifiable) return null;
 
-    final membres = <String>{
-      for (final creneau in etat.planning.creneaux)
-        for (final attribution in etat.planning.attributionsDe(creneau.id))
-          attribution.userId,
-    }.length;
+    final membres = _membresAttribues(etat);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -533,7 +535,9 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
         // sentir avant d'appuyer.
         Text(
           AppStrings.publierDetail(membres),
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          // **Le même style qu'au bandeau** : la phrase est la même, elle ne
+          // change pas de taille selon l'endroit d'où on la lit.
+          style: AppTextStyles.mention.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
@@ -626,7 +630,14 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       // réservée ; `filActions` reçoit enfin le bouton « Publier » que le 016
       // avait annoncé et que le 017 a laissé vide.
       panneauLateral: panneau == null ? null : _panneau(panneau),
-      filActions: _filActions(ref.watch(planningControllerProvider).value),
+      // Quand la matrice est à l'écran, « Publier » vit dans le bandeau du
+      // mois et le fil du bas n'a plus rien à porter (chantier 061c). Sous la
+      // vue par jour — téléphone, tablette portrait, grande échelle de
+      // texte — il le reprend : c'est la seule zone de l'ossature qui ne
+      // défile pas avec elle.
+      filActions: _matriceVisible(context)
+          ? null
+          : _filActions(ref.watch(planningControllerProvider).value),
       child: _corps(admin: admin, asynchrone: asynchrone, etat: etat),
     );
   }
@@ -708,10 +719,40 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     final planning = etatPlanning?.planning ?? PlanningMois.vide();
     final creneauChoisi = ref.watch(creneauSelectionneProvider);
 
-    final echelle = MediaQuery.textScalerOf(context).scale(16) / 16;
-    final classe = AppWindowClass.of(context);
-    final matriceVisible =
-        classe.supporteDeuxVolets && echelle <= MatriceScreen.seuilVueJour;
+    final matriceVisible = _matriceVisible(context);
+
+    // Ce que la barre — et, sur grand écran, le bandeau — savent du planning.
+    // **`null` tant que le planning n'est pas lu** : tant qu'on ne sait pas
+    // s'il existe, on n'affirme ni qu'il existe ni le contraire.
+    final commande = etatPlanning == null
+        ? null
+        : CommandePlanning(
+            existe: planning.existe,
+            etat: planning.planning?.etat ?? PlanningEtat.brouillon,
+            canalBranche: etatPlanning.canalBranche,
+            creation: etatPlanning.creation,
+            onCreer: _raisonCreation(etatPlanning) != null
+                ? null
+                : () => unawaited(_creer()),
+            raisonCreation: _raisonCreation(etatPlanning),
+            resteAPourvoir: ref.watch(resteAPourvoirProvider),
+            proposition: etatPlanning.proposition,
+            onProposer: _raisonProposition(etatPlanning) != null
+                ? null
+                : () => unawaited(_proposer(etatPlanning)),
+            raisonProposition: _raisonProposition(etatPlanning),
+            // « Publier » vit dans le bandeau quand la matrice est à
+            // l'écran (chantier 061c) et dans le fil du bas dès que la vue
+            // par jour prend la main, où la barre défile.
+            publication: etatPlanning.publication,
+            onPublier: matriceVisible && etatPlanning.planning.modifiable
+                ? () => unawaited(_publier(etatPlanning))
+                : null,
+            raisonPublication: _raisonPublication(etatPlanning),
+            detailPublication: AppStrings.publierDetail(
+              _membresAttribues(etatPlanning),
+            ),
+          );
 
     final barre = BarreCommandeMatrice(
       periodes: periodes,
@@ -726,28 +767,20 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       onReessayer: _relire,
       total: etat.matrice.lignes.length,
       affiches: visibles.length,
-      montrerLegende: matriceVisible,
-      // Tant que le planning n'est pas lu, la barre n'en dit rien : ni
-      // « crée-le », ni « il existe ».
-      planning: etatPlanning == null
-          ? null
-          : CommandePlanning(
-              existe: planning.existe,
-              etat: planning.planning?.etat ?? PlanningEtat.brouillon,
-              canalBranche: etatPlanning.canalBranche,
-              creation: etatPlanning.creation,
-              onCreer: _raisonCreation(etatPlanning) != null
-                  ? null
-                  : () => unawaited(_creer()),
-              raisonCreation: _raisonCreation(etatPlanning),
-              resteAPourvoir: ref.watch(resteAPourvoirProvider),
-              proposition: etatPlanning.proposition,
-              onProposer: _raisonProposition(etatPlanning) != null
-                  ? null
-                  : () => unawaited(_proposer(etatPlanning)),
-              raisonProposition: _raisonProposition(etatPlanning),
-            ),
+      matriceVisible: matriceVisible,
+      planning: commande,
     );
+
+    /// La zone du planning du bandeau, **sur grand écran seulement**.
+    Widget? zonePlanning({required bool uneRangee}) =>
+        !matriceVisible || commande == null
+        ? null
+        : ZonePlanning(
+            planning: commande,
+            mois: AppStrings.moisLongs[etat.periode.mois - 1],
+            creneaux: etat.periode.nombreDeJours * 2,
+            uneRangee: uneRangee,
+          );
 
     // Les trois chiffres du mois, comptés sur les créneaux et les
     // attributions **déjà en mémoire** : aucune lecture de plus (ticket 061b).
@@ -795,24 +828,41 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
               final resume = visibles.isNotEmpty;
               final complet =
                   resume && place >= MatriceScreen.placeBandeauComplet;
+              // **Réduit seulement si la rangée d'actions y tient.** Sur
+              // une fenêtre étroite, elle se replierait sur deux lignes et
+              // le bloc « réduit » serait plus haut que le bloc complet.
               final reduit =
                   resume &&
                   !complet &&
-                  place >= MatriceScreen.placeBandeauReduit;
+                  place >= MatriceScreen.placeBandeauReduit &&
+                  (zonePlanning(uneRangee: true) == null ||
+                      contraintes.maxWidth >=
+                          BandeauMois.largeurReduitAvecActions);
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   if (complet || reduit)
-                    BandeauMois(resume: bandeau, compact: reduit),
-                  if (complet || reduit)
-                    BandeSemaine(
-                      annee: etat.periode.annee,
-                      mois: etat.periode.mois,
-                      nombreDeJours: etat.periode.nombreDeJours,
-                      aujourdhui: DateTime.now(),
-                      jourVise: _jourVise,
-                      onJour: _viser,
+                    BandeauMois(
+                      resume: bandeau,
+                      compact: reduit,
+                      actions: zonePlanning(uneRangee: reduit),
+                    )
+                  // **Le bandeau s'efface, pas la décision.** Sur une fenêtre
+                  // trop courte pour ses chiffres, la zone du planning reste
+                  // seule : un planning qu'on ne peut plus publier parce que
+                  // la fenêtre est basse serait un cul-de-sac.
+                  else if (resume &&
+                      zonePlanning(uneRangee: true) != null &&
+                      place >= MatriceScreen.placeZonePlanningSeule)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.lg,
+                        0,
+                        AppSpacing.lg,
+                        AppSpacing.sm,
+                      ),
+                      child: zonePlanning(uneRangee: true),
                     ),
                   Expanded(
                     child: visibles.isEmpty
@@ -843,23 +893,19 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     FiltresMatrice filtres,
     PlanningMois planning,
     String? creneauChoisi,
-  ) => NotificationListener<ScrollNotification>(
-    onNotification: _suivreDefilement,
-    child: GrilleMatrice(
-      defilementJour: _defilement,
-      matrice: etat.matrice,
-      lignes: visibles,
-      annee: etat.periode.annee,
-      mois: etat.periode.mois,
-      commentaires: filtres.commentaires,
-      aujourdhui: DateTime.now(),
-      erreurs: etat.erreurs,
-      saisieActive: _saisieActive(etat, matrice: true),
-      onCase: _basculer,
-      planning: planning,
-      creneauSelectionne: creneauChoisi,
-      onCreneau: _ouvrirCreneau,
-    ),
+  ) => GrilleMatrice(
+    matrice: etat.matrice,
+    lignes: visibles,
+    annee: etat.periode.annee,
+    mois: etat.periode.mois,
+    commentaires: filtres.commentaires,
+    aujourdhui: DateTime.now(),
+    erreurs: etat.erreurs,
+    saisieActive: _saisieActive(etat, matrice: true),
+    onCase: _basculer,
+    planning: planning,
+    creneauSelectionne: creneauChoisi,
+    onCreneau: _ouvrirCreneau,
   );
 
   Widget _vueJour(
@@ -911,34 +957,6 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
   );
 
   void _basculer(CleCellule cle) => unawaited(_controleur.basculer(cle));
-
-  /// Une pastille touchée : la matrice s'y rend, et la bande marque le jour.
-  void _viser(int jour) {
-    _defilement.viser(jour);
-    if (_jourVise != jour) setState(() => _jourVise = jour);
-  }
-
-  /// La marque du jour visé **s'efface quand la grille s'en va**.
-  ///
-  /// Elle dit « voilà où la matrice est posée » : la laisser après un
-  /// défilement à la main désignerait une colonne que plus personne ne voit.
-  /// Le décalage vient de la grille elle-même, à la molette comme au doigt ;
-  /// le saut que la bande commande, lui, amène la colonne au bord gauche,
-  /// donc bien à l'intérieur de la fenêtre, et ne se défait pas tout seul.
-  bool _suivreDefilement(ScrollNotification notification) {
-    final jour = _jourVise;
-    if (jour == null) return false;
-    final metriques = notification.metrics;
-    if (metriques.axis != Axis.horizontal) return false;
-    if (notification is! ScrollUpdateNotification) return false;
-
-    final gauche = (jour - 1) * GeoMatrice.largeurJour;
-    final visible =
-        gauche + GeoMatrice.largeurJour > metriques.pixels &&
-        gauche < metriques.pixels + metriques.viewportDimension;
-    if (!visible) setState(() => _jourVise = null);
-    return false;
-  }
 
   /// Vrai quand une case répond au clic : le mode est armé, la caserne est
   /// modifiable, le réseau est là, et la densité employée est actionnable

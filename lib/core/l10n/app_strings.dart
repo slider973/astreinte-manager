@@ -1417,7 +1417,20 @@ abstract final class AppStrings {
 
   static String moisOuvertJusquAuCourt(String date) => 'Ouvert jusqu\'au $date';
 
+  /// La même date sans le mot « Ouvert », que l'icône du sélecteur dit déjà.
+  static String moisJusquAuCourt(String date) => 'jusqu\'au $date';
+
   static const String moisVerrouilleCourt = 'Verrouillé';
+
+  /// L'état de la période, en un mot, pour l'icône du bouton sur une ligne :
+  /// c'est elle qui le porte à l'œil depuis le chantier 061c, et un lecteur
+  /// d'écran ne voit pas les cadenas.
+  static const String moisOuvertCourt = 'Ouvert';
+
+  /// Le mois et son état sur une seule ligne : « Octobre 2026 · Verrouillé ».
+  /// Le point médian sépare deux faits de même rang, là où un tiret aurait
+  /// suggéré une suite.
+  static String moisEtEtat(String mois, String etat) => '$mois · $etat';
 
   static String moisSelectionSemantique(String mois) =>
       'Mois sélectionné : $mois';
@@ -2210,15 +2223,19 @@ abstract final class AppStrings {
 
   /// Ce que le bouton va faire, écrit avant qu'on l'actionne. Le nombre est
   /// celui du mois affiché : 56, 60 ou 62, jamais un 62 supposé.
+  ///
+  /// **Une ligne, pas trois** (chantier 061c) : l'explication vit sous le
+  /// bouton, dans la zone du planning du bandeau, et trois lignes de texte y
+  /// dépliaient le bloc. Les deux faits qui comptent restent — combien de
+  /// créneaux, et d'où vient leur effectif.
   static String planningCreerDetail(int creneaux) =>
-      '$creneaux créneaux seront créés, un par jour et par créneau, avec '
-      'l\'effectif requis de tes réglages.';
+      '$creneaux créneaux, à l\'effectif requis de tes réglages.';
 
   static String planningCreeTexte(String mois, int creneaux) =>
       'Planning ${moisAvecDe(mois)} créé : $creneaux créneaux.';
 
   // -------------------------------------------------------------------
-  // Le compte, le bandeau du mois et la bande de semaine (ticket 061b)
+  // Le compte et le bandeau du mois (ticket 061b)
   // -------------------------------------------------------------------
 
   static const String compteOuvrir = 'Mon profil';
@@ -2249,10 +2266,6 @@ abstract final class AppStrings {
   /// elle, ne dit rien — une longueur n'est pas un état.
   static String bandeauPartSemantique(String libelle, int n, int total) =>
       '$libelle : $n créneau${n > 1 ? 'x' : ''} sur $total';
-
-  // --- La bande de semaine ----------------------------------------------
-
-  static const String bandeAllerAuJour = 'Appuie pour voir ce jour';
 
   // --- La ligne des créneaux --------------------------------------------
 
@@ -2467,12 +2480,14 @@ abstract final class AppStrings {
 
   /// Ce que le bouton va faire, avant qu'on l'actionne. Le nombre compte les
   /// **membres** : c'est le nombre de téléphones qui vont sonner.
+  /// **Une ligne, à côté du bouton** (chantier 061c) : l'explication vit
+  /// désormais dans une rangée de 48 points, où trois lignes de texte
+  /// dépliaient la barre. Le nombre de téléphones reste ; la phrase qui
+  /// l'enrobait est partie.
   static String publierDetail(int membres) => switch (membres) {
-    0 =>
-      'Aucun pompier n\'est attribué : le planning deviendra simplement '
-          'visible de tous.',
-    1 => '1 pompier recevra une notification.',
-    _ => '$membres pompiers recevront une notification.',
+    0 => 'Personne n\'est attribué : aucune notification.',
+    1 => '1 pompier sera prévenu.',
+    _ => '$membres pompiers seront prévenus.',
   };
 
   static String publierTitre(String mois) =>
