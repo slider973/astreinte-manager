@@ -20,18 +20,34 @@ import 'feuille_raccourci.dart';
 /// qui n'existe que quand elle a quelque chose à dire : le résultat du dernier
 /// raccourci et son bouton « Annuler ».
 class BarreRaccourcis extends ConsumerWidget {
-  const BarreRaccourcis({super.key, this.vertical = false});
+  const BarreRaccourcis({
+    super.key,
+    this.vertical = false,
+    this.dansCarte = false,
+  });
 
   /// Vrai dans le panneau de droite (`large`) : les boutons s'empilent au
   /// lieu de défiler.
   final bool vertical;
+
+  /// Vrai dans la carte des raccourcis du Calendrier (ticket 064c) : la marge
+  /// n'est plus celle de la page, c'est le rembourrage interne de la carte.
+  ///
+  /// La bande garde son défilement horizontal et son dernier bouton qui
+  /// dépasse — c'est ce qui dit qu'il y en a d'autres —, mais il dépasse
+  /// désormais du bord de la carte, pas de celui de l'écran.
+  final bool dansCarte;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final etat = ref.watch(saisieControllerProvider).value;
     if (etat == null) return const SizedBox.shrink();
 
-    final marge = vertical ? 0.0 : AppWindowClass.of(context).margePage;
+    final marge = vertical
+        ? 0.0
+        : dansCarte
+        ? AppSpacing.md
+        : AppWindowClass.of(context).margePage;
     final raison = etat.periode.ouverte
         ? (etat.lectureSeule ? AppStrings.raccourcisLectureSeule : null)
         : AppStrings.raccourcisVerrouilles;

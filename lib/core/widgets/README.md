@@ -16,6 +16,8 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `empty_state.dart` | `EmptyState` | Vide, erreur, hors ligne. Jamais muet, toujours une sortie. |
 | `loading_skeleton.dart` | `LoadingSkeleton`, `SkeletonLigne`, `SkeletonBloc`, `SkeletonGrilleMois` | L'ossature du contenu attendu, jamais une roue. |
 | `app_divider.dart` | `AppDivider` | Le filet : le matériau de séparation du système. |
+| `carte_douce.dart` | `CarteDouce`, `CarteDouceSliver` | **La carte du monde du pompier** (ticket 064c) : `surface` sur le papier doux, rayon `carte` = 20, filet `outline-variant`, aucune ombre. `CarteDouce.nue` quand l'enfant porte ses propres marges ; `CarteDouceSliver` autour d'un groupe de slivers, pour une grille de soixante-deux lignes qui ne peut pas entrer dans une boîte. Elle **ne s'imbrique jamais** : ce qui vit dans une carte est un contrôle, pas une seconde carte. |
+| `entete_section.dart` | `EnteteSection` | Le titre d'une section, son compte, et le filet qui ouvre la liste. `discret` est la forme du monde du pompier (ticket 064c) : `titleMedium` au lieu de `titleLarge`, et **pas de filet** — une liste de cartes se sépare toute seule. |
 | `count_stat.dart` | `CountStat` | Un compteur en chiffres tabulaires, avec ou sans plafond. |
 | `save_indicator.dart` | `SaveIndicator` | Où en est l'enregistrement automatique. |
 | `legende_etats.dart` | `LegendeEtats` | La clé des trois états de la case du registre, avec de vraies `SlotChip` inertes. `LegendeEtats.attributions` fait la même chose pour les trois blocs d'attribution, dans le bandeau du mois — les deux familles ne se mélangent pas dans une rangée (chantier 061c-2). `espacement` resserre l'écart entre entrées : `lg` dans un bloc, `sm` dans la barre de commande de l'admin, dont la rangée se compte au point près (chantier 061c). |
@@ -37,6 +39,11 @@ réservé à ces cartes : un bouton ou un champ à 20 serait une gélule, que `D
 proscrit. `feuilleCarreeRadius` est le rayon `feuille` sur les quatre coins — le carré d'initiale
 des lignes de liste —, là où `feuilleRadius` ne porte que les deux coins hauts d'une feuille de
 bas d'écran.
+
+Depuis le chantier 064c, ce rayon-là ne s'écrit plus à la main : `CarteDouce` le porte, avec son
+papier et son filet, pour les trois écrans du pompier. Un écran qui écrirait un `Material` à
+rayon 20 aurait deux chances sur trois d'oublier le filet — et un cran de cette palette ne vaut
+que 1,06:1, donc la carte disparaîtrait.
 
 ## La règle qui a produit `BoutonRetour`
 

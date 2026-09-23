@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/l10n/app_strings.dart';
+import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_status.dart';
+import '../../../../core/widgets/carte_douce.dart';
 
 /// Le bloc qui apprend le geste, puis disparaît **tout seul**.
 ///
@@ -26,41 +27,30 @@ class BlocAstuce extends StatelessWidget {
   Widget build(BuildContext context) {
     if (_vide) return const SizedBox.shrink();
 
-    final theme = Theme.of(context);
+    final marge = AppWindowClass.of(context).margePage;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.lg,
-        0,
-      ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: AppRadius.controleRadius,
-          border: Border.all(color: context.statuts.filetDecoratif),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              if (montrerTouche)
-                const _Ligne(
-                  icone: Icons.touch_app,
-                  texte: AppStrings.astuceSaisieTouche,
-                ),
-              if (montrerTouche && montrerGlissement)
-                const SizedBox(height: AppSpacing.sm),
-              if (montrerGlissement)
-                const _Ligne(
-                  icone: Icons.swipe_vertical,
-                  texte: AppStrings.astuceSaisieGlissement,
-                ),
-            ],
-          ),
+      padding: EdgeInsets.fromLTRB(marge, AppSpacing.md, marge, 0),
+      // La carte du monde du pompier (ticket 064c) : le bloc d'aide était déjà
+      // `surface` sur filet, il ne change que de rayon.
+      child: CarteDouce(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (montrerTouche)
+              const _Ligne(
+                icone: Icons.touch_app,
+                texte: AppStrings.astuceSaisieTouche,
+              ),
+            if (montrerTouche && montrerGlissement)
+              const SizedBox(height: AppSpacing.sm),
+            if (montrerGlissement)
+              const _Ligne(
+                icone: Icons.swipe_vertical,
+                texte: AppStrings.astuceSaisieGlissement,
+              ),
+          ],
         ),
       ),
     );

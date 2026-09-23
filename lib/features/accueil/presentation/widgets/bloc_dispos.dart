@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
+import '../../../../core/widgets/carte_douce.dart';
 import '../../domain/tableau_bord.dart';
 
 /// La section « Disponibilités » de l'accueil.
@@ -129,35 +130,20 @@ class _Constat extends StatelessWidget {
         // Une carte de `surface` sur le papier doux de la page, comme les
         // lignes de proposition : rien à faire ici, mais la ligne appartient
         // au même monde (`design/064 § 2`).
-        child: Material(
-          color: scheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: AppRadius.carteRadius,
-            side: BorderSide(color: scheme.outlineVariant),
-          ),
-          child: InkWell(
-            onTap: () => onSaisir(appel.cleMois),
-            borderRadius: AppRadius.carteRadius,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: AppTouch.cible),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Row(
-                  children: <Widget>[
-                    Icon(
-                      Icons.task_alt,
-                      size: AppTouch.icone,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Text(texte, style: theme.textTheme.bodyLarge),
-                    ),
-                    Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
-                  ],
-                ),
+        child: CarteDouce(
+          onTap: () => onSaisir(appel.cleMois),
+          hauteurMin: AppTouch.cible,
+          child: Row(
+            children: <Widget>[
+              Icon(
+                Icons.task_alt,
+                size: AppTouch.icone,
+                color: scheme.onSurfaceVariant,
               ),
-            ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: Text(texte, style: theme.textTheme.bodyLarge)),
+              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            ],
           ),
         ),
       ),

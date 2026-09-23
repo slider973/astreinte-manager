@@ -7,6 +7,7 @@ import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
+import '../../../../core/widgets/carte_douce.dart';
 import '../../domain/disponibilite_mois.dart';
 import '../../domain/preferences_mois.dart';
 import '../controllers/saisie_controller.dart';
@@ -263,24 +264,17 @@ class _Bloc extends StatelessWidget {
   final Widget child;
   final bool enErreur;
 
+  /// La carte du monde du pompier (ticket 064c). Le bloc était déjà `surface`
+  /// sur filet `outline-variant` : il ne change que de rayon, 8 → 20, et le
+  /// filet d'erreur de 2 dp lui reste — c'est une erreur de **saisie**, celle
+  /// du plafond qu'on vient de taper, pas une erreur de chargement.
+  ///
+  /// Sans rembourrage : les deux formes de la section, compacte et complète,
+  /// portent déjà les leurs, et un commentaire replié doit pouvoir toucher
+  /// les bords de sa carte.
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: AppRadius.controleRadius,
-        border: Border.all(
-          color: enErreur
-              ? theme.colorScheme.error
-              : context.statuts.filetDecoratif,
-          width: enErreur ? AppStroke.etat : AppStroke.filet,
-        ),
-      ),
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) =>
+      CarteDouce.nue(enErreur: enErreur, child: child);
 }
 
 /// **La forme compacte** — celle qu'on voit sans rien faire.

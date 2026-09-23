@@ -42,9 +42,18 @@ class EnteteColonnes extends SliverPersistentHeaderDelegate {
     // une géométrie invalide (`layoutExtent` supérieur à `paintExtent`).
     return SizedBox(
       height: hauteur,
+      // **Le papier de la carte, et un filet dessous** (ticket 064c) :
+      // l'en-tête est le premier élément de la carte de la grille, il en épouse
+      // donc les coins hauts. Un cran de surface de plus y aurait fait une
+      // bande claire aux angles carrés dans une carte à rayon 20, et
+      // `DESIGN.md § Elevation & Depth` sépare au niveau 0 « par un filet
+      // 1 dp **et/ou** une surface tonale » — ici, c'est le filet.
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHigh,
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(AppRadius.carte),
+          ),
           border: Border(
             bottom: BorderSide(color: context.statuts.filetDecoratif),
           ),

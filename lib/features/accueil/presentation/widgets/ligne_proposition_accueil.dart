@@ -4,6 +4,7 @@ import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/l10n/format_date.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
+import '../../../../core/widgets/carte_douce.dart';
 import '../../../astreintes/domain/astreinte.dart';
 import '../../../propositions/domain/proposition.dart';
 
@@ -68,65 +69,51 @@ class LignePropositionAccueil extends StatelessWidget {
       ].join(', '),
       child: ExcludeSemantics(
         // **Une carte de `surface` sur le papier doux de la page**
-        // (`design/064 § 2`). Le filet `outline-variant` la détache : un cran
-        // de surface ne vaut que 1,06:1 dans cette palette, et c'est le trait
-        // qui fait le travail au niveau 0 (`DESIGN.md § Elevation & Depth`).
-        child: Material(
-          color: scheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: AppRadius.carteRadius,
-            side: BorderSide(color: scheme.outlineVariant),
-          ),
-          child: InkWell(
-            onTap: onOuvrir,
-            borderRadius: AppRadius.carteRadius,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: AppTouch.cible),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Row(
+        // (`design/064 § 2`), celle que `CarteDouce` porte pour les trois
+        // écrans du pompier depuis le chantier 064c.
+        child: CarteDouce(
+          onTap: onOuvrir,
+          hauteurMin: AppTouch.cible,
+          child: Row(
+            children: <Widget>[
+              _CarreCreneau(
+                initiale: creneau.libelle.characters.first.toUpperCase(),
+                icone: creneau.icone,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    _CarreCreneau(
-                      initiale: creneau.libelle.characters.first.toUpperCase(),
-                      icone: creneau.icone,
+                    Text(
+                      titre,
+                      style: theme.textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(
-                            titre,
-                            style: theme.textTheme.titleMedium,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            soutien,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                    Text(
+                      soutien,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (mention != null) ...<Widget>[
-                      const SizedBox(width: AppSpacing.sm),
-                      Text(
-                        mention,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                      ),
-                    ],
                   ],
                 ),
               ),
-            ),
+              if (mention != null) ...<Widget>[
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  mention,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                ),
+              ],
+            ],
           ),
         ),
       ),
