@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/widgets/count_stat.dart';
+import '../../../../core/widgets/legende_etats.dart';
 import '../../domain/resume_mois.dart';
 import 'barre_repartition.dart';
 import 'zone_planning.dart';
@@ -26,6 +27,7 @@ class BandeauMois extends StatelessWidget {
     super.key,
     this.compact = false,
     this.actions,
+    this.legendeAttributions = false,
   });
 
   /// La hauteur du bloc entier, **mesurée** : cadre, ligne de chiffres, barre
@@ -40,6 +42,16 @@ class BandeauMois extends StatelessWidget {
   /// l'écran réserve : sinon le bloc apparaîtrait puis déborderait le jour où
   /// le planning existe.
   static const double hauteurComplet = 144;
+
+  /// Le même bloc **avec la légende des trois blocs d'attribution**, qui
+  /// s'adosse à celle de la répartition dès que le planning existe.
+  ///
+  /// Vingt-deux points de plus, mesurés à 1280 : une rangée de cases de 28 et
+  /// l'écart qui la sépare de la légende au-dessus, moins les dix points dont
+  /// la colonne des chiffres était plus courte que celle des actions. C'est le
+  /// prix de nommer une marque nouvelle, et il est payé ici parce que la barre
+  /// de commande le facturait 56 (`DESIGN.md § Écarts, 061c-2`).
+  static const double hauteurCompletAvecLegende = 166;
 
   /// Le même bloc sans la zone du planning : sur un mois dont le planning
   /// n'est pas encore lu, et en `compact`.
@@ -76,6 +88,21 @@ class BandeauMois extends StatelessWidget {
   /// ces boutons changent. `null` sur téléphone, où la création reste dans la
   /// barre et « Publier » dans le fil d'actions du bas.
   final Widget? actions;
+
+  /// **La légende des trois blocs d'attribution**, sous celle de répartition.
+  ///
+  /// Elle est ici et non dans la barre de commande, où vit la légende des
+  /// disponibilités, parce que la barre n'a pas la place : mesurée à 1280 avec
+  /// un planning, la légende complète la porte de 120 à 176 points, soit deux
+  /// rangées de contrôles plus une. Le bandeau, lui, parle déjà de ces
+  /// attributions — ses trois chiffres les comptent — et sa barre de
+  /// répartition a une légende à laquelle celle-ci s'adosse
+  /// (`DESIGN.md § Écarts, 061c-2`).
+  ///
+  /// Faux tant que le planning n'existe pas : aucune case ne porte alors de
+  /// bloc, et nommer ce qui n'est pas à l'écran est du bruit. Faux aussi en
+  /// `compact`, où la matrice n'est pas là.
+  final bool legendeAttributions;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +178,10 @@ class BandeauMois extends StatelessWidget {
                   chiffres,
                   const SizedBox(height: AppSpacing.md),
                   BarreRepartition(parts: _parts(context)),
+                  if (legendeAttributions) ...<Widget>[
+                    const SizedBox(height: AppSpacing.xs),
+                    const LegendeEtats.attributions(),
+                  ],
                 ],
               );
 

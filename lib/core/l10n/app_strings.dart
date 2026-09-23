@@ -2186,6 +2186,23 @@ abstract final class AppStrings {
   static String matriceCaseAction(String etatSuivant) =>
       'Appuie pour le marquer ${etatSuivant.toLowerCase()}';
 
+  /// La case d'un membre **qui porte une astreinte** : l'attribution d'abord,
+  /// puis entre parenthèses ce que le membre avait déclaré.
+  ///
+  /// Les deux faits comptent et ne se déduisent pas l'un de l'autre :
+  /// « accepté (absent) » est la ligne qu'un chef doit entendre, et le bloc
+  /// seul ne la dirait pas — il a remplacé la case de disponibilité.
+  static String matriceCaseAttributionSemantique({
+    required String membre,
+    required String jourEtDate,
+    required String creneau,
+    required String etat,
+    required String disponibilite,
+  }) =>
+      '$membre, $jourEtDate, ${creneau.toLowerCase()}, '
+      '${etat.toLowerCase()} '
+      '(disponibilité déclarée : ${disponibilite.toLowerCase()})';
+
   static String matriceDisponiblesSemantique({
     required String jourEtDate,
     required String creneau,

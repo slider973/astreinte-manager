@@ -10,8 +10,10 @@ import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/widgets/app_divider.dart';
+import '../../../../core/widgets/case_attribution.dart';
 import '../../../../core/widgets/slot_chip.dart';
 import '../../domain/cle_cellule.dart';
+import '../../domain/creneau_planning.dart';
 import '../../domain/ligne_matrice.dart';
 import '../../domain/matrice_mois.dart';
 import '../../domain/planning_mois.dart';
@@ -113,6 +115,13 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
   List<String> _libelles = const <String>[];
   int _libellesPour = 0;
 
+  /// La table `(membre, jour, créneau) → attribution`, construite une fois par
+  /// planning et non une recherche par case : à soixante membres et
+  /// soixante-deux créneaux, un balayage linéaire par case ferait 3 720
+  /// parcours de la liste des attributions à chaque image.
+  Map<CleCellule, Attribution> _attributions = const <CleCellule, Attribution>{};
+  PlanningMois? _attributionsPour;
+
   @override
   void initState() {
     super.initState();
@@ -187,6 +196,42 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
     _libellesPour = clef;
     return _libelles;
   }
+
+  /// Les attributions du mois, rangées par case.
+  ///
+  /// **Aucune lecture de plus** : tout est déjà en mémoire (`PlanningMois`),
+  /// et la table se refait seulement quand le planning change d'objet — une
+  /// attribution posée, retirée, ou reçue du temps réel.
+  ///
+  /// Une attribution **remplacée ou annulée n'y entre pas** : ce sont les
+  /// statuts que le dépôt écarte déjà à la lecture (`_statutsActifs`), et une
+  /// astreinte qui ne compte plus ne doit pas occuper la case d'un membre.
+  Map<CleCellule, Attribution> _tableAttributions() {
+    if (identical(_attributionsPour, widget.planning)) return _attributions;
+
+    final table = <CleCellule, Attribution>{};
+    for (final attribution in widget.planning.attributions) {
+      if (!_affichee(attribution.etat)) continue;
+      final creneau = widget.planning.creneauParId(attribution.creneauId);
+      if (creneau == null) continue;
+      table[CleCellule(
+        userId: attribution.userId,
+        jour: creneau.jour,
+        creneau: creneau.creneau,
+      )] = attribution;
+    }
+
+    _attributions = table;
+    _attributionsPour = widget.planning;
+    return table;
+  }
+
+  static bool _affichee(AttributionEtat etat) => switch (etat) {
+    AttributionEtat.propose ||
+    AttributionEtat.accepte ||
+    AttributionEtat.refuse => true,
+    AttributionEtat.remplace || AttributionEtat.annule => false,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -366,6 +411,7 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
 
   Widget _corps(int visibles) {
     final libelles = _libellesJours();
+    final attributions = _tableAttributions();
 
     return Scrollbar(
       controller: _hGrille,
@@ -395,6 +441,7 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
                   ligne: widget.lignes[index],
                   jour: jour,
                   libelle: libelles[jour - 1],
+                  attributions: attributions,
                 ),
               ),
             ),
@@ -408,6 +455,7 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
     required LigneMatrice ligne,
     required int jour,
     required String libelle,
+    required Map<CleCellule, Attribution> attributions,
   }) {
     final date = DateTime(widget.annee, widget.mois, jour);
     return FondJour(
@@ -420,9 +468,9 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              _case(ligne, jour, CreneauType.jour, libelle),
+              _case(ligne, jour, CreneauType.jour, libelle, attributions),
               const SizedBox(width: GeoMatrice.ecartCreneaux),
-              _case(ligne, jour, CreneauType.nuit, libelle),
+              _case(ligne, jour, CreneauType.nuit, libelle, attributions),
             ],
           ),
         ),
@@ -435,11 +483,44 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
     int jour,
     CreneauType creneau,
     String libelle,
+    Map<CleCellule, Attribution> attributions,
   ) {
     final statuts = context.statuts;
     final cellule = ligne.cellule(jour, creneau);
     final cle = CleCellule(userId: ligne.userId, jour: jour, creneau: creneau);
     final suivant = CelluleMatrice.suivant(cellule.etat);
+
+    // **L'attribution passe devant la déclaration.** Un membre posé sur un
+    // créneau se lit dans sa propre ligne, et non seulement dans la fraction
+    // du bloc épinglé ou dans le panneau : c'est ce que la référence du
+    // propriétaire montre d'un coup d'œil. La disponibilité déclarée n'est pas
+    // perdue — elle est dite entre parenthèses dans la sémantique.
+    final attribution = attributions[cle];
+    if (attribution != null) {
+      return CaseAttribution(
+        etat: attribution.etat,
+        erreur: widget.erreurs.contains(cle),
+        libelleSemantique: AppStrings.matriceCaseAttributionSemantique(
+          membre: ligne.nomAffiche,
+          jourEtDate: libelle,
+          creneau: statuts.creneau(creneau).libelle,
+          etat: statuts.attribution(attribution.etat).libelle,
+          disponibilite: statuts.disponibilite(cellule.etat).libelle,
+        ),
+        // **Le mode de saisie garde la main.** Armé, l'appui cycle la
+        // disponibilité comme partout ailleurs et le bloc reste affiché ;
+        // au repos, il ouvre le créneau, exactement comme la ligne des
+        // créneaux au-dessus de la même colonne.
+        actionSemantique: widget.saisieActive
+            ? AppStrings.matriceCaseAction(
+                statuts.disponibilite(suivant).libelle,
+              )
+            : AppStrings.planningCouvertureAction,
+        onTap: widget.saisieActive
+            ? () => widget.onCase(cle)
+            : () => widget.onCreneau(attribution.creneauId),
+      );
+    }
 
     return SlotChip(
       densite: SlotChipDensite.dense,

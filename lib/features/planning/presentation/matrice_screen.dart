@@ -91,6 +91,15 @@ class MatriceScreen extends ConsumerStatefulWidget {
   static const double placeBandeauComplet =
       BandeauMois.hauteurComplet + placeGrilleUtile;
 
+  /// La même, quand le planning existe et que le bandeau porte en plus la
+  /// légende des blocs d'attribution : vingt-deux points de plus.
+  ///
+  /// **Le seuil ne paie que ce qui s'affiche** (règle du chantier 061c) : sur
+  /// un mois sans planning, la légende n'existe pas et le bandeau complet
+  /// revient vingt-deux points plus tôt.
+  static const double placeBandeauCompletAvecLegende =
+      BandeauMois.hauteurCompletAvecLegende + placeGrilleUtile;
+
   /// En dessous, la ligne de trois chiffres seule ; puis plus rien.
   static const double placeBandeauReduit =
       BandeauMois.hauteurReduit + placeGrilleUtile;
@@ -826,8 +835,16 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
               // rien ouvre un message avec une sortie : la coincer sous deux
               // cents points de résumé, c'est la rendre inatteignable.
               final resume = visibles.isNotEmpty;
+              // La légende des blocs d'attribution ne se dessine que sur un
+              // mois dont le planning existe : c'est elle qui décide du
+              // seuil, et non la classe de fenêtre.
+              final legende = planning.existe;
               final complet =
-                  resume && place >= MatriceScreen.placeBandeauComplet;
+                  resume &&
+                  place >=
+                      (legende
+                          ? MatriceScreen.placeBandeauCompletAvecLegende
+                          : MatriceScreen.placeBandeauComplet);
               // **Réduit seulement si la rangée d'actions y tient.** Sur
               // une fenêtre étroite, elle se replierait sur deux lignes et
               // le bloc « réduit » serait plus haut que le bloc complet.
@@ -847,6 +864,12 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
                       resume: bandeau,
                       compact: reduit,
                       actions: zonePlanning(uneRangee: reduit),
+                      // La légende des blocs d'attribution n'a lieu d'être
+                      // que quand la grille en porte : le planning existe, et
+                      // le bloc est complet — réduit, il n'a plus sa barre de
+                      // répartition, donc plus de légende à laquelle
+                      // s'adosser.
+                      legendeAttributions: !reduit && legende,
                     )
                   // **Le bandeau s'efface, pas la décision.** Sur une fenêtre
                   // trop courte pour ses chiffres, la zone du planning reste
