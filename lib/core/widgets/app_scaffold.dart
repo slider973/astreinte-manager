@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_strings.dart';
+import '../router/app_router.dart';
 import '../theme/app_breakpoints.dart';
 import '../theme/app_spacing.dart';
 import 'app_banner.dart';
@@ -20,6 +21,7 @@ class AppDestination {
     required this.iconeSelectionnee,
     required this.route,
     this.pastille,
+    this.pastilleLibelle,
   });
 
   final String libelle;
@@ -30,62 +32,68 @@ class AppDestination {
   /// Icône sélectionnée (pleine).
   final IconData iconeSelectionnee;
 
-  /// Nom de route `go_router`.
+  /// **Nom de route `go_router`**, pas un chemin : chaque destination est une
+  /// route à elle depuis le ticket 064, et `goNamed` suffit à y aller.
   final String route;
 
   /// Nombre affiché en pastille, plafonné à « 9+ ». `null` ou `0` : aucune
   /// pastille.
   final int? pastille;
 
-  /// Les cinq destinations du produit, dans l'ordre imposé par `DESIGN.md`.
-  /// « Admin » n'est présente que pour un administrateur de caserne.
+  /// La phrase annoncée à la place du nombre : « 3 notifications non lues ».
+  /// Obligatoire dès qu'il y a une pastille — un chiffre nu ne dit pas ce
+  /// qu'il compte.
+  final String? pastilleLibelle;
+
+  /// **Les quatre destinations du pompier** (ticket 064), plus « Admin » en
+  /// cinquième pour qui administre la caserne.
+  ///
+  /// L'ordre est celui du brief `design/064 § 4` : Accueil, Calendrier,
+  /// Astreintes, Boîte. Le profil n'y est plus — il s'ouvre depuis l'avatar de
+  /// l'en-tête et se pousse, parce qu'on l'ouvre deux fois par an là où les
+  /// quatre autres se visitent tous les jours.
   static List<AppDestination> pour({
     required bool admin,
-    int propositionsEnAttente = 0,
+    int boiteNonLues = 0,
   }) => <AppDestination>[
     const AppDestination(
-      libelle: AppStrings.navMonMois,
+      libelle: AppStrings.navAccueil,
+      icone: Icons.home_outlined,
+      iconeSelectionnee: Icons.home,
+      route: AppRoutes.accueilName,
+    ),
+    const AppDestination(
+      libelle: AppStrings.navCalendrier,
       icone: Icons.calendar_month_outlined,
       iconeSelectionnee: Icons.calendar_month,
-      route: 'monMois',
-    ),
-    AppDestination(
-      libelle: AppStrings.navPropositions,
-      icone: Icons.inbox_outlined,
-      iconeSelectionnee: Icons.inbox,
-      route: 'propositions',
-      pastille: propositionsEnAttente,
+      route: AppRoutes.calendrierName,
     ),
     // **La destination de consultation** (ticket 027). Elle portait
     // « Planning » et l'icône `groups` au ticket 004 ; `groups` disait « les
     // autres » sur un écran qui, tant qu'un planning reste `published`, ne
-    // montre que soi. Le ticket 023 y ajoutera la vue de la caserne derrière
-    // un sélecteur à deux segments — d'où le mot « Astreintes », qui couvre
-    // les deux (`design/027 § 4`).
+    // montre que soi (`design/027 § 4`).
     const AppDestination(
       libelle: AppStrings.navAstreintes,
       icone: Icons.event_available_outlined,
       iconeSelectionnee: Icons.event_available,
-      route: 'astreintes',
+      route: AppRoutes.astreintesName,
     ),
-    const AppDestination(
-      libelle: AppStrings.navProfil,
-      icone: Icons.person_outline,
-      iconeSelectionnee: Icons.person,
-      route: 'profil',
+    AppDestination(
+      libelle: AppStrings.navBoite,
+      icone: Icons.inbox_outlined,
+      iconeSelectionnee: Icons.inbox,
+      route: AppRoutes.boiteName,
+      pastille: boiteNonLues,
+      pastilleLibelle: AppStrings.centreNonLuesBadge(boiteNonLues),
     ),
     if (admin)
       const AppDestination(
         libelle: AppStrings.navAdmin,
         icone: Icons.admin_panel_settings_outlined,
         iconeSelectionnee: Icons.admin_panel_settings,
-        route: 'admin',
+        route: AppRoutes.planningAdminName,
       ),
   ];
-
-  /// La place de « Profil » dans la liste, admin ou non : « Admin » vient
-  /// après lui, donc l'indice ne bouge pas d'un rôle à l'autre.
-  static const int indexProfil = 3;
 
   /// Le glyphe de la destination, avec sa pastille chiffrée s'il y en a une.
   ///
@@ -98,14 +106,11 @@ class AppDestination {
     if (compte == 0) return dessin;
 
     // La pastille chiffrée est plafonnée à « 9+ », et doublée d'un libellé
-    // annoncé : « 3 propositions en attente ».
+    // annoncé : « 3 notifications non lues ».
     return Badge.count(
       count: compte,
       maxCount: 9,
-      child: Semantics(
-        label: AppStrings.navPropositionsBadge(compte),
-        child: dessin,
-      ),
+      child: Semantics(label: pastilleLibelle ?? libelle, child: dessin),
     );
   }
 }
@@ -138,6 +143,7 @@ class AppScaffold extends StatelessWidget {
     this.filActions,
     this.caserne,
     this.actionsEnTete = const <Widget>[],
+    this.sansBarreApplication = false,
   });
 
   final String titre;
@@ -174,6 +180,16 @@ class AppScaffold extends StatelessWidget {
   /// d'application n'a pas la largeur de deux actions de plus, et la cloche y
   /// vit déjà dans [actions] des écrans qui la portent.
   final List<Widget> actionsEnTete;
+
+  /// L'écran porte son propre en-tête dans son contenu : la barre
+  /// d'application s'efface sous `expanded`.
+  ///
+  /// **Un seul écran l'utilise**, l'accueil (ticket 064), dont l'en-tête est
+  /// la salutation, l'avatar et la cloche — une barre au-dessus redirait
+  /// « Accueil » à trente points de distance. Dès `expanded`, la question ne
+  /// se pose plus : c'est [EnTeteTravail] qui titre, et l'accueil n'affiche
+  /// alors que la salutation.
+  final bool sansBarreApplication;
 
   @override
   Widget build(BuildContext context) {
@@ -285,8 +301,9 @@ class AppScaffold extends StatelessWidget {
     );
   }
 
-  PreferredSizeWidget _barre(BuildContext context) =>
-      AppBar(title: Text(titre), actions: actions);
+  PreferredSizeWidget? _barre(BuildContext context) => sansBarreApplication
+      ? null
+      : AppBar(title: Text(titre), actions: actions);
 
   Widget _barreNavigation(BuildContext context, MediaQueryData media) {
     return Padding(
@@ -347,6 +364,6 @@ class AppScaffold extends StatelessWidget {
     final compte = destination.pastille ?? 0;
     return compte == 0
         ? destination.libelle
-        : AppStrings.navPropositionsBadge(compte);
+        : destination.pastilleLibelle ?? destination.libelle;
   }
 }

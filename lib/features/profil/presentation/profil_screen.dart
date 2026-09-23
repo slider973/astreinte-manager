@@ -5,7 +5,7 @@ import '../../../core/l10n/app_strings.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
-import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/bouton_retour.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../notifications/presentation/widgets/reglage_notifications.dart';
 import '../domain/profil.dart';
@@ -28,43 +28,47 @@ import 'widgets/bloc_regle.dart';
 /// une raison précise. Il est donc **plat, ordonné et sans surprise** — quatre
 /// blocs réglés, du plus consulté au plus définitif.
 ///
-/// Il vit dans l'onglet 3 de la coquille d'accueil. La route `/profil` annoncée
-/// par `DESIGN.md § Navigation` attend que la coquille éclate en routes, comme
-/// `/mois` (tickets 011 et 027).
+/// **Il a sa route depuis le ticket 064**, `/profil`, et il n'est plus une
+/// destination : on l'ouvre depuis l'avatar de l'en-tête, par `push`, et on en
+/// revient par `BoutonRetour`. La place qu'il libérait dans la barre est celle
+/// de la Boîte — quatre entrées pour un pompier, cinq pour un admin
+/// (`design/064 § 4`).
 class ProfilScreen extends ConsumerWidget {
-  const ProfilScreen({
-    required this.destinations,
-    required this.indexSelectionne,
-    required this.onDestination,
-    super.key,
-  });
-
-  final List<AppDestination> destinations;
-  final int indexSelectionne;
-  final ValueChanged<int> onDestination;
+  const ProfilScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profil = ref.watch(monProfilProvider);
 
-    return AppScaffold(
-      titre: AppStrings.profilEcranTitre,
-      destinations: destinations,
-      indexSelectionne: indexSelectionne,
-      onDestination: onDestination,
-      actions: const <Widget>[BoutonNotifications()],
-      // Une lecture en échec ne vide pas l'écran : la caserne, les
-      // notifications et les deux sorties ne dépendent pas de `profiles`, et
-      // c'est peut-être exactement pour se déconnecter qu'on est venu.
-      banniere: profil.hasError
-          ? AppBanner(
+    return Scaffold(
+      appBar: AppBar(
+        leading: const BoutonRetour(),
+        leadingWidth: BoutonRetour.largeur(context),
+        title: const Text(AppStrings.profilEcranTitre),
+        actions: const <Widget>[BoutonNotifications()],
+      ),
+      body: Column(
+        children: <Widget>[
+          // Une lecture en échec ne vide pas l'écran : la caserne, les
+          // notifications et les deux sorties ne dépendent pas de `profiles`,
+          // et c'est peut-être exactement pour se déconnecter qu'on est venu.
+          if (profil.hasError)
+            AppBanner(
               variante: AppBannerVariante.erreur,
               texte: AppStrings.profilLectureEchec,
               libelleAction: AppStrings.actionReessayer,
               onAction: () => ref.invalidate(monProfilProvider),
             )
-          : null,
-      child: _Contenu(profil: profil.value, enChargement: profil.isLoading),
+          else
+            const SizedBox.shrink(),
+          Expanded(
+            child: _Contenu(
+              profil: profil.value,
+              enChargement: profil.isLoading,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

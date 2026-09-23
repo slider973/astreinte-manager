@@ -9,7 +9,7 @@ import 'helpers.dart';
 
 Widget _ossature({
   bool admin = false,
-  int propositions = 0,
+  int nonLues = 0,
   AppBanner? banniere,
   ValueChanged<int>? onDestination,
 }) {
@@ -17,7 +17,7 @@ Widget _ossature({
     titre: 'Octobre 2026',
     destinations: AppDestination.pour(
       admin: admin,
-      propositionsEnAttente: propositions,
+      boiteNonLues: nonLues,
     ),
     indexSelectionne: 0,
     onDestination: onDestination ?? (_) {},
@@ -37,10 +37,10 @@ void main() {
       expect(
         AppDestination.pour(admin: true).map((d) => d.libelle).toList(),
         <String>[
-          AppStrings.navMonMois,
-          AppStrings.navPropositions,
+          AppStrings.navAccueil,
+          AppStrings.navCalendrier,
           AppStrings.navAstreintes,
-          AppStrings.navProfil,
+          AppStrings.navBoite,
           AppStrings.navAdmin,
         ],
       );
@@ -158,7 +158,7 @@ void main() {
     });
 
     testWidgets('une pastille chiffrée à trois', (tester) async {
-      await monterEcran(tester, _ossature(propositions: 3));
+      await monterEcran(tester, _ossature(nonLues: 3));
 
       expect(find.byType(Badge), findsWidgets);
       expect(find.text('3'), findsWidgets);
@@ -168,14 +168,14 @@ void main() {
       tester,
     ) async {
       final handle = tester.ensureSemantics();
-      await monterEcran(tester, _ossature(propositions: 12));
+      await monterEcran(tester, _ossature(nonLues: 12));
 
       expect(find.text('9+'), findsWidgets);
       // Le libellé complet est fusionné dans la destination : on le cherche
       // dans le nœud, pas en égalité stricte.
       expect(
         find.bySemanticsLabel(
-          RegExp(RegExp.escape(AppStrings.navPropositionsBadge(12))),
+          RegExp(RegExp.escape(AppStrings.centreNonLuesBadge(12))),
         ),
         findsWidgets,
       );

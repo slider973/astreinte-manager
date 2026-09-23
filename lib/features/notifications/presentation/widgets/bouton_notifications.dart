@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,22 +8,20 @@ import '../../domain/centre_providers.dart';
 
 /// La cloche de la barre d'application, avec sa pastille de non-lues.
 ///
-/// **Pourquoi pas une destination de navigation.** `DESIGN.md § Navigation`
-/// fixe cinq destinations au maximum, et un administrateur en a déjà cinq.
-/// « Aucune destination ne s'ajoute sans en retirer une », et aucune des cinq
-/// ne mérite d'être retirée au profit d'un journal qu'on consulte après coup.
-/// La cloche vit donc dans la barre d'application de la coquille d'accueil,
-/// présente sur les quatre onglets.
+/// **Elle mène à la Boîte, qui est une destination** depuis le ticket 064.
+/// Jusque-là le centre était un écran poussé, parce que la barre n'avait pas
+/// de place pour lui ; le profil l'a libérée. La cloche reste malgré tout :
+/// elle porte le compte de non-lues à l'endroit où on le cherche, en tête
+/// d'écran, et sur l'accueil c'est elle que le brief met à droite de la
+/// salutation (`design/064 § 3.1`).
 ///
-/// La pastille suit les règles de celle des propositions : plafonnée à « 9+ »,
-/// doublée d'un libellé annoncé qui porte le nombre réel.
+/// **Elle remplace, elle n'empile plus** : une destination n'a ni avant ni
+/// après, et le glissement de page y raconterait le contraire de ce qui se
+/// passe (ticket 063). Personne n'est enfermé pour autant — la Boîte porte la
+/// barre de navigation, ce qu'un écran poussé n'avait pas.
 ///
-/// **La cloche empile, elle ne remplace pas** (ticket 052). Le centre est un
-/// détour : on y va en laissant son travail ouvert derrière soi, et on en
-/// revient. `push` pose le centre au-dessus de l'écran courant sans y toucher,
-/// donc l'onglet, le mois affiché et la position de défilement survivent sans
-/// qu'on ait rien à sérialiser — ce qu'une route enfant n'aurait pas rendu,
-/// les cinq écrans porteurs de la cloche étant un seul et même emplacement.
+/// La pastille est plafonnée à « 9+ » et doublée d'un libellé annoncé qui
+/// porte le nombre réel.
 class BoutonNotifications extends ConsumerWidget {
   const BoutonNotifications({super.key});
 
@@ -53,14 +49,11 @@ class BoutonNotifications extends ConsumerWidget {
     );
   }
 
-  /// Empile le centre, **une seule fois**.
-  ///
-  /// Deux touches rapprochées empileraient deux centres, donc deux flèches à
-  /// presser pour sortir : la plainte d'origine, en pire. Quand l'emplacement
-  /// servi est déjà celui du centre, la cloche ne fait rien.
+  /// Va à la Boîte. Quand on y est déjà, la cloche ne fait rien : `go` sur
+  /// l'emplacement courant rejouerait la page pour rien.
   static void _ouvrir(BuildContext context) {
     final routeur = GoRouter.of(context);
-    if (routeur.state.matchedLocation == AppRoutes.notifications) return;
-    unawaited(routeur.pushNamed<void>(AppRoutes.notificationsName));
+    if (routeur.state.matchedLocation == AppRoutes.boite) return;
+    routeur.goNamed(AppRoutes.boiteName);
   }
 }

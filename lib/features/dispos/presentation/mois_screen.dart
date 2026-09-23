@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/preferences/reperes_locaux.dart';
+import '../../../core/router/app_router.dart';
+import '../../../core/router/destinations.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
@@ -33,7 +37,8 @@ final FutureProvider<bool> peintureDejaFaiteProvider = FutureProvider<bool>(
       ref.watch(reperesLocauxProvider).dejaVu(RepereAccueil.peintureDispos),
 );
 
-/// **« Mon mois »** — l'écran le plus ouvert du produit.
+/// **« Calendrier »** — la saisie des disponibilités, l'écran le plus ouvert
+/// du produit avec l'accueil.
 ///
 /// Le membre ouvre le mois, pose ses créneaux, et repart sans avoir cherché
 /// de bouton « Enregistrer ». Il n'y en a pas : l'écran enregistre seul.
@@ -44,14 +49,7 @@ final FutureProvider<bool> peintureDejaFaiteProvider = FutureProvider<bool>(
 /// quelle que soit la largeur au-delà de ×1.6 d'échelle de texte — la grille
 /// change de forme plutôt que de rogner son texte.
 class MoisScreen extends ConsumerStatefulWidget {
-  const MoisScreen({
-    required this.destinations,
-    required this.indexSelectionne,
-    required this.onDestination,
-    super.key,
-    this.moisInitial,
-    this.onMoisChange,
-  });
+  const MoisScreen({super.key, this.mois});
 
   /// L'échelle de texte au-delà de laquelle la vue calendaire retombe sur le
   /// registre et la ligne passe à deux niveaux.
@@ -61,15 +59,8 @@ class MoisScreen extends ConsumerStatefulWidget {
   /// deviendraient absurdement larges.
   static const double largeurRegistreMax = 560;
 
-  final List<AppDestination> destinations;
-  final int indexSelectionne;
-  final ValueChanged<int> onDestination;
-
   /// Le mois porté par l'URL (`?mois=AAAA-MM`), s'il y en a un.
-  final String? moisInitial;
-
-  /// Remonte le mois choisi à la coquille, qui l'écrit dans l'URL.
-  final ValueChanged<String>? onMoisChange;
+  final String? mois;
 
   @override
   ConsumerState<MoisScreen> createState() => _MoisScreenState();
@@ -102,7 +93,7 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
   @override
   void didUpdateWidget(MoisScreen ancien) {
     super.didUpdateWidget(ancien);
-    if (widget.moisInitial != ancien.moisInitial) _suivreUrl();
+    if (widget.mois != ancien.mois) _suivreUrl();
   }
 
   /// Aligne le mois affiché sur celui de l'URL.
@@ -116,7 +107,7 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
   /// `didUpdateWidget` est interdit par Riverpod, et pour une bonne raison —
   /// deux widgets abonnés au même provider liraient des états différents.
   void _suivreUrl() {
-    final cle = widget.moisInitial;
+    final cle = widget.mois;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ref.read(moisSelectionneProvider.notifier).definir(cle);
     });
@@ -224,11 +215,17 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     final deuxNiveaux = echelle > MoisScreen.seuilDeuxNiveaux;
     final calendrier = classe.supporteDeuxVolets && !deuxNiveaux;
 
+    final destinations = ref.watch(destinationsProvider);
+
     return AppScaffold(
-      titre: AppStrings.navMonMois,
-      destinations: widget.destinations,
-      indexSelectionne: widget.indexSelectionne,
-      onDestination: widget.onDestination,
+      titre: AppStrings.navCalendrier,
+      destinations: destinations,
+      indexSelectionne: indexDestination(
+        destinations,
+        AppRoutes.calendrierName,
+      ),
+      onDestination: (index) =>
+          allerVersDestination(context, destinations, index),
       // La cloche du centre de notifications (ticket 026). Elle vit ici et non
       // dans la navigation : cinq destinations, c'est plein.
       actions: const <Widget>[BoutonNotifications()],
@@ -412,11 +409,16 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
   static double _hauteurEntete(BuildContext context) =>
       MediaQuery.textScalerOf(context).scale(12) * 2 + AppSpacing.lg;
 
+  /// Le mois voyage dans l'URL. `goNamed` empile une entrée d'historique : le
+  /// retour du navigateur ramène au mois précédemment consulté.
   void _choisirMois(PeriodeSaisie periode) {
     unawaited(
       ref.read(saisieControllerProvider.notifier).choisirMois(periode.cle),
     );
-    widget.onMoisChange?.call(periode.cle);
+    context.goNamed(
+      AppRoutes.calendrierName,
+      queryParameters: <String, String>{AppRoutes.parametreMois: periode.cle},
+    );
   }
 
   Widget _barre(EtatSaisie etat, {required bool grand}) => BarreCompteurs(

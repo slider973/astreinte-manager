@@ -798,22 +798,22 @@ class _SectionOssature extends StatelessWidget {
           'pastille plafonnée à 9+.',
       children: <Widget>[
         DevSpecimen(
-          nom: 'compact, membre, 3 propositions',
+          nom: 'compact, membre, 3 non lues',
           child: _Fenetre(
             // 360 dp : la largeur du plus petit téléphone réellement visé.
             largeur: 360,
             hauteur: 380,
             admin: false,
-            propositions: 3,
+            nonLues: 3,
           ),
         ),
         DevSpecimen(
-          nom: 'compact, admin, 12 propositions (pastille « 9+ »)',
+          nom: 'compact, admin, 12 non lues (pastille « 9+ »)',
           child: _Fenetre(
             largeur: 360,
             hauteur: 380,
             admin: true,
-            propositions: 12,
+            nonLues: 12,
           ),
         ),
         DevSpecimen(
@@ -822,7 +822,7 @@ class _SectionOssature extends StatelessWidget {
             largeur: 640,
             hauteur: 380,
             admin: true,
-            propositions: 0,
+            nonLues: 0,
           ),
         ),
       ],
@@ -837,19 +837,19 @@ class _Fenetre extends StatelessWidget {
     required this.largeur,
     required this.hauteur,
     required this.admin,
-    required this.propositions,
+    required this.nonLues,
   });
 
   final double largeur;
   final double hauteur;
   final bool admin;
-  final int propositions;
+  final int nonLues;
 
   @override
   Widget build(BuildContext context) {
     final destinations = AppDestination.pour(
       admin: admin,
-      propositionsEnAttente: propositions,
+      boiteNonLues: nonLues,
     );
 
     // Une fenêtre simulée grandit avec l'échelle de texte : à 2.0, un

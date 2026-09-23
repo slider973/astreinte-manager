@@ -22,7 +22,7 @@ Widget _ossature({
 }) => AppScaffold(
   titre: AppStrings.matriceTitre,
   caserne: caserne,
-  destinations: AppDestination.pour(admin: true, propositionsEnAttente: 3),
+  destinations: AppDestination.pour(admin: true, boiteNonLues: 3),
   indexSelectionne: selectionne,
   onDestination: onDestination ?? (_) {},
   actions: actions,

@@ -56,6 +56,13 @@ abstract final class AppRadius {
   /// Dialogue, feuille de bas d'écran, menu.
   static const double feuille = 12;
 
+  /// **La carte du monde du pompier** (ticket 064). Le registre de l'admin est
+  /// fait de cases à rayon 4 et de blocs à rayon 8 ; les écrans du pompier
+  /// sont faits de cartes posées sur un fond doux, et c'est leur rayon qui
+  /// les distingue (`design/064 § 2`). Réservé à ces cartes : un bouton ou un
+  /// champ à rayon 20 serait une gélule, que `DESIGN.md § Shapes` proscrit.
+  static const double carte = 20;
+
   /// Avatar et pastille de compteur de notifications **uniquement**.
   static const double pastille = 999;
 
@@ -67,6 +74,16 @@ abstract final class AppRadius {
   );
   static const BorderRadius feuilleRadius = BorderRadius.vertical(
     top: Radius.circular(feuille),
+  );
+  /// Le rayon `feuille` sur les **quatre** coins : le carré d'initiale des
+  /// lignes de liste du monde du pompier (ticket 064). [feuilleRadius] ne
+  /// porte que les deux coins hauts, parce qu'il sert aux feuilles de bas
+  /// d'écran.
+  static const BorderRadius feuilleCarreeRadius = BorderRadius.all(
+    Radius.circular(feuille),
+  );
+  static const BorderRadius carteRadius = BorderRadius.all(
+    Radius.circular(carte),
   );
   static const BorderRadius pastilleRadius = BorderRadius.all(
     Radius.circular(pastille),
