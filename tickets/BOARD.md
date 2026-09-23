@@ -1,12 +1,12 @@
 # Tableau des tickets
 
-Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main.
+Généré par `scripts/ticket.sh board` le 2026-09-23. Ne pas éditer à la main.
 
 ## En cours
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 061 | [Un nouveau monde visuel, à partir de l'écran de l'admin](in-progress/061-monde-visuel-admin.md) | P1 | 004 016 017 | https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a) |
+| 061 | [Un nouveau monde visuel, à partir de l'écran de l'admin](in-progress/061-monde-visuel-admin.md) | P1 | 004 016 017 | https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1) |
 
 ## À faire
 
@@ -18,6 +18,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-22. Ne pas éditer à la main
 | 056 | [L'éditeur sans caserne perd sa destination au démarrage à froid](backlog/056-superadmin-destination-perdue-a-froid.md) | P2 | 045 053 | — |
 | 057 | [Le jeton d'appareil des notifications n'est pas branché sur l'oubli](backlog/057-jeton-appareil-hors-oubli.md) | P2 | 024 053 | — |
 | 058 | [Lire l'adresse confirmée à la source, pas dans les métadonnées](backlog/058-invitations-en-attente-adresse-confirmee.md) | P2 | 051 | — |
+| 063 | [Passer d'une destination à l'autre sans glissement](backlog/063-transition-entre-destinations.md) | P1 | 061 | — |
 
 ## Terminés
 
