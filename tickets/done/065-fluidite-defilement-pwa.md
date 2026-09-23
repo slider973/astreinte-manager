@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 060
 - **Branche** : `feat/065-fluidite-defilement-pwa`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/62
 - **Statut** : terminé le 2026-09-23 (PR créée)
 
 ## Contexte
