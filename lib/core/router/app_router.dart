@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -272,6 +272,38 @@ abstract final class AppRoutes {
   static const String devComponentsName = 'devComponents';
 }
 
+/// La page d'une **destination de premier niveau** : elle prend la place de
+/// la précédente sans transition (ticket 063).
+///
+/// Passer d'une destination à sa sœur — « Admin », puis « Profil » — n'est pas
+/// une poussée : il n'y a ni avant ni après, rien d'où revenir. Or le thème
+/// (`core/theme/app_theme.dart`) donne à toute page par défaut la transition
+/// de la plateforme, un glissement de droite à gauche sur iOS et macOS. Sur
+/// une coquille qui ne bouge pas — colonne de navigation, en-tête, barre du
+/// bas — ce glissement raconte le contraire de ce qui se passe.
+///
+/// Pas de fondu non plus : deux coquilles identiques qui se croisent en
+/// opacité font clignoter la colonne.
+///
+/// Les écrans qu'on **pousse** et dont on revient (inviter, importer, le
+/// centre de notifications, les autres écrans d'administration) gardent la
+/// page par défaut et donc la transition du thème. Seules les routes servies
+/// par `AppDestination` passent par ici : `/` et `/admin/planning`. `/admin/
+/// suivi` n'en est pas une — on y va par la barre d'application, la coquille
+/// n'y mène jamais comme destination.
+///
+/// Les trois attributs recopient ce que `go_router` donne à une page bâtie
+/// depuis un `builder` (`go_router/src/builder.dart`) : même clé, donc même
+/// `State` d'un changement de chaîne de requête à l'autre — c'est ce dont
+/// `AccueilScreen.didUpdateWidget` dépend pour suivre `?onglet=`.
+Page<void> pageDestination(GoRouterState state, Widget enfant) =>
+    NoTransitionPage<void>(
+      key: state.pageKey,
+      name: state.name ?? state.path,
+      restorationId: state.pageKey.value,
+      child: enfant,
+    );
+
 /// Routeur de l'application.
 ///
 /// La redirection est **réactive** : [_RafraichissementRouteur] écoute
@@ -414,23 +446,31 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: <RouteBase>[
+      // **Les deux routes que la coquille sert comme destinations** : elles
+      // changent sans transition (ticket 063, voir [pageDestination]).
       GoRoute(
         path: AppRoutes.accueil,
         name: AppRoutes.accueilName,
-        builder: (context, state) => AccueilScreen(
-          ongletInitial:
-              int.tryParse(
-                state.uri.queryParameters[AppRoutes.parametreOnglet] ?? '',
-              ) ??
-              0,
-          mois: state.uri.queryParameters[AppRoutes.parametreMois],
+        pageBuilder: (context, state) => pageDestination(
+          state,
+          AccueilScreen(
+            ongletInitial:
+                int.tryParse(
+                  state.uri.queryParameters[AppRoutes.parametreOnglet] ?? '',
+                ) ??
+                0,
+            mois: state.uri.queryParameters[AppRoutes.parametreMois],
+          ),
         ),
       ),
       GoRoute(
         path: AppRoutes.planningAdmin,
         name: AppRoutes.planningAdminName,
-        builder: (context, state) => MatriceScreen(
-          mois: state.uri.queryParameters[AppRoutes.parametreMois],
+        pageBuilder: (context, state) => pageDestination(
+          state,
+          MatriceScreen(
+            mois: state.uri.queryParameters[AppRoutes.parametreMois],
+          ),
         ),
       ),
       GoRoute(

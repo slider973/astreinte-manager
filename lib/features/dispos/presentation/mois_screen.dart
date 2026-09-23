@@ -570,40 +570,64 @@ class _Annonce extends StatelessWidget {
 
 /// Le chargement, **à la forme de la grille qui va s'afficher**.
 ///
-/// Sélecteur, en-tête de colonnes, puis huit lignes de jour. Jamais de
-/// `CircularProgressIndicator` : l'écran montre l'ossature de ce qui arrive.
+/// Sélecteur, en-tête de colonnes, puis autant de lignes de jour que la
+/// hauteur en accueille, huit au plus. Jamais de `CircularProgressIndicator` :
+/// l'écran montre l'ossature de ce qui arrive.
+///
+/// Le compte se mesure, il ne se suppose pas : huit lignes en dur débordaient
+/// de 235 px sur un téléphone en paysage (844 × 390), et le registre qui les
+/// remplace, lui, défile. Un squelette ne porte aucune information — il ne
+/// doit jamais crier au débordement pour de la place qu'il n'utilisera pas.
 class _Squelette extends StatelessWidget {
   const _Squelette();
+
+  /// Le plus grand nombre de lignes montrées, hauteur suffisante.
+  static const int _lignesMax = 8;
 
   @override
   Widget build(BuildContext context) {
     return LoadingSkeleton(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            const SizedBox(
-              height: SelecteurMois.hauteurBouton,
-              child: SkeletonLigne(hauteur: SelecteurMois.hauteurBouton),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            for (var ligne = 0; ligne < 8; ligne++) ...<Widget>[
-              const SizedBox(
-                height: GrilleRegistre.hauteurLigne - AppSpacing.sm,
-                child: Row(
-                  children: <Widget>[
-                    Expanded(child: SkeletonLigne(hauteur: 48)),
-                    SizedBox(width: AppSpacing.entreCibles),
-                    Expanded(child: SkeletonLigne(hauteur: 48)),
-                    SizedBox(width: AppSpacing.entreCibles),
-                    Expanded(child: SkeletonLigne(hauteur: 48)),
-                  ],
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints contraintes) {
+            final place =
+                contraintes.maxHeight -
+                SelecteurMois.hauteurBouton -
+                AppSpacing.lg;
+            final lignes = contraintes.hasBoundedHeight
+                ? (place / GrilleRegistre.hauteurLigne).floor().clamp(
+                    0,
+                    _lignesMax,
+                  )
+                : _lignesMax;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const SizedBox(
+                  height: SelecteurMois.hauteurBouton,
+                  child: SkeletonLigne(hauteur: SelecteurMois.hauteurBouton),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
-          ],
+                const SizedBox(height: AppSpacing.lg),
+                for (var ligne = 0; ligne < lignes; ligne++) ...<Widget>[
+                  const SizedBox(
+                    height: GrilleRegistre.hauteurLigne - AppSpacing.sm,
+                    child: Row(
+                      children: <Widget>[
+                        Expanded(child: SkeletonLigne(hauteur: 48)),
+                        SizedBox(width: AppSpacing.entreCibles),
+                        Expanded(child: SkeletonLigne(hauteur: 48)),
+                        SizedBox(width: AppSpacing.entreCibles),
+                        Expanded(child: SkeletonLigne(hauteur: 48)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );
