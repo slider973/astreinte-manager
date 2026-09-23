@@ -201,23 +201,32 @@ class _PropositionsScreenState extends ConsumerState<PropositionsScreen>
           const BoutonNotifications(),
         ],
       ),
-      body: Column(
-        children: <Widget>[
-          // La zone de bannière existe toujours, même vide : un enfant
-          // conditionnel décalerait tous les suivants d'un cran à l'apparition
-          // d'une bannière, et la liste y perdrait sa position de défilement
-          // (même raison qu'`AppScaffold`).
-          banniere ?? const SizedBox.shrink(),
-          Expanded(
-            child: _corps(
-              etat: etat,
-              raisonBlocage: _raisonBlocage(
-                enLigne: enLigne,
-                lectureSeule: lectureSeule,
+      // **La zone sûre basse d'un écran poussé.** Cet écran vivait dans
+      // `AppScaffold`, dont la barre de navigation ajoutait
+      // `viewPadding.bottom` à sa hauteur ; poussé depuis le ticket 064, il
+      // n'a plus rien sous lui, et les 34 points de la barre d'accueil d'un
+      // iPhone en PWA installée mangeaient les boutons de la dernière
+      // proposition (`core/widgets/README.md`).
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: <Widget>[
+            // La zone de bannière existe toujours, même vide : un enfant
+            // conditionnel décalerait tous les suivants d'un cran à
+            // l'apparition d'une bannière, et la liste y perdrait sa position
+            // de défilement (même raison qu'`AppScaffold`).
+            banniere ?? const SizedBox.shrink(),
+            Expanded(
+              child: _corps(
+                etat: etat,
+                raisonBlocage: _raisonBlocage(
+                  enLigne: enLigne,
+                  lectureSeule: lectureSeule,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

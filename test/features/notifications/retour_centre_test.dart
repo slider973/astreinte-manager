@@ -16,6 +16,7 @@ import 'package:astreinte_sp/features/notifications/presentation/notifications_s
 import 'package:astreinte_sp/features/notifications/presentation/widgets/bouton_notifications.dart';
 import 'package:astreinte_sp/features/notifications/presentation/widgets/ligne_notification.dart';
 import 'package:astreinte_sp/features/profil/presentation/profil_screen.dart';
+import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
 import 'package:astreinte_sp/features/propositions/presentation/propositions_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/faux_auth.dart';
 import '../../support/faux_dispos.dart';
 import '../../support/faux_notifications.dart';
+import '../../support/faux_propositions.dart';
 
 /// Un écran haut : les quatre destinations tiennent sans défiler.
 const Size _telephoneLong = Size(420, 1400);
@@ -43,12 +45,14 @@ Future<void> _monterMembre(
   WidgetTester tester, {
   FauxNotificationsRepository? depot,
   FauxDisposRepository? dispos,
+  FauxPropositionsRepository? propositions,
 }) => monterApp(
   tester,
   session: sessionMembre,
   appartenances: const <Appartenance>[appartenanceMembre],
   notifications: depot ?? FauxNotificationsRepository(),
   dispos: dispos,
+  propositions: propositions,
   taille: _telephoneLong,
 );
 
@@ -496,6 +500,98 @@ void main() {
         _telephoneLong.height -
             tester.getBottomLeft(find.byType(PrimaryButton)).dy,
         greaterThanOrEqualTo(barreAccueil),
+      );
+    });
+  });
+
+  // **Les deux écrans devenus poussés au ticket 064.** Ils vivaient dans
+  // `AppScaffold`, dont la barre de navigation ajoute `viewPadding.bottom` à
+  // sa hauteur. Poussés, ils n'ont plus rien sous eux : sans réserve, les
+  // 34 points de la barre d'accueil d'un iPhone en PWA installée mangent la
+  // fin du contenu — « Se déconnecter » et « Supprimer mon compte ».
+  group('La zone sûre basse des écrans poussés', () {
+    const double barreAccueil = 34;
+
+    Future<void> ouvrirAvecBarre(WidgetTester tester, String route) async {
+      final reserve = FakeViewPadding(
+        bottom: barreAccueil * tester.view.devicePixelRatio,
+      );
+      tester.view
+        ..viewPadding = reserve
+        ..padding = reserve;
+      await _monterMembre(
+        tester,
+        propositions: FauxPropositionsRepository(
+          propositions: <Proposition>[
+            for (var index = 0; index < 8; index++)
+              proposition(
+                id: 'a-$index',
+                creneauId: 'c-$index',
+                jour: DateTime(2026, 10, index + 1),
+              ),
+          ],
+        ),
+      );
+      await ouvrirRoute(tester, route);
+    }
+
+    /// Ce qui reste sous le bas de [cible].
+    double sousLeBas(WidgetTester tester, Finder cible) =>
+        _telephoneLong.height - tester.getBottomLeft(cible.last).dy;
+
+    /// Amène la liste à son extrémité : c'est là, et nulle part ailleurs, que
+    /// la réserve basse se voit.
+    Future<void> aLaFin(WidgetTester tester) async {
+      final defilement = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      defilement.jumpTo(defilement.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        defilement.maxScrollExtent,
+        greaterThan(0),
+        reason: 'la liste tient dans l\'écran : le bas n\'est pas éprouvé',
+      );
+    }
+
+    testWidgets('le profil garde ses deux sorties au-dessus de la barre', (
+      tester,
+    ) async {
+      await ouvrirAvecBarre(tester, AppRoutes.profil);
+      await aLaFin(tester);
+
+      // La liste elle-même s'arrête au-dessus de la barre d'accueil…
+      expect(
+        sousLeBas(tester, find.byType(ListView)),
+        greaterThanOrEqualTo(barreAccueil),
+        reason: 'la liste du profil descend sous la barre d\'accueil',
+      );
+      // …et donc la dernière chose qu'on y lit aussi.
+      expect(
+        sousLeBas(tester, find.text(AppStrings.legalMentionsLien)),
+        greaterThanOrEqualTo(barreAccueil),
+        reason: 'le dernier lien passe sous la barre d\'accueil',
+      );
+    });
+
+    testWidgets('les propositions gardent leurs boutons au-dessus', (
+      tester,
+    ) async {
+      await ouvrirAvecBarre(tester, AppRoutes.propositions);
+      await aLaFin(tester);
+
+      expect(
+        sousLeBas(tester, find.byType(ListView)),
+        greaterThanOrEqualTo(barreAccueil),
+        reason: 'la liste des propositions descend sous la barre d\'accueil',
+      );
+      expect(
+        sousLeBas(
+          tester,
+          find.widgetWithText(PrimaryButton, AppStrings.propositionsRefuser),
+        ),
+        greaterThanOrEqualTo(barreAccueil),
+        reason: 'le dernier bouton passe sous la barre d\'accueil',
       );
     });
   });

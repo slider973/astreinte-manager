@@ -47,27 +47,38 @@ class ProfilScreen extends ConsumerWidget {
         title: const Text(AppStrings.profilEcranTitre),
         actions: const <Widget>[BoutonNotifications()],
       ),
-      body: Column(
-        children: <Widget>[
-          // Une lecture en échec ne vide pas l'écran : la caserne, les
-          // notifications et les deux sorties ne dépendent pas de `profiles`,
-          // et c'est peut-être exactement pour se déconnecter qu'on est venu.
-          if (profil.hasError)
-            AppBanner(
-              variante: AppBannerVariante.erreur,
-              texte: AppStrings.profilLectureEchec,
-              libelleAction: AppStrings.actionReessayer,
-              onAction: () => ref.invalidate(monProfilProvider),
-            )
-          else
-            const SizedBox.shrink(),
-          Expanded(
-            child: _Contenu(
-              profil: profil.value,
-              enChargement: profil.isLoading,
+      // **La zone sûre basse d'un écran poussé.** Cet écran vivait dans
+      // `AppScaffold`, dont la barre de navigation ajoutait
+      // `viewPadding.bottom` à sa hauteur ; poussé depuis le ticket 064, il
+      // n'a plus rien sous lui, et les 34 points de la barre d'accueil d'un
+      // iPhone en PWA installée mangeaient « Se déconnecter » et « Supprimer
+      // mon compte ». Même forme que `DocumentLegalScreen`, l'autre écran
+      // poussé à liste (`core/widgets/README.md`).
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: <Widget>[
+            // Une lecture en échec ne vide pas l'écran : la caserne, les
+            // notifications et les deux sorties ne dépendent pas de
+            // `profiles`, et c'est peut-être exactement pour se déconnecter
+            // qu'on est venu.
+            if (profil.hasError)
+              AppBanner(
+                variante: AppBannerVariante.erreur,
+                texte: AppStrings.profilLectureEchec,
+                libelleAction: AppStrings.actionReessayer,
+                onAction: () => ref.invalidate(monProfilProvider),
+              )
+            else
+              const SizedBox.shrink(),
+            Expanded(
+              child: _Contenu(
+                profil: profil.value,
+                enChargement: profil.isLoading,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

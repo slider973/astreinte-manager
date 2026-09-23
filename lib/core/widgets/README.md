@@ -44,8 +44,16 @@ Un écran atteint par une navigation depuis un autre écran, déclaré au premie
 sans barre de navigation, n'a **par construction aucune sortie** : sur iPhone en PWA plein écran il
 n'y a pas de barre d'adresse, et la personne est enfermée. À vérifier pour toute nouvelle route :
 
-> *Un écran qui ne porte ni `AppScaffold` ni un parent dans le routeur s'ouvre par `push` et porte
-> une flèche à repli.*
+> *Un écran qui ne porte ni `AppScaffold` ni un parent dans le routeur s'ouvre par `push`, porte
+> une flèche à repli, **et réserve lui-même la zone sûre basse**.*
+
+La seconde moitié de la règle est arrivée au ticket 064a, avec le profil et les propositions : ils
+vivaient dans `AppScaffold`, dont la barre de navigation ajoute `viewPadding.bottom` à sa hauteur.
+Poussés, ils n'ont plus rien sous eux, et les 34 points de la barre d'accueil d'un iPhone en PWA
+installée mangent la fin du contenu — « Se déconnecter » et « Supprimer mon compte ». La forme est
+celle de `DocumentLegalScreen`, l'écran poussé à liste qui l'avait déjà : `body: SafeArea(top:
+false, …)`. Pas de widget commun : les écrans poussés ne partagent pas d'ossature, seulement cette
+règle et cette forme.
 
 ## Ce qu'aucun de ces widgets ne fait
 
