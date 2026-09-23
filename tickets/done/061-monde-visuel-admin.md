@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 004, 016, 017
 - **Branche** : `feat/061-monde-visuel-admin`
-- **PR** : https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1)
+- **PR** : https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1), https://github.com/slider973/astreinte-manager/pull/57 (chantier 061c-2)
 - **Statut** : terminé le 2026-09-23 (PR créée)
 
 ## Contexte
