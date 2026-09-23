@@ -12,6 +12,8 @@ Widget _ossature({
   int nonLues = 0,
   AppBanner? banniere,
   ValueChanged<int>? onDestination,
+  Widget? filActions,
+  Widget? contenu,
 }) {
   return AppScaffold(
     titre: 'Octobre 2026',
@@ -19,7 +21,8 @@ Widget _ossature({
     indexSelectionne: 0,
     onDestination: onDestination ?? (_) {},
     banniere: banniere,
-    child: const Center(child: Text('Contenu')),
+    filActions: filActions,
+    child: contenu ?? const Center(child: Text('Contenu')),
   );
 }
 
@@ -202,6 +205,40 @@ void main() {
       // Le contenu de la barre s'arrête 34 dp au-dessus du bas de l'écran.
       expect(bas, lessThanOrEqualTo(844 - 34));
     });
+
+    // **L'alignement de la barre d'actions** (chantier 064d). Le contenu
+    // prend `classe.margePage` — 24 dès `medium` —, la barre d'actions
+    // prenait 16 en dur : ses cartes sortaient de huit points par rapport à
+    // tout ce qu'elles ferment. Mesuré contre les bords de la zone de
+    // contenu, pas contre ceux de la fenêtre : en `medium`, le rail occupe
+    // déjà la gauche.
+    for (final cas in <(String, Size, double)>[
+      ('compact, à 390', const Size(390, 844), 16),
+      ('medium, à 768', const Size(768, 1024), 24),
+    ]) {
+      testWidgets('la barre d\'actions prend la marge de page — ${cas.$1}', (
+        tester,
+      ) async {
+        await monterEcran(
+          tester,
+          _ossature(
+            contenu: const SizedBox.expand(key: Key('corps')),
+            filActions: const SizedBox(
+              key: Key('actions'),
+              height: 40,
+              width: double.infinity,
+            ),
+          ),
+          taille: cas.$2,
+        );
+
+        final corps = tester.getRect(find.byKey(const Key('corps')));
+        final actions = tester.getRect(find.byKey(const Key('actions')));
+
+        expect(actions.left - corps.left, cas.$3, reason: 'marge gauche');
+        expect(corps.right - actions.right, cas.$3, reason: 'marge droite');
+      });
+    }
 
     testWidgets('sélectionner une destination remonte son index', (
       tester,

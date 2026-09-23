@@ -230,8 +230,14 @@ class AppScaffold extends StatelessWidget {
           SafeArea(
             top: false,
             bottom: classe.estCompact,
+            // **La marge de la classe de fenêtre**, pas seize en dur : le
+            // contenu au-dessus prend `margePage`, qui vaut 24 dès `medium`.
+            // Écrite à 16, la barre d'actions décalait ses cartes de huit
+            // points vers l'extérieur par rapport à tout ce qu'elle ferme —
+            // vu à 768, où le registre et la barre des compteurs se
+            // répondent bord à bord.
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
+              padding: EdgeInsets.all(classe.margePage),
               child: filActions,
             ),
           ),

@@ -129,13 +129,26 @@ void main() {
         ),
       );
 
-      final decoration =
-          tester
-                  .widget<DecoratedSliver>(find.byType(DecoratedSliver))
-                  .decoration
-              as BoxDecoration;
-      expect(decoration.color, AppTheme.clair.colorScheme.surface);
-      expect(decoration.borderRadius, AppRadius.carteRadius);
+      // Le papier derrière, le filet devant : deux décorations, jamais une.
+      final decorations = tester
+          .widgetList<DecoratedSliver>(find.byType(DecoratedSliver))
+          .toList();
+      expect(decorations, hasLength(2));
+
+      final papier = decorations.first.decoration as BoxDecoration;
+      expect(decorations.first.position, DecorationPosition.background);
+      expect(papier.color, AppTheme.clair.colorScheme.surface);
+      expect(papier.borderRadius, AppRadius.carteRadius);
+
+      final trait = decorations.last.decoration as BoxDecoration;
+      expect(decorations.last.position, DecorationPosition.foreground);
+      expect(trait.color, isNull, reason: 'le filet ne repeint pas le papier');
+      expect(
+        trait.border!.top.color,
+        AppTheme.clair.colorScheme.outlineVariant,
+      );
+      expect(trait.border!.top.width, AppStroke.filet);
+
       expect(find.text('ligne 2'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
