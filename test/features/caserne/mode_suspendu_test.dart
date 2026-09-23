@@ -10,7 +10,7 @@ import 'package:astreinte_sp/features/astreintes/domain/astreinte.dart';
 import 'package:astreinte_sp/features/astreintes/presentation/widgets/ligne_astreinte.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
-import 'package:astreinte_sp/features/propositions/presentation/widgets/ligne_proposition.dart';
+import 'package:astreinte_sp/features/propositions/presentation/widgets/carte_proposition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -121,7 +121,12 @@ void main() {
       expect(_banniere(tester).variante, AppBannerVariante.lectureSeule);
 
       // La proposition reste lisible : sa date, son créneau, tout est là.
-      expect(find.byType(LigneDeProposition), findsOneWidget);
+      expect(find.byType(CarteProposition), findsOneWidget);
+
+      // Les deux réponses vivent derrière un appui depuis le chantier 064b :
+      // la feuille de réponse de la Boîte.
+      await tester.tap(find.byType(CarteProposition));
+      await tester.pumpAndSettle();
 
       final boutons = tester
           .widgetList<PrimaryButton>(find.byType(PrimaryButton))

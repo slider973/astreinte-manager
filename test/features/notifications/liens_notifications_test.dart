@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:astreinte_sp/app.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
 import 'package:astreinte_sp/core/router/destination_initiale.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/features/demarrage/presentation/demarrage_screen.dart';
@@ -24,8 +25,8 @@ void main() {
     testWidgets('chaque destination de WORKFLOWS § 8 mène au bon écran', (
       tester,
     ) async {
-      const attendu = <String, String>{
-        '/proposals': AppRoutes.propositions,
+      final attendu = <String, String>{
+        '/proposals': AppRoutes.boiteOnglet(OngletBoite.propositions),
         '/schedule/2026-10': AppRoutes.astreintes,
         '/availability/2026-10': '/calendrier?mois=2026-10',
         '/admin/schedule/2026-10': '/admin/suivi?mois=2026-10',

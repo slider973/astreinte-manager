@@ -81,10 +81,18 @@ class FauxNotificationsRepository implements NotificationsRepository {
 }
 
 /// Une notification interne de test, avec des valeurs par défaut lisibles.
+///
+/// **Le type par défaut est un rappel**, `assignment_changed`, depuis le
+/// chantier 064b : l'astreinte proposée et sa relance ne s'affichent plus en
+/// rappel dans la Boîte — la ligne de proposition, qui porte la réponse, dit
+/// la même chose en mieux (`NotificationInterne.estRappel`). Un test qui veut
+/// éprouver ces deux types-là les nomme, et c'est alors le sujet du test.
+/// La route ne bouge pas : `assignment_changed` mène bien aux propositions
+/// (`supabase/functions/README.md § Liens profonds`).
 NotificationInterne notification({
   required String id,
-  TypeNotification type = TypeNotification.astreinteProposee,
-  String titre = 'Une astreinte t\'est proposée',
+  TypeNotification type = TypeNotification.creneauModifie,
+  String titre = 'Ton astreinte a changé',
   String corps = 'Samedi 4 octobre, nuit.',
   String? route = '/proposals',
   DateTime? creeLe,

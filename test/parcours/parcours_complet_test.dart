@@ -56,7 +56,7 @@ import 'package:astreinte_sp/features/invitation/presentation/invitation_screen.
 import 'package:astreinte_sp/features/membres/presentation/inviter_screen.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/ligne_candidat.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/panneau_creneau.dart';
-import 'package:astreinte_sp/features/propositions/presentation/widgets/ligne_proposition.dart';
+import 'package:astreinte_sp/features/propositions/presentation/widgets/carte_proposition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -299,24 +299,26 @@ void main() {
       await _monterMembre(tester, _marieId, _adresseRecrue);
       await ouvrirRoute(tester, '/proposals');
 
-      expect(find.byType(LigneDeProposition), findsNWidgets(2));
+      expect(find.byType(CarteProposition), findsNWidgets(2));
 
       // L'ordre de la liste est celui du calendrier : jour avant nuit. La
       // première ligne est donc le créneau de jour du 1er.
-      await tester.tap(_refuser().first);
+      await _ouvrirReponse(tester);
+      await tester.tap(_refuser());
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'en formation');
       await tester.pumpAndSettle();
       await tester.tap(find.text(AppStrings.refusConfirmer));
       await tester.pumpAndSettle();
 
-      expect(find.byType(LigneDeProposition), findsOneWidget);
+      expect(find.byType(CarteProposition), findsOneWidget);
       final refusee = _attributionDe(_creneauRefuse, _marieId)!;
       expect(refusee.etat, AttributionEtat.refuse);
       expect(refusee.motifRefus, 'en formation');
 
       // Et elle accepte celui de nuit.
-      await tester.tap(_accepter().first);
+      await _ouvrirReponse(tester);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
       expect(
@@ -358,8 +360,9 @@ void main() {
       await _monterMembre(tester, thomasId, 'membre2@caserne-a.test');
       await ouvrirRoute(tester, '/proposals');
 
-      expect(find.byType(LigneDeProposition), findsOneWidget);
-      await tester.tap(_accepter().first);
+      expect(find.byType(CarteProposition), findsOneWidget);
+      await _ouvrirReponse(tester);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
       // Tous les créneaux requis sont acceptés : `schedule_reevaluer` bascule
@@ -449,6 +452,14 @@ Finder _candidat(String nom) => find.descendant(
   ),
   matching: find.byWidgetPredicate((Widget w) => w is TextButton),
 );
+
+/// Ouvre la réponse de la [index]-ième proposition affichée, puis rend la
+/// main. Depuis le chantier 064b, les deux boutons vivent derrière cet appui :
+/// la feuille de réponse de la Boîte.
+Future<void> _ouvrirReponse(WidgetTester tester, {int index = 0}) async {
+  await tester.tap(find.byType(CarteProposition).at(index));
+  await tester.pumpAndSettle();
+}
 
 Finder _accepter() =>
     find.widgetWithText(PrimaryButton, AppStrings.propositionsAccepter);

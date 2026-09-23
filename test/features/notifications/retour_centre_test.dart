@@ -12,12 +12,13 @@ import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
 import 'package:astreinte_sp/features/legal/presentation/document_legal_screen.dart';
 import 'package:astreinte_sp/features/notifications/domain/notification_interne.dart';
-import 'package:astreinte_sp/features/notifications/presentation/notifications_screen.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
+import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:astreinte_sp/features/notifications/presentation/widgets/bouton_notifications.dart';
 import 'package:astreinte_sp/features/notifications/presentation/widgets/ligne_notification.dart';
 import 'package:astreinte_sp/features/profil/presentation/profil_screen.dart';
 import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
-import 'package:astreinte_sp/features/propositions/presentation/propositions_screen.dart';
+import 'package:astreinte_sp/features/propositions/presentation/widgets/carte_proposition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -79,7 +80,7 @@ void main() {
           await tester.tap(find.byType(BoutonNotifications));
           await tester.pumpAndSettle();
 
-          expect(find.byType(NotificationsScreen), findsOneWidget);
+          expect(find.byType(BoiteScreen), findsOneWidget);
           expect(emplacementCourant(tester), AppRoutes.boite);
 
           // **Personne n'est enfermé** : c'est l'invariant du ticket 052, et
@@ -166,7 +167,7 @@ void main() {
       await tester.tap(find.byType(BoutonNotifications));
       await tester.pumpAndSettle();
 
-      expect(find.byType(NotificationsScreen), findsOneWidget);
+      expect(find.byType(BoiteScreen), findsOneWidget);
 
       // **Rien n'a été empilé.** Une Boîte posée au-dessus de l'accueil
       // porterait une flèche de retour, et deux touches en poseraient deux :
@@ -183,7 +184,7 @@ void main() {
       // des historiques de navigateur et dans des onglets restaurés.
       await ouvrirRoute(tester, AppRoutes.notifications);
 
-      expect(find.byType(NotificationsScreen), findsOneWidget);
+      expect(find.byType(BoiteScreen), findsOneWidget);
       expect(emplacementCourant(tester), AppRoutes.boite);
     });
   });
@@ -319,13 +320,15 @@ void main() {
   });
 
   group('Non-régression du ticket 026', () {
-    testWidgets('toucher une ligne quitte la Boîte au lieu de l\'empiler', (
+    testWidgets('toucher un rappel ouvre sa cible au lieu de l\'empiler', (
       tester,
     ) async {
       await _monterMembre(
         tester,
         depot: FauxNotificationsRepository(
-          notifications: <NotificationInterne>[notification(id: 'n-1')],
+          notifications: <NotificationInterne>[
+            notification(id: 'n-1', route: '/schedule/2026-10'),
+          ],
         ),
       );
       await ouvrirRoute(tester, AppRoutes.boite);
@@ -333,12 +336,44 @@ void main() {
       await tester.tap(find.byType(LigneNotification));
       await tester.pumpAndSettle();
 
-      // `/proposals` traduit par `destinationInterne` : l'écran des
-      // propositions. On ne revient pas au journal après avoir ouvert ce
-      // qu'il annonçait.
-      expect(find.byType(NotificationsScreen), findsNothing);
-      expect(find.byType(PropositionsScreen), findsOneWidget);
-      expect(emplacementCourant(tester), AppRoutes.propositions);
+      // `/schedule/<mois>` traduit par `destinationInterne` : la destination
+      // « Astreintes ». On ne revient pas au journal après avoir ouvert ce
+      // qu'il annonçait, et rien n'est empilé — c'est un `go`.
+      expect(find.byType(BoiteScreen), findsNothing);
+      expect(find.byType(AstreintesScreen), findsOneWidget);
+      expect(emplacementCourant(tester), AppRoutes.astreintes);
+      expect(_fleche, findsNothing);
+    });
+
+    testWidgets('un rappel qui mène aux propositions change d\'onglet', (
+      tester,
+    ) async {
+      await _monterMembre(
+        tester,
+        depot: FauxNotificationsRepository(
+          notifications: <NotificationInterne>[notification(id: 'n-1')],
+        ),
+        propositions: FauxPropositionsRepository(
+          propositions: <Proposition>[
+            proposition(id: 'a-12', creneauId: 'c-12', jour: DateTime(2026, 10, 12)),
+          ],
+        ),
+      );
+      await ouvrirRoute(tester, AppRoutes.boite);
+
+      await tester.tap(find.byType(LigneNotification));
+      await tester.pumpAndSettle();
+
+      // Le lien public `/proposals` n'a pas bougé ; ce qu'il désigne est
+      // maintenant un onglet, et non plus un écran (chantier 064b). On reste
+      // donc dans la Boîte, sans rien empiler.
+      expect(find.byType(BoiteScreen), findsOneWidget);
+      expect(
+        emplacementCourant(tester),
+        AppRoutes.boiteOnglet(OngletBoite.propositions),
+      );
+      expect(find.byType(CarteProposition), findsOneWidget);
+      expect(_fleche, findsNothing);
     });
   });
 
@@ -523,7 +558,7 @@ void main() {
         tester,
         propositions: FauxPropositionsRepository(
           propositions: <Proposition>[
-            for (var index = 0; index < 8; index++)
+            for (var index = 0; index < 28; index++)
               proposition(
                 id: 'a-$index',
                 creneauId: 'c-$index',
@@ -574,24 +609,28 @@ void main() {
       );
     });
 
-    testWidgets('les propositions gardent leurs boutons au-dessus', (
+    // **La Boîte, elle, est une destination.** Sa réserve basse n'est plus la
+    // sienne : la barre de navigation ajoute `viewPadding.bottom` à sa propre
+    // hauteur, et la liste s'arrête au-dessus de la barre.
+    testWidgets('la Boîte garde sa dernière ligne au-dessus de la barre', (
       tester,
     ) async {
-      await ouvrirAvecBarre(tester, AppRoutes.propositions);
+      await ouvrirAvecBarre(
+        tester,
+        AppRoutes.boiteOnglet(OngletBoite.propositions),
+      );
       await aLaFin(tester);
 
+      expect(find.byType(NavigationBar), findsOneWidget);
       expect(
         sousLeBas(tester, find.byType(ListView)),
         greaterThanOrEqualTo(barreAccueil),
-        reason: 'la liste des propositions descend sous la barre d\'accueil',
+        reason: 'la liste de la Boîte descend sous la barre d\'accueil',
       );
       expect(
-        sousLeBas(
-          tester,
-          find.widgetWithText(PrimaryButton, AppStrings.propositionsRefuser),
-        ),
+        sousLeBas(tester, find.byType(CarteProposition)),
         greaterThanOrEqualTo(barreAccueil),
-        reason: 'le dernier bouton passe sous la barre d\'accueil',
+        reason: 'la dernière carte passe sous la barre d\'accueil',
       );
     });
   });

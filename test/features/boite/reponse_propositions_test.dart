@@ -1,3 +1,20 @@
+/// **Le parcours de réponse du ticket 021, éprouvé dans la Boîte.**
+///
+/// Ce fichier est celui de l'écran des propositions, déplacé et non réécrit :
+/// l'écran a disparu au chantier 064b, le parcours non. Chaque attente d'alors
+/// est encore là — la charge utile à une clé, le refus qui confirme, la ligne
+/// qui revient à sa place exacte, la bannière d'information pour un créneau
+/// repris, le compte en attente sur l'accueil.
+///
+/// **Ce qui a changé, et il faut le dire :** répondre coûte une touche de plus.
+/// Le brief du 064 (`design/064 § 3.4`, décision 2 du chantier 064b) remplace
+/// la ligne à deux boutons par une carte qui ouvre la réponse — une feuille de
+/// bas d'écran en `compact`, le volet latéral en `large`. La promesse « deux
+/// touches » de `design/021 § 2` devient donc « la notification, la ligne, la
+/// réponse ». Le test le dit en toutes lettres plutôt que de faire comme si de
+/// rien n'était.
+library;
+
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
@@ -9,10 +26,12 @@ import 'package:astreinte_sp/core/widgets/entete_section.dart';
 import 'package:astreinte_sp/core/widgets/loading_skeleton.dart';
 import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
+import 'package:astreinte_sp/features/boite/presentation/widgets/panneau_reponse.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
 import 'package:astreinte_sp/features/propositions/domain/propositions_providers.dart';
-import 'package:astreinte_sp/features/propositions/presentation/widgets/ligne_proposition.dart';
+import 'package:astreinte_sp/features/propositions/presentation/widgets/carte_proposition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +44,11 @@ const Size _telephone = Size(390, 844);
 
 /// Le lien public d'une notification (`docs/WORKFLOWS.md § 8`).
 const String _lienNotification = '/proposals';
+
+/// L'adresse où il mène depuis le chantier 064b.
+final String _ongletPropositions = AppRoutes.boiteOnglet(
+  OngletBoite.propositions,
+);
 
 /// Trois propositions, deux mois. Le 12 et le 19 octobre, le 3 novembre.
 FauxPropositionsRepository _depot({
@@ -84,16 +108,18 @@ Future<FauxPropositionsRepository> _ouvrir(
   return propositions;
 }
 
-/// Le bouton « Accepter » de la première ligne affichée.
-Finder _accepter() => find.widgetWithText(
-  PrimaryButton,
-  AppStrings.propositionsAccepter,
-);
+/// Ouvre la réponse de la première proposition affichée.
+Future<void> _ouvrirReponse(WidgetTester tester) async {
+  await tester.tap(find.byType(CarteProposition).first);
+  await tester.pumpAndSettle();
+}
 
-Finder _refuser() => find.widgetWithText(
-  PrimaryButton,
-  AppStrings.propositionsRefuser,
-);
+/// Le bouton « Accepter » de la réponse ouverte.
+Finder _accepter() =>
+    find.widgetWithText(PrimaryButton, AppStrings.propositionsAccepter);
+
+Finder _refuser() =>
+    find.widgetWithText(PrimaryButton, AppStrings.propositionsRefuser);
 
 /// Le nombre de propositions en attente, lu **depuis l'accueil** : c'est là
 /// qu'il s'affiche depuis le ticket 064, en tête de la section, et il vient
@@ -104,31 +130,38 @@ int _comptePropositions(WidgetTester tester) => ProviderScope.containerOf(
 
 void main() {
   group('Les propositions — l\'ouverture depuis une notification', () {
-    testWidgets('le lien /proposals mène à la liste, pas à l\'accueil', (
+    testWidgets('le lien /proposals mène à l\'onglet, pas à l\'accueil', (
       tester,
     ) async {
       await _ouvrir(tester);
 
       // Le lien public est traduit par la liste blanche du ticket 024 : rien
-      // n'a été dupliqué ici.
-      expect(emplacementCourant(tester), AppRoutes.propositions);
-      expect(find.byType(LigneDeProposition), findsNWidgets(3));
+      // n'a été dupliqué ici, et le lien n'a pas bougé d'un caractère quand
+      // l'écran a disparu.
+      expect(emplacementCourant(tester), _ongletPropositions);
+      expect(find.byType(CarteProposition), findsNWidgets(3));
     });
 
-    testWidgets('deux touches suffisent : la notification puis « Accepter »', (
-      tester,
-    ) async {
-      final depot = await _ouvrir(tester);
+    testWidgets(
+      'trois touches : la notification, la ligne, puis « Accepter »',
+      (tester) async {
+        final depot = await _ouvrir(tester);
 
-      // Première touche : la notification, déjà consommée par `ouvrirRoute`.
-      // Seconde touche : le bouton. Aucun écran intermédiaire, aucune
-      // confirmation.
-      await tester.tap(_accepter().first);
-      await tester.pumpAndSettle();
+        // Première touche : la notification, déjà consommée par `ouvrirRoute`.
+        // Deuxième : la ligne, qui ouvre la réponse. Troisième : le bouton.
+        // Aucun écran intermédiaire, aucune confirmation.
+        await _ouvrirReponse(tester);
+        expect(find.byType(PanneauReponse), findsOneWidget);
 
-      expect(depot.chargesEnvoyees, hasLength(1));
-      expect(find.byType(LigneDeProposition), findsNWidgets(2));
-    });
+        await tester.tap(_accepter());
+        await tester.pumpAndSettle();
+
+        expect(depot.chargesEnvoyees, hasLength(1));
+        expect(find.byType(CarteProposition), findsNWidgets(2));
+        // La feuille se referme d'elle-même : la ligne a quitté la liste.
+        expect(find.byType(PanneauReponse), findsNothing);
+      },
+    );
   });
 
   group('Les propositions — la liste', () {
@@ -144,10 +177,10 @@ void main() {
       // L'ordre est celui du calendrier, jamais celui de la réponse du
       // serveur.
       final lignes = tester
-          .widgetList<LigneDeProposition>(find.byType(LigneDeProposition))
+          .widgetList<CarteProposition>(find.byType(CarteProposition))
           .toList();
       expect(
-        lignes.map((LigneDeProposition ligne) => ligne.proposition.id),
+        lignes.map((CarteProposition ligne) => ligne.proposition.id),
         <String>['a-12', 'a-19', 'a-nov'],
       );
     });
@@ -179,36 +212,49 @@ void main() {
           ),
         );
 
-        expect(find.byType(LigneDeProposition), findsOneWidget);
+        expect(find.byType(CarteProposition), findsOneWidget);
         expect(find.text('Août 2026'), findsNothing);
         expect(find.text('lundi 12 octobre'), findsOneWidget);
       },
     );
 
-    testWidgets('chaque ligne porte sa date, son créneau et ses deux actions', (
+    testWidgets('chaque ligne porte sa date, son créneau et son ancienneté', (
       tester,
     ) async {
       await _ouvrir(tester);
 
       expect(find.text('lundi 12 octobre'), findsOneWidget);
-      expect(find.text(AppStrings.creneauNuit), findsOneWidget);
-      expect(_accepter(), findsNWidgets(3));
-      expect(_refuser(), findsNWidgets(3));
+      expect(
+        find.textContaining(AppStrings.creneauNuit),
+        findsWidgets,
+      );
+      // Les deux réponses ne sont plus sur la ligne : elles sont derrière un
+      // appui, et une seule à la fois.
+      expect(_accepter(), findsNothing);
+      expect(_refuser(), findsNothing);
     });
 
     testWidgets('« Accepter » est la plus grande cible des deux', (
       tester,
     ) async {
       await _ouvrir(tester);
+      await _ouvrirReponse(tester);
 
-      final oui = tester.getSize(_accepter().first);
-      final non = tester.getSize(_refuser().first);
+      final oui = tester.getSize(_accepter());
+      final non = tester.getSize(_refuser());
 
       expect(oui.width, greaterThan(non.width));
       // Les deux restent très au-dessus du plancher tactile.
       expect(non.width, greaterThanOrEqualTo(48));
       expect(oui.height, greaterThanOrEqualTo(48));
       expect(non.height, greaterThanOrEqualTo(48));
+    });
+
+    testWidgets('la ligne touchée tient le plancher tactile', (tester) async {
+      await _ouvrir(tester);
+
+      final taille = tester.getSize(find.byType(CarteProposition).first);
+      expect(taille.height, greaterThanOrEqualTo(48));
     });
 
     testWidgets('le chargement montre un squelette, jamais une roue', (
@@ -244,7 +290,7 @@ void main() {
       expect(find.text(AppStrings.videPropositionsTitre), findsOneWidget);
       expect(find.text(AppStrings.videPropositionsTexte), findsOneWidget);
       expect(find.text(AppStrings.propositionsVideAction), findsOneWidget);
-      expect(find.byType(LigneDeProposition), findsNothing);
+      expect(find.byType(CarteProposition), findsNothing);
     });
 
     testWidgets('son action ramène sur le Calendrier', (tester) async {
@@ -264,8 +310,9 @@ void main() {
   group('Les propositions — accepter', () {
     testWidgets('la charge utile ne porte que le statut', (tester) async {
       final depot = await _ouvrir(tester);
+      await _ouvrirReponse(tester);
 
-      await tester.tap(_accepter().first);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
       // **Le garde-fou du ticket** : une colonne de plus ferait échouer toute
@@ -278,8 +325,9 @@ void main() {
 
     testWidgets('la ligne disparaît et le message le confirme', (tester) async {
       await _ouvrir(tester);
+      await _ouvrirReponse(tester);
 
-      await tester.tap(_accepter().first);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
       expect(find.text('lundi 12 octobre'), findsNothing);
@@ -311,7 +359,8 @@ void main() {
           ),
         );
 
-        await tester.tap(_accepter().first);
+        await _ouvrirReponse(tester);
+        await tester.tap(_accepter());
         await tester.pumpAndSettle();
 
         expect(depot.planningsRelus, <String>['plan-10']);
@@ -329,7 +378,8 @@ void main() {
 
         // Le 12 et le 19 partagent le même planning : il reste une réponse à
         // donner, rien à constater.
-        await tester.tap(_accepter().first);
+        await _ouvrirReponse(tester);
+        await tester.tap(_accepter());
         await tester.pumpAndSettle();
 
         expect(depot.planningsRelus, isEmpty);
@@ -339,7 +389,8 @@ void main() {
 
   group('Les propositions — refuser', () {
     Future<void> ouvrirLaFeuille(WidgetTester tester) async {
-      await tester.tap(_refuser().first);
+      await _ouvrirReponse(tester);
+      await tester.tap(_refuser());
       await tester.pumpAndSettle();
     }
 
@@ -363,7 +414,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(depot.chargesEnvoyees, isEmpty);
-      expect(find.byType(LigneDeProposition), findsNWidgets(3));
+      // La réponse est restée ouverte : on n'a rien perdu en renonçant.
+      expect(find.byType(PanneauReponse), findsOneWidget);
     });
 
     testWidgets('sans motif, la charge utile ne porte que le statut', (
@@ -406,7 +458,7 @@ void main() {
       await tester.tap(find.text(AppStrings.refusConfirmer));
       await tester.pumpAndSettle();
 
-      expect(find.byType(LigneDeProposition), findsNWidgets(2));
+      expect(find.byType(CarteProposition), findsNWidgets(2));
       expect(
         find.text(
           AppStrings.propositionsRefusee(
@@ -421,8 +473,9 @@ void main() {
   group('Les propositions — l\'attribution disparue', () {
     testWidgets('elle produit une phrase, pas une erreur', (tester) async {
       await _ouvrir(tester, depot: _depot(disparue: true));
+      await _ouvrirReponse(tester);
 
-      await tester.tap(_accepter().first);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
       final banniere = tester.widget<AppBanner>(find.byType(AppBanner));
@@ -434,11 +487,12 @@ void main() {
 
     testWidgets('la ligne ne revient pas', (tester) async {
       await _ouvrir(tester, depot: _depot(disparue: true));
+      await _ouvrirReponse(tester);
 
-      await tester.tap(_accepter().first);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
-      expect(find.byType(LigneDeProposition), findsNWidgets(2));
+      expect(find.byType(CarteProposition), findsNWidgets(2));
       expect(find.text('lundi 12 octobre'), findsNothing);
     });
 
@@ -446,8 +500,9 @@ void main() {
       tester,
     ) async {
       await _ouvrir(tester, depot: _depot(disparue: true));
+      await _ouvrirReponse(tester);
 
-      await tester.tap(_accepter().first);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
       await tester.tap(
@@ -465,16 +520,17 @@ void main() {
         tester,
         depot: _depot(erreurReponse: ErreurProposition.reseau),
       );
+      await _ouvrirReponse(tester);
 
-      await tester.tap(_accepter().first);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
       // Rien n'est perdu : les trois lignes sont là, dans le même ordre.
       final lignes = tester
-          .widgetList<LigneDeProposition>(find.byType(LigneDeProposition))
+          .widgetList<CarteProposition>(find.byType(CarteProposition))
           .toList();
       expect(
-        lignes.map((LigneDeProposition ligne) => ligne.proposition.id),
+        lignes.map((CarteProposition ligne) => ligne.proposition.id),
         <String>['a-12', 'a-19', 'a-nov'],
       );
 
@@ -490,8 +546,9 @@ void main() {
       addTearDown(reseau.dispose);
 
       await _ouvrir(tester, reseau: reseau);
+      await _ouvrirReponse(tester);
 
-      final bouton = tester.widget<PrimaryButton>(_accepter().first);
+      final bouton = tester.widget<PrimaryButton>(_accepter());
       expect(bouton.onPressed, isNull);
       // Un bouton grisé sans explication est un défaut (`DESIGN.md`).
       expect(bouton.raisonDesactivation, isNotNull);
@@ -508,8 +565,9 @@ void main() {
         tester,
         depot: _depot(erreurReponse: ErreurProposition.lectureSeule),
       );
+      await _ouvrirReponse(tester);
 
-      await tester.tap(_accepter().first);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
       final banniere = tester.widget<AppBanner>(find.byType(AppBanner));
@@ -517,8 +575,11 @@ void main() {
       // La ligne est revenue : rien n'est perdu, et la liste n'est pas
       // remplacée par un message.
       expect(find.text('lundi 12 octobre'), findsOneWidget);
+
+      // Et la réponse rouverte naît inerte, avec sa raison.
+      await _ouvrirReponse(tester);
       expect(
-        tester.widget<PrimaryButton>(_accepter().first).onPressed,
+        tester.widget<PrimaryButton>(_accepter()).onPressed,
         isNull,
       );
     });
@@ -547,8 +608,9 @@ void main() {
 
     testWidgets('il baisse d\'un à chaque réponse', (tester) async {
       await _ouvrir(tester);
+      await _ouvrirReponse(tester);
 
-      await tester.tap(_accepter().first);
+      await tester.tap(_accepter());
       await tester.pumpAndSettle();
       await ouvrirRoute(tester, AppRoutes.accueil);
 

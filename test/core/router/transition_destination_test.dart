@@ -8,7 +8,7 @@ import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
 import 'package:astreinte_sp/features/membres/presentation/inviter_screen.dart';
 import 'package:astreinte_sp/features/membres/presentation/membres_screen.dart';
-import 'package:astreinte_sp/features/notifications/presentation/notifications_screen.dart';
+import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:astreinte_sp/features/planning/domain/ligne_matrice.dart';
 import 'package:astreinte_sp/features/planning/presentation/matrice_screen.dart';
 import 'package:flutter/cupertino.dart';
@@ -170,7 +170,7 @@ void main() {
             reason: 'vers « Boîte », image $image',
           ),
         );
-        expect(find.byType(NotificationsScreen), findsOneWidget);
+        expect(find.byType(BoiteScreen), findsOneWidget);
         expect(emplacementCourant(tester), AppRoutes.boite);
       },
       variant: const TargetPlatformVariant(<TargetPlatform>{
