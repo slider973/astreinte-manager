@@ -6,8 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-23. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 064 | [Un monde visuel pour le pompier, à partir d'un tableau de bord](in-progress/064-monde-visuel-pompier.md) | P1 | 061 063 | https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a) |
-| 065 | [Un défilement fluide sur la PWA installée](in-progress/065-fluidite-defilement-pwa.md) | P1 | 060 | — |
+| 064 | [Un monde visuel pour le pompier, à partir d'un tableau de bord](in-progress/064-monde-visuel-pompier.md) | P1 | 061 063 | https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a), https://github.com/slider973/astreinte-manager/pull/60 (chantier 064c), https://github.com/slider973/astreinte-manager/pull/61 (chantier 064b) |
 
 ## À faire
 
@@ -79,4 +78,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-23. Ne pas éditer à la main
 | 061 | [Un nouveau monde visuel, à partir de l'écran de l'admin](done/061-monde-visuel-admin.md) | P1 | 004 016 017 | https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1), https://github.com/slider973/astreinte-manager/pull/57 (chantier 061c-2) |
 | 062 | [La vérification de la PWA vise un alias protégé au lieu du domaine](done/062-verification-pwa-sur-le-domaine.md) | P0 | 060 | https://github.com/slider973/astreinte-manager/pull/53 |
 | 063 | [Passer d'une destination à l'autre sans glissement](done/063-transition-entre-destinations.md) | P1 | 004 | https://github.com/slider973/astreinte-manager/pull/58 |
+| 065 | [Un défilement fluide sur la PWA installée](done/065-fluidite-defilement-pwa.md) | P1 | 060 | — |
 
