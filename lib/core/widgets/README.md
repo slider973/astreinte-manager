@@ -6,7 +6,7 @@ montre tous, dans tous leurs états, en clair et en sombre.
 
 | Fichier | Widget | Rôle |
 |---|---|---|
-| `app_scaffold.dart` | `AppScaffold`, `AppDestination` | Ossature d'écran : barre, bannière, contenu, navigation. Barre basse en compact, rail au-delà, panneau latéral en large. |
+| `app_scaffold.dart` | `AppScaffold`, `AppDestination` | Ossature d'écran : barre, bannière, contenu, navigation. Barre basse en compact, rail au-delà, panneau latéral en large. Les destinations sont **quatre** pour un pompier depuis le ticket 064 — Accueil, Calendrier, Astreintes, Boîte — et cinq pour un admin ; leur `route` est un **nom** de route `go_router`, et `core/router/destinations.dart` porte le provider partagé, l'index courant et le geste. `sansBarreApplication` efface la barre sous `expanded` pour le seul écran qui porte son propre en-tête, l'accueil. |
 | `app_banner.dart` | `AppBanner` | **Composant signature.** Les faits qui changent tout ce qui est en dessous. Une seule à la fois, par ordre de priorité. |
 | `primary_button.dart` | `PrimaryButton` | Bloc à rayon 8, hauteur 52, libellé 16 sp. Un bouton désactivé **doit** dire pourquoi. |
 | `slot_chip.dart` | `SlotChip` | **Composant signature.** La case du registre. Trois densités, trois remplissages. |
@@ -27,6 +27,16 @@ montre tous, dans tous leurs états, en clair et en sombre.
 | `entete_travail.dart` | `EnTeteTravail` | L'en-tête de la zone de travail sur grand écran, **à la place de la barre d'application** : nom de la caserne à gauche, actions de l'écran puis cloche et compte à droite. |
 | `avatar_initiales.dart` | `AvatarInitiales` | Un disque d'initiales. Pas de photo : ce serait une donnée personnelle de plus, et les pompiers n'en ont pas dans ce produit. Toujours décoratif (`ExcludeSemantics`) : le nom à côté est le seul libellé. Les lettres rétrécissent plutôt que d'être coupées quand le disque est petit (24 dans la matrice) ou le texte grand. |
 | `bouton_retour.dart` | `BoutonRetour` | La sortie d'un écran sans ossature ni parent dans le routeur. Flèche seule quand il y a une pile à dépiler, flèche **suivie du mot « Accueil »** quand il n'y en a pas (ticket 052). |
+
+## Les rayons, et lequel prendre
+
+`AppRadius` porte cinq rayons et **deux mondes**. Le registre de l'admin est fait de cases à
+rayon 4 et de blocs à rayon 8 ; les écrans du pompier sont faits de **cartes à rayon 20**
+(`AppRadius.carte`, ticket 064) posées sur un fond `surface-container-low`. Le rayon `carte` est
+réservé à ces cartes : un bouton ou un champ à 20 serait une gélule, que `DESIGN.md § Shapes`
+proscrit. `feuilleCarreeRadius` est le rayon `feuille` sur les quatre coins — le carré d'initiale
+des lignes de liste —, là où `feuilleRadius` ne porte que les deux coins hauts d'une feuille de
+bas d'écran.
 
 ## La règle qui a produit `BoutonRetour`
 

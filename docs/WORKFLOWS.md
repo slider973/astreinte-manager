@@ -233,10 +233,25 @@ canal qui atteigne un chef de centre qui n'a pas ouvert l'application depuis tro
 le cas nominal d'une fin d'essai. Aucun membre n'en reçoit : le canal sert à dire « tu es
 d'astreinte », pas « paie » *(ticket 030)*.
 
-Deep links (`notifications.data.route`) :
-- `/proposals` : écran des propositions en attente.
-- `/schedule/<period>` : planning de la caserne.
-- `/admin/schedule/<period>` : suivi admin.
-- `/availability/<period>` : saisie du mois.
-- `/admin/subscription` : l'abonnement de la caserne. Ignoré pour un membre ordinaire —
-  `destinationInterne` rend `null` et on retombe sur l'accueil, sans message d'erreur.
+Deep links (`notifications.data.route`). **Ce sont des liens publics** : ils partent dans des
+notifications et survivent aux refontes d'écran. `destinationInterne`
+(`features/notifications/domain/destination_push.dart`) les traduit en emplacement interne, et
+c'est le seul endroit à changer quand les écrans bougent. La colonne de droite dit où ils mènent
+depuis le ticket 064, qui a fait éclater la coquille d'accueil en routes.
+
+| Lien public | Emplacement interne |
+|---|---|
+| `/proposals` | `/propositions` |
+| `/schedule/<period>` | `/astreintes` |
+| `/admin/schedule/<period>` | `/admin/suivi?mois=<period>` *(admin seulement)* |
+| `/availability/<period>` | `/calendrier?mois=<period>` |
+| `/admin/subscription` | `/admin/abonnement` *(admin seulement)* |
+
+Un lien inconnu, mal formé, ou visant un écran que ce compte n'a pas le droit d'ouvrir retombe sur
+l'accueil **sans message d'erreur** : le membre n'a rien fait de mal, et le lien peut dater d'avant
+une rétrogradation.
+
+Les adresses de la coquille d'avant le ticket 064 — `/?onglet=N`, `/?mois=AAAA-MM`,
+`/notifications` — sont redirigées vers les nouvelles routes (`core/router/destinations.dart`,
+`ongletHerite`). Elles dorment dans des historiques de navigateur et dans des onglets restaurés :
+aucune ne rend un écran vide.

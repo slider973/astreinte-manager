@@ -21,10 +21,11 @@ Expo et Appwrite.
 
 ## Users
 
-- **Sapeur-pompier volontaire (membre)** : saisit ses disponibilités du mois, répond aux
-  propositions d'astreinte, consulte ses astreintes. Usage sur téléphone, en quelques secondes,
-  entre deux activités, parfois en extérieur ou avec des gants. Tous âges, aisance numérique
-  variable.
+- **Sapeur-pompier volontaire (membre)** : ouvre l'application sur un **tableau de bord** qui lui
+  dit sa prochaine astreinte, ce qu'on lui demande et s'il a saisi ses disponibilités ; saisit son
+  mois dans l'onglet « Calendrier », répond aux propositions, consulte ses astreintes. Usage sur
+  téléphone, en quelques secondes, entre deux activités, parfois en extérieur ou avec des gants.
+  Tous âges, aisance numérique variable.
 - **Admin de caserne** (chef de centre ou adjoint) : construit le planning du mois à partir des
   disponibilités, publie, suit les réponses, réattribue les refus. Usage sur ordinateur en
   priorité, tablette parfois, téléphone pour le suivi.
@@ -47,6 +48,9 @@ Deux mécanismes que l'outil remplacé n'a pas :
 
 ## Operating Context
 
+- L'accueil du membre est un **tableau de bord**, décidé par le propriétaire au ticket 064 :
+  salutation, prochaine astreinte, propositions à répondre, appel à saisir le mois ouvert. La
+  saisie des disponibilités, qui était le premier écran, est la deuxième destination.
 - Un mois de saisie s'ouvre deux mois à l'avance et se verrouille à une date limite fixée par la
   caserne (par défaut le 15 du mois précédent).
 - Deux créneaux par jour : jour et nuit. Un weekend = samedi et dimanche, jour et nuit. Jours fériés
