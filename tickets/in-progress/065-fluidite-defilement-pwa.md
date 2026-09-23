@@ -5,7 +5,7 @@
 - **Dépend de** : 060
 - **Branche** : `feat/065-fluidite-defilement-pwa`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-23
 
 ## Contexte
 
