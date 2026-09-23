@@ -6,7 +6,10 @@ import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
+import 'package:astreinte_sp/core/theme/app_theme.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
+import 'package:astreinte_sp/core/widgets/app_scaffold.dart';
+import 'package:astreinte_sp/core/widgets/carte_douce.dart';
 import 'package:astreinte_sp/core/widgets/count_stat.dart';
 import 'package:astreinte_sp/core/widgets/day_cell.dart';
 import 'package:astreinte_sp/core/widgets/empty_state.dart';
@@ -19,6 +22,7 @@ import 'package:astreinte_sp/features/dispos/data/file_locale.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
+import 'package:astreinte_sp/features/dispos/presentation/widgets/selecteur_mois.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -723,6 +727,92 @@ void main() {
         tester.widgetList<DayCell>(find.byType(DayCell)).first.nomJour,
         'jeu.',
         reason: 'le 1er octobre 2026 est un jeudi',
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // La matière du monde du pompier (chantier 064c)
+  // -------------------------------------------------------------------
+
+  group('MoisScreen — la matière du monde du pompier', () {
+    testWidgets('le papier est doux et la grille vit dans une carte', (
+      tester,
+    ) async {
+      await ouvrirMois(tester);
+
+      final scaffold = tester.widget<Scaffold>(
+        find
+            .descendant(
+              of: find.byType(AppScaffold),
+              matching: find.byType(Scaffold),
+            )
+            .first,
+      );
+      expect(
+        scaffold.backgroundColor,
+        AppTheme.clair.colorScheme.surfaceContainerLow,
+        reason: 'le fond de page du pompier est le papier doux',
+      );
+
+      // La grille et son en-tête de colonnes, dans la même carte.
+      expect(find.byType(CarteDouceSliver), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(CarteDouceSliver),
+          matching: find.byType(SlotChip),
+        ),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('le sélecteur de mois est une pastille, pas un bouton cerné', (
+      tester,
+    ) async {
+      await ouvrirMois(tester);
+
+      final selecteur = tester.widget<SelecteurMois>(
+        find.byType(SelecteurMois),
+      );
+      expect(selecteur.pastilles, isTrue);
+
+      // Le mois courant porte le fond indigo pâle de la sélection, et rien
+      // ne le cerne : c'est la forme de la bande de semaine de l'accueil.
+      final fonds = tester
+          .widgetList<DecoratedBox>(
+            find.descendant(
+              of: find.byType(SelecteurMois),
+              matching: find.byType(DecoratedBox),
+            ),
+          )
+          .map((DecoratedBox boite) => boite.decoration as BoxDecoration)
+          .toList();
+      expect(
+        fonds.where(
+          (BoxDecoration d) =>
+              d.color == AppTheme.clair.colorScheme.primaryContainer,
+        ),
+        hasLength(1),
+      );
+      expect(
+        fonds.every((BoxDecoration d) => d.border == null),
+        isTrue,
+        reason: 'une pastille n\'a pas de filet',
+      );
+    });
+
+    testWidgets('les compteurs restent visibles sans défiler', (tester) async {
+      await ouvrirMois(tester);
+
+      // Ils ne sont pas dans la carte de la grille : ils sont posés au bas de
+      // l'écran, là où la peinture les lit pendant qu'elle a lieu.
+      expect(find.byType(CountStat), findsNWidgets(3));
+      expect(
+        find.descendant(
+          of: find.byType(CarteDouceSliver),
+          matching: find.byType(CountStat),
+        ),
+        findsNothing,
       );
     });
   });

@@ -15,6 +15,7 @@ import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/carte_douce.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/peinture_grille.dart';
@@ -230,10 +231,21 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
       // La cloche de la Boîte (ticket 026) et l'avatar du compte (ticket 064).
       // Dès `expanded`, les deux passent dans l'en-tête de travail.
       actions: const <Widget>[BoutonNotifications(), BoutonCompte()],
+      // **La matière du monde du pompier** (`design/064 § 2`, chantier 064c) :
+      // papier `surface-container-low`, cartes en `surface`. Le sélecteur, les
+      // raccourcis, les préférences et la grille y sont posés ; la coquille de
+      // l'admin, elle, garde son papier blanc.
+      fondDoux: true,
       banniere: _banniere(etat, periodes),
       filActions: etat == null || classe.estLarge
           ? null
-          : _barre(etat, grand: false),
+          : CarteDouce(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: _barre(etat, grand: false),
+            ),
       panneauLateral: etat == null ? null : _panneau(etat),
       child: _corps(
         periodes: periodes,
@@ -329,6 +341,7 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
   }) {
     final aujourdhui = DateTime.now();
     final astuce = _astuce(etat);
+    final marge = classe.margePage;
 
     return CustomScrollView(
       controller: _defilement,
@@ -339,18 +352,27 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
             child: SelecteurMois(
               periodes: periodes,
               selectionnee: etat.periode,
+              // La forme du monde du pompier : le mois courant en pastille
+              // pleine, les autres en texte sur le papier doux.
+              pastilles: true,
               onChoisir: _choisirMois,
             ),
           ),
         ),
         // La place que le brief du 011 avait gardée aux raccourcis : entre le
         // sélecteur de mois et l'en-tête épinglé. En `large`, la bande n'est
-        // pas ici mais en tête du panneau de droite.
+        // pas ici mais en tête du panneau de droite. Depuis le 064c, elle est
+        // dans sa carte — la deuxième de l'écran, après le sélecteur.
         if (!classe.estLarge)
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.only(top: AppSpacing.md),
-              child: BarreRaccourcis(),
+              padding: EdgeInsets.fromLTRB(marge, AppSpacing.md, marge, 0),
+              child: const CarteDouce.nue(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: BarreRaccourcis(dansCarte: true),
+                ),
+              ),
             ),
           ),
         // La place du ticket 013 : **au-dessus de la grille**, dans le même
@@ -363,21 +385,34 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
         if (astuce != null) SliverToBoxAdapter(child: astuce),
         SliverToBoxAdapter(child: _Annonce(texte: etat.annonce)),
         const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: EnteteColonnes(
-            calendrier: calendrier,
-            hauteur: _hauteurEntete(context),
+        // **La grille dans sa carte** (`design/064 § 3.2`). L'en-tête de
+        // colonnes s'épingle à l'intérieur de la carte et s'en va avec elle :
+        // c'est ce que `SliverMainAxisGroup` fait, et c'est pourquoi la carte
+        // est un sliver et non une boîte — soixante-deux lignes ne se
+        // construisent pas d'avance.
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: marge),
+          sliver: CarteDouceSliver(
+            slivers: <Widget>[
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: EnteteColonnes(
+                  calendrier: calendrier,
+                  hauteur: _hauteurEntete(context),
+                ),
+              ),
+              if (calendrier)
+                GrilleCalendrier(periode: etat.periode, aujourdhui: aujourdhui)
+              else
+                GrilleRegistre(
+                  periode: etat.periode,
+                  aujourdhui: aujourdhui,
+                  deuxNiveaux: deuxNiveaux,
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
+            ],
           ),
         ),
-        if (calendrier)
-          GrilleCalendrier(periode: etat.periode, aujourdhui: aujourdhui)
-        else
-          GrilleRegistre(
-            periode: etat.periode,
-            aujourdhui: aujourdhui,
-            deuxNiveaux: deuxNiveaux,
-          ),
         const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
       ],
     );
@@ -445,7 +480,7 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
       children: <Widget>[
         const BarreRaccourcis(vertical: true),
         const SizedBox(height: AppSpacing.xl),
-        _barre(etat, grand: true),
+        CarteDouce(child: _barre(etat, grand: true)),
         // La place que le 011 avait réservée : sous les compteurs. Elle est
         // gardée telle quelle — ici, rien n'est en concurrence avec la
         // grille, et la section est visible sans défiler.

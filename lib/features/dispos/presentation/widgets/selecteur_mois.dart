@@ -19,6 +19,7 @@ class SelecteurMois extends StatelessWidget {
     required this.onChoisir,
     super.key,
     this.uneLigne = false,
+    this.pastilles = false,
   });
 
   /// Hauteur du bouton : le nom du mois, puis sa ligne d'état.
@@ -41,6 +42,20 @@ class SelecteurMois extends StatelessWidget {
   /// lignes n'est pas plus court qu'un bouton à deux lignes.
   final bool uneLigne;
 
+  /// **La forme du monde du pompier** (ticket 064c) : le mois choisi est une
+  /// pastille pleine `primary-container`, les autres ne sont que leur texte.
+  ///
+  /// C'est la forme qu'ont déjà la bande de semaine de l'accueil et l'en-tête
+  /// des dates de la matrice : un fond plein sous l'élément courant, rien
+  /// sous les autres. Sur le papier doux, un bouton `surface` cerné par mois
+  /// ferait une rangée de cinq cartes au-dessus d'une sixième — la carte de la
+  /// grille —, là où il n'y a qu'un choix à porter.
+  ///
+  /// **Faux partout ailleurs** : la barre de commande et le suivi de l'admin
+  /// gardent leurs boutons cernés, sur le papier blanc du registre, où rien
+  /// ne les détacherait sans filet.
+  final bool pastilles;
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -60,6 +75,7 @@ class SelecteurMois extends StatelessWidget {
                 periode: periode,
                 choisi: periode.cle == selectionnee?.cle,
                 uneLigne: uneLigne,
+                pastille: pastilles,
                 onChoisir: () => onChoisir(periode),
               ),
               if (periode != periodes.last)
@@ -77,12 +93,14 @@ class _Bouton extends StatelessWidget {
     required this.periode,
     required this.choisi,
     required this.uneLigne,
+    required this.pastille,
     required this.onChoisir,
   });
 
   final PeriodeSaisie periode;
   final bool choisi;
   final bool uneLigne;
+  final bool pastille;
   final VoidCallback onChoisir;
 
   @override
@@ -96,6 +114,23 @@ class _Bouton extends StatelessWidget {
     final encre = choisi
         ? theme.colorScheme.onPrimaryContainer
         : theme.colorScheme.onSurface;
+
+    // En pastille, le mois qui n'est pas choisi n'a ni fond ni filet : il est
+    // son propre libellé, posé sur le papier doux. Le contraste de l'encre
+    // sur ce papier est celui de tout le texte de l'écran, déjà mesuré.
+    final fond = choisi
+        ? theme.colorScheme.primaryContainer
+        : pastille
+        ? Colors.transparent
+        : theme.colorScheme.surface;
+    final bordure = pastille
+        ? null
+        : Border.all(
+            color: choisi
+                ? theme.colorScheme.primary
+                : statuts.filetDecoratif,
+            width: choisi ? AppStroke.etat : AppStroke.filet,
+          );
 
     return Semantics(
       button: true,
@@ -116,16 +151,9 @@ class _Bouton extends StatelessWidget {
           ),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: choisi
-                  ? theme.colorScheme.primaryContainer
-                  : theme.colorScheme.surface,
+              color: fond,
               borderRadius: AppRadius.controleRadius,
-              border: Border.all(
-                color: choisi
-                    ? theme.colorScheme.primary
-                    : statuts.filetDecoratif,
-                width: choisi ? AppStroke.etat : AppStroke.filet,
-              ),
+              border: bordure,
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(
