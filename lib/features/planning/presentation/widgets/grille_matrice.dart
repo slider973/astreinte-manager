@@ -204,6 +204,19 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
         );
         final visibles = GeoMatrice.joursVisibles(largeurGrille);
 
+        // **Le bloc épinglé ne déborde jamais sa fenêtre.** Sur un navigateur
+        // à demi hauteur, la grille peut recevoir moins que ses 116 points
+        // d'en-tête ; sans cette borne, la `Column` signalait un débordement
+        // et rayait l'écran de jaune et noir. Bornée, elle laisse toujours
+        // une ligne de membre visible sous l'en-tête.
+        final hauteurEpingle = math.min(
+          GeoMatrice.hauteurBlocEpingle(avecCreneaux: widget.planning.existe),
+          math.max(
+            GeoMatrice.hauteurEntete,
+            contraintes.maxHeight - GeoMatrice.hauteurLigne,
+          ),
+        );
+
         return Shortcuts(
           shortcuts: const <ShortcutActivator, Intent>{
             SingleActivator(LogicalKeyboardKey.home): _DebutDuMoisIntent(),
@@ -227,18 +240,28 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
             child: Column(
               children: <Widget>[
                 SizedBox(
-                  height: GeoMatrice.hauteurBlocEpingle(
-                    avecCreneaux: widget.planning.existe,
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      CoinFige(
-                        largeur: largeurFigee,
+                  height: hauteurEpingle,
+                  // Le bloc garde sa géométrie et se laisse rogner par le
+                  // bas : le coin figé et l'en-tête des dates restent en
+                  // face l'un de l'autre au pixel près, même quand la
+                  // fenêtre ne leur donne pas leurs 116 points.
+                  child: ClipRect(
+                    child: OverflowBox(
+                      alignment: Alignment.topLeft,
+                      maxHeight: GeoMatrice.hauteurBlocEpingle(
                         avecCreneaux: widget.planning.existe,
                       ),
-                      const AppDivider.colonneFigee(),
-                      Expanded(child: _entete(visibles)),
-                    ],
+                      child: Row(
+                        children: <Widget>[
+                          CoinFige(
+                            largeur: largeurFigee,
+                            avecCreneaux: widget.planning.existe,
+                          ),
+                          const AppDivider.colonneFigee(),
+                          Expanded(child: _entete(visibles)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
                 const AppDivider.enTete(),

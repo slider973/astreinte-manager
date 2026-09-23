@@ -344,7 +344,9 @@ void main() {
 
           expect(
             tester.getSize(find.byType(BandeauMois)).height,
-            compact ? BandeauMois.hauteurReduit : BandeauMois.hauteurComplet,
+            compact
+                ? BandeauMois.hauteurReduitSansActions
+                : BandeauMois.hauteurCompletSansActions,
             reason: 'largeur $largeur, compact $compact',
           );
         }

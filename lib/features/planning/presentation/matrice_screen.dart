@@ -51,6 +51,7 @@ import 'widgets/recapitulatif_proposition.dart';
 import 'widgets/recapitulatif_publication.dart';
 import 'widgets/squelette_matrice.dart';
 import 'widgets/vue_jour.dart';
+import 'widgets/zone_planning.dart';
 
 /// **« Planning du mois »** — la vue centrale de l'admin.
 ///
@@ -92,6 +93,13 @@ class MatriceScreen extends ConsumerStatefulWidget {
   /// En dessous, la ligne de trois chiffres seule ; puis plus rien.
   static const double placeBandeauReduit =
       BandeauMois.hauteurReduit + placeGrilleUtile;
+
+  /// En dessous encore, le bandeau s'efface mais **pas la décision** : la
+  /// zone du planning reste seule sur sa rangée, tant que la grille garde ses
+  /// quatre lignes. Plus bas que ça, la matrice reprend tout : un écran de
+  /// deux cents points ne sert plus à publier, il sert à lire.
+  static const double placeZonePlanningSeule =
+      AppTouch.cible + AppSpacing.sm * 2 + placeGrilleUtile;
 
   /// Le mois porté par l'URL (`?mois=AAAA-MM`), s'il y en a un.
   final String? mois;
@@ -698,6 +706,38 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     final matriceVisible =
         classe.supporteDeuxVolets && echelle <= MatriceScreen.seuilVueJour;
 
+    // Ce que la barre — et, sur grand écran, le bandeau — savent du planning.
+    // **`null` tant que le planning n'est pas lu** : tant qu'on ne sait pas
+    // s'il existe, on n'affirme ni qu'il existe ni le contraire.
+    final commande = etatPlanning == null
+        ? null
+        : CommandePlanning(
+            existe: planning.existe,
+            etat: planning.planning?.etat ?? PlanningEtat.brouillon,
+            canalBranche: etatPlanning.canalBranche,
+            creation: etatPlanning.creation,
+            onCreer: _raisonCreation(etatPlanning) != null
+                ? null
+                : () => unawaited(_creer()),
+            raisonCreation: _raisonCreation(etatPlanning),
+            resteAPourvoir: ref.watch(resteAPourvoirProvider),
+            proposition: etatPlanning.proposition,
+            onProposer: _raisonProposition(etatPlanning) != null
+                ? null
+                : () => unawaited(_proposer(etatPlanning)),
+            raisonProposition: _raisonProposition(etatPlanning),
+            // « Publier » vit dans le bandeau dès `expanded` (chantier 061c)
+            // et sous la grille en `compact`, où la barre défile.
+            publication: etatPlanning.publication,
+            onPublier: matriceVisible && etatPlanning.planning.modifiable
+                ? () => unawaited(_publier(etatPlanning))
+                : null,
+            raisonPublication: _raisonPublication(etatPlanning),
+            detailPublication: AppStrings.publierDetail(
+              _membresAttribues(etatPlanning),
+            ),
+          );
+
     final barre = BarreCommandeMatrice(
       periodes: periodes,
       periode: etat.periode,
@@ -712,37 +752,19 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       total: etat.matrice.lignes.length,
       affiches: visibles.length,
       montrerLegende: matriceVisible,
-      // Tant que le planning n'est pas lu, la barre n'en dit rien : ni
-      // « crée-le », ni « il existe ».
-      planning: etatPlanning == null
-          ? null
-          : CommandePlanning(
-              existe: planning.existe,
-              etat: planning.planning?.etat ?? PlanningEtat.brouillon,
-              canalBranche: etatPlanning.canalBranche,
-              creation: etatPlanning.creation,
-              onCreer: _raisonCreation(etatPlanning) != null
-                  ? null
-                  : () => unawaited(_creer()),
-              raisonCreation: _raisonCreation(etatPlanning),
-              resteAPourvoir: ref.watch(resteAPourvoirProvider),
-              proposition: etatPlanning.proposition,
-              onProposer: _raisonProposition(etatPlanning) != null
-                  ? null
-                  : () => unawaited(_proposer(etatPlanning)),
-              raisonProposition: _raisonProposition(etatPlanning),
-              // « Publier » vit dans la barre dès `expanded` (chantier 061c)
-              // et sous la grille en `compact`, où la barre défile.
-              publication: etatPlanning.publication,
-              onPublier: matriceVisible && etatPlanning.planning.modifiable
-                  ? () => unawaited(_publier(etatPlanning))
-                  : null,
-              raisonPublication: _raisonPublication(etatPlanning),
-              detailPublication: AppStrings.publierDetail(
-                _membresAttribues(etatPlanning),
-              ),
-            ),
+      planning: commande,
     );
+
+    /// La zone du planning du bandeau, **sur grand écran seulement**.
+    Widget? zonePlanning({required bool uneRangee}) =>
+        !matriceVisible || commande == null
+        ? null
+        : ZonePlanning(
+            planning: commande,
+            mois: AppStrings.moisLongs[etat.periode.mois - 1],
+            creneaux: etat.periode.nombreDeJours * 2,
+            uneRangee: uneRangee,
+          );
 
     // Les trois chiffres du mois, comptés sur les créneaux et les
     // attributions **déjà en mémoire** : aucune lecture de plus (ticket 061b).
@@ -790,16 +812,42 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
               final resume = visibles.isNotEmpty;
               final complet =
                   resume && place >= MatriceScreen.placeBandeauComplet;
+              // **Réduit seulement si la rangée d'actions y tient.** Sur
+              // une fenêtre étroite, elle se replierait sur deux lignes et
+              // le bloc « réduit » serait plus haut que le bloc complet.
               final reduit =
                   resume &&
                   !complet &&
-                  place >= MatriceScreen.placeBandeauReduit;
+                  place >= MatriceScreen.placeBandeauReduit &&
+                  (zonePlanning(uneRangee: true) == null ||
+                      contraintes.maxWidth >=
+                          BandeauMois.largeurReduitAvecActions);
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   if (complet || reduit)
-                    BandeauMois(resume: bandeau, compact: reduit),
+                    BandeauMois(
+                      resume: bandeau,
+                      compact: reduit,
+                      actions: zonePlanning(uneRangee: reduit),
+                    )
+                  // **Le bandeau s'efface, pas la décision.** Sur une fenêtre
+                  // trop courte pour ses chiffres, la zone du planning reste
+                  // seule : un planning qu'on ne peut plus publier parce que
+                  // la fenêtre est basse serait un cul-de-sac.
+                  else if (resume &&
+                      zonePlanning(uneRangee: true) != null &&
+                      place >= MatriceScreen.placeZonePlanningSeule)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.lg,
+                        0,
+                        AppSpacing.lg,
+                        AppSpacing.sm,
+                      ),
+                      child: zonePlanning(uneRangee: true),
+                    ),
                   Expanded(
                     child: visibles.isEmpty
                         ? _aucunResultat(filtres)

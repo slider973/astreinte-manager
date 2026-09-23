@@ -8,6 +8,7 @@ import '../../../../core/theme/app_status.dart';
 import '../../../../core/widgets/count_stat.dart';
 import '../../domain/resume_mois.dart';
 import 'barre_repartition.dart';
+import 'zone_planning.dart';
 
 /// **Le bandeau du mois** : où en est le planning, avant tout défilement.
 ///
@@ -24,6 +25,7 @@ class BandeauMois extends StatelessWidget {
     required this.resume,
     super.key,
     this.compact = false,
+    this.actions,
   });
 
   /// La hauteur du bloc entier, **mesurée** : cadre, ligne de chiffres, barre
@@ -34,16 +36,46 @@ class BandeauMois extends StatelessWidget {
   /// C'est la grandeur avec laquelle l'écran décide s'il a la place du bloc
   /// (`MatriceScreen.placeBandeauComplet`). Un test la tient à jour : si le
   /// bloc grossit, la constante le dit au lieu de mentir.
-  static const double hauteurComplet = 134;
+  /// **C'est le plus grand des deux** — avec la zone du planning — que
+  /// l'écran réserve : sinon le bloc apparaîtrait puis déborderait le jour où
+  /// le planning existe.
+  static const double hauteurComplet = 144;
+
+  /// Le même bloc sans la zone du planning : sur un mois dont le planning
+  /// n'est pas encore lu, et en `compact`.
+  static const double hauteurCompletSansActions = 134;
 
   /// La même, réduite à sa ligne de trois chiffres, sur une fenêtre où les
-  /// libellés ne se replient pas.
-  static const double hauteurReduit = 58;
+  /// libellés ne se replient pas, la rangée d'actions comprise.
+  static const double hauteurReduit = 68;
+
+  /// La ligne de trois chiffres seule, sans rangée d'actions.
+  static const double hauteurReduitSansActions = 58;
+
+  /// La largeur qu'il faut au bloc pour que ses chiffres **et** la rangée
+  /// d'actions tiennent côte à côte, réduits. En dessous, l'écran garde le
+  /// bloc complet plutôt que de replier la rangée d'actions sur deux lignes.
+  static const double largeurReduitAvecActions = 1000;
+
+  /// Ce qu'il faut laisser aux trois chiffres et à leur barre pour qu'ils
+  /// restent lisibles à côté de la colonne d'actions. En dessous, la colonne
+  /// passe **sous** la barre de répartition au lieu de l'étrangler.
+  static const double largeurMinimaleResume = 380;
 
   final ResumeMois resume;
 
   /// Vrai en `compact` : une seule ligne de trois chiffres, sans barre.
   final bool compact;
+
+  /// **La zone du planning**, à droite des chiffres (chantier 061c) : son
+  /// état, « Publier », « Proposer automatiquement » ou « Créer le planning »,
+  /// et l'explication du geste.
+  ///
+  /// Elle est ici et non dans la barre de commande parce que c'est ce bloc
+  /// qui décrit le planning : les trois chiffres comptent exactement ce que
+  /// ces boutons changent. `null` sur téléphone, où la création reste dans la
+  /// barre et « Publier » dans le fil d'actions du bas.
+  final Widget? actions;
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +88,21 @@ class BandeauMois extends StatelessWidget {
           horizontal: AppSpacing.lg,
           vertical: AppSpacing.sm,
         ),
-        child: chiffres,
+        // Réduit, le bloc garde ses actions : elles passent sur **une seule
+        // rangée** à droite des chiffres. Un planning qu'on ne peut plus
+        // publier parce que la fenêtre est courte serait un cul-de-sac.
+        child: actions == null
+            ? chiffres
+            : Row(
+                children: <Widget>[
+                  Expanded(child: chiffres),
+                  const SizedBox(width: AppSpacing.lg),
+                  SizedBox(
+                    width: ZonePlanning.largeurUneRangee,
+                    child: actions,
+                  ),
+                ],
+              ),
       );
     }
 
@@ -81,19 +127,55 @@ class BandeauMois extends StatelessWidget {
           // chaque côté sont quatre points rendus à la grille sur une fenêtre
           // courte, là où ils décident de ce qui se voit.
           padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              // **Le mois n'est pas écrit ici.** Le sélecteur de la barre de
-              // commande, juste au-dessus, le porte déjà — avec l'état de la
-              // période, que lui seul connaît. La ligne des chiffres part
-              // donc du bord gauche du bloc, sur la même verticale que la
-              // barre et que sa légende : un intitulé neutre à cette place
-              // se lirait comme un quatrième compteur privé de son nombre.
-              chiffres,
-              const SizedBox(height: AppSpacing.md),
-              BarreRepartition(parts: _parts(context)),
-            ],
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints contraintes) {
+              // La colonne d'actions ne passe à droite que si les chiffres
+              // gardent de quoi se lire. Sur une fenêtre `expanded`, elle
+              // descend sous la barre de répartition : un résumé étranglé
+              // à cent points ne résume plus rien.
+              final cote =
+                  actions != null &&
+                  contraintes.maxWidth >=
+                      ZonePlanning.largeur + largeurMinimaleResume;
+
+              final resumeDuMois = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  // **Le mois n'est pas écrit ici.** Le sélecteur de la
+                  // barre de commande, juste au-dessus, le porte déjà — avec
+                  // l'état de la période, que lui seul connaît. La ligne des
+                  // chiffres part donc du bord gauche du bloc, sur la même
+                  // verticale que la barre et que sa légende : un intitulé
+                  // neutre à cette place se lirait comme un quatrième
+                  // compteur privé de son nombre.
+                  chiffres,
+                  const SizedBox(height: AppSpacing.md),
+                  BarreRepartition(parts: _parts(context)),
+                ],
+              );
+
+              if (!cote) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    resumeDuMois,
+                    if (actions != null) ...<Widget>[
+                      const SizedBox(height: AppSpacing.md),
+                      actions!,
+                    ],
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(child: resumeDuMois),
+                  const SizedBox(width: AppSpacing.xl),
+                  SizedBox(width: ZonePlanning.largeur, child: actions),
+                ],
+              );
+            },
           ),
         ),
       ),

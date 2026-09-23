@@ -12,6 +12,7 @@ import 'package:astreinte_sp/features/planning/presentation/widgets/bandeau_mois
 import 'package:astreinte_sp/features/planning/presentation/widgets/barre_commande_matrice.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/barre_repartition.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/grille_matrice.dart';
+import 'package:astreinte_sp/features/planning/presentation/widgets/zone_planning.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -182,8 +183,8 @@ void main() {
       expect(barre.right - legende.right, lessThan(80));
     });
 
-    testWidgets('« Publier » vit dans la barre sur grand écran, pas sous la '
-        'grille', (tester) async {
+    testWidgets('« Publier » vit dans le bandeau, pas dans la barre ni sous '
+        'la grille', (tester) async {
       await _ouvrirLaMatrice(tester, avecPlanning: true, membresAttribues: 2);
 
       final publier = find.widgetWithText(
@@ -191,32 +192,63 @@ void main() {
         AppStrings.publierAction,
       );
       expect(publier, findsOneWidget);
+      // Le bandeau compte ce que ce bouton change : c'est là que la décision
+      // se prend (chantier 061c).
+      expect(
+        find.descendant(of: find.byType(ZonePlanning), matching: publier),
+        findsOneWidget,
+      );
       expect(
         find.descendant(
           of: find.byType(BarreCommandeMatrice),
           matching: publier,
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(find.text(AppStrings.publierDetail(2)), findsOneWidget);
     });
 
-    testWidgets('avec un planning encore à pourvoir, la seconde rangée prend '
-        'deux lignes — et c\'est mesuré, pas subi', (tester) async {
+    testWidgets('avec un planning, la barre garde ses deux rangées', (
+      tester,
+    ) async {
       await _ouvrirLaMatrice(tester, avecPlanning: true, membresAttribues: 2);
 
-      // **Le plafond n'est pas tenu dans ce cas, et le dire vaut mieux que
-      // de l'arrondir.** La rangée porte alors cinq éléments que le brief du
-      // 061c n'avait pas budgétés — l'état du planning, le témoin « Direct »
-      // et « Proposer automatiquement », venus des tickets 017 et 018 — soit
-      // 418 points dans une rangée qui en a 95 de libres. `Wrap` les passe à
-      // la ligne plutôt que de les couper.
-      //
-      // Ce qui est tenu : la barre coûte toujours **moins** que les quatre
-      // étages du 061b et le fil « Publier » qu'elle a remplacés.
       expect(tester.takeException(), isNull);
-      expect(_hauteurBarre(tester), lessThan(230 + 70));
-      expect(_hauteurBarre(tester), lessThanOrEqualTo(_plafondBarre + 60));
+      expect(_hauteurBarre(tester), lessThanOrEqualTo(_plafondBarre));
+      // Et le bandeau qui accueille les actions reste sous son plafond.
+      expect(
+        tester.getSize(find.byType(BandeauMois)).height,
+        lessThanOrEqualTo(150),
+      );
+      expect(
+        tester.getSize(find.byType(BandeauMois)).height,
+        lessThanOrEqualTo(BandeauMois.hauteurComplet),
+      );
+    });
+
+    testWidgets('à deux mois ouverts, les deux libellés sont entiers dans la '
+        'fenêtre', (tester) async {
+      await _ouvrirLaMatrice(tester, moisOuverts: 2);
+
+      final fenetre = Offset.zero & tester.view.physicalSize / tester.view.devicePixelRatio;
+      for (var i = 0; i < 2; i++) {
+        final periode = periodeOuverte(
+          annee: _maintenant.year,
+          mois: _maintenant.month + i,
+        );
+        final libelle = find.text(
+          AppStrings.moisEtEtat(periode.libelle, periode.ligneEtatBreve),
+        );
+        expect(libelle, findsOneWidget, reason: 'mois $i');
+        final rect = tester.getRect(libelle);
+        // **Jamais rogné, jamais caché derrière un défilement** : le
+        // sélecteur prend sa largeur intrinsèque dans la rangée.
+        expect(
+          fenetre.contains(rect.topLeft) && fenetre.contains(rect.bottomRight),
+          isTrue,
+          reason: 'mois $i, rect $rect hors de $fenetre',
+        );
+      }
     });
   });
 
@@ -233,7 +265,7 @@ void main() {
       expect(find.byType(BarreRepartition), findsOneWidget);
       expect(
         tester.getSize(find.byType(BandeauMois)).height,
-        BandeauMois.hauteurComplet,
+        lessThanOrEqualTo(BandeauMois.hauteurComplet),
       );
 
       // Et la grille garde ses quatre lignes de réserve.

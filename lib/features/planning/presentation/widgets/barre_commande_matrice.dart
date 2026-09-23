@@ -182,16 +182,20 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
       children: <Widget>[
         // Rangée 1 — quel mois, et quelles lignes.
         //
-        // Une `Row` et non une `Wrap` : le sélecteur grandit avec le nombre
-        // de périodes ouvertes, et à trois mois il poussait les puces à la
-        // ligne. Il défile déjà horizontalement — c'est sa forme depuis le
-        // ticket 011 — donc on lui donne une part de la rangée au lieu de
-        // laisser la rangée suivre sa largeur. Les puces, elles, gardent leur
-        // taille et se replient en dernier, sur une fenêtre étroite.
+        // **Le sélecteur prend sa largeur intrinsèque** : il porte toutes les
+        // périodes ouvertes de la caserne, et aucune ne doit être rognée ni
+        // cachée derrière un défilement qu'on ne voit pas. C'est le reste de
+        // la rangée qui cède : la recherche et les puces se replient par
+        // `Wrap` quand la place manque.
         Row(
           children: <Widget>[
+            // `Flexible` et non `Expanded` : le sélecteur garde sa largeur
+            // intrinsèque tant qu'elle tient — un, deux, trois mois ouverts
+            // s'y lisent entiers. Au-delà, il retrouve le défilement
+            // horizontal qu'il a sur téléphone depuis le ticket 011, parce
+            // que `periodesProvider` rend **toutes** les périodes de la
+            // caserne et qu'un ruban de douze mois déborderait la rangée.
             Flexible(
-              flex: 3,
               child: SelecteurMois(
                 periodes: widget.periodes,
                 selectionnee: widget.periode,
@@ -210,19 +214,13 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            Flexible(
-              flex: 6,
-              child: Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: _puces(),
-              ),
-            ),
+            _puceTri(),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        // Rangée 2 — ce qui agit sur le planning, la légende au bord droit.
+        // Rangée 2 — ce qui change la lecture de la grille, la légende au
+        // bord droit. **Le planning n'est plus ici** : son état et ses gestes
+        // vivent dans le bandeau du mois, qui compte ce qu'ils changent.
         Row(
           children: <Widget>[
             Expanded(
@@ -236,8 +234,9 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
                     possible: widget.raisonSaisieImpossible == null,
                     onArmer: widget.onArmer,
                   ),
+                  _puceMasquer(),
+                  _puceCommentaires(),
                   ..._raisonEtCompte(context),
-                  ..._actionPlanning(context, avecPublier: true),
                 ],
               ),
             ),
@@ -303,7 +302,7 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
             // Le fil « Publier » reste sous la grille en `compact` : la barre
             // y défile avec la vue par jour, et un bouton qui s'en va au
             // défilement est un bouton qu'on cherche.
-            ..._actionPlanning(context, avecPublier: false),
+            ..._actionPlanning(context),
             if (widget.montrerLegende) const LegendeEtats(),
             SaveIndicator(
               etat: widget.sync,
@@ -319,28 +318,31 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
 
   // --- Les morceaux partagés ----------------------------------------------
 
-  List<Widget> _puces() {
-    final filtres = widget.filtres;
-    return <Widget>[
-      FilterChip(
-        label: const Text(AppStrings.matriceMasquerNonSaisis),
-        selected: filtres.masquerNonSaisis,
-        onSelected: (bool valeur) =>
-            widget.onFiltres(filtres.copie(masquerNonSaisis: valeur)),
-      ),
-      FilterChip(
-        label: const Text(AppStrings.matriceAfficherCommentaires),
-        avatar: const Icon(Icons.chat_bubble_outline, size: 18),
-        selected: filtres.commentaires,
-        onSelected: (bool valeur) =>
-            widget.onFiltres(filtres.copie(commentaires: valeur)),
-      ),
-      _MenuTri(
-        tri: filtres.tri,
-        onTri: (TriMatrice tri) => widget.onFiltres(filtres.copie(tri: tri)),
-      ),
-    ];
-  }
+  List<Widget> _puces() => <Widget>[
+    _puceMasquer(),
+    _puceCommentaires(),
+    _puceTri(),
+  ];
+
+  Widget _puceMasquer() => FilterChip(
+    label: const Text(AppStrings.matriceMasquerNonSaisis),
+    selected: widget.filtres.masquerNonSaisis,
+    onSelected: (bool valeur) =>
+        widget.onFiltres(widget.filtres.copie(masquerNonSaisis: valeur)),
+  );
+
+  Widget _puceCommentaires() => FilterChip(
+    label: const Text(AppStrings.matriceAfficherCommentaires),
+    avatar: const Icon(Icons.chat_bubble_outline, size: 18),
+    selected: widget.filtres.commentaires,
+    onSelected: (bool valeur) =>
+        widget.onFiltres(widget.filtres.copie(commentaires: valeur)),
+  );
+
+  Widget _puceTri() => _MenuTri(
+    tri: widget.filtres.tri,
+    onTri: (TriMatrice tri) => widget.onFiltres(widget.filtres.copie(tri: tri)),
+  );
 
   /// La raison d'un contrôle désactivé, et le compte des lignes filtrées.
   ///
@@ -380,16 +382,13 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
     ];
   }
 
-  /// L'emplacement de l'action du planning : le créer, ou le publier.
+  /// L'emplacement de l'action du planning, **en `compact` seulement**.
   ///
-  /// **La création du planning vit ici**, pas dans un écran à part : c'est le
-  /// premier geste du mois, au même endroit que tous les autres contrôles du
-  /// mois. Et depuis le chantier 061c, « Publier » prend cette même place
-  /// quand le planning existe, au lieu des 70 points d'un fil sous la grille.
-  List<Widget> _actionPlanning(
-    BuildContext context, {
-    required bool avecPublier,
-  }) {
+  /// C'est le premier geste du mois, au même endroit que les autres contrôles
+  /// du mois. Sur grand écran, il a déménagé dans le bandeau
+  /// (`ZonePlanning`, chantier 061c) : la seconde rangée demandait 418 points
+  /// pour ces contrôles quand il en restait 95.
+  List<Widget> _actionPlanning(BuildContext context) {
     final planning = widget.planning;
     if (planning == null) return const <Widget>[];
 
@@ -417,8 +416,6 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
     return <Widget>[
       StatusBadge.planning(planning.etat, taille: StatusBadgeTaille.compacte),
       IndicateurDirect(branche: planning.canalBranche),
-      // **Le remplissage automatique vit ici**, à côté de l'état du planning.
-      //
       // Absent quand il n'y a plus rien à pourvoir : un bouton qui ne ferait
       // rien est un bouton qui ment.
       if (planning.resteAPourvoir)
@@ -431,22 +428,6 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
           onPressed: planning.onProposer,
           raisonDesactivation: planning.raisonProposition,
         ),
-      if (avecPublier && planning.onPublier != null) ...<Widget>[
-        PrimaryButton(
-          libelle: AppStrings.publierAction,
-          icone: Icons.campaign,
-          chargement: planning.publication,
-          pleineLargeur: false,
-          onPressed: planning.raisonPublication == null
-              ? planning.onPublier
-              : null,
-          raisonDesactivation: planning.raisonPublication,
-        ),
-        // Le nombre de **téléphones qui vont sonner**, pas le nombre
-        // d'attributions : c'est la seule grandeur que le chef ait besoin de
-        // sentir avant d'appuyer.
-        _Explication(texte: planning.detailPublication),
-      ],
     ];
   }
 }

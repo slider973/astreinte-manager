@@ -2219,12 +2219,12 @@ abstract final class AppStrings {
   /// Ce que le bouton va faire, écrit avant qu'on l'actionne. Le nombre est
   /// celui du mois affiché : 56, 60 ou 62, jamais un 62 supposé.
   ///
-  /// **Une ligne, pas trois** (chantier 061c) : l'explication vit à côté du
-  /// bouton dans une rangée de 48 points, et trois lignes de texte y
-  /// dépliaient la barre. Les deux faits qui comptent restent — combien de
+  /// **Une ligne, pas trois** (chantier 061c) : l'explication vit sous le
+  /// bouton, dans la zone du planning du bandeau, et trois lignes de texte y
+  /// dépliaient le bloc. Les deux faits qui comptent restent — combien de
   /// créneaux, et d'où vient leur effectif.
   static String planningCreerDetail(int creneaux) =>
-      '$creneaux créneaux, effectif requis.';
+      '$creneaux créneaux, à l\'effectif requis de tes réglages.';
 
   static String planningCreeTexte(String mois, int creneaux) =>
       'Planning ${moisAvecDe(mois)} créé : $creneaux créneaux.';
