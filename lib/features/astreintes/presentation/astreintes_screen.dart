@@ -176,6 +176,11 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
         const BoutonNotifications(),
         const BoutonCompte(),
       ],
+      // **La matière du monde du pompier** (`design/064 § 2`, chantier 064c) :
+      // papier `surface-container-low`, lignes et grille en cartes `surface`.
+      // La portée « La caserne » la prend aussi : c'est le même écran, et deux
+      // papiers derrière une même bascule seraient deux écrans.
+      fondDoux: true,
       banniere: caserne
           ? _banniereCaserne(enLigne: enLigne)
           : _banniereMoi(enLigne: enLigne),
@@ -447,39 +452,34 @@ class _Liste extends StatelessWidget {
 
               final element = elements[index - entete];
               return switch (element) {
+                // L'en-tête **discret** du monde du pompier : titre plus
+                // petit, et pas de filet — une liste de cartes se sépare
+                // toute seule.
                 EnteteMoisAstreintes() => EnteteSection(
                   titre: element.libelle,
                   compte: AppStrings.astreintesCompte(element.compte),
                   premiere: element.premier,
+                  discret: true,
                 ),
                 ReplisPassees() => Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      const AppDivider(),
-                      ReplisPasseesLigne(
-                        compte: element.compte,
-                        ouvert: element.ouvert,
-                        onBasculer: onBasculerPassees,
-                      ),
-                      const AppDivider(),
-                    ],
+                  child: ReplisPasseesLigne(
+                    compte: element.compte,
+                    ouvert: element.ouvert,
+                    onBasculer: onBasculerPassees,
                   ),
                 ),
-                LigneAstreinte(:final astreinte, :final passee) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    LigneDAstreinte(
-                      key: ValueKey<String>(astreinte.id),
-                      astreinte: astreinte,
-                      heures: heures,
-                      passee: passee,
-                      onOuvrir: () => onOuvrir(astreinte),
-                    ),
-                    if (_suivant(index - entete) is LigneAstreinte)
-                      const AppDivider(),
-                  ],
+                // L'écart entre deux cartes remplace le filet qui les
+                // séparait : c'est le vide qui range, pas le trait.
+                LigneAstreinte(:final astreinte, :final passee) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: LigneDAstreinte(
+                    key: ValueKey<String>(astreinte.id),
+                    astreinte: astreinte,
+                    heures: heures,
+                    passee: passee,
+                    onOuvrir: () => onOuvrir(astreinte),
+                  ),
                 ),
               };
             },
@@ -489,6 +489,4 @@ class _Liste extends StatelessWidget {
     );
   }
 
-  ElementAstreintes? _suivant(int index) =>
-      index + 1 < elements.length ? elements[index + 1] : null;
 }

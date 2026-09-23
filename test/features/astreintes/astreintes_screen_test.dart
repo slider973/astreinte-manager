@@ -7,7 +7,10 @@ import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/session/appartenances_locales.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
+import 'package:astreinte_sp/core/theme/app_theme.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
+import 'package:astreinte_sp/core/widgets/app_scaffold.dart';
+import 'package:astreinte_sp/core/widgets/carte_douce.dart';
 import 'package:astreinte_sp/core/widgets/empty_state.dart';
 import 'package:astreinte_sp/core/widgets/entete_section.dart';
 import 'package:astreinte_sp/core/widgets/loading_skeleton.dart';
@@ -62,8 +65,7 @@ Future<FauxAstreintesRepository> _ouvrir(
   Size taille = _telephone,
   bool stabiliser = true,
 }) async {
-  final astreintes =
-      depot ?? FauxAstreintesRepository(astreintes: _quatre());
+  final astreintes = depot ?? FauxAstreintesRepository(astreintes: _quatre());
 
   await monterApp(
     tester,
@@ -81,16 +83,15 @@ Future<FauxAstreintesRepository> _ouvrir(
 }
 
 void main() {
-  testWidgets(
-    'le lien /schedule mène à la destination « Astreintes »',
-    (WidgetTester tester) async {
-      await _ouvrir(tester);
+  testWidgets('le lien /schedule mène à la destination « Astreintes »', (
+    WidgetTester tester,
+  ) async {
+    await _ouvrir(tester);
 
-      expect(emplacementCourant(tester), AppRoutes.astreintes);
-      expect(find.text(AppStrings.astreintesTitre), findsOneWidget);
-      expect(find.text(AppStrings.navAstreintes), findsWidgets);
-    },
-  );
+    expect(emplacementCourant(tester), AppRoutes.astreintes);
+    expect(find.text(AppStrings.astreintesTitre), findsOneWidget);
+    expect(find.text(AppStrings.navAstreintes), findsWidgets);
+  });
 
   group('la liste', () {
     testWidgets('ouvre sur les à venir, groupées par mois', (
@@ -120,10 +121,18 @@ void main() {
         ),
       );
 
+      // Depuis le chantier 064c, la ligne de soutien de la carte porte le
+      // créneau **et** ses heures, comme la ligne de proposition de l'accueil.
       // Le 17 est de nuit : l'intervalle complémentaire du jour.
-      expect(find.text('20:00 – 08:00'), findsOneWidget);
+      expect(
+        find.text('${AppStrings.creneauNuit} · 20:00 – 08:00'),
+        findsOneWidget,
+      );
       // Le 3 novembre est de jour.
-      expect(find.text('08:00 – 20:00'), findsOneWidget);
+      expect(
+        find.text('${AppStrings.creneauJour} · 08:00 – 20:00'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('une ligne se lit en une phrase complète', (
@@ -176,6 +185,96 @@ void main() {
 
       expect(depot.lectures, greaterThan(avant));
       expect(find.byType(LigneDAstreinte), findsNWidgets(2));
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // La matière du monde du pompier (chantier 064c)
+  // -------------------------------------------------------------------
+
+  group('la matière du monde du pompier', () {
+    testWidgets('papier doux, lignes en cartes, en-têtes de mois discrets', (
+      WidgetTester tester,
+    ) async {
+      await _ouvrir(tester);
+
+      final scaffold = tester.widget<Scaffold>(
+        find
+            .descendant(
+              of: find.byType(AppScaffold),
+              matching: find.byType(Scaffold),
+            )
+            .first,
+      );
+      expect(
+        scaffold.backgroundColor,
+        AppTheme.clair.colorScheme.surfaceContainerLow,
+      );
+
+      // Chaque astreinte est une carte, et il n'y a plus de filet entre deux.
+      expect(
+        find.descendant(
+          of: find.byType(LigneDAstreinte),
+          matching: find.byType(CarteDouce),
+        ),
+        findsNWidgets(2),
+      );
+      for (final entete in tester.widgetList<EnteteSection>(
+        find.byType(EnteteSection),
+      )) {
+        expect(entete.discret, isTrue);
+      }
+      expect(
+        find.descendant(
+          of: find.byType(EnteteSection),
+          matching: find.byType(Divider),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+      'la ligne porte le carré du créneau, pas la marge du registre',
+      (WidgetTester tester) async {
+        await _ouvrir(tester);
+
+        // « N » pour le 17 octobre de nuit, « J » pour le 3 novembre de jour.
+        expect(
+          find.descendant(
+            of: find.byType(LigneDAstreinte),
+            matching: find.text('N'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byType(LigneDAstreinte),
+            matching: find.text('J'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.text('samedi 17 octobre'),
+          findsOneWidget,
+          reason: 'la date dit le week-end, la marge n\'a plus à le teinter',
+        );
+      },
+    );
+
+    testWidgets('la grille du mois vit dans une carte', (
+      WidgetTester tester,
+    ) async {
+      await _ouvrir(tester);
+      await tester.tap(find.text(AppStrings.astreintesVueCalendrier));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(CalendrierAstreintes),
+          matching: find.byType(CarteDouce),
+        ),
+        findsOneWidget,
+      );
     });
   });
 
@@ -237,9 +336,7 @@ void main() {
 
       // Le 17 est marqué, le 16 ne l'est pas.
       expect(
-        find.bySemanticsLabel(
-          'samedi 17 octobre, nuit. Voir le détail.',
-        ),
+        find.bySemanticsLabel('samedi 17 octobre, nuit. Voir le détail.'),
         findsOneWidget,
       );
       expect(
@@ -285,7 +382,10 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await tester.pumpAndSettle();
 
-      expect(find.text(AppStrings.astreintesCalendrierTropGrand), findsOneWidget);
+      expect(
+        find.text(AppStrings.astreintesCalendrierTropGrand),
+        findsOneWidget,
+      );
       expect(find.byType(CalendrierAstreintes), findsNothing);
       expect(find.byType(LigneDAstreinte), findsWidgets);
     });
@@ -315,10 +415,7 @@ void main() {
       await tester.tap(find.text('mardi 3 novembre'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text(AppStrings.astreintesEquipiersAttente),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.astreintesEquipiersAttente), findsOneWidget);
       // Ni liste de noms, ni « tu es seul » : on ne sait pas, et on le dit.
       expect(find.text(AppStrings.astreintesEquipiersTitre), findsNothing);
       expect(find.text(AppStrings.astreintesSeul), findsNothing);
@@ -497,41 +594,40 @@ void main() {
       expect(find.byType(AppBanner), findsNothing);
     });
 
-    testWidgets('un démarrage à froid sans réseau atteint quand même l\'écran', (
-      WidgetTester tester,
-    ) async {
-      // **La scène du ticket** : la PWA rouverte dans une remise. La session
-      // se restaure depuis le stockage local, mais `memberships` échoue. Sans
-      // la caserne gardée sur l'appareil, l'application s'arrêterait sur
-      // « Pas de connexion » et le cache d'astreintes ne servirait jamais.
-      await monterApp(
-        tester,
-        session: sessionMembre,
-        erreurAppartenances: AuthErreur.reseau,
-        appartenancesLocales: AppartenancesLocalesMemoire(
-          const <Appartenance>[appartenanceMembre],
-        ),
-        astreintes: FauxAstreintesRepository(
-          erreur: ErreurAstreintes.reseau,
-        ),
-        cacheAstreintes: CacheAstreintesMemoire(
-          MesAstreintes(
-            astreintes: _quatre(),
-            luLe: _aujourdhui.subtract(const Duration(hours: 5)),
+    testWidgets(
+      'un démarrage à froid sans réseau atteint quand même l\'écran',
+      (WidgetTester tester) async {
+        // **La scène du ticket** : la PWA rouverte dans une remise. La session
+        // se restaure depuis le stockage local, mais `memberships` échoue. Sans
+        // la caserne gardée sur l'appareil, l'application s'arrêterait sur
+        // « Pas de connexion » et le cache d'astreintes ne servirait jamais.
+        await monterApp(
+          tester,
+          session: sessionMembre,
+          erreurAppartenances: AuthErreur.reseau,
+          appartenancesLocales: AppartenancesLocalesMemoire(
+            const <Appartenance>[appartenanceMembre],
           ),
-        ),
-        horloge: () => _aujourdhui,
-        reseau: ConnectiviteMemoire(enLigne: false),
-      );
-      await ouvrirRoute(tester, _lienNotification);
+          astreintes: FauxAstreintesRepository(erreur: ErreurAstreintes.reseau),
+          cacheAstreintes: CacheAstreintesMemoire(
+            MesAstreintes(
+              astreintes: _quatre(),
+              luLe: _aujourdhui.subtract(const Duration(hours: 5)),
+            ),
+          ),
+          horloge: () => _aujourdhui,
+          reseau: ConnectiviteMemoire(enLigne: false),
+        );
+        await ouvrirRoute(tester, _lienNotification);
 
-      expect(find.text(AppStrings.astreintesTitre), findsOneWidget);
-      expect(find.byType(LigneDAstreinte), findsNWidgets(2));
+        expect(find.text(AppStrings.astreintesTitre), findsOneWidget);
+        expect(find.byType(LigneDAstreinte), findsNWidgets(2));
 
-      final banniere = tester.widget<AppBanner>(find.byType(AppBanner));
-      expect(banniere.variante, AppBannerVariante.horsLigne);
-      expect(banniere.detail, contains('il y a 5 h'));
-    });
+        final banniere = tester.widget<AppBanner>(find.byType(AppBanner));
+        expect(banniere.variante, AppBannerVariante.horsLigne);
+        expect(banniere.detail, contains('il y a 5 h'));
+      },
+    );
 
     testWidgets('une lecture réussie réécrit le cache en entier', (
       WidgetTester tester,

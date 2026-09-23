@@ -30,28 +30,45 @@ class SqueletteAstreintes extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           const SkeletonLigne(largeur: 110),
           const SizedBox(height: AppSpacing.lg),
+          // La forme attendue depuis le chantier 064c : des **cartes**, le
+          // carré d'initiale à gauche, la date et ses heures à droite.
           for (var ligne = 0; ligne < lignes; ligne++) ...<Widget>[
-            const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                SkeletonLigne(largeur: 48, hauteur: 40),
-                SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      SkeletonLigne(largeur: 190),
-                      SizedBox(height: AppSpacing.sm),
-                      SkeletonLigne(largeur: 120, hauteur: AppSpacing.md),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
+            const _CarteFantome(),
+            const SizedBox(height: AppSpacing.sm),
           ],
         ],
       ),
+    ),
+  );
+}
+
+/// Une ligne d'astreinte à venir : le filet de la carte, le carré du créneau,
+/// la date et l'intervalle.
+class _CarteFantome extends StatelessWidget {
+  const _CarteFantome();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(AppSpacing.md),
+    decoration: BoxDecoration(
+      borderRadius: AppRadius.carteRadius,
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    child: const Row(
+      children: <Widget>[
+        SkeletonLigne(largeur: 40, hauteur: 40),
+        SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              SkeletonLigne(largeur: 190),
+              SizedBox(height: AppSpacing.sm),
+              SkeletonLigne(largeur: 120, hauteur: AppSpacing.md),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }

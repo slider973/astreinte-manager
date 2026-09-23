@@ -7,6 +7,7 @@ import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/carte_douce.dart';
 import '../../domain/astreinte.dart';
 import 'barre_mois.dart';
 
@@ -103,44 +104,67 @@ class CalendrierAstreintes extends StatelessWidget {
           raisonPrecedent: AppStrings.astreintesMoisAvantDebut,
           raisonSuivant: AppStrings.astreintesMoisApresFin,
         ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: marge),
-          child: _EnteteJours(ecart: ecart),
-        ),
+        // **La grille dans sa carte** (`design/064 § 3.2`, chantier 064c).
+        // Sa marge extérieure est celle que la grille portait, et ses cases
+        // touchent le filet : les rentrer d'un rembourrage de plus ferait
+        // tomber une case sous le plancher de 44 dp sur un téléphone de 360,
+        // ce que le calcul du ticket 027 interdit.
         Expanded(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(marge, 0, marge, AppSpacing.xxl),
-            child: Column(
-              children: <Widget>[
-                for (final semaine in _semaines(mois))
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(marge, 0, marge, AppSpacing.md),
+            child: CarteDouce.nue(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
                   Padding(
-                    padding: EdgeInsets.only(top: ecart),
-                    // Les sept blocs d'une semaine s'alignent sur le plus
-                    // haut : sans cela, une semaine sans astreinte serait
-                    // deux fois plus basse que la suivante.
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                    padding: const EdgeInsets.only(top: AppSpacing.sm),
+                    child: _EnteteJours(ecart: ecart),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Column(
                         children: <Widget>[
-                          for (final date in semaine) ...<Widget>[
-                            Expanded(
-                              child: _Case(
-                                date: date,
-                                horsMois: date.month != mois.month,
-                                aujourdhui: _memeJour(date, aujourdhui),
-                                astreintes: date.month == mois.month
-                                    ? parJour[date.day] ?? const <Astreinte>[]
-                                    : const <Astreinte>[],
-                                onOuvrir: onOuvrir,
+                          for (final semaine in _semaines(mois))
+                            Padding(
+                              padding: EdgeInsets.only(top: ecart),
+                              // Les sept blocs d'une semaine s'alignent sur le plus
+                              // haut : sans cela, une semaine sans astreinte serait
+                              // deux fois plus basse que la suivante.
+                              child: IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: <Widget>[
+                                    for (final date in semaine) ...<Widget>[
+                                      Expanded(
+                                        child: _Case(
+                                          date: date,
+                                          horsMois: date.month != mois.month,
+                                          aujourdhui: _memeJour(
+                                            date,
+                                            aujourdhui,
+                                          ),
+                                          astreintes: date.month == mois.month
+                                              ? parJour[date.day] ??
+                                                    const <Astreinte>[]
+                                              : const <Astreinte>[],
+                                          onOuvrir: onOuvrir,
+                                        ),
+                                      ),
+                                      if (date != semaine.last)
+                                        SizedBox(width: ecart),
+                                    ],
+                                  ],
+                                ),
                               ),
                             ),
-                            if (date != semaine.last) SizedBox(width: ecart),
-                          ],
                         ],
                       ),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
