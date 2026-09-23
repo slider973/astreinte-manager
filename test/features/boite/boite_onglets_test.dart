@@ -20,11 +20,13 @@ import 'package:astreinte_sp/features/propositions/data/propositions_repository.
 import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
 import 'package:astreinte_sp/features/propositions/presentation/widgets/carte_proposition.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
 import '../../support/faux_notifications.dart';
 import '../../support/faux_propositions.dart';
+import '../../support/polices.dart';
 
 /// Un téléphone haut : les trois onglets et leurs lignes tiennent sans
 /// défiler.
@@ -123,6 +125,27 @@ String _titre(WidgetTester tester) => tester
 
 Finder _onglet(OngletBoite onglet) =>
     find.widgetWithText(Tab, onglet.libelle);
+
+/// Vrai si le texte de [cible] ne tient pas dans la place qu'il occupe.
+///
+/// `PrimaryButton` pose toujours `TextOverflow.ellipsis` — lire l'attribut ne
+/// dit donc rien. Ce qui compte est la mesure : le mot composé avec son propre
+/// style, contre la largeur qu'il a reçue.
+bool _tronque(WidgetTester tester, Finder cible) {
+  // Un `Text` à libellé annoncé s'enveloppe d'un nœud de sémantique : c'est
+  // le `RichText` de dessous qui est le paragraphe rendu.
+  final rendu = tester.renderObject<RenderParagraph>(
+    find
+        .descendant(of: cible, matching: find.byType(RichText))
+        .first,
+  );
+  final peintre = TextPainter(
+    text: rendu.text,
+    textDirection: TextDirection.ltr,
+    textScaler: TextScaler.noScaling,
+  )..layout();
+  return peintre.width > rendu.size.width + 0.5;
+}
 
 void main() {
   group('Les trois onglets et l\'adresse', () {
@@ -242,6 +265,35 @@ void main() {
       expect(tester.takeException(), isNull);
       for (final onglet in OngletBoite.values) {
         expect(_onglet(onglet), findsOneWidget, reason: onglet.libelle);
+      }
+    });
+
+    testWidgets('à l\'échelle 1, les trois mots s\'écrivent en entier', (
+      tester,
+    ) async {
+      // **Avec les vraies polices du produit.** `flutter test` compose par
+      // défaut dans une police dont chaque glyphe est un carré d'un cadratin,
+      // près de deux fois plus large que l'Atkinson embarquée : une mesure
+      // faite avec elle condamnerait un mot qui tient à l'écran.
+      await chargerPolicesDuProduit();
+      await _ouvrir(tester);
+
+      // « Propositions » s'éteignait sur son « s » : la marge de page et les
+      // 32 points de rembourrage par défaut de `Tab` lui laissaient 92 points
+      // pour 102. Vu dans Chrome, et c'est le cas le plus serré de l'écran.
+      for (final onglet in OngletBoite.values) {
+        expect(
+          _tronque(
+            tester,
+            // `TabBar` empile deux calques de libellé, l'un choisi et
+            // l'autre non : les deux ont la même largeur.
+            find
+                .descendant(of: _onglet(onglet), matching: find.byType(Text))
+                .first,
+          ),
+          isFalse,
+          reason: onglet.libelle,
+        );
       }
     });
   });
@@ -529,6 +581,44 @@ void main() {
       expect(find.byType(BottomSheet), findsNothing);
       // La liste est toujours là, à gauche : le volet ne la recouvre pas.
       expect(find.byType(CarteProposition), findsNWidgets(2));
+    });
+
+    testWidgets('dans le volet, « Refuser » s\'écrit en entier', (
+      tester,
+    ) async {
+      await chargerPolicesDuProduit();
+      await _ouvrir(
+        tester,
+        onglet: OngletBoite.propositions,
+        taille: _poste,
+      );
+
+      await tester.tap(find.byType(CarteProposition).first);
+      await tester.pumpAndSettle();
+
+      // Le volet fait 360 : les deux cinquièmes de l'asymétrie n'y valent que
+      // 128 points, et « Refuser » en demande 144. Les deux boutons
+      // s'empilent alors, et le mot s'écrit en entier — il s'éteignait sur
+      // « Refu… », vu dans Chrome.
+      final refuser = find.descendant(
+        of: find.byType(PanneauReponse),
+        matching: find.text(AppStrings.propositionsRefuser),
+      );
+      expect(refuser, findsOneWidget);
+      expect(_tronque(tester, refuser), isFalse);
+
+      // Et la réponse est posée en haut du volet, pas flottante au milieu :
+      // `AppScaffold` la range dans une `Row`, qui centre par défaut.
+      final haut = tester.getTopLeft(find.byType(PanneauReponse)).dy;
+      expect(
+        tester.getTopLeft(
+          find.descendant(
+            of: find.byType(PanneauReponse),
+            matching: find.text('lundi 12 octobre'),
+          ),
+        ).dy,
+        lessThan(haut + 100),
+      );
     });
 
     testWidgets('le volet se referme et la liste reste', (tester) async {

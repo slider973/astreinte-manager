@@ -377,7 +377,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
       // Le volet de droite ne prend la réponse qu'en `large` ; en dessous,
       // c'est la feuille de bas d'écran (`_ouvrirFeuille`).
       panneauLateral: grand && ouverte != null
-          ? _panneau(ouverte)
+          ? _panneau(ouverte, etendu: true)
           : null,
       child: Column(
         children: <Widget>[
@@ -405,8 +405,10 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
     );
   }
 
-  Widget _panneau(Proposition proposition) => PanneauReponse(
-    proposition: proposition,
+  Widget _panneau(Proposition proposition, {bool etendu = false}) =>
+      PanneauReponse(
+        proposition: proposition,
+        etendu: etendu,
     heures: _heures(),
     raisonBlocage: _raisonBlocage(
       enLigne: ref.watch(enLigneProvider).value ?? true,

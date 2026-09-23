@@ -33,7 +33,16 @@ class PanneauReponse extends StatelessWidget {
     super.key,
     this.raisonBlocage,
     this.maintenant,
+    this.etendu = false,
   });
+
+  /// En dessous de cette largeur de rangée, les deux boutons s'empilent.
+  ///
+  /// Mesurée : « Refuser », son glyphe et le rembourrage de 24 points de
+  /// `PrimaryButton` demandent 144 points, et les deux cinquièmes que
+  /// l'asymétrie lui accorde n'en valent que 128 dans le volet de 360. Le mot
+  /// s'écrivait « Refu… », vu dans Chrome.
+  static const double largeurCoteACote = 350;
 
   final Proposition proposition;
 
@@ -53,6 +62,14 @@ class PanneauReponse extends StatelessWidget {
   /// test.
   final DateTime? maintenant;
 
+  /// Le panneau occupe toute la hauteur qu'on lui donne : c'est le cas du
+  /// volet latéral, que `AppScaffold` pose dans une `Row` — dont l'alignement
+  /// transversal par défaut **centre** un enfant de hauteur minimale. Sans
+  /// ceci, la réponse flottait au milieu d'une colonne vide.
+  ///
+  /// Faux dans une feuille de bas d'écran, qui se règle sur son contenu.
+  final bool etendu;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -67,7 +84,7 @@ class PanneauReponse extends StatelessWidget {
       label: AppStrings.boiteReponseTitre(libelleCreneau),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: etendu ? MainAxisSize.max : MainAxisSize.min,
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -132,46 +149,64 @@ class PanneauReponse extends StatelessWidget {
           const AppDivider(),
           Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // Trois cinquièmes pour la réponse que la donnée prédit.
-                Expanded(
-                  flex: 3,
-                  child: PrimaryButton(
-                    libelle: AppStrings.propositionsAccepter,
-                    libelleAnnonce: AppStrings.propositionsAccepterCreneau(
-                      libelleCreneau,
-                    ),
-                    icone: Icons.task_alt,
-                    pleineLargeur: true,
-                    onPressed: raison == null ? onAccepter : null,
-                    raisonDesactivation: raison,
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints contraintes) {
+                final accepter = PrimaryButton(
+                  libelle: AppStrings.propositionsAccepter,
+                  libelleAnnonce: AppStrings.propositionsAccepterCreneau(
+                    libelleCreneau,
                   ),
-                ),
-                const SizedBox(width: AppSpacing.entreCibles),
-                Expanded(
-                  flex: 2,
-                  child: PrimaryButton(
-                    libelle: AppStrings.propositionsRefuser,
-                    libelleAnnonce: AppStrings.propositionsRefuserCreneau(
-                      libelleCreneau,
-                    ),
-                    // Le glyphe de l'état « Refusé ». Un sens, un glyphe.
-                    icone: Icons.cancel,
-                    // **Pas `danger`** : le vermillon appartient à l'état qui
-                    // résultera, pas au bouton qui y mène. Le seul rouge du
-                    // parcours est la confirmation de la feuille de refus.
-                    variante: PrimaryButtonVariante.secondaire,
-                    pleineLargeur: true,
-                    onPressed: raison == null ? onRefuser : null,
-                    raisonDesactivation: raison,
-                    // Les deux boutons partagent la raison : le premier
-                    // l'écrit, le second se contente de l'annoncer.
-                    raisonVisible: false,
+                  icone: Icons.task_alt,
+                  pleineLargeur: true,
+                  onPressed: raison == null ? onAccepter : null,
+                  raisonDesactivation: raison,
+                );
+                final refuser = PrimaryButton(
+                  libelle: AppStrings.propositionsRefuser,
+                  libelleAnnonce: AppStrings.propositionsRefuserCreneau(
+                    libelleCreneau,
                   ),
-                ),
-              ],
+                  // Le glyphe de l'état « Refusé ». Un sens, un glyphe.
+                  icone: Icons.cancel,
+                  // **Pas `danger`** : le vermillon appartient à l'état qui
+                  // résultera, pas au bouton qui y mène. Le seul rouge du
+                  // parcours est la confirmation de la feuille de refus.
+                  variante: PrimaryButtonVariante.secondaire,
+                  pleineLargeur: true,
+                  onPressed: raison == null ? onRefuser : null,
+                  raisonDesactivation: raison,
+                  // Les deux boutons partagent la raison : le premier
+                  // l'écrit, le second se contente de l'annoncer.
+                  raisonVisible: false,
+                );
+
+                // **L'asymétrie change de moyen, pas de sens.** Côte à côte,
+                // « Accepter » prend trois cinquièmes de la largeur ; empilés,
+                // il prend la première place, celle où le pouce tombe. Le
+                // produit sait quelle réponse il espère dans les deux cas
+                // (`design/021 § 6.2`).
+                if (contraintes.maxWidth < largeurCoteACote) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      accepter,
+                      const SizedBox(height: AppSpacing.entreCibles),
+                      refuser,
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    // Trois cinquièmes pour la réponse que la donnée prédit.
+                    Expanded(flex: 3, child: accepter),
+                    const SizedBox(width: AppSpacing.entreCibles),
+                    Expanded(flex: 2, child: refuser),
+                  ],
+                );
+              },
             ),
           ),
         ],
