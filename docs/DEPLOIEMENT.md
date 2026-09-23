@@ -396,6 +396,23 @@ Le premier défilement est la compilation des shaders. Elle ne disparaît pas �
 d'être visible : 417 ms devient 33 ms, soit une image perdue au lieu de vingt-cinq. Aucun
 préchauffage n'a été ajouté : il n'y a plus rien à préchauffer.
 
+**Aucune ligne de Dart n'a changé, et c'est la mesure qui l'a décidé.** Le ticket 065 gardait
+trois corrections en réserve pour les écrans denses ; les trois étaient déjà faites, ou sans
+objet :
+
+- *une frontière de repeinture par ligne* — elle y est déjà. `ListView.builder` et
+  `SliverList.builder` posent un `RepaintBoundary` autour de chaque enfant
+  (`addRepaintBoundaries`, vrai par défaut), et rien dans le dépôt ne le met à faux ;
+- *des listes en `builder`* — la matrice est virtualisée sur les deux axes
+  (`lib/features/planning/presentation/widgets/grille_matrice.dart`), le calendrier est un
+  `SliverFixedExtentList`, le tableau de bord un `ListView` de dix enfants mesuré sans aucune
+  image perdue ;
+- *pas d'opacité animée pendant le défilement* — il n'y en a aucune : ni `AnimatedOpacity`, ni
+  `FadeTransition`, ni `AnimationController` dans les trois fonctionnalités concernées.
+
+Le coût n'était pas dans l'arbre de widgets, il était dans le moteur : un seul fil pour
+construire, peindre et rastériser.
+
 ### Le plafond que ce ticket ne franchit pas
 
 **Sur un iPhone ProMotion, Safari cadence `requestAnimationFrame` à 60 Hz**, là où le reste du

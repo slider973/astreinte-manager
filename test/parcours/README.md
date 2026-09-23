@@ -52,6 +52,30 @@ basculer `flutter test` vers le chemin « appareil », qui refuse le web.
 Effet de bord utile : `flutter test` sans argument joue aussi le parcours, sur la VM,
 dans la tâche « flutter ». Il est donc gardé deux fois, pour cinq secondes de plus.
 
+### `--wasm` ne marche pas ici, et il ment en échouant
+
+Depuis le ticket 065, la production est servie en WebAssembly. La tentation est d'aligner
+le parcours : `flutter test --platform chrome --wasm`. Elle ne tient pas.
+
+```
+$ flutter test --platform chrome --wasm test/parcours
+Generated wasm module '…/main.dart.wasm', and JS init file '…/main.dart.mjs'.
+00:00 +0: loading …/test/parcours/parcours_complet_test.dart
+No tests ran.
+$ echo $?
+0
+```
+
+Le module est compilé, la page n'exécute rien, **et la commande rend 0**. Posée en CI,
+elle supprimerait le parcours sans jamais échouer : le pire des deux mondes. La tâche
+« parcours » reste donc sur `--platform chrome` — dart2js —, et le moteur Wasm est
+éprouvé là où il vit, dans un vrai navigateur sur la construction de production
+(`docs/DEPLOIEMENT.md` § 6 bis).
+
+Ce n'est pas une perte de couverture : `flutter build web --wasm`, joué par la CI,
+passe le code dans **les deux** compilateurs. Ce que `--platform chrome` vérifie ici,
+c'est le fil des écrans, pas le rastériseur.
+
 ### Le serveur du parcours
 
 `backend_memoire.dart` est une caserne en mémoire qui rejoue les règles de la base —
