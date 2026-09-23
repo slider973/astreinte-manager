@@ -121,9 +121,9 @@ void main() {
       );
 
       // Le 17 est de nuit : l'intervalle complémentaire du jour.
-      expect(find.text('20:00 → 08:00'), findsOneWidget);
+      expect(find.text('20:00 – 08:00'), findsOneWidget);
       // Le 3 novembre est de jour.
-      expect(find.text('08:00 → 20:00'), findsOneWidget);
+      expect(find.text('08:00 – 20:00'), findsOneWidget);
     });
 
     testWidgets('une ligne se lit en une phrase complète', (
@@ -304,7 +304,7 @@ void main() {
       expect(find.text('Samedi 17 octobre 2026'), findsOneWidget);
       expect(find.text(AppStrings.astreintesEquipiersTitre), findsOneWidget);
       expect(find.text('Thomas B.'), findsOneWidget);
-      expect(find.text('19:00 → 07:00'), findsWidgets);
+      expect(find.text('19:00 – 07:00'), findsWidgets);
     });
 
     testWidgets('dit pourquoi les noms manquent quand il est publié', (

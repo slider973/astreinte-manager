@@ -3126,12 +3126,21 @@ abstract final class AppStrings {
 
   // --- La ligne et le créneau ---------------------------------------------
 
-  /// « 19:00 → 07:00 ». Les heures viennent des paramètres de la caserne
+  /// « 19:00 – 07:00 ». Les heures viennent des paramètres de la caserne
   /// (`docs/SCHEMA.md § 2.1`), jamais d'un 7 h – 19 h écrit en dur.
+  ///
+  /// **Un tiret demi-cadratin, et non une flèche** (ticket 064a). La flèche
+  /// `→` (U+2192) n'existe dans aucune des quatre coupes Atkinson embarquées —
+  /// seulement dans Archivo, qui ne porte que les titres. Les heures étant
+  /// composées en Atkinson Mono, elle s'affichait comme un carré vide, vu à
+  /// l'écran sur la carte indigo de l'accueil. Le tiret `–` (U+2013), lui, est
+  /// présent dans les six coupes ; `test/core/l10n/glyphes_couverts_test.dart`
+  /// interdit à quiconque de remettre un glyphe que les polices ne portent
+  /// pas.
   static String astreintesIntervalle(String debut, String fin) =>
-      '$debut → $fin';
+      '$debut – $fin';
 
-  /// La même chose, dite : la flèche ne se lit pas à voix haute.
+  /// La même chose, dite : le tiret ne se lit pas à voix haute.
   static String astreintesIntervalleDit(String debut, String fin) =>
       'de $debut à $fin';
 

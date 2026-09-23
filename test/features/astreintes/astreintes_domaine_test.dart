@@ -252,8 +252,8 @@ void main() {
   group('HeuresAffichage', () {
     test('la nuit est l\'intervalle complémentaire du jour', () {
       const heures = HeuresAffichage(debutJour: '08:00', finJour: '20:00');
-      expect(heures.intervalle(CreneauType.jour), '08:00 → 20:00');
-      expect(heures.intervalle(CreneauType.nuit), '20:00 → 08:00');
+      expect(heures.intervalle(CreneauType.jour), '08:00 – 20:00');
+      expect(heures.intervalle(CreneauType.nuit), '20:00 – 08:00');
     });
   });
 

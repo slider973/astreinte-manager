@@ -213,7 +213,7 @@ void main() {
         ),
       );
 
-      expect(find.text('20:00 → 08:00'), findsOneWidget);
+      expect(find.text('20:00 – 08:00'), findsOneWidget);
     });
   });
 
@@ -255,8 +255,8 @@ void main() {
           findsNothing,
         );
         // Le créneau de jour n'est pas affiché du tout.
-        expect(find.text('07:00 → 19:00'), findsNothing);
-        expect(find.text('19:00 → 07:00'), findsOneWidget);
+        expect(find.text('07:00 – 19:00'), findsNothing);
+        expect(find.text('19:00 – 07:00'), findsOneWidget);
       },
     );
 
