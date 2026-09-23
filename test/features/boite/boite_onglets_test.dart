@@ -583,6 +583,45 @@ void main() {
       expect(find.byType(CarteProposition), findsNWidgets(2));
     });
 
+    testWidgets('sans choix, le volet invite à en faire un', (tester) async {
+      await _ouvrir(
+        tester,
+        onglet: OngletBoite.propositions,
+        taille: _poste,
+      );
+
+      // **Le volet ne s'ouvre pas sur du vide.** Il est permanent en `large`
+      // (`DESIGN.md § Points de rupture`) : sans phrase, c'est une colonne de
+      // 360 points qui ne dit pas pourquoi elle est là.
+      expect(find.text(AppStrings.boiteVoletVideTitre), findsOneWidget);
+      expect(find.text(AppStrings.boiteVoletVideTexte), findsOneWidget);
+
+      // Et la réponse prend sa place dès qu'on touche une ligne.
+      await tester.tap(find.byType(CarteProposition).first);
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.boiteVoletVideTitre), findsNothing);
+      expect(find.byType(PanneauReponse), findsOneWidget);
+    });
+
+    testWidgets('l\'invitation ne paraît que là où elle a un sens', (
+      tester,
+    ) async {
+      // Dans « Tout », elle parlerait de lignes que la liste mélange avec des
+      // rappels ; sur une liste vide, elle inviterait à toucher ce qui
+      // n'existe pas. Dans les deux cas la zone de travail garde sa largeur.
+      await _ouvrir(tester, taille: _poste);
+      expect(find.text(AppStrings.boiteVoletVideTitre), findsNothing);
+
+      await _ouvrir(
+        tester,
+        onglet: OngletBoite.propositions,
+        propositions: const <Proposition>[],
+        taille: _poste,
+      );
+      expect(find.text(AppStrings.boiteVoletVideTitre), findsNothing);
+      expect(find.text(AppStrings.videPropositionsTitre), findsOneWidget);
+    });
+
     testWidgets('dans le volet, « Refuser » s\'écrit en entier', (
       tester,
     ) async {
@@ -668,6 +707,45 @@ void main() {
         emplacementCourant(tester),
         AppRoutes.boiteOnglet(OngletBoite.propositions),
       );
+    });
+
+    testWidgets('à ×2,2 sur un petit écran, elle défile au lieu de déborder', (
+      tester,
+    ) async {
+      // **Une feuille de bas d'écran est bornée aux neuf seizièmes de
+      // l'écran** tant qu'elle n'est pas `isScrollControlled`. À ×2,2 sur un
+      // 390 × 667, la réponse dépassait de dix points, et de cent cinquante à
+      // ×3 — et ce qui déborde d'une feuille n'est pas tronqué, c'est perdu.
+      // Ici, ce sont les deux boutons.
+      tester.platformDispatcher.textScaleFactorTestValue = 2.2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await _ouvrir(
+        tester,
+        onglet: OngletBoite.propositions,
+        taille: const Size(390, 667),
+      );
+
+      await tester.tap(find.byType(CarteProposition).first);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PanneauReponse), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // Les deux réponses restent atteignables : la feuille défile.
+      final defilement = find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(Scrollable),
+      );
+      expect(defilement, findsWidgets);
+      await tester.scrollUntilVisible(
+        find.text(AppStrings.propositionsRefuser),
+        120,
+        scrollable: defilement.first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.propositionsRefuser), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('elle s\'ouvre aussi depuis « Tout »', (tester) async {

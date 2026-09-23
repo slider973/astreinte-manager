@@ -58,8 +58,12 @@ Deux teintes, deux sens, et aucun recouvrement.
 Material 3 sélectionne en `secondary-container`, c'est-à-dire, depuis le 061, en vert. **Tout
 composant qui exprime une sélection doit donc être réglé dans `app_theme.dart`** —
 `segmentedButtonTheme`, `chipTheme`, `navigationBarTheme`, `navigationRailTheme`,
-`navigationDrawerTheme` le sont. Un composant Material ajouté sans ce réglage repartira en vert
-et fera dire à la couleur deux choses à la fois.
+`navigationDrawerTheme` et, depuis le 064b, `tabBarTheme` le sont. Un composant Material ajouté
+sans ce réglage repartira en vert et fera dire à la couleur deux choses à la fois.
+
+La même règle vaut pour ce qui **compte** : `badgeTheme` peint la pastille chiffrée en indigo et
+non dans l'`error` de Material 3, parce que le rose de ce système dit « absent, refusé, conflit,
+erreur » et qu'une notification à lire n'est aucun des quatre (ticket 064b).
 
 Les deux pastilles ont presque la même valeur (1.01:1 l'une contre l'autre) : en niveaux de gris
 elles sont le même gris. Rien de ce qui sépare « choisi » de « accepté » ne repose donc sur la

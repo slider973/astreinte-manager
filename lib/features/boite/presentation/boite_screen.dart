@@ -232,12 +232,22 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
   Future<void> _ouvrirFeuille() async {
     await showModalBottomSheet<void>(
       context: context,
+      // **La feuille prend la hauteur qu'il lui faut, et elle défile.** Sans
+      // `isScrollControlled`, une feuille de bas d'écran est bornée aux neuf
+      // seizièmes de l'écran : à ×2,2 d'échelle de texte sur un 390 × 667, la
+      // réponse dépassait de 9,8 points, et de 154 à ×3. Ce qui déborde d'une
+      // feuille n'est pas tronqué, c'est perdu — et ici ce sont les deux
+      // boutons.
+      isScrollControlled: true,
       showDragHandle: true,
       builder: (BuildContext contexteFeuille) => Consumer(
         builder: (BuildContext context, WidgetRef ref, Widget? _) {
           final proposition = ref.watch(propositionOuverteProvider);
           if (proposition == null) return const SizedBox.shrink();
-          return SafeArea(top: false, child: _panneau(proposition));
+          return SafeArea(
+            top: false,
+            child: SingleChildScrollView(child: _panneau(proposition)),
+          );
         },
       ),
     );
@@ -376,9 +386,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
       ),
       // Le volet de droite ne prend la réponse qu'en `large` ; en dessous,
       // c'est la feuille de bas d'écran (`_ouvrirFeuille`).
-      panneauLateral: grand && ouverte != null
-          ? _panneau(ouverte, etendu: true)
-          : null,
+      panneauLateral: grand ? _volet(etat: etat, ouverte: ouverte) : null,
       child: Column(
         children: <Widget>[
           _BarreOnglets(controleur: _onglets),
@@ -405,23 +413,44 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
     );
   }
 
+  /// Le volet de droite, en `large` seulement.
+  ///
+  /// **Il ne s'ouvre pas sur du vide.** Une réponse choisie, ou l'invitation à
+  /// en choisir une quand l'onglet « Propositions » en affiche et qu'aucune
+  /// n'est ouverte — c'est là, et là seulement, que la phrase a un sens :
+  /// dans « Tout », le volet parlerait de lignes que la liste mélange avec des
+  /// rappels, et sur une liste vide il inviterait à toucher ce qui n'existe
+  /// pas. `null` partout ailleurs, et la zone de travail reprend sa largeur.
+  Widget? _volet({required EtatBoite etat, required Proposition? ouverte}) {
+    if (ouverte != null) return _panneau(ouverte, etendu: true);
+    if (widget.onglet != OngletBoite.propositions) return null;
+    if (etat.propositions.isEmpty) return null;
+    return const Center(
+      child: EmptyState(
+        titre: AppStrings.boiteVoletVideTitre,
+        texte: AppStrings.boiteVoletVideTexte,
+        icone: Icons.touch_app_outlined,
+      ),
+    );
+  }
+
   Widget _panneau(Proposition proposition, {bool etendu = false}) =>
       PanneauReponse(
         proposition: proposition,
         etendu: etendu,
-    heures: _heures(),
-    raisonBlocage: _raisonBlocage(
-      enLigne: ref.watch(enLigneProvider).value ?? true,
-      lectureSeule:
-          (ref.watch(propositionsControllerProvider).value?.lectureSeule ??
-              false) ||
-          ref.watch(lectureSeuleCaserneProvider),
-    ),
-    maintenant: ref.watch(horlogeAstreintesProvider)(),
-    onAccepter: () => _accepter(proposition),
-    onRefuser: () => unawaited(_refuser(proposition)),
-    onFermer: _fermerReponse,
-  );
+        heures: _heures(),
+        raisonBlocage: _raisonBlocage(
+          enLigne: ref.watch(enLigneProvider).value ?? true,
+          lectureSeule:
+              (ref.watch(propositionsControllerProvider).value?.lectureSeule ??
+                  false) ||
+              ref.watch(lectureSeuleCaserneProvider),
+        ),
+        maintenant: ref.watch(horlogeAstreintesProvider)(),
+        onAccepter: () => _accepter(proposition),
+        onRefuser: () => unawaited(_refuser(proposition)),
+        onFermer: _fermerReponse,
+      );
 
   /// Les heures d'affichage de la caserne.
   ///
@@ -435,10 +464,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
       ref.watch(astreintesControllerProvider).value?.donnees.heures ??
       HeuresAffichage.defaut;
 
-  String? _raisonBlocage({
-    required bool enLigne,
-    required bool lectureSeule,
-  }) {
+  String? _raisonBlocage({required bool enLigne, required bool lectureSeule}) {
     if (lectureSeule) return AppStrings.propositionsLectureSeuleRaison;
     if (!enLigne) return AppStrings.propositionsHorsLigneRaison;
     return null;

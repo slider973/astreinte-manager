@@ -2187,14 +2187,6 @@ abstract final class AppStrings {
   static String centreNonLuesBadge(int n) =>
       n <= 1 ? '$n notification non lue' : '$n notifications non lues';
 
-  /// Le compte de l'en-tête de liste. Il dit combien de lignes suivent, et
-  /// combien restent à lire.
-  static String centreCompte(int total, int nonLues) {
-    final lignes = total <= 1 ? '$total notification' : '$total notifications';
-    if (nonLues == 0) return '$lignes, tout est lu';
-    return '$lignes, $nonLues non lue${nonLues > 1 ? 's' : ''}';
-  }
-
   /// Annoncé en tête du libellé d'une ligne : l'état ne tient jamais à la
   /// seule couleur ni à la seule marque.
   static const String centreNonLue = 'Non lue';

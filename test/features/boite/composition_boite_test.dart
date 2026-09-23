@@ -243,14 +243,15 @@ void main() {
   });
 
   group('Une relecture en panne n\'efface pas ce qui était juste', () {
-    test('le centre garde sa liste, et la Boîte ne se croit pas vide', () async {
-      // **Le piège du 064a, sous un autre visage**, éprouvé sur le vrai
-      // contrôleur : `AsyncValue.guard` rend une erreur, et Riverpod lui
-      // rattache la valeur précédente. Tester `hasError` seul — ou passer par
-      // un `whenData` — effacerait une liste parfaitement juste.
-      final depot = FauxNotificationsRepository(
-        notifications: <NotificationInterne>[notification(id: 'n-1')],
-      );
+    /// Un centre branché sur [depot], lu une fois avec succès.
+    ///
+    /// Le vrai contrôleur, et non un `AsyncValue` bricolé : c'est lui qui
+    /// produit le cas — `AsyncValue.guard` rend une erreur, et Riverpod lui
+    /// rattache la valeur précédente. L'API qui compose ce couple à la main
+    /// est interne au paquet.
+    Future<ProviderContainer> centreLu(
+      FauxNotificationsRepository depot,
+    ) async {
       final conteneur = ProviderContainer(
         overrides: [
           notificationsRepositoryProvider.overrideWithValue(depot),
@@ -270,6 +271,60 @@ void main() {
       conteneur.listen(centreNotificationsProvider, (_, _) {});
       await conteneur.read(centreNotificationsProvider.future);
       expect(depot.lectures, 1);
+      return conteneur;
+    }
+
+    test(
+      'un centre qui n\'a que des propositions et qui tombe est en échec',
+      () async {
+        // **L'échec se mesure sur la liste affichée**, pas sur la lecture
+        // brute. Une dernière lecture réussie qui ne portait que des
+        // `assignment_proposed` ne donne aucun rappel : mesuré sur
+        // `notifications`, l'onglet aurait dit « Aucun rappel » alors que la
+        // relecture venait d'échouer.
+        final depot = FauxNotificationsRepository(
+          notifications: <NotificationInterne>[
+            notification(
+              id: 'n-proposee',
+              type: TypeNotification.astreinteProposee,
+            ),
+          ],
+        );
+        final conteneur = await centreLu(depot);
+
+        depot.erreurLecture = true;
+        await conteneur
+            .read(centreNotificationsProvider.notifier)
+            .rafraichir();
+
+        final apres = conteneur.read(centreNotificationsProvider);
+        expect(apres.hasError, isTrue);
+        expect(
+          apres.value?.notifications,
+          hasLength(1),
+          reason: 'la lecture précédente est toujours là',
+        );
+
+        final etat = etatBoiteDe(
+          propositions: const AsyncValue<EtatPropositions>.data(
+            EtatPropositions(),
+          ),
+          centre: apres,
+        );
+        expect(etat.rappels, isEmpty);
+        expect(etat.echecRappels, isTrue);
+      },
+    );
+
+    test('le centre garde sa liste, et la Boîte ne se croit pas vide', () async {
+      // **Le piège du 064a, sous un autre visage**, éprouvé sur le vrai
+      // contrôleur : `AsyncValue.guard` rend une erreur, et Riverpod lui
+      // rattache la valeur précédente. Tester `hasError` seul — ou passer par
+      // un `whenData` — effacerait une liste parfaitement juste.
+      final depot = FauxNotificationsRepository(
+        notifications: <NotificationInterne>[notification(id: 'n-1')],
+      );
+      final conteneur = await centreLu(depot);
 
       depot.erreurLecture = true;
       await conteneur.read(centreNotificationsProvider.notifier).rafraichir();

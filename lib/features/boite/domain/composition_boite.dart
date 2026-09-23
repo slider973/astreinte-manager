@@ -147,7 +147,12 @@ EtatBoite etatBoiteDe({
     chargeRappels: etatCentre == null && !centre.hasError,
     echecPropositions:
         propositions.hasError && (listePropositions?.isEmpty ?? true),
-    echecRappels: centre.hasError && (etatCentre?.notifications.isEmpty ?? true),
+    // **Sur la liste affichée, pas sur la lecture brute.** Un centre dont la
+    // dernière lecture réussie ne portait que des propositions n'a aucun
+    // rappel à montrer : mesurer l'échec sur `notifications` l'aurait dit
+    // « Aucun rappel » alors que la relecture venait d'échouer — le même
+    // invariant que `echecPropositions`, sur la même liste que l'onglet.
+    echecRappels: centre.hasError && rappels.isEmpty,
   );
 }
 
