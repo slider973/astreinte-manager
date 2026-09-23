@@ -248,6 +248,10 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
+            // **La légende des attributions n'est pas ici** : mesurée, elle
+            // porte la rangée de 120 à 176 points. Elle vit dans le bandeau
+            // du mois, sous la légende de répartition, qui parle déjà des
+            // mêmes attributions (`DESIGN.md § Écarts, 061c-2`).
             const LegendeEtats(espacement: AppSpacing.sm),
             const SizedBox(width: AppSpacing.sm),
             SaveIndicator(

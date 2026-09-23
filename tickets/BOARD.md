@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-23. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 061 | [Un nouveau monde visuel, à partir de l'écran de l'admin](in-progress/061-monde-visuel-admin.md) | P1 | 004 016 017 | https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1) |
 | 063 | [Passer d'une destination à l'autre sans glissement](in-progress/063-transition-entre-destinations.md) | P1 | 004 | — |
 
 ## À faire
@@ -77,5 +76,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-23. Ne pas éditer à la main
 | 053 | [L'écran super-admin n'offre aucune déconnexion](done/053-superadmin-sans-deconnexion.md) | P2 | 031 | https://github.com/slider973/astreinte-manager/pull/50 |
 | 054 | [Le déploiement automatique des fonctions ignore la carte d'imports](done/054-deploiement-fonctions-carte-imports.md) | P0 | 049 | https://github.com/slider973/astreinte-manager/pull/48 |
 | 060 | [Mettre la PWA en ligne par l'API Vercel, avec le jeton de projet](done/060-deploiement-pwa-par-api.md) | P0 | 054 | https://github.com/slider973/astreinte-manager/pull/52 |
+| 061 | [Un nouveau monde visuel, à partir de l'écran de l'admin](done/061-monde-visuel-admin.md) | P1 | 004 016 017 | https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1), https://github.com/slider973/astreinte-manager/pull/57 (chantier 061c-2) |
 | 062 | [La vérification de la PWA vise un alias protégé au lieu du domaine](done/062-verification-pwa-sur-le-domaine.md) | P0 | 060 | https://github.com/slider973/astreinte-manager/pull/53 |
 

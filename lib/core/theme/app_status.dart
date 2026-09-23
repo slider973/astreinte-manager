@@ -55,8 +55,12 @@ class StatusDescriptor {
     this.hachure = false,
     this.barre = false,
     IconData? iconeCase,
+    Color? fondBloc,
+    Color? encreBloc,
   }) : assert(libelle != '', 'Un état sans libellé est interdit.'),
-       _iconeCase = iconeCase;
+       _iconeCase = iconeCase,
+       _fondBloc = fondBloc,
+       _encreBloc = encreBloc;
 
   /// Glyphe accompagnant le libellé. Toujours une icône Material, jamais un
   /// emoji ni un glyphe Unicode.
@@ -85,6 +89,29 @@ class StatusDescriptor {
 
   final IconData? _iconeCase;
 
+  final Color? _fondBloc;
+  final Color? _encreBloc;
+
+  /// Fond du **bloc plein** : la marque d'un état qui occupe une case entière
+  /// au lieu d'accompagner un libellé.
+  ///
+  /// Un badge est posé dans une phrase et se lit de près ; un bloc de 28 px
+  /// dans une grille de soixante-deux colonnes se repère **de loin, en
+  /// balayant**, et doit peser au moins autant que la case pleine qu'il
+  /// remplace. Les fonds pâles des badges y disparaissaient sous la coche
+  /// indigo de « disponible », et l'écran disait l'inverse de ce qu'il fallait
+  /// lire : quelqu'un **posé** sur un créneau compte plus qu'une déclaration
+  /// (chantier 061c-2).
+  ///
+  /// Vaut [fond] quand l'état n'a pas de forme pleine — la plupart en ont
+  /// une seule.
+  Color get blocFond => _fondBloc ?? fond;
+
+  /// Encre du glyphe sur [blocFond]. Mesurée à ≥ 3:1 sur son fond, et le fond
+  /// à ≥ 3:1 sur les surfaces de la grille, dans
+  /// `test/core/theme/contraste_test.dart`.
+  Color get blocEncre => _encreBloc ?? encre;
+
   /// Glyphe employé **dans la case du registre**, où l'encombrement d'une
   /// icône de case à cocher nuit à la lecture à 28 px : `check`, `close` et
   /// `remove` au lieu de `check_box`, `disabled_by_default` et
@@ -104,7 +131,9 @@ class StatusDescriptor {
           other.filet == filet &&
           other.hachure == hachure &&
           other.barre == barre &&
-          other.iconeCase == iconeCase;
+          other.iconeCase == iconeCase &&
+          other.blocFond == blocFond &&
+          other.blocEncre == blocEncre;
 
   @override
   int get hashCode => Object.hash(
@@ -116,6 +145,8 @@ class StatusDescriptor {
     hachure,
     barre,
     iconeCase,
+    blocFond,
+    blocEncre,
   );
 
   /// Interpolation entre deux descripteurs, pour le passage clair/sombre.
@@ -136,6 +167,8 @@ class StatusDescriptor {
       filet: Color.lerp(a.filet, b.filet, t),
       hachure: versB ? b.hachure : a.hachure,
       barre: versB ? b.barre : a.barre,
+      fondBloc: Color.lerp(a.blocFond, b.blocFond, t),
+      encreBloc: Color.lerp(a.blocEncre, b.blocEncre, t),
     );
   }
 }
@@ -267,6 +300,13 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         encre: AppColors.etatAttenteSurFond,
         fond: AppColors.etatAttenteFond,
         filet: AppColors.etatAttente,
+        // **L'orange vif de la charte, en remplissage seul** — c'est le seul
+        // endroit de la grille où il vit (`design/061 § 3`). Il ne fait que
+        // 2,26:1 sur le papier blanc : c'est le **contour** `etatAttente`
+        // (4,94:1) qui porte la limite du bloc, comme le demande WCAG 1.4.11.
+        // Le glyphe encre y est à 7,64:1.
+        fondBloc: AppColors.orangeVif,
+        encreBloc: AppColors.onSurface,
       ),
       // **Accepté est vert, pas indigo** : l'indigo dit « disponible » et
       // l'accent, le vert dit « accepté, couvert, validé, publié » (brief
@@ -278,6 +318,10 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         libelle: AppStrings.attributionAccepte,
         encre: AppColors.etatAccepteSurFond,
         fond: AppColors.etatAccepteFond,
+        // Le vert franc sous un glyphe blanc : 5,12:1 pour les deux, le fond
+        // contre le papier comme le glyphe contre le fond.
+        fondBloc: AppColors.secondary,
+        encreBloc: AppColors.onSecondary,
       ),
       AttributionEtat.refuse: StatusDescriptor(
         icone: Icons.cancel,
@@ -285,6 +329,12 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         encre: AppColors.etatAbsentSurFond,
         fond: AppColors.etatAbsentFond,
         barre: true,
+        // Le rose vif, remplissage seul lui aussi : 3,60:1 sur le papier et
+        // 3,03:1 sur le fond de weekend, au-dessus du seuil des éléments non
+        // textuels. Le glyphe est **encre et non blanc** — 4,78:1 contre
+        // 3,60:1, la mesure a tranché.
+        fondBloc: AppColors.roseVif,
+        encreBloc: AppColors.onSurface,
       ),
       AttributionEtat.remplace: StatusDescriptor(
         icone: Icons.swap_horiz,
@@ -440,12 +490,18 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         encre: AppColors.darkEtatAttenteSurFond,
         fond: AppColors.darkEtatAttenteFond,
         filet: AppColors.darkEtatAttente,
+        // En sombre, l'orange vif passe **seul** : 8,08:1 sur le papier de
+        // nuit, glyphe encre à 7,64:1. Le contour reste, il ne gêne pas.
+        fondBloc: AppColors.darkTertiary,
+        encreBloc: AppColors.darkOnTertiary,
       ),
       AttributionEtat.accepte: StatusDescriptor(
         icone: Icons.task_alt,
         libelle: AppStrings.attributionAccepte,
         encre: AppColors.darkEtatAccepteSurFond,
         fond: AppColors.darkEtatAccepteFond,
+        fondBloc: AppColors.darkSecondary,
+        encreBloc: AppColors.darkOnSecondary,
       ),
       AttributionEtat.refuse: StatusDescriptor(
         icone: Icons.cancel,
@@ -453,6 +509,8 @@ class AppStatusColors extends ThemeExtension<AppStatusColors> {
         encre: AppColors.darkOnErrorContainer,
         fond: AppColors.darkErrorContainer,
         barre: true,
+        fondBloc: AppColors.darkError,
+        encreBloc: AppColors.darkOnError,
       ),
       AttributionEtat.remplace: StatusDescriptor(
         icone: Icons.swap_horiz,

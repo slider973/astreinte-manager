@@ -4,6 +4,7 @@ import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/avatar_initiales.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../domain/candidat.dart';
 
@@ -48,6 +49,11 @@ class LigneCandidat extends StatelessWidget {
     this.raison,
   });
 
+  /// Le disque d'initiales, à gauche du bloc de texte. 32 points : la ligne
+  /// fait 48 au minimum, le disque y tient sans la pousser, et il est assez
+  /// grand pour se lire de loin — ce que 24 ne ferait pas ici.
+  static const double tailleAvatar = 32;
+
   final Candidat candidat;
   final ActionCandidat action;
 
@@ -84,6 +90,17 @@ class LigneCandidat extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          // **Décoratif** : le nom, juste à droite, est le seul libellé.
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: ExcludeSemantics(
+              child: AvatarInitiales(
+                nom: membre.nomAffiche,
+                taille: tailleAvatar,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Semantics(
               label: membre.nomAffiche,

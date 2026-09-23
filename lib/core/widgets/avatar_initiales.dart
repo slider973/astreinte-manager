@@ -51,19 +51,30 @@ class AvatarInitiales extends StatelessWidget {
         color: scheme.primaryContainer,
         borderRadius: AppRadius.pastilleRadius,
       ),
-      child: lettres.isEmpty
-          ? Icon(
-              Icons.person_outline,
-              size: AppTouch.icone,
-              color: scheme.onPrimaryContainer,
-            )
-          : Text(
-              lettres,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
-              maxLines: 1,
-            ),
+      // **Le disque ne grandit pas, les lettres rétrécissent.** À 24 points
+      // dans la colonne figée de la matrice, ou à grande échelle de texte, deux
+      // majuscules dépassent le cercle : sans ce repli elles étaient coupées au
+      // bord. Une lettre réduite reste lisible parce qu'elle ne porte rien —
+      // l'avatar est décoratif, le nom qui le suit est le seul libellé.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+          child: lettres.isEmpty
+              ? Icon(
+                  Icons.person_outline,
+                  size: AppTouch.icone,
+                  color: scheme.onPrimaryContainer,
+                )
+              : Text(
+                  lettres,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                  ),
+                  maxLines: 1,
+                ),
+        ),
+      ),
     );
   }
 }

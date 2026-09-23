@@ -4,8 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 004, 016, 017
 - **Branche** : `feat/061-monde-visuel-admin`
-- **PR** : https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1)
-- **Statut** : en cours depuis 2026-09-22
+- **PR** : https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1), https://github.com/slider973/astreinte-manager/pull/57 (chantier 061c-2)
+- **Statut** : terminé le 2026-09-23 (PR créée)
 
 ## Contexte
 
@@ -66,3 +66,19 @@ nuit sur blanc, et `PRODUCT.md` fixe « une seule apparence partout ».
 - Si un écran est livré dans ce ticket : `flutter analyze` sans avertissement, `flutter test`
   verts, `flutter build web` qui passe, détecteur Impeccable à vide, inspection à l'écran aux
   deux largeurs.
+
+## Livraison
+
+Le monde visuel de l'admin a été livré en quatre chantiers, un par PR :
+
+- **061a** — tokens, thème Flutter et police Archivo, `DESIGN.md` réécrit par `document`.
+- **061b** — la coquille de l'écran admin : navigation latérale sur grand écran, bandeau des
+  chiffres du mois avec barre de répartition, bande de semaine.
+- **061c-1** — les dates et la barre de commande de la matrice.
+- **061c-2** — les cases d'attribution, les avatars à initiales et le panneau des candidats.
+
+Le chantier **061d**, la passe de finition sur les écrans pompier, est repris par le ticket 064
+(`tickets/backlog/064-monde-visuel-pompier.md`). Ce ticket-ci se ferme donc sur l'admin.
+
+Les écarts entre le brief et le code livré sont consignés dans `DESIGN.md`, § « Écarts
+d'implémentation (ticket 061b) » et § « Écarts d'implémentation (ticket 061c) ».

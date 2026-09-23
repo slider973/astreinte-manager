@@ -55,6 +55,13 @@ class PlanningMois {
 
   Iterable<CreneauPlanning> get creneaux => _creneaux.values;
 
+  /// Toutes les attributions du mois, dans l'ordre de l'index.
+  ///
+  /// La matrice en a besoin pour construire sa table `(membre, jour,
+  /// créneau)` **en un seul passage** : la parcourir créneau par créneau
+  /// aurait coûté un balayage complet par colonne (chantier 061c).
+  Iterable<Attribution> get attributions => _attributions.values;
+
   /// Le créneau d'une journée, ou `null` si le planning n'existe pas.
   CreneauPlanning? creneau(int jour, CreneauType type) {
     final id = _parJour[_cle(jour, type)];
