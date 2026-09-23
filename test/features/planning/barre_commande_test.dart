@@ -41,6 +41,7 @@ Future<void> _ouvrirLaMatrice(
   Size taille = _portable,
   bool avecPlanning = false,
   int membresAttribues = 0,
+  int moisOuverts = 1,
 }) async {
   // **Les vraies polices, sinon la mesure ne vaut rien.** La barre de
   // commande est faite de `Wrap` : composée avec la police d'essai, plus
@@ -53,7 +54,11 @@ Future<void> _ouvrirLaMatrice(
     appartenances: const <Appartenance>[appartenanceAdmin],
     dispos: FauxDisposRepository(
       periodes: <PeriodeSaisie>[
-        periodeOuverte(annee: _maintenant.year, mois: _maintenant.month),
+        for (var i = 0; i < moisOuverts; i++)
+          periodeOuverte(
+            annee: _maintenant.year,
+            mois: _maintenant.month + i,
+          ),
       ],
     ),
     matrice: FauxMatriceRepository(
@@ -99,23 +104,25 @@ void main() {
       expect(_hauteurBarre(tester), lessThanOrEqualTo(_plafondBarre));
     });
 
-    testWidgets('la première rangée est une seule ligne de 48 points', (
-      tester,
-    ) async {
-      await _ouvrirLaMatrice(tester);
+    testWidgets('la première rangée est une seule ligne de 48 points, même à '
+        'trois mois ouverts', (tester) async {
+      await _ouvrirLaMatrice(tester, moisOuverts: 3);
 
       // Le mois, la recherche et les trois puces côte à côte : si l'un d'eux
-      // passait à la ligne, la rangée ferait deux fois 48.
-      final rangee = find
+      // passait à la ligne, la rangée ferait deux fois 48. Le sélecteur
+      // défile plutôt que de pousser les puces — c'est lui qui grandit avec
+      // le nombre de périodes ouvertes.
+      final puces = find
           .descendant(
             of: find.byType(BarreCommandeMatrice),
             matching: find.byType(Wrap),
           )
           .first;
       expect(
-        tester.getSize(rangee).height,
-        BarreCommandeMatrice.hauteurRangee,
+        tester.getSize(puces).height,
+        lessThanOrEqualTo(BarreCommandeMatrice.hauteurRangee),
       );
+      expect(_hauteurBarre(tester), lessThanOrEqualTo(_plafondBarre));
 
       expect(find.byType(SelecteurMois), findsOneWidget);
       expect(find.text(AppStrings.matriceRechercheLibelle), findsOneWidget);

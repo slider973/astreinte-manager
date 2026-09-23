@@ -343,6 +343,11 @@ void main() {
       await _armer(tester);
       expect(find.text(AppStrings.matriceModeSaisieActif), findsOneWidget);
 
+      // Le sélecteur défile : sur grand écran il ne prend qu'une part de la
+      // première rangée de la barre, et la caserne a toutes ses périodes
+      // dedans (chantier 061c).
+      await tester.ensureVisible(find.text(_libelleBoutonMois(1)));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(_libelleBoutonMois(1)));
       await tester.pumpAndSettle();
 

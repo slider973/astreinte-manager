@@ -181,17 +181,25 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         // Rangée 1 — quel mois, et quelles lignes.
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        //
+        // Une `Row` et non une `Wrap` : le sélecteur grandit avec le nombre
+        // de périodes ouvertes, et à trois mois il poussait les puces à la
+        // ligne. Il défile déjà horizontalement — c'est sa forme depuis le
+        // ticket 011 — donc on lui donne une part de la rangée au lieu de
+        // laisser la rangée suivre sa largeur. Les puces, elles, gardent leur
+        // taille et se replient en dernier, sur une fenêtre étroite.
+        Row(
           children: <Widget>[
-            SelecteurMois(
-              periodes: widget.periodes,
-              selectionnee: widget.periode,
-              uneLigne: true,
-              onChoisir: widget.onMois,
+            Flexible(
+              flex: 3,
+              child: SelecteurMois(
+                periodes: widget.periodes,
+                selectionnee: widget.periode,
+                uneLigne: true,
+                onChoisir: widget.onMois,
+              ),
             ),
+            const SizedBox(width: AppSpacing.sm),
             SizedBox(
               width: BarreCommandeMatrice.largeurRecherche,
               child: _ChampRecherche(
@@ -201,7 +209,16 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
                 onEffacer: _effacer,
               ),
             ),
-            ..._puces(),
+            const SizedBox(width: AppSpacing.sm),
+            Flexible(
+              flex: 6,
+              child: Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: _puces(),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
