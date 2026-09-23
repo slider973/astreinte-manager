@@ -105,22 +105,20 @@ void main() {
       expect(_hauteurBarre(tester), lessThanOrEqualTo(_plafondBarre));
     });
 
-    testWidgets('la première rangée est une seule ligne de 48 points, même à '
-        'trois mois ouverts', (tester) async {
-      await _ouvrirLaMatrice(tester, moisOuverts: 3);
+    testWidgets('la première rangée est une seule ligne de 48 points, à un '
+        'comme à deux mois ouverts', (tester) async {
+      await _ouvrirLaMatrice(tester, moisOuverts: 2);
 
-      // Le mois, la recherche et les trois puces côte à côte : si l'un d'eux
-      // passait à la ligne, la rangée ferait deux fois 48. Le sélecteur
-      // défile plutôt que de pousser les puces — c'est lui qui grandit avec
-      // le nombre de périodes ouvertes.
-      final puces = find
+      // Le mois, la recherche et le tri côte à côte : si l'un d'eux passait
+      // à la ligne, la rangée ferait deux fois 48.
+      final rangee = find
           .descendant(
             of: find.byType(BarreCommandeMatrice),
             matching: find.byType(Wrap),
           )
           .first;
       expect(
-        tester.getSize(puces).height,
+        tester.getSize(rangee).height,
         lessThanOrEqualTo(BarreCommandeMatrice.hauteurRangee),
       );
       expect(_hauteurBarre(tester), lessThanOrEqualTo(_plafondBarre));
@@ -226,30 +224,37 @@ void main() {
       );
     });
 
-    testWidgets('à deux mois ouverts, les deux libellés sont entiers dans la '
-        'fenêtre', (tester) async {
-      await _ouvrirLaMatrice(tester, moisOuverts: 2);
+    for (final fenetre in <Size>[_portable, const Size(1000, 700)]) {
+      testWidgets('à ${fenetre.width.toInt()} de large avec deux mois '
+          'ouverts, les deux libellés sont entiers dans la fenêtre', (
+        tester,
+      ) async {
+        await _ouvrirLaMatrice(tester, moisOuverts: 2, taille: fenetre);
 
-      final fenetre = Offset.zero & tester.view.physicalSize / tester.view.devicePixelRatio;
-      for (var i = 0; i < 2; i++) {
-        final periode = periodeOuverte(
-          annee: _maintenant.year,
-          mois: _maintenant.month + i,
-        );
-        final libelle = find.text(
-          AppStrings.moisEtEtat(periode.libelle, periode.ligneEtatBreve),
-        );
-        expect(libelle, findsOneWidget, reason: 'mois $i');
-        final rect = tester.getRect(libelle);
-        // **Jamais rogné, jamais caché derrière un défilement** : le
-        // sélecteur prend sa largeur intrinsèque dans la rangée.
-        expect(
-          fenetre.contains(rect.topLeft) && fenetre.contains(rect.bottomRight),
-          isTrue,
-          reason: 'mois $i, rect $rect hors de $fenetre',
-        );
-      }
-    });
+        final vue = Offset.zero & fenetre;
+        for (var i = 0; i < 2; i++) {
+          final periode = periodeOuverte(
+            annee: _maintenant.year,
+            mois: _maintenant.month + i,
+          );
+          final libelle = find.text(
+            AppStrings.moisEtEtat(periode.libelle, periode.ligneEtatBreve),
+          );
+          expect(libelle, findsOneWidget, reason: 'mois $i');
+          final rect = tester.getRect(libelle);
+          // **Jamais rogné, jamais caché derrière un défilement.** Le
+          // sélecteur n'est borné que s'il dépasse la barre à lui seul ;
+          // sinon ce sont la recherche et le tri qui descendent d'une
+          // rangée. Borné à la place restante, il rognait « Octobre 2026 »
+          // dès 1000 points de large — vu à l'écran.
+          expect(
+            vue.contains(rect.topLeft) && vue.contains(rect.bottomRight),
+            isTrue,
+            reason: 'mois $i, rect $rect hors de $vue',
+          );
+        }
+      });
+    }
   });
 
   group('BarreCommandeMatrice — la place rendue à la matrice', () {

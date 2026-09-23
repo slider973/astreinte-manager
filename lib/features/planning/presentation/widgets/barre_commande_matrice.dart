@@ -187,23 +187,25 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
         // cachée derrière un défilement qu'on ne voit pas. C'est le reste de
         // la rangée qui cède : la recherche et les puces se replient par
         // `Wrap` quand la place manque.
-        Row(
+        // Une `Wrap` et non une `Row` : c'est elle qui donne au sélecteur la
+        // règle voulue. Une `Wrap` construit chaque enfant sous la largeur
+        // **entière** de la rangée, et le sélecteur — un défilement
+        // horizontal depuis le ticket 011 — se réduit à son contenu quand il
+        // y tient. Il n'est donc borné, et ne défile, que s'il dépasse la
+        // barre à lui seul ; en dessous, ce sont la recherche et le tri qui
+        // descendent d'une rangée. Bornée à la place qui reste (`Flexible`),
+        // la carte du second mois était rognée dès 1000 points de large.
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
-            // `Flexible` et non `Expanded` : le sélecteur garde sa largeur
-            // intrinsèque tant qu'elle tient — un, deux, trois mois ouverts
-            // s'y lisent entiers. Au-delà, il retrouve le défilement
-            // horizontal qu'il a sur téléphone depuis le ticket 011, parce
-            // que `periodesProvider` rend **toutes** les périodes de la
-            // caserne et qu'un ruban de douze mois déborderait la rangée.
-            Flexible(
-              child: SelecteurMois(
-                periodes: widget.periodes,
-                selectionnee: widget.periode,
-                uneLigne: true,
-                onChoisir: widget.onMois,
-              ),
+            SelecteurMois(
+              periodes: widget.periodes,
+              selectionnee: widget.periode,
+              uneLigne: true,
+              onChoisir: widget.onMois,
             ),
-            const SizedBox(width: AppSpacing.sm),
             SizedBox(
               width: BarreCommandeMatrice.largeurRecherche,
               child: _ChampRecherche(
@@ -213,7 +215,6 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
                 onEffacer: _effacer,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
             _puceTri(),
           ],
         ),

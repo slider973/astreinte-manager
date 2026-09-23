@@ -209,11 +209,13 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
         // d'en-tête ; sans cette borne, la `Column` signalait un débordement
         // et rayait l'écran de jaune et noir. Bornée, elle laisse toujours
         // une ligne de membre visible sous l'en-tête.
-        final hauteurEpingle = math.min(
-          GeoMatrice.hauteurBlocEpingle(avecCreneaux: widget.planning.existe),
-          math.max(
-            GeoMatrice.hauteurEntete,
-            contraintes.maxHeight - GeoMatrice.hauteurLigne,
+        final hauteurEpingle = math.max(
+          0.0,
+          math.min(
+            GeoMatrice.hauteurBlocEpingle(
+              avecCreneaux: widget.planning.existe,
+            ),
+            contraintes.maxHeight - AppStroke.etat - GeoMatrice.hauteurLigne,
           ),
         );
 
