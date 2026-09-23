@@ -77,5 +77,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-23. Ne pas éditer à la main
 | 060 | [Mettre la PWA en ligne par l'API Vercel, avec le jeton de projet](done/060-deploiement-pwa-par-api.md) | P0 | 054 | https://github.com/slider973/astreinte-manager/pull/52 |
 | 061 | [Un nouveau monde visuel, à partir de l'écran de l'admin](done/061-monde-visuel-admin.md) | P1 | 004 016 017 | https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1), https://github.com/slider973/astreinte-manager/pull/57 (chantier 061c-2) |
 | 062 | [La vérification de la PWA vise un alias protégé au lieu du domaine](done/062-verification-pwa-sur-le-domaine.md) | P0 | 060 | https://github.com/slider973/astreinte-manager/pull/53 |
-| 063 | [Passer d'une destination à l'autre sans glissement](done/063-transition-entre-destinations.md) | P1 | 004 | — |
+| 063 | [Passer d'une destination à l'autre sans glissement](done/063-transition-entre-destinations.md) | P1 | 004 | https://github.com/slider973/astreinte-manager/pull/58 |
 
