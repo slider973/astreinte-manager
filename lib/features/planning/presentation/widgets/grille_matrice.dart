@@ -204,82 +204,94 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
         );
         final visibles = GeoMatrice.joursVisibles(largeurGrille);
 
-        // **Le bloc épinglé ne déborde jamais sa fenêtre.** Sur un navigateur
-        // à demi hauteur, la grille peut recevoir moins que ses 116 points
-        // d'en-tête ; sans cette borne, la `Column` signalait un débordement
-        // et rayait l'écran de jaune et noir. Bornée, elle laisse toujours
-        // une ligne de membre visible sous l'en-tête.
+        // **Le bloc épinglé ne déborde jamais sa fenêtre, et ne disparaît
+        // jamais non plus.** Sur un navigateur à demi hauteur, la grille peut
+        // recevoir moins que ses 116 points d'en-tête : le bloc se resserre
+        // alors jusqu'à la rangée de dates, son plancher, et la colonne
+        // entière est rognée par le bas plutôt que de signaler un
+        // débordement. Une grille sans ses dates ne se lit pas.
         final hauteurEpingle = math.max(
-          0.0,
+          GeoMatrice.hauteurEntete,
           math.min(
-            GeoMatrice.hauteurBlocEpingle(
-              avecCreneaux: widget.planning.existe,
-            ),
+            GeoMatrice.hauteurBlocEpingle(avecCreneaux: widget.planning.existe),
             contraintes.maxHeight - AppStroke.etat - GeoMatrice.hauteurLigne,
           ),
         );
 
-        return Shortcuts(
-          shortcuts: const <ShortcutActivator, Intent>{
-            SingleActivator(LogicalKeyboardKey.home): _DebutDuMoisIntent(),
-            SingleActivator(LogicalKeyboardKey.end): _FinDuMoisIntent(),
-          },
-          child: Actions(
-            actions: <Type, Action<Intent>>{
-              _DebutDuMoisIntent: CallbackAction<_DebutDuMoisIntent>(
-                onInvoke: (_) {
-                  _allerA(0);
-                  return null;
+        /// Ce qu'il faut à la grille pour dire encore quelque chose : la
+        /// rangée de dates et le filet qui la suit.
+        const hauteurMinimale = GeoMatrice.hauteurEntete + AppStroke.etat;
+
+        return ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.topLeft,
+            // La colonne se construit sur son plancher quand la fenêtre est
+            // plus courte, et le surplus est rogné : c'est un `RenderFlex`
+            // qui n'a plus rien à signaler, pas un défaut caché.
+            maxHeight: math.max(contraintes.maxHeight, hauteurMinimale),
+            child: Shortcuts(
+              shortcuts: const <ShortcutActivator, Intent>{
+                SingleActivator(LogicalKeyboardKey.home): _DebutDuMoisIntent(),
+                SingleActivator(LogicalKeyboardKey.end): _FinDuMoisIntent(),
+              },
+              child: Actions(
+                actions: <Type, Action<Intent>>{
+                  _DebutDuMoisIntent: CallbackAction<_DebutDuMoisIntent>(
+                    onInvoke: (_) {
+                      _allerA(0);
+                      return null;
+                    },
+                  ),
+                  _FinDuMoisIntent: CallbackAction<_FinDuMoisIntent>(
+                    onInvoke: (_) {
+                      _allerA(double.infinity);
+                      return null;
+                    },
+                  ),
                 },
-              ),
-              _FinDuMoisIntent: CallbackAction<_FinDuMoisIntent>(
-                onInvoke: (_) {
-                  _allerA(double.infinity);
-                  return null;
-                },
-              ),
-            },
-            child: Column(
-              children: <Widget>[
-                SizedBox(
-                  height: hauteurEpingle,
-                  // Le bloc garde sa géométrie et se laisse rogner par le
-                  // bas : le coin figé et l'en-tête des dates restent en
-                  // face l'un de l'autre au pixel près, même quand la
-                  // fenêtre ne leur donne pas leurs 116 points.
-                  child: ClipRect(
-                    child: OverflowBox(
-                      alignment: Alignment.topLeft,
-                      maxHeight: GeoMatrice.hauteurBlocEpingle(
-                        avecCreneaux: widget.planning.existe,
-                      ),
-                      child: Row(
-                        children: <Widget>[
-                          CoinFige(
-                            largeur: largeurFigee,
+                child: Column(
+                  children: <Widget>[
+                    SizedBox(
+                      height: hauteurEpingle,
+                      // Le bloc garde sa géométrie et se laisse rogner par le
+                      // bas : le coin figé et l'en-tête des dates restent en
+                      // face l'un de l'autre au pixel près, même quand la
+                      // fenêtre ne leur donne pas leurs 116 points.
+                      child: ClipRect(
+                        child: OverflowBox(
+                          alignment: Alignment.topLeft,
+                          maxHeight: GeoMatrice.hauteurBlocEpingle(
                             avecCreneaux: widget.planning.existe,
                           ),
+                          child: Row(
+                            children: <Widget>[
+                              CoinFige(
+                                largeur: largeurFigee,
+                                avecCreneaux: widget.planning.existe,
+                              ),
+                              const AppDivider.colonneFigee(),
+                              Expanded(child: _entete(visibles)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const AppDivider.enTete(),
+                    Expanded(
+                      child: Row(
+                        children: <Widget>[
+                          SizedBox(
+                            width: largeurFigee,
+                            child: _colonneFigee(largeurFigee),
+                          ),
                           const AppDivider.colonneFigee(),
-                          Expanded(child: _entete(visibles)),
+                          Expanded(child: _corps(visibles)),
                         ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                const AppDivider.enTete(),
-                Expanded(
-                  child: Row(
-                    children: <Widget>[
-                      SizedBox(
-                        width: largeurFigee,
-                        child: _colonneFigee(largeurFigee),
-                      ),
-                      const AppDivider.colonneFigee(),
-                      Expanded(child: _corps(visibles)),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );

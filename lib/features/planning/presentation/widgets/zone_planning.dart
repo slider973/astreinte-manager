@@ -60,7 +60,10 @@ class ZonePlanning extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // **Le bouton « Publier » n'est pas toujours là** : un planning publié ne
+    // se republie pas. Son explication non plus, alors — « 12 pompiers seront
+    // prévenus » sans le bouton qui les prévient est une promesse sans geste.
+    final publiable = planning.existe && planning.onPublier != null;
 
     final boutons = <Widget>[
       if (!planning.existe)
@@ -73,7 +76,7 @@ class ZonePlanning extends StatelessWidget {
           raisonDesactivation: planning.raisonCreation,
         )
       else ...<Widget>[
-        if (planning.onPublier != null)
+        if (publiable)
           PrimaryButton(
             libelle: AppStrings.publierAction,
             icone: Icons.campaign,
@@ -109,14 +112,14 @@ class ZonePlanning extends StatelessWidget {
           ]
         : const <Widget>[];
 
-    final explication = Text(
-      planning.existe
-          ? planning.detailPublication
-          : AppStrings.planningCreerDetail(creneaux),
-      style: AppTextStyles.mention.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-      ),
-    );
+    // Chaque explication est **liée à son bouton** : celle de la création
+    // disparaît avec « Créer le planning », celle de la publication avec
+    // « Publier le planning ».
+    final Widget? explication = !planning.existe
+        ? _Explication(texte: AppStrings.planningCreerDetail(creneaux))
+        : publiable
+        ? _Explication(texte: planning.detailPublication)
+        : null;
 
     // Une seule rangée : l'état, puis les boutons, sans explication. La
     // fenêtre est courte, et le récapitulatif de publication redit de toute
@@ -151,12 +154,28 @@ class ZonePlanning extends StatelessWidget {
           runSpacing: AppSpacing.sm,
           children: boutons,
         ),
-        const SizedBox(height: AppSpacing.xxs),
-        // **L'explication sous le bouton**, jamais seulement dans une
-        // info-bulle : le geste sort de l'application et fait sonner des
-        // téléphones (`DESIGN.md § Do's`).
-        explication,
+        if (explication != null) ...<Widget>[
+          const SizedBox(height: AppSpacing.xxs),
+          // **L'explication sous le bouton**, jamais seulement dans une
+          // info-bulle : le geste sort de l'application et fait sonner des
+          // téléphones (`DESIGN.md § Do's`).
+          explication,
+        ],
       ],
     );
   }
+}
+
+class _Explication extends StatelessWidget {
+  const _Explication({required this.texte});
+
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    texte,
+    style: AppTextStyles.mention.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    ),
+  );
 }

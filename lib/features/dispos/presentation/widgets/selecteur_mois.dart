@@ -140,6 +140,14 @@ class _Bouton extends StatelessWidget {
                           descripteur.icone,
                           size: AppTouch.iconePetite,
                           color: encre,
+                          // Sur une ligne, « Ouvert » n'est plus écrit : le
+                          // cadenas le dit seul, et un lecteur d'écran ne
+                          // voit pas les cadenas. La valeur du bouton porte
+                          // déjà la phrase entière ; ceci la double pour qui
+                          // parcourt les icônes.
+                          semanticLabel: periode.ouverte
+                              ? AppStrings.moisOuvertCourt
+                              : AppStrings.moisVerrouilleCourt,
                         ),
                         const SizedBox(width: AppSpacing.xs),
                         Text(

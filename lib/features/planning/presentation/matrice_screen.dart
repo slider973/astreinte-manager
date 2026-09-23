@@ -153,6 +153,18 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     return true;
   }
 
+  /// **La matrice est-elle à l'écran ?** Deux volets, et une échelle de texte
+  /// sous le seuil au-delà duquel la grille change de forme.
+  ///
+  /// C'est la découpe de cet écran, et non la classe de fenêtre : entre les
+  /// deux — tablette portrait, téléphone en paysage, texte à ×1.8 sur un
+  /// poste — il y a la vue par jour, qui n'a ni bandeau de mois ni colonne
+  /// d'actions.
+  bool _matriceVisible(BuildContext context) =>
+      AppWindowClass.of(context).supporteDeuxVolets &&
+      MediaQuery.textScalerOf(context).scale(16) / 16 <=
+          MatriceScreen.seuilVueJour;
+
   MatriceController get _controleur =>
       ref.read(matriceControllerProvider.notifier);
 
@@ -615,11 +627,14 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       // réservée ; `filActions` reçoit enfin le bouton « Publier » que le 016
       // avait annoncé et que le 017 a laissé vide.
       panneauLateral: panneau == null ? null : _panneau(panneau),
-      // Sur grand écran, « Publier » est remonté dans la barre de commande :
-      // le fil du bas n'a plus rien à porter (chantier 061c).
-      filActions: compact
-          ? _filActions(ref.watch(planningControllerProvider).value)
-          : null,
+      // Quand la matrice est à l'écran, « Publier » vit dans le bandeau du
+      // mois et le fil du bas n'a plus rien à porter (chantier 061c). Sous la
+      // vue par jour — téléphone, tablette portrait, grande échelle de
+      // texte — il le reprend : c'est la seule zone de l'ossature qui ne
+      // défile pas avec elle.
+      filActions: _matriceVisible(context)
+          ? null
+          : _filActions(ref.watch(planningControllerProvider).value),
       child: _corps(admin: admin, asynchrone: asynchrone, etat: etat),
     );
   }
@@ -701,10 +716,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     final planning = etatPlanning?.planning ?? PlanningMois.vide();
     final creneauChoisi = ref.watch(creneauSelectionneProvider);
 
-    final echelle = MediaQuery.textScalerOf(context).scale(16) / 16;
-    final classe = AppWindowClass.of(context);
-    final matriceVisible =
-        classe.supporteDeuxVolets && echelle <= MatriceScreen.seuilVueJour;
+    final matriceVisible = _matriceVisible(context);
 
     // Ce que la barre — et, sur grand écran, le bandeau — savent du planning.
     // **`null` tant que le planning n'est pas lu** : tant qu'on ne sait pas
@@ -751,7 +763,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       onReessayer: _relire,
       total: etat.matrice.lignes.length,
       affiches: visibles.length,
-      montrerLegende: matriceVisible,
+      matriceVisible: matriceVisible,
       planning: commande,
     );
 

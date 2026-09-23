@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/l10n/app_strings.dart';
-import '../../../../core/theme/app_breakpoints.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -50,7 +49,7 @@ class BarreCommandeMatrice extends StatefulWidget {
     required this.onReessayer,
     required this.total,
     required this.affiches,
-    required this.montrerLegende,
+    required this.matriceVisible,
     required this.planning,
     super.key,
   });
@@ -91,9 +90,15 @@ class BarreCommandeMatrice extends StatefulWidget {
   final int total;
   final int affiches;
 
-  /// La légende n'a pas sa place sur un téléphone, où la vue par jour montre
-  /// déjà deux cases nommées.
-  final bool montrerLegende;
+  /// **La matrice est à l'écran**, c'est-à-dire ni la vue par jour d'un
+  /// téléphone, ni celle d'une grande échelle de texte.
+  ///
+  /// C'est la seule découpe qui vaille pour cette barre, et non la classe de
+  /// fenêtre : quand la matrice n'est pas là, le bandeau qui porte les gestes
+  /// du planning n'y est pas non plus, et la barre doit les reprendre. La
+  /// légende suit la même règle — elle décrit les cases de la matrice, et la
+  /// vue par jour en montre déjà deux, nommées.
+  final bool matriceVisible;
 
   /// Ce que la barre dit du planning : le créer, le publier, son état, et
   /// l'état du canal temps réel. **`null` tant que le planning n'est pas
@@ -163,9 +168,7 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      child: AppWindowClass.of(context).estCompact
-          ? _empilee(context)
-          : _deuxRangees(context),
+      child: widget.matriceVisible ? _deuxRangees(context) : _empilee(context),
     );
   }
 
@@ -241,7 +244,7 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
                 ],
               ),
             ),
-            if (widget.montrerLegende) ...<Widget>[
+            if (widget.matriceVisible) ...<Widget>[
               const SizedBox(width: AppSpacing.sm),
               const LegendeEtats(espacement: AppSpacing.sm),
             ],
@@ -257,7 +260,13 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
     ),
   );
 
-  // --- La forme de téléphone : inchangée depuis le ticket 017 -------------
+  // --- La forme sans matrice : inchangée depuis le ticket 017 -------------
+  //
+  // La vue par jour, sur téléphone **et** sur toute fenêtre où la matrice a
+  // changé de forme : tablette portrait, téléphone en paysage, grande échelle
+  // de texte. Le bandeau n'y porte pas la zone du planning, donc la barre
+  // reprend la création, l'état et le remplissage automatique ; « Publier »
+  // reste dans le fil d'actions du bas.
 
   Widget _empilee(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -300,11 +309,11 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
               onArmer: widget.onArmer,
             ),
             ..._raisonEtCompte(context),
-            // Le fil « Publier » reste sous la grille en `compact` : la barre
-            // y défile avec la vue par jour, et un bouton qui s'en va au
-            // défilement est un bouton qu'on cherche.
+            // Le fil « Publier » reste sous la vue par jour : la barre y
+            // défile, et un bouton qui s'en va au défilement est un bouton
+            // qu'on cherche.
             ..._actionPlanning(context),
-            if (widget.montrerLegende) const LegendeEtats(),
+            if (widget.matriceVisible) const LegendeEtats(),
             SaveIndicator(
               etat: widget.sync,
               compact: true,

@@ -1422,6 +1422,11 @@ abstract final class AppStrings {
 
   static const String moisVerrouilleCourt = 'Verrouillé';
 
+  /// L'état de la période, en un mot, pour l'icône du bouton sur une ligne :
+  /// c'est elle qui le porte à l'œil depuis le chantier 061c, et un lecteur
+  /// d'écran ne voit pas les cadenas.
+  static const String moisOuvertCourt = 'Ouvert';
+
   /// Le mois et son état sur une seule ligne : « Octobre 2026 · Verrouillé ».
   /// Le point médian sépare deux faits de même rang, là où un tiret aurait
   /// suggéré une suite.

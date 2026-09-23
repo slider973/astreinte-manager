@@ -1,6 +1,7 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_spacing.dart';
+import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/legende_etats.dart';
 import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
@@ -12,6 +13,7 @@ import 'package:astreinte_sp/features/planning/presentation/widgets/bandeau_mois
 import 'package:astreinte_sp/features/planning/presentation/widgets/barre_commande_matrice.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/barre_repartition.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/grille_matrice.dart';
+import 'package:astreinte_sp/features/planning/presentation/widgets/vue_jour.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/zone_planning.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,6 +45,7 @@ Future<void> _ouvrirLaMatrice(
   bool avecPlanning = false,
   int membresAttribues = 0,
   int moisOuverts = 1,
+  PlanningEtat etatPlanning = PlanningEtat.brouillon,
 }) async {
   // **Les vraies polices, sinon la mesure ne vaut rien.** La barre de
   // commande est faite de `Wrap` : composée avec la police d'essai, plus
@@ -74,7 +77,7 @@ Future<void> _ouvrirLaMatrice(
     ),
     planning: avecPlanning
         ? FauxPlanningRepository(
-            planning: planningBrouillon,
+            planning: PlanningBrouillon(id: 'plan-1', etat: etatPlanning),
             creneaux: creneauxDuMois(_joursDuMois),
             attributions: <Attribution>[
               for (var i = 0; i < membresAttribues; i++)
@@ -255,6 +258,112 @@ void main() {
         }
       });
     }
+  });
+
+  group('Les gestes du planning suivent la matrice, pas la classe de '
+      'fenêtre', () {
+    testWidgets('sur une tablette portrait, la barre reprend les actions et '
+        'le fil « Publier » revient sous la vue par jour', (tester) async {
+      // 768 de large : ni `compact`, ni deux volets. La matrice n'y est pas,
+      // le bandeau qui porte la zone du planning non plus — et sans cette
+      // règle, l'admin n'avait plus aucun geste de planning.
+      await _ouvrirLaMatrice(
+        tester,
+        taille: const Size(768, 1024),
+        avecPlanning: true,
+        membresAttribues: 2,
+      );
+
+      expect(find.byType(VueJour), findsOneWidget);
+      expect(find.byType(ZonePlanning), findsNothing);
+      expect(
+        find.widgetWithText(PrimaryButton, AppStrings.publierAction),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(PrimaryButton, AppStrings.proposerAction),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sans planning, la tablette portrait garde « Créer le '
+        'planning »', (tester) async {
+      await _ouvrirLaMatrice(tester, taille: const Size(768, 1024));
+
+      expect(
+        find.widgetWithText(
+          PrimaryButton,
+          AppStrings.planningCreer(
+            AppStrings.moisLongs[_maintenant.month - 1],
+          ),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('à 1280 avec une échelle de texte de 1,8, « Publier » reste '
+        'atteignable', (tester) async {
+      // L'échelle doit exister **avant** le montage : elle décide de la
+      // composition, pas de la taille des glyphes.
+      tester.platformDispatcher.textScaleFactorTestValue = 1.8;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await _ouvrirLaMatrice(
+        tester,
+        avecPlanning: true,
+        membresAttribues: 2,
+      );
+
+      expect(find.byType(VueJour), findsOneWidget);
+      expect(find.byType(ZonePlanning), findsNothing);
+      expect(
+        find.widgetWithText(PrimaryButton, AppStrings.publierAction),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('un planning publié ne promet plus de prévenir personne', (
+      tester,
+    ) async {
+      await _ouvrirLaMatrice(
+        tester,
+        avecPlanning: true,
+        membresAttribues: 2,
+        etatPlanning: PlanningEtat.publie,
+      );
+
+      // Le bouton n'existe plus — un planning publié ne se republie pas — et
+      // son explication s'en va avec lui : « 2 pompiers seront prévenus »
+      // sans le geste qui les prévient est une promesse en l'air.
+      expect(
+        find.widgetWithText(PrimaryButton, AppStrings.publierAction),
+        findsNothing,
+      );
+      expect(find.text(AppStrings.publierDetail(2)), findsNothing);
+      // L'état, lui, se lit toujours.
+      expect(find.byType(ZonePlanning), findsOneWidget);
+      expect(find.text(AppStrings.planningPublie), findsOneWidget);
+    });
+
+    testWidgets('l\'explication tombe sous « Publier », pas sous « Proposer »',
+        (tester) async {
+      await _ouvrirLaMatrice(
+        tester,
+        avecPlanning: true,
+        membresAttribues: 2,
+      );
+
+      final publier = find.widgetWithText(
+        PrimaryButton,
+        AppStrings.publierAction,
+      );
+      final explication = find.text(AppStrings.publierDetail(2));
+      expect(publier, findsOneWidget);
+      expect(explication, findsOneWidget);
+      expect(
+        tester.getRect(explication).left,
+        moreOrLessEquals(tester.getRect(publier).left, epsilon: 0.5),
+      );
+    });
   });
 
   group('BarreCommandeMatrice — la place rendue à la matrice', () {
