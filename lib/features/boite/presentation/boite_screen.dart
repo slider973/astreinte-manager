@@ -595,32 +595,33 @@ class _BarreOnglets extends StatelessWidget {
   final TabController controleur;
 
   @override
-  Widget build(BuildContext context) {
-    final marge = AppWindowClass.of(context).margePage;
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: marge - AppSpacing.sm),
-          child: TabBar(
-            controller: controleur,
-            tabs: <Widget>[
-              for (final onglet in OngletBoite.values)
-                Tab(
-                  height: AppTouch.cible,
-                  child: Text(
-                    onglet.libelle,
-                    semanticsLabel: onglet.annonce,
-                    maxLines: 1,
-                    overflow: TextOverflow.fade,
-                    softWrap: false,
-                  ),
-                ),
-            ],
-          ),
-        ),
+  Widget build(BuildContext context) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: AppSpacing.colonneMax),
+      // **Pleine largeur, et le rembourrage des libellés au minimum.** Trois
+      // onglets se partagent la largeur à parts égales : à 390 points, la
+      // marge de page et les 32 points de rembourrage par défaut de `Tab`
+      // laissaient 92 points à « Propositions », qui en demande 102 — le mot
+      // s'éteignait sur son « s », vu dans Chrome. Une barre d'onglets est
+      // d'ailleurs un bandeau de commande, comme le filet qu'elle porte : elle
+      // va d'un bord à l'autre.
+      child: TabBar(
+        controller: controleur,
+        labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+        tabs: <Widget>[
+          for (final onglet in OngletBoite.values)
+            Tab(
+              height: AppTouch.cible,
+              child: Text(
+                onglet.libelle,
+                semanticsLabel: onglet.annonce,
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+              ),
+            ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }

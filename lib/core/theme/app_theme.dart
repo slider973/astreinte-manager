@@ -336,6 +336,18 @@ abstract final class AppTheme {
           ),
         ),
       ),
+      // **La pastille chiffrée est indigo, pas rose** (ticket 064b). Material
+      // 3 la peint en `error`, et le compte de non-lues de la cloche et de la
+      // barre se lisait donc comme une alarme : dans ce système, le rose dit
+      // « absent, refusé, conflit, erreur » et rien d'autre
+      // (`DESIGN.md § Error`). Une notification à lire n'est aucun des quatre.
+      // L'indigo est la couleur de ce qui attend un geste, et c'est déjà celle
+      // de la destination choisie sous laquelle la pastille se pose.
+      badgeTheme: BadgeThemeData(
+        backgroundColor: scheme.primary,
+        textColor: scheme.onPrimary,
+        textStyle: textTheme.labelSmall,
+      ),
       // Les trois onglets de la Boîte (ticket 064b). Material 3 les rendrait
       // déjà en indigo, mais deux réglages ne se devinent pas : le libellé en
       // `labelLarge` (16, pas 14 — `DESIGN.md § Hierarchy`, c'est une action),

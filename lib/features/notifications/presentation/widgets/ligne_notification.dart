@@ -88,9 +88,16 @@ class LigneNotification extends StatelessWidget {
                   children: <Widget>[
                     _Marque(
                       visible: !lue,
+                      // **Indigo, et non plus le vert de l'information**
+                      // (`design/064 § 3.4`, décision 4). Le vert de ce
+                      // système dit « accepté, validé, couvert » : posé sur
+                      // « Ton astreinte du 12 a changé », il lisait le
+                      // contraire du fait qu'il annonce. L'indigo est la
+                      // couleur de ce qui attend un geste, et c'est celle de
+                      // la pastille chiffrée qui compte ces mêmes lignes.
                       couleur: sombre
-                          ? AppColors.darkEtatInfo
-                          : AppColors.etatInfo,
+                          ? AppColors.darkPrimary
+                          : AppColors.primary,
                     ),
                     Icon(
                       notification.type.icone,
