@@ -119,8 +119,15 @@ void main() {
 
       // Le disque montre « JD » ; le bouton, lui, dit le nom entier et rien
       // de plus — deux lettres épelées à la suite du nom ne renseignent
-      // personne.
-      expect(find.byType(AvatarInitiales), findsOneWidget);
+      // personne. Le finder est borné au bouton : depuis le chantier 061c-2,
+      // chaque ligne de la matrice porte le sien, décoratif lui aussi.
+      expect(
+        find.descendant(
+          of: find.byType(BoutonCompte),
+          matching: find.byType(AvatarInitiales),
+        ),
+        findsOneWidget,
+      );
       expect(find.bySemanticsLabel(RegExp('JD')), findsNothing);
 
       handle.dispose();

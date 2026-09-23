@@ -108,7 +108,7 @@ Finder _caseDe({
   required AttributionEtat etat,
   required DisponibiliteEtat disponibilite,
 }) {
-  final statuts = AppStatusColors.clair;
+  const statuts = AppStatusColors.clair;
   return find.bySemanticsLabel(
     AppStrings.matriceCaseAttributionSemantique(
       membre: membre,
@@ -154,7 +154,7 @@ void main() {
         ]),
       );
 
-      final statuts = AppStatusColors.clair;
+      const statuts = AppStatusColors.clair;
       expect(find.byType(CaseAttribution), findsNWidgets(3));
 
       for (final (int jour, AttributionEtat etat) in <(int, AttributionEtat)>[

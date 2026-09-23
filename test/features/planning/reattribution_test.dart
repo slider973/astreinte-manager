@@ -21,6 +21,7 @@ import '../../support/faux_invitations.dart';
 import '../../support/faux_matrice.dart';
 import '../../support/faux_planning.dart';
 import '../../support/faux_suivi.dart';
+import '../../support/polices.dart';
 
 const String _chemin = '/admin/suivi';
 
@@ -136,6 +137,11 @@ Future<Poste> _ouvrir(
         disponibles: <String>{'girard@c-1-j', 'bernard@c-1-j'},
       );
   addTearDown(planning.fermer);
+
+  // **Les vraies polices, sinon la mesure ne vaut rien** : le panneau des
+  // candidats fait 360 points de large, et la police d'essai y replie chaque
+  // ligne deux fois plus.
+  await chargerPolicesDuProduit();
 
   await monterApp(
     tester,

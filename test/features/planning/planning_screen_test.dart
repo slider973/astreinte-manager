@@ -15,6 +15,7 @@ import '../../support/faux_dispos.dart';
 import '../../support/faux_invitations.dart';
 import '../../support/faux_matrice.dart';
 import '../../support/faux_planning.dart';
+import '../../support/polices.dart';
 
 const String _chemin = '/admin/planning';
 
@@ -103,6 +104,12 @@ Future<FauxPlanningRepository> _ouvrir(
         },
       );
   addTearDown(planning.fermer);
+
+  // **Les vraies polices, sinon la mesure ne vaut rien.** Le panneau des
+  // candidats fait 360 points de large : avec la police d'essai, plus large de
+  // moitié, une ligne de candidat en prend 168 au lieu de 78 et les sections
+  // qui la suivent sortent de l'écran. Ce fichier vérifie ce qui se voit.
+  await chargerPolicesDuProduit();
 
   await monterApp(
     tester,

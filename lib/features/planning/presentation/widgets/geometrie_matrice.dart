@@ -69,6 +69,13 @@ abstract final class GeoMatrice {
   static double colonneFigee(AppWindowClass classe) =>
       classe.estLarge ? 280 : 240;
 
+  /// Le disque d'initiales devant le nom, dans la colonne figée.
+  ///
+  /// 24 points dans une ligne de 32 : il tient sans la pousser, et sa mesure
+  /// vit ici parce que c'est elle qui décide de ce qui reste au nom
+  /// (`design/061 § 8 bis`).
+  static const double tailleAvatar = 24;
+
   /// Largeur des deux compteurs de quota, dans l'en-tête de ligne.
   static const double largeurQuota = 48;
 

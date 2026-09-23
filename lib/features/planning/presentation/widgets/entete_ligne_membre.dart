@@ -4,6 +4,7 @@ import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/avatar_initiales.dart';
 import '../../domain/ligne_matrice.dart';
 import 'geometrie_matrice.dart';
 
@@ -61,6 +62,18 @@ class EnteteLigneMembre extends StatelessWidget {
               height: GeoMatrice.hauteurLigne,
               child: Row(
                 children: <Widget>[
+                  // **Décoratif, et rien d'autre.** Le disque distingue deux
+                  // lignes voisines d'un coup d'œil ; le nom juste à côté est
+                  // le seul libellé, et l'annoncer deux fois n'apprend rien.
+                  // 24 points : la ligne en fait 32, et la hauteur ne bouge
+                  // pas (`design/061 § 8 bis`).
+                  ExcludeSemantics(
+                    child: AvatarInitiales(
+                      nom: ligne.nomAffiche,
+                      taille: GeoMatrice.tailleAvatar,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
                       ligne.nomAffiche,
