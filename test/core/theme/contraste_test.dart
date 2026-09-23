@@ -932,4 +932,101 @@ void main() {
       });
     }
   });
+
+  group('Contraste — le fond doux du monde du pompier (ticket 064a)', () {
+    // `design/064 § 2` : fond de page `surface-container-low`, cartes en
+    // `surface`. Ce groupe mesure les deux choses qu'un fond de page change :
+    // le texte qui se pose dessus, et la carte qui doit s'en détacher.
+    for (final theme in <(String, ColorScheme)>[
+      ('clair', AppTheme.clair.colorScheme),
+      ('sombre', AppTheme.sombre.colorScheme),
+    ]) {
+      group(theme.$1, () {
+        final scheme = theme.$2;
+
+        test('tout texte tient sur le papier doux', () {
+          verifier(
+            'onSurface/surfaceContainerLow',
+            scheme.onSurface,
+            scheme.surfaceContainerLow,
+          );
+          verifier(
+            'onSurfaceVariant/surfaceContainerLow',
+            scheme.onSurfaceVariant,
+            scheme.surfaceContainerLow,
+          );
+        });
+
+        test('et sur la carte posée dessus', () {
+          verifier('onSurface/surface', scheme.onSurface, scheme.surface);
+          verifier(
+            'onSurfaceVariant/surface',
+            scheme.onSurfaceVariant,
+            scheme.surface,
+          );
+        });
+
+        test('les cartes qui portent un état se détachent du papier', () {
+          // Elles, la mesure les couvre largement : ce sont des blocs pleins.
+          verifier(
+            'primary/surfaceContainerLow',
+            scheme.primary,
+            scheme.surfaceContainerLow,
+            seuil: seuilFilet,
+          );
+          // La carte d'appel à saisir, elle, n'est pas un bloc fort : c'est
+          // un `primary-container`. Elle se détache quand même du papier,
+          // au-dessus du cran ordinaire.
+          verifier(
+            'primaryContainer/surfaceContainerLow (appel à saisir)',
+            scheme.primaryContainer,
+            scheme.surfaceContainerLow,
+            seuil: 1.2,
+          );
+        });
+      });
+    }
+
+    test('un cran de surface ne suffit pas : c\'est le filet qui détache', () {
+      // **La mesure, et ce qu\'elle impose.** Un cran de cette palette vaut
+      // ~1,06:1 : `surface` sur `surface-container-low` fait 1,056 en clair et
+      // 1,059 en sombre. Le seuil de 1,2 demandé à l\'inspection n\'est atteint
+      // par **aucune** paire de crans en clair — le maximum est 1,18, entre
+      // `surface-container-highest` et le papier doux — parce que ce système
+      // ne sépare pas par la valeur : `DESIGN.md § Elevation & Depth` sépare
+      // au niveau 0 « par un filet `outline-variant` 1 dp **et/ou** une
+      // surface tonale d\'un cran ». Les cartes de l\'accueil portent donc les
+      // deux, et c\'est le filet qui fait le travail.
+      const clair = AppColors.surface;
+      const clairFond = AppColors.surfaceContainerLow;
+      expect(ratio(clair, clairFond), closeTo(1.06, 0.01));
+      expect(
+        ratio(AppColors.darkSurface, AppColors.darkSurfaceContainerLow),
+        closeTo(1.06, 0.01),
+      );
+
+      // Le filet, lui, se voit : c\'est lui la limite de la carte.
+      expect(
+        ratio(AppColors.outlineVariant, clairFond),
+        greaterThan(1.4),
+        reason: 'le filet d\'une carte s\'efface dans le papier',
+      );
+      expect(
+        ratio(AppColors.darkOutlineVariant, AppColors.darkSurfaceContainerLow),
+        greaterThan(1.4),
+        reason: 'le filet d\'une carte s\'efface dans le papier de nuit',
+      );
+    });
+
+    test('remonter les cartes d\'un cran ne réglerait rien', () {
+      // `surface-container` sur `surface-container-low` vaut **moins** que
+      // `surface` : 1,046 en clair. En clair, la carte deviendrait aussi plus
+      // sombre que sa page, ce que le brief ne demande pas. La note est là
+      // pour que personne ne refasse l\'essai en croyant gagner quelque chose.
+      expect(
+        ratio(AppColors.surfaceContainer, AppColors.surfaceContainerLow),
+        lessThan(ratio(AppColors.surface, AppColors.surfaceContainerLow)),
+      );
+    });
+  });
 }

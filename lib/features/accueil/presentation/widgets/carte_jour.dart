@@ -105,7 +105,16 @@ class CarteJourVue extends StatelessWidget {
           borderRadius: AppRadius.carteRadius,
           border: filet == null
               ? null
-              : Border.all(color: filet, width: AppStroke.etat),
+              // Le filet d'une carte « Libre » sépare deux surfaces : 1 dp
+              // suffit. Celui d'une proposition **porte un état** — c'est lui
+              // qui donne sa limite au bloc orange — et vaut 2 dp
+              // (`DESIGN.md § Shapes`).
+              : Border.all(
+                  color: filet,
+                  width: carte.etat == EtatCarte.proposition
+                      ? AppStroke.etat
+                      : AppStroke.filet,
+                ),
         ),
         child: ExcludeSemantics(
           child: Column(

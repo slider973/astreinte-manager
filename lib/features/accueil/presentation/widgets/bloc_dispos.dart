@@ -126,29 +126,36 @@ class _Constat extends StatelessWidget {
       button: true,
       label: texte,
       child: ExcludeSemantics(
-        child: InkWell(
-          onTap: () => onSaisir(appel.cleMois),
-          borderRadius: AppRadius.controleRadius,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: AppTouch.cible),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: AppSpacing.sm,
-                horizontal: AppSpacing.xs,
-              ),
-              child: Row(
-                children: <Widget>[
-                  Icon(
-                    Icons.task_alt,
-                    size: AppTouch.icone,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Text(texte, style: theme.textTheme.bodyLarge),
-                  ),
-                  Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
-                ],
+        // Une carte de `surface` sur le papier doux de la page, comme les
+        // lignes de proposition : rien à faire ici, mais la ligne appartient
+        // au même monde (`design/064 § 2`).
+        child: Material(
+          color: scheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.carteRadius,
+            side: BorderSide(color: scheme.outlineVariant),
+          ),
+          child: InkWell(
+            onTap: () => onSaisir(appel.cleMois),
+            borderRadius: AppRadius.carteRadius,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: AppTouch.cible),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      Icons.task_alt,
+                      size: AppTouch.icone,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Text(texte, style: theme.textTheme.bodyLarge),
+                    ),
+                    Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+                  ],
+                ),
               ),
             ),
           ),

@@ -67,56 +67,64 @@ class LignePropositionAccueil extends StatelessWidget {
         if (mention != null) AppStrings.accueilProposeeDepuis(mention),
       ].join(', '),
       child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onOuvrir,
-          borderRadius: AppRadius.controleRadius,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: AppTouch.cible),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: AppSpacing.sm,
-                horizontal: AppSpacing.xs,
-              ),
-              child: Row(
-                children: <Widget>[
-                  _CarreCreneau(
-                    initiale: creneau.libelle.characters.first.toUpperCase(),
-                    icone: creneau.icone,
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          titre,
-                          style: theme.textTheme.titleMedium,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          soutien,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: scheme.onSurfaceVariant,
+        // **Une carte de `surface` sur le papier doux de la page**
+        // (`design/064 § 2`). Le filet `outline-variant` la détache : un cran
+        // de surface ne vaut que 1,06:1 dans cette palette, et c'est le trait
+        // qui fait le travail au niveau 0 (`DESIGN.md § Elevation & Depth`).
+        child: Material(
+          color: scheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.carteRadius,
+            side: BorderSide(color: scheme.outlineVariant),
+          ),
+          child: InkWell(
+            onTap: onOuvrir,
+            borderRadius: AppRadius.carteRadius,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: AppTouch.cible),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  children: <Widget>[
+                    _CarreCreneau(
+                      initiale: creneau.libelle.characters.first.toUpperCase(),
+                      icone: creneau.icone,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            titre,
+                            style: theme.textTheme.titleMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (mention != null) ...<Widget>[
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      mention,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
+                          Text(
+                            soutien,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                      maxLines: 1,
                     ),
+                    if (mention != null) ...<Widget>[
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        mention,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -126,7 +134,7 @@ class LignePropositionAccueil extends StatelessWidget {
   }
 }
 
-/// Le carré d'initiale : « J » ou « N », et l'icône du créneau dessous.
+/// Le carré d'initiale : « J » ou « N », et l'icône du créneau à côté.
 ///
 /// L'initiale seule serait une lettre sans système — « J » et « N » ne se
 /// devinent pas. L'icône du créneau la double, à la taille où elle se lit

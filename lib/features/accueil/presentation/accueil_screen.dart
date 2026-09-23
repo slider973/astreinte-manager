@@ -57,6 +57,10 @@ class AccueilScreen extends ConsumerWidget {
       // cloche. Une barre d'application au-dessus redirait « Accueil » à
       // trente points de « Bonsoir, Marie ».
       sansBarreApplication: true,
+      // **La matière du monde du pompier** (`design/064 § 2`) : fond de page
+      // `surface-container-low`, cartes en `surface`. Le Calendrier et les
+      // Astreintes la prendront au chantier 064c.
+      fondDoux: true,
       actionsEnTete: const <Widget>[BoutonNotifications(), BoutonCompte()],
       // **Le fait qui change tout ce qui est en dessous.** Une caserne
       // suspendue ou un essai qui s'achève se disait jusqu'ici sur le premier
@@ -169,12 +173,15 @@ class _Contenu extends ConsumerWidget {
                 for (final proposition in tableau.propositions.take(
                   _propositionsMontrees,
                 ))
-                  LignePropositionAccueil(
-                    key: ValueKey<String>(proposition.id),
-                    proposition: proposition,
-                    heures: tableau.heures,
-                    maintenant: maintenant,
-                    onOuvrir: () => _ouvrirReponse(context),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: LignePropositionAccueil(
+                      key: ValueKey<String>(proposition.id),
+                      proposition: proposition,
+                      heures: tableau.heures,
+                      maintenant: maintenant,
+                      onOuvrir: () => _ouvrirReponse(context),
+                    ),
                   ),
 
               if (dispos != null) ...<Widget>[

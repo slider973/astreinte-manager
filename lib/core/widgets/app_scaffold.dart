@@ -144,6 +144,7 @@ class AppScaffold extends StatelessWidget {
     this.caserne,
     this.actionsEnTete = const <Widget>[],
     this.sansBarreApplication = false,
+    this.fondDoux = false,
   });
 
   final String titre;
@@ -181,6 +182,16 @@ class AppScaffold extends StatelessWidget {
   /// vit déjà dans [actions] des écrans qui la portent.
   final List<Widget> actionsEnTete;
 
+  /// **La matière du monde du pompier** (`design/064 § 2`) : le fond de page
+  /// passe à `surface-container-low` et les cartes y sont posées en `surface`.
+  ///
+  /// Faux par défaut : la coquille de l'admin garde son papier blanc, sur
+  /// lequel une grille dense de 3 720 cases se lit. Le pompier, lui, ne lit
+  /// pas un tableau mais trois ou quatre cartes, et c'est le cran de surface
+  /// qui les détache — doublé du filet `outline-variant` que
+  /// `DESIGN.md § Elevation & Depth` donne au niveau 0.
+  final bool fondDoux;
+
   /// L'écran porte son propre en-tête dans son contenu : la barre
   /// d'application s'efface sous `expanded`.
   ///
@@ -201,6 +212,9 @@ class AppScaffold extends StatelessWidget {
 
     final classe = AppWindowClass.of(context);
     final media = MediaQuery.of(context);
+    final fond = fondDoux
+        ? Theme.of(context).colorScheme.surfaceContainerLow
+        : null;
 
     final corps = Column(
       children: <Widget>[
@@ -248,6 +262,7 @@ class AppScaffold extends StatelessWidget {
 
     if (classe.estCompact) {
       return Scaffold(
+        backgroundColor: fond,
         appBar: _barre(context),
         body: SafeArea(top: false, bottom: false, child: contenu),
         bottomNavigationBar: _barreNavigation(context, media),
@@ -256,6 +271,7 @@ class AppScaffold extends StatelessWidget {
 
     if (!classe.supporteDeuxVolets) {
       return Scaffold(
+        backgroundColor: fond,
         appBar: _barre(context),
         body: SafeArea(
           top: false,
@@ -273,6 +289,7 @@ class AppScaffold extends StatelessWidget {
     // Grand écran : la navigation passe à côté du contenu, et l'en-tête avec
     // elle. Plus de barre d'application pleine largeur au-dessus des deux.
     return Scaffold(
+      backgroundColor: fond,
       body: SafeArea(
         child: Row(
           children: <Widget>[
