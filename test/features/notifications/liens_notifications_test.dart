@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:astreinte_sp/app.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
-import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
 import 'package:astreinte_sp/core/router/destination_initiale.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
 import 'package:astreinte_sp/features/demarrage/presentation/demarrage_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -11,11 +11,11 @@ import 'package:astreinte_sp/features/accueil/presentation/widgets/bloc_dispos.d
 import 'package:astreinte_sp/features/accueil/presentation/widgets/carte_jour.dart';
 import 'package:astreinte_sp/features/astreintes/data/astreintes_repository.dart';
 import 'package:astreinte_sp/features/astreintes/domain/astreinte.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
+import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
-import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
-import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:astreinte_sp/features/propositions/presentation/widgets/carte_proposition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

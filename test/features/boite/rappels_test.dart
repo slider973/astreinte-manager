@@ -1,9 +1,9 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
-import 'package:astreinte_sp/features/notifications/domain/notification_interne.dart';
 import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
 import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
+import 'package:astreinte_sp/features/notifications/domain/notification_interne.dart';
 import 'package:astreinte_sp/features/notifications/presentation/widgets/ligne_notification.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

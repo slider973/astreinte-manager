@@ -6,11 +6,11 @@ import 'package:astreinte_sp/core/widgets/app_scaffold.dart';
 import 'package:astreinte_sp/core/widgets/bouton_retour.dart';
 import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
 import 'package:astreinte_sp/features/astreintes/presentation/astreintes_screen.dart';
+import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
+import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
 import 'package:astreinte_sp/features/planning/presentation/matrice_screen.dart';
 import 'package:astreinte_sp/features/profil/presentation/profil_screen.dart';
-import 'package:astreinte_sp/features/boite/domain/onglet_boite.dart';
-import 'package:astreinte_sp/features/boite/presentation/boite_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
