@@ -88,6 +88,9 @@ Usage
                          `supabase/config.toml`
     --parallele N        envois de front (défaut : 8)
     --dry-run            n'envoie rien, liste ce qui partirait
+    --afficher-domaine   écrit le domaine de production et s'arrête ; c'est par
+                         là que `scripts/verifier_production.sh` l'obtient,
+                         plutôt que de relire `config.toml` à sa façon
 
 Codes de sortie
 ---------------
@@ -261,6 +264,25 @@ def televerser(fichiers: list[dict], jeton: str, equipe: str, parallele: int) ->
                 f"{API}/v2/files?teamId={equipe}",
                 jeton,
                 corps=fichier["octets"],
+                # **`application/octet-stream` ne décide de rien.** Cet
+                # en-tête décrit le corps de *cette requête* vers
+                # `POST /v2/files`, qui dépose des octets indexés par leur
+                # empreinte ; le type servi plus tard est déduit de
+                # l'extension par le serveur statique de Vercel. Vérifié en
+                # production le 23 septembre 2026, avant même que le Wasm
+                # parte :
+                #
+                #     curl -sI …/canvaskit/chromium/canvaskit.wasm
+                #     content-type: application/wasm
+                #     x-content-type-options: nosniff
+                #
+                # Ce couple n'est pas décoratif pour ce ticket : avec
+                # `nosniff`, `WebAssembly.compileStreaming` **refuse** tout ce
+                # qui n'est pas `application/wasm`, et `main.dart.wasm` comme
+                # `canvaskit/skwasm.wasm` passent par là. Un type faux ne
+                # dégraderait pas le rendu, il empêcherait l'application de
+                # démarrer ; `scripts/verifier_production.sh` le vérifie sur
+                # l'adresse servie après chaque mise en ligne.
                 entetes={
                     "Content-Type": "application/octet-stream",
                     "x-vercel-digest": fichier["sha"],
@@ -478,6 +500,11 @@ def analyser(arguments: list[str]) -> argparse.Namespace:
     )
     analyseur.add_argument("--parallele", type=int, default=8, help="envois de front")
     analyseur.add_argument(
+        "--afficher-domaine",
+        action="store_true",
+        help="écrit le domaine de production sur la sortie standard et s'arrête",
+    )
+    analyseur.add_argument(
         "--dry-run",
         action="store_true",
         help="n'envoie rien : liste les fichiers, les empreintes et le corps du déploiement",
@@ -487,6 +514,18 @@ def analyser(arguments: list[str]) -> argparse.Namespace:
 
 def main(arguments: list[str]) -> int:
     options = analyser(arguments)
+
+    # Le domaine seul, sans rien envoyer et sans aucun secret : c'est la seule
+    # lecture dont `scripts/verifier_production.sh` a besoin pour savoir quelle
+    # adresse interroger. Le faire ici plutôt qu'en `awk` dans le script bash
+    # garde une seule façon de lire `[remotes.production.auth].site_url`.
+    if options.afficher_domaine:
+        try:
+            print(options.domaine or domaine_production())
+        except Echec as erreur:
+            journal(f"::error::{erreur}")
+            return 2
+        return 0
 
     racine = Path(options.racine)
     if not racine.is_dir():
