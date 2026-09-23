@@ -53,12 +53,7 @@ Attribution _attribution({
   required String creneauId,
   required String userId,
   AttributionEtat etat = AttributionEtat.propose,
-}) => Attribution(
-  id: id,
-  creneauId: creneauId,
-  userId: userId,
-  etat: etat,
-);
+}) => Attribution(id: id, creneauId: creneauId, userId: userId, etat: etat);
 
 /// Ce qui s'est passé pendant le test : les cases cyclées, les créneaux
 /// ouverts. Deux listes et non deux drapeaux — un appui qui déclenche les deux
@@ -121,14 +116,16 @@ Finder _caseDe({
 }
 
 BoxDecoration _decoration(WidgetTester tester, Finder caseAttribution) =>
-    tester.widget<DecoratedBox>(
-          find
-              .descendant(
-                of: caseAttribution,
-                matching: find.byType(DecoratedBox),
-              )
-              .first,
-        ).decoration
+    tester
+            .widget<DecoratedBox>(
+              find
+                  .descendant(
+                    of: caseAttribution,
+                    matching: find.byType(DecoratedBox),
+                  )
+                  .first,
+            )
+            .decoration
         as BoxDecoration;
 
 void main() {
@@ -342,11 +339,7 @@ void main() {
 
     testWidgets('un enregistrement en échec garde son contour d\'erreur sous '
         'le bloc', (tester) async {
-      const cle = CleCellule(
-        userId: 'u1',
-        jour: 1,
-        creneau: CreneauType.jour,
-      );
+      const cle = CleCellule(userId: 'u1', jour: 1, creneau: CreneauType.jour);
       await _monterLaGrille(
         tester,
         erreurs: <CleCellule>{cle},

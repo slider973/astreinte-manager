@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/l10n/format_date.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_status.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_divider.dart';
 import '../../../../core/widgets/empty_state.dart';
@@ -308,8 +309,14 @@ class _EnTete extends StatelessWidget {
 /// « Planning publié : la personne choisie sera notifiée tout de suite. »
 ///
 /// Icône + libellé, jamais la couleur seule. Pas de filet coloré à gauche : le
-/// fond `secondary-container` et l'icône suffisent, et un liseré de 4 dp sur un
-/// bloc d'information est une habitude, pas une décision (`DESIGN.md § Don't`).
+/// fond et l'icône suffisent, et un liseré de 4 dp sur un bloc d'information
+/// est une habitude, pas une décision (`DESIGN.md § Don't`).
+///
+/// **Le bloc emprunte l'état qu'il décrit** : « publié » du planning, dont il
+/// porte déjà l'icône `campaign`. Il lisait `secondary-container` en direct —
+/// les mêmes octets aujourd'hui, mais un rôle Material qui ne dit rien du fait
+/// annoncé, et que la prochaine retouche de palette aurait décroché de la
+/// famille sans que rien ne le signale (revue `craft-floor`, chantier 061c-2).
 class _BandeauReattribution extends StatelessWidget {
   const _BandeauReattribution({required this.texte});
 
@@ -317,30 +324,30 @@ class _BandeauReattribution extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final publie = context.statuts.planning(PlanningEtat.publie);
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.sm,
       ),
       decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer,
+        color: publie.fond,
         borderRadius: AppRadius.controleRadius,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Icon(
-            Icons.campaign,
+            publie.icone,
             size: AppTouch.iconePetite,
-            color: theme.colorScheme.onSecondaryContainer,
+            color: publie.encre,
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               texte,
               style: AppTextStyles.corpsSecondaire.copyWith(
-                color: theme.colorScheme.onSecondaryContainer,
+                color: publie.encre,
               ),
             ),
           ),

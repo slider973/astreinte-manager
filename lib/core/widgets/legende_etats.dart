@@ -34,12 +34,10 @@ class LegendeEtats extends StatelessWidget {
   /// Les trois états d'**attribution** seuls : proposé, accepté, refusé. La
   /// forme que porte le bandeau du mois, sous la légende de répartition, dès
   /// que le planning existe.
-  const LegendeEtats.attributions({
-    super.key,
-    this.espacement = AppSpacing.lg,
-  }) : densite = SlotChipDensite.dense,
-       creneau = CreneauType.jour,
-       _attributions = true;
+  const LegendeEtats.attributions({super.key, this.espacement = AppSpacing.lg})
+    : densite = SlotChipDensite.dense,
+      creneau = CreneauType.jour,
+      _attributions = true;
 
   /// Densité des cases de la légende. [SlotChipDensite.dense] par défaut :
   /// une légende ne se touche pas, elle se lit.

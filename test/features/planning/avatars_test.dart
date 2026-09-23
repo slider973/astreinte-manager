@@ -67,10 +67,8 @@ bool _tronque(WidgetTester tester, String texte) {
   return paragraphe.didExceedMaxLines;
 }
 
-Candidat _candidat(String nom) => Candidat(
-  membre: _ligne(nom),
-  disponibilite: DisponibiliteEtat.disponible,
-);
+Candidat _candidat(String nom) =>
+    Candidat(membre: _ligne(nom), disponibilite: DisponibiliteEtat.disponible);
 
 void main() {
   group('EnteteLigneMembre — le disque devant le nom', () {
