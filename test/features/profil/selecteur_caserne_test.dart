@@ -40,8 +40,7 @@ Future<void> _ouvrirProfil(
     profils: FauxProfilRepository(),
     caserneChoisie: caserneChoisie,
   );
-  await tester.tap(find.text(AppStrings.navProfil));
-  await tester.pumpAndSettle();
+  await ouvrirProfil(tester);
   await defilerJusqua(tester, find.text(AppStrings.profilCaserneTitre));
 }
 

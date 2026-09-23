@@ -75,11 +75,7 @@ class CarteJourVue extends StatelessWidget {
         propose.blocEncre,
         propose.filet,
       ),
-      EtatCarte.libre => (
-        scheme.surfaceContainerHigh,
-        scheme.onSurface,
-        null,
-      ),
+      EtatCarte.libre => (scheme.surfaceContainerHigh, scheme.onSurface, null),
     };
 
     final creneau = carte.creneau;

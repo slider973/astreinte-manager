@@ -1,5 +1,6 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/slot_chip.dart';
@@ -33,6 +34,9 @@ Future<void> ouvrirMois(
     reperes: ReperesLocauxMemoire(<RepereAccueil>{RepereAccueil.peintureDispos}),
     taille: taille,
   );
+  // Le Calendrier a sa route depuis le ticket 064 : `/` porte le tableau de
+  // bord.
+  await ouvrirRoute(tester, AppRoutes.calendrier);
 }
 
 /// Amène un bouton de portée sous le doigt — la bande défile — puis l'ouvre.

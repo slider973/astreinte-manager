@@ -24,20 +24,19 @@ import '../../support/faux_auth.dart';
 import '../../support/faux_dispos.dart';
 import '../../support/faux_notifications.dart';
 
-/// Un écran haut : les quatre onglets tiennent sans défiler.
+/// Un écran haut : les quatre destinations tiennent sans défiler.
 const Size _telephoneLong = Size(420, 1400);
 
-/// Les quatre onglets que la coquille sert réellement, et l'écran de chacun.
+/// Les trois destinations qui portent la cloche, et l'écran de chacune.
 ///
-/// Ce sont eux qui portent la cloche, par `AppScaffold.actions` — un seul et
-/// même widget, donc une seule correction (`design/052 § 8.1`). La cinquième
-/// occurrence de `BoutonNotifications` est l'état « à venir » de la coquille,
-/// qu'aucune destination n'atteint aujourd'hui.
-const Map<int, Type> _onglets = <int, Type>{
-  0: MoisScreen,
-  1: PropositionsScreen,
-  2: AstreintesScreen,
-  3: ProfilScreen,
+/// Elles la portent par `AppScaffold.actions` ou par l'en-tête du tableau de
+/// bord — un seul et même widget, donc une seule correction
+/// (`design/052 § 8.1`). La Boîte, elle, ne se montre pas le chemin vers
+/// elle-même.
+const Map<String, Type> _destinations = <String, Type>{
+  AppRoutes.accueil: AccueilScreen,
+  AppRoutes.calendrier: MoisScreen,
+  AppRoutes.astreintes: AstreintesScreen,
 };
 
 Future<void> _monterMembre(
@@ -53,77 +52,58 @@ Future<void> _monterMembre(
   taille: _telephoneLong,
 );
 
-/// La sortie du centre, dans sa forme « il y a une pile à dépiler ».
+/// La sortie d'un écran poussé, dans sa forme « il y a une pile à dépiler ».
 final Finder _fleche = find.byTooltip(AppStrings.actionRetour);
 
 /// La même, dans sa forme « pile vide » : le mot est écrit à côté.
 final Finder _flecheAccueil = find.text(AppStrings.retourAccueil);
 
+/// L'index de la destination choisie dans la barre du bas.
+int _destinationChoisie(WidgetTester tester) =>
+    tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
+
 void main() {
-  group('Le centre s\'empile et se dépile', () {
-    for (final onglet in _onglets.entries) {
+  group('La Boîte est une destination, pas un écran poussé', () {
+    for (final destination in _destinations.entries) {
       testWidgets(
-        'onglet ${onglet.key} : la cloche ouvre le centre, la flèche y ramène',
+        '${destination.key} : la cloche mène à la Boîte, et la barre y reste',
         (tester) async {
           await _monterMembre(tester);
-          await ouvrirRoute(
-            tester,
-            '${AppRoutes.accueil}?${AppRoutes.parametreOnglet}=${onglet.key}',
-          );
-          expect(find.byType(onglet.value), findsOneWidget);
-
-          // L'état de l'écran d'origine, tel qu'il est avant le détour. La
-          // coquille ne doit pas être reconstruite : c'est elle qui tient
-          // l'onglet, le mois affiché et la position de défilement.
-          final avant = tester.state<State<AccueilScreen>>(
-            find.byType(AccueilScreen),
-          );
+          await ouvrirRoute(tester, destination.key);
+          expect(find.byType(destination.value), findsOneWidget);
 
           await tester.tap(find.byType(BoutonNotifications));
           await tester.pumpAndSettle();
 
           expect(find.byType(NotificationsScreen), findsOneWidget);
-          // **L'écran d'origine est toujours monté**, sous la pile : c'est la
-          // preuve que la cloche a empilé au lieu de remplacer.
+          expect(emplacementCourant(tester), AppRoutes.boite);
+
+          // **Personne n'est enfermé** : c'est l'invariant du ticket 052, et
+          // il tient autrement depuis le 064. Le centre n'a plus de flèche
+          // parce qu'il n'a plus de pile au-dessus de laquelle il flotte : il
+          // a la barre de navigation, et ses quatre sorties.
+          expect(_fleche, findsNothing);
+          expect(find.byType(NavigationBar), findsOneWidget);
           expect(
-            find.byType(onglet.value, skipOffstage: false),
-            findsOneWidget,
+            _destinationChoisie(tester),
+            3,
+            reason: 'la Boîte est la quatrième destination',
           );
 
-          await tester.tap(_fleche);
+          // Et on en revient par où l'on veut : la barre est une sortie.
+          await tester.tap(find.text(AppStrings.navAccueil));
           await tester.pumpAndSettle();
-
-          expect(find.byType(NotificationsScreen), findsNothing);
-          expect(find.byType(onglet.value), findsOneWidget);
-          // **L'adresse est redevenue celle de l'écran d'origine**, onglet
-          // compris : c'est elle que le rechargement rejouerait.
-          expect(
-            emplacementCourant(tester),
-            '${AppRoutes.accueil}?${AppRoutes.parametreOnglet}=${onglet.key}',
-          );
-          // Le même `State`, pas un nouveau : rien n'a été resérialisé.
-          expect(
-            identical(
-              tester.state<State<AccueilScreen>>(find.byType(AccueilScreen)),
-              avant,
-            ),
-            isTrue,
-            reason: 'la coquille a été reconstruite : l\'onglet est perdu',
-          );
-          expect(
-            tester
-                .widget<NavigationBar>(find.byType(NavigationBar))
-                .selectedIndex,
-            onglet.key,
-          );
+          expect(find.byType(AccueilScreen), findsOneWidget);
+          expect(emplacementCourant(tester), AppRoutes.accueil);
         },
       );
     }
 
-    // **La preuve 2 du brief** : « Mon mois » sur novembre, cloche, retour —
-    // novembre, pas octobre. Le mois ne vit que dans `?mois=`, et c'est ce qui
-    // se perdait quand la flèche faisait un `go` vers « / ».
-    testWidgets('le mois affiché survit à l\'aller-retour', (tester) async {
+    // **La preuve 2 du brief du 052, transposée sur un écran poussé.** Le
+    // Calendrier sur novembre, un détour par le profil, le retour — novembre,
+    // pas octobre. Le mois ne vit que dans `?mois=`, et c'est ce qui se
+    // perdait quand une flèche faisait un `go` vers « / ».
+    testWidgets('le mois affiché survit à un détour poussé', (tester) async {
       await _monterMembre(
         tester,
         dispos: FauxDisposRepository(
@@ -134,8 +114,7 @@ void main() {
         ),
       );
       const depart =
-          '${AppRoutes.accueil}?${AppRoutes.parametreOnglet}=0'
-          '&${AppRoutes.parametreMois}=2026-11';
+          '${AppRoutes.calendrier}?${AppRoutes.parametreMois}=2026-11';
       await ouvrirRoute(tester, depart);
       expect(
         tester.widgetList<DayCell>(find.byType(DayCell)).first.nomJour,
@@ -143,9 +122,8 @@ void main() {
         reason: 'le 1er novembre 2026 est un dimanche',
       );
 
-      await tester.tap(find.byType(BoutonNotifications));
-      await tester.pumpAndSettle();
-      expect(find.byType(NotificationsScreen), findsOneWidget);
+      await ouvrirProfil(tester);
+      expect(find.byType(ProfilScreen), findsOneWidget);
 
       await tester.tap(_fleche);
       await tester.pumpAndSettle();
@@ -158,7 +136,7 @@ void main() {
       );
     });
 
-    testWidgets('l\'adresse dit « /notifications » pendant l\'affichage', (
+    testWidgets('l\'adresse dit « /boite » pendant l\'affichage', (
       tester,
     ) async {
       await _monterMembre(tester);
@@ -167,32 +145,62 @@ void main() {
       await tester.tap(find.byType(BoutonNotifications));
       await tester.pumpAndSettle();
 
-      // Sans `GoRouter.optionURLReflectsImperativeAPIs`, l'adresse resterait
-      // sur `/` pendant que le centre s'affiche, et un rechargement rendrait
-      // l'accueil (`design/052 § 3.3`).
-      expect(emplacementCourant(tester), AppRoutes.notifications);
+      // Un rechargement doit rendre la Boîte, pas l'accueil
+      // (`design/052 § 3.3`).
+      expect(emplacementCourant(tester), AppRoutes.boite);
     });
 
-    testWidgets('deux touches rapprochées n\'empilent qu\'un seul centre', (
+    testWidgets('deux touches rapprochées n\'ouvrent qu\'une Boîte', (
       tester,
     ) async {
       await _monterMembre(tester);
       await ouvrirRoute(tester, AppRoutes.accueil);
 
       // Sans attendre d'image entre les deux : la seconde touche part avant
-      // que le centre ne soit peint.
+      // que la Boîte ne soit peinte.
       await tester.tap(find.byType(BoutonNotifications));
       await tester.tap(find.byType(BoutonNotifications));
       await tester.pumpAndSettle();
 
       expect(find.byType(NotificationsScreen), findsOneWidget);
 
-      // **Une seule flèche à presser pour sortir.** Deux centres empilés
-      // reproduiraient la plainte d'origine, en pire.
+      // **Rien n'a été empilé.** Une Boîte posée au-dessus de l'accueil
+      // porterait une flèche de retour, et deux touches en poseraient deux :
+      // la plainte d'origine, en pire.
+      expect(find.byType(BoutonRetour), findsNothing);
+      expect(find.byType(AccueilScreen, skipOffstage: false), findsNothing);
+    });
+
+    testWidgets('l\'ancienne adresse « /notifications » mène à la Boîte', (
+      tester,
+    ) async {
+      await _monterMembre(tester);
+      // Elle a été poussée par la cloche pendant six tickets : elle dort dans
+      // des historiques de navigateur et dans des onglets restaurés.
+      await ouvrirRoute(tester, AppRoutes.notifications);
+
+      expect(find.byType(NotificationsScreen), findsOneWidget);
+      expect(emplacementCourant(tester), AppRoutes.boite);
+    });
+  });
+
+  group('Les écrans poussés gardent leur flèche', () {
+    testWidgets('le profil s\'ouvre par l\'avatar et se referme', (
+      tester,
+    ) async {
+      await _monterMembre(tester);
+      await ouvrirRoute(tester, AppRoutes.accueil);
+
+      await ouvrirProfil(tester);
+      expect(find.byType(ProfilScreen), findsOneWidget);
+      expect(emplacementCourant(tester), AppRoutes.profil);
+      expect(_fleche, findsOneWidget);
+
       await tester.tap(_fleche);
       await tester.pumpAndSettle();
-      expect(find.byType(NotificationsScreen), findsNothing);
-      expect(find.byType(MoisScreen), findsOneWidget);
+      expect(find.byType(ProfilScreen), findsNothing);
+      expect(find.byType(AccueilScreen), findsOneWidget);
+      expect(emplacementCourant(tester), AppRoutes.accueil);
     });
 
     testWidgets('le retour système fait la même chose que la flèche', (
@@ -200,19 +208,17 @@ void main() {
     ) async {
       await _monterMembre(tester);
       await ouvrirRoute(tester, AppRoutes.accueil);
-
-      await tester.tap(find.byType(BoutonNotifications));
-      await tester.pumpAndSettle();
-      expect(find.byType(NotificationsScreen), findsOneWidget);
+      await ouvrirProfil(tester);
+      expect(find.byType(ProfilScreen), findsOneWidget);
 
       // C'est le chemin du bouton précédent du navigateur et du geste retour
       // iOS : un seul cran d'historique, le même résultat.
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
-      expect(find.byType(NotificationsScreen), findsNothing);
-      expect(find.byType(MoisScreen), findsOneWidget);
-      expect(emplacementCourant(tester), startsWith(AppRoutes.accueil));
+      expect(find.byType(ProfilScreen), findsNothing);
+      expect(find.byType(AccueilScreen), findsOneWidget);
+      expect(emplacementCourant(tester), AppRoutes.accueil);
     });
   });
 
@@ -223,9 +229,9 @@ void main() {
       await _monterMembre(tester);
       // Aucune pile : c'est exactement ce que fait la reprise du ticket 045,
       // qui rejoue la destination mémorisée avec un `go`.
-      await ouvrirRoute(tester, AppRoutes.notifications);
+      await ouvrirRoute(tester, AppRoutes.profil);
 
-      expect(find.byType(NotificationsScreen), findsOneWidget);
+      expect(find.byType(ProfilScreen), findsOneWidget);
       expect(_flecheAccueil, findsOneWidget);
       // Rien ne parle d'erreur : il n'y a pas d'erreur, il y a un autre
       // chemin d'arrivée.
@@ -235,12 +241,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(emplacementCourant(tester), AppRoutes.accueil);
-      expect(find.byType(MoisScreen), findsOneWidget);
+      expect(find.byType(AccueilScreen), findsOneWidget);
     });
 
     testWidgets('le mot est annoncé « Aller à l\'accueil »', (tester) async {
       await _monterMembre(tester);
-      await ouvrirRoute(tester, AppRoutes.notifications);
+      await ouvrirRoute(tester, AppRoutes.profil);
 
       expect(
         tester.getSemantics(_flecheAccueil).label,
@@ -251,8 +257,7 @@ void main() {
     testWidgets('la pile pleine n\'affiche pas le mot', (tester) async {
       await _monterMembre(tester);
       await ouvrirRoute(tester, AppRoutes.accueil);
-      await tester.tap(find.byType(BoutonNotifications));
-      await tester.pumpAndSettle();
+      await ouvrirProfil(tester);
 
       expect(_flecheAccueil, findsNothing);
       expect(_fleche, findsOneWidget);
@@ -265,15 +270,14 @@ void main() {
     ) async {
       await _monterMembre(tester);
 
-      await ouvrirRoute(tester, AppRoutes.notifications);
+      await ouvrirRoute(tester, AppRoutes.profil);
       expect(
         tester.getSize(find.byType(BoutonRetour)).height,
         greaterThanOrEqualTo(48),
       );
 
       await ouvrirRoute(tester, AppRoutes.accueil);
-      await tester.tap(find.byType(BoutonNotifications));
-      await tester.pumpAndSettle();
+      await ouvrirProfil(tester);
       expect(
         tester.getSize(find.byType(BoutonRetour)).height,
         greaterThanOrEqualTo(48),
@@ -289,7 +293,7 @@ void main() {
       tester,
     ) async {
       await _monterMembre(tester);
-      await ouvrirRoute(tester, AppRoutes.notifications);
+      await ouvrirRoute(tester, AppRoutes.profil);
 
       // À l'échelle normale, le mot est là.
       expect(_flecheAccueil, findsOneWidget);
@@ -311,7 +315,7 @@ void main() {
   });
 
   group('Non-régression du ticket 026', () {
-    testWidgets('toucher une ligne quitte le centre au lieu de l\'empiler', (
+    testWidgets('toucher une ligne quitte la Boîte au lieu de l\'empiler', (
       tester,
     ) async {
       await _monterMembre(
@@ -320,22 +324,17 @@ void main() {
           notifications: <NotificationInterne>[notification(id: 'n-1')],
         ),
       );
-      await ouvrirRoute(tester, AppRoutes.accueil);
-      await tester.tap(find.byType(BoutonNotifications));
-      await tester.pumpAndSettle();
+      await ouvrirRoute(tester, AppRoutes.boite);
 
       await tester.tap(find.byType(LigneNotification));
       await tester.pumpAndSettle();
 
-      // `/proposals` traduit par `destinationInterne` : l'onglet des
-      // propositions, et la pile redevient celle de la destination. On ne
-      // revient pas au journal après avoir ouvert ce qu'il annonçait.
+      // `/proposals` traduit par `destinationInterne` : l'écran des
+      // propositions. On ne revient pas au journal après avoir ouvert ce
+      // qu'il annonçait.
       expect(find.byType(NotificationsScreen), findsNothing);
       expect(find.byType(PropositionsScreen), findsOneWidget);
-      expect(
-        emplacementCourant(tester),
-        contains('${AppRoutes.parametreOnglet}=1'),
-      );
+      expect(emplacementCourant(tester), AppRoutes.propositions);
     });
   });
 
@@ -344,10 +343,8 @@ void main() {
       tester,
     ) async {
       await _monterMembre(tester);
-      await ouvrirRoute(
-        tester,
-        '${AppRoutes.accueil}?${AppRoutes.parametreOnglet}=3',
-      );
+      await ouvrirRoute(tester, AppRoutes.accueil);
+      await ouvrirProfil(tester);
       expect(find.byType(ProfilScreen), findsOneWidget);
 
       await defilerJusqua(
@@ -364,20 +361,15 @@ void main() {
       // Avant le ticket 052, `go` remettait la pile à plat et renvoyait sur
       // « Mon mois ».
       expect(find.byType(ProfilScreen), findsOneWidget);
-      expect(
-        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-        3,
-      );
+      expect(emplacementCourant(tester), AppRoutes.profil);
     });
 
     testWidgets('passer à l\'autre document ne creuse pas la pile', (
       tester,
     ) async {
       await _monterMembre(tester);
-      await ouvrirRoute(
-        tester,
-        '${AppRoutes.accueil}?${AppRoutes.parametreOnglet}=3',
-      );
+      await ouvrirRoute(tester, AppRoutes.accueil);
+      await ouvrirProfil(tester);
 
       await defilerJusqua(
         tester,
@@ -413,9 +405,10 @@ void main() {
     });
   });
 
-  // La zone sûre basse du centre : la barre d'accueil de l'iPhone en PWA
-  // installée mange les 34 derniers points de l'écran, et rien d'autre que ce
-  // qui est au bas de la liste ne les réserve.
+  // La zone sûre basse de la Boîte : la barre d'accueil de l'iPhone en PWA
+  // installée mange les 34 derniers points de l'écran. Depuis le ticket 064,
+  // c'est la barre de navigation qui les réserve — elle ajoute
+  // `viewPadding.bottom` à sa propre hauteur (`AppScaffold`).
   group('La zone sûre basse', () {
     /// La hauteur de la barre d'accueil d'un iPhone récent, en points.
     const double barreAccueil = 34;
@@ -432,14 +425,14 @@ void main() {
                 .padding
             as EdgeInsets;
 
-    Future<void> ouvrirCentre(
+    Future<void> ouvrirBoite(
       WidgetTester tester, {
       required bool toutLu,
     }) async {
       // Deux propriétés, deux lecteurs : `viewPadding` nourrit
-      // `MediaQuery.viewPaddingOf`, que lit la liste, et `padding` nourrit
-      // `SafeArea`, dont se sert `BarreActionsBasse`. Les fixer toutes les
-      // deux, c'est l'iPhone en PWA installée, clavier fermé.
+      // `MediaQuery.viewPaddingOf`, que lit la barre de navigation, et
+      // `padding` nourrit `SafeArea`, dont se sert `BarreActionsBasse`. Les
+      // fixer toutes les deux, c'est l'iPhone en PWA installée, clavier fermé.
       final reserve = FakeViewPadding(
         bottom: barreAccueil * tester.view.devicePixelRatio,
       );
@@ -461,17 +454,17 @@ void main() {
           ],
         ),
       );
-      await ouvrirRoute(tester, AppRoutes.notifications);
+      await ouvrirRoute(tester, AppRoutes.boite);
     }
 
-    testWidgets('tout lu : la dernière ligne garde les 34 points', (
+    testWidgets('tout lu : la barre de navigation porte les 34 points', (
       tester,
     ) async {
-      await ouvrirCentre(tester, toutLu: true);
+      await ouvrirBoite(tester, toutLu: true);
 
-      // Rien sous la liste : c'est elle qui porte la zone sûre.
+      // La liste ne double pas la réserve : la barre l'a déjà posée.
       expect(find.byType(BarreActionsBasse), findsNothing);
-      expect(reserveListe(tester).bottom, AppSpacing.xl + barreAccueil);
+      expect(reserveListe(tester).bottom, AppSpacing.xl);
 
       // Et à l'écran, une fois la liste défilée jusqu'au bout : la dernière
       // ligne s'arrête au-dessus de la barre d'accueil.
@@ -492,13 +485,11 @@ void main() {
       );
     });
 
-    testWidgets('des non-lus : c\'est la barre d\'actions qui la porte', (
+    testWidgets('des non-lus : la barre d\'actions reste au-dessus', (
       tester,
     ) async {
-      await ouvrirCentre(tester, toutLu: false);
+      await ouvrirBoite(tester, toutLu: false);
 
-      // La réserve ne compte qu'une fois : doubler la zone sûre creuserait un
-      // trou entre la liste et la barre.
       expect(reserveListe(tester).bottom, AppSpacing.xl);
       expect(find.byType(BarreActionsBasse), findsOneWidget);
       expect(

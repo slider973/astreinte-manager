@@ -1,5 +1,6 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/count_stat.dart';
@@ -55,20 +56,20 @@ Future<void> ouvrir(
       RepereAccueil.peintureDispos,
     }),
     taille: taille,
-  );
+  ); // Le Calendrier a sa route depuis le ticket 064 : `/` porte le tableau de
+  // bord.
+  await ouvrirRoute(tester, AppRoutes.calendrier);
 }
 
-int compteur(WidgetTester tester, String libelle) => tester
-    .widget<CountStat>(find.widgetWithText(CountStat, libelle))
-    .valeur;
+int compteur(WidgetTester tester, String libelle) =>
+    tester.widget<CountStat>(find.widgetWithText(CountStat, libelle)).valeur;
 
 /// La rangée de plafond, et non le compteur du même nom : « Weekends » est
 /// écrit aux deux endroits, et c'est voulu — c'est le même chiffre.
 Finder rangee(String libelle) => find.widgetWithText(RangeePlafond, libelle);
 
-int? plafondDe(WidgetTester tester, String libelle) => tester
-    .widget<CountStat>(find.widgetWithText(CountStat, libelle))
-    .plafond;
+int? plafondDe(WidgetTester tester, String libelle) =>
+    tester.widget<CountStat>(find.widgetWithText(CountStat, libelle)).plafond;
 
 void main() {
   group('La section des maximums — quand elle se montre', () {
@@ -78,7 +79,8 @@ void main() {
       expect(
         find.byType(SectionPreferences),
         findsNothing,
-        reason: 'rien de coché, rien à plafonner : le bloc d\'aide du 011 '
+        reason:
+            'rien de coché, rien à plafonner : le bloc d\'aide du 011 '
             'tient le haut de l\'écran',
       );
     });
@@ -93,7 +95,8 @@ void main() {
       expect(
         find.byType(SectionPreferences),
         findsOneWidget,
-        reason: 'la question « combien j\'en veux » naît avec la première '
+        reason:
+            'la question « combien j\'en veux » naît avec la première '
             'réponse à « quand je peux »',
       );
       await tester.pump(apresLeDelai);
@@ -134,10 +137,7 @@ void main() {
 
       expect(find.byType(SectionPreferences), findsOneWidget);
       expect(find.text(AppStrings.preferencesLecon), findsNothing);
-      expect(
-        find.text(AppStrings.preferencesValeurs(null, 1)),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.preferencesValeurs(null, 1)), findsOneWidget);
     });
   });
 

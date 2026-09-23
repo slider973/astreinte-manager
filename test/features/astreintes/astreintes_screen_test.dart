@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/session/appartenances_locales.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
@@ -85,7 +86,7 @@ void main() {
     (WidgetTester tester) async {
       await _ouvrir(tester);
 
-      expect(emplacementCourant(tester), '/?onglet=2');
+      expect(emplacementCourant(tester), AppRoutes.astreintes);
       expect(find.text(AppStrings.astreintesTitre), findsOneWidget);
       expect(find.text(AppStrings.navAstreintes), findsWidgets);
     },

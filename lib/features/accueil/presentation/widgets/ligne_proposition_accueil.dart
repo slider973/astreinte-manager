@@ -50,7 +50,8 @@ class LignePropositionAccueil extends StatelessWidget {
     final creneau = context.statuts.creneau(proposition.creneau);
 
     final titre = dateAvecJourSemaine(proposition.jour);
-    final soutien = '${creneau.libelle} · '
+    final soutien =
+        '${creneau.libelle} · '
         '${heures.intervalle(proposition.creneau)}';
     final proposeeLe = proposition.proposeeLe;
     final mention = proposeeLe == null

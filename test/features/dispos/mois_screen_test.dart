@@ -59,6 +59,9 @@ Future<void> ouvrirMois(
         ReperesLocauxMemoire(<RepereAccueil>{RepereAccueil.peintureDispos}),
     taille: taille,
   );
+  // La saisie n'est plus le premier écran : `/` porte le tableau de bord
+  // depuis le ticket 064, et le Calendrier a sa route.
+  await ouvrirRoute(tester, AppRoutes.calendrier);
 }
 
 /// Choisit un mois dans le sélecteur, en l'amenant d'abord sous le doigt :
@@ -408,9 +411,7 @@ void main() {
 
         expect(
           find.text(
-            AppStrings.moisRefusVerrouille(
-              AppStrings.moisNomEtAnnee(10, 2026),
-            ),
+            AppStrings.moisRefusVerrouille(AppStrings.moisNomEtAnnee(10, 2026)),
           ),
           findsOneWidget,
         );
@@ -717,7 +718,7 @@ void main() {
 
       // Le retour du navigateur ramène à l'entrée précédente, sans mois :
       // c'est le mois par défaut qui doit revenir.
-      await ouvrirRoute(tester, '/?onglet=0');
+      await ouvrirRoute(tester, AppRoutes.calendrier);
       expect(
         tester.widgetList<DayCell>(find.byType(DayCell)).first.nomJour,
         'jeu.',
@@ -736,6 +737,7 @@ void main() {
         dispos: depot,
         stabiliser: false,
       );
+      await ouvrirRoute(tester, AppRoutes.calendrier, stabiliser: false);
 
       expect(find.byType(LoadingSkeleton), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);

@@ -49,8 +49,7 @@ Future<Decor> _ouvrirProfil(
     telechargement: telechargement,
   );
 
-  await tester.tap(find.text(AppStrings.navProfil));
-  await tester.pumpAndSettle();
+  await ouvrirProfil(tester);
   await defilerJusqua(tester, find.text(AppStrings.exportBouton));
 
   return (depot: export, fichiers: telechargement);
@@ -117,7 +116,10 @@ void main() {
 
       // L'entête porte l'inventaire : c'est ce qui permet de vérifier un
       // export sans le relire en entier.
-      expect((relu['export']! as Map<String, dynamic>)['inventaire'], isNotNull);
+      expect(
+        (relu['export']! as Map<String, dynamic>)['inventaire'],
+        isNotNull,
+      );
 
       // Lisible par un humain, pas seulement par une machine : un JSON sur une
       // seule ligne de 20 000 caractères ne s'ouvre pas dans une mairie.
@@ -130,9 +132,7 @@ void main() {
     ) async {
       final decor = await _ouvrirProfil(
         tester,
-        fichiers: FauxTelechargement(
-          resultat: ResultatTelechargement.partage,
-        ),
+        fichiers: FauxTelechargement(resultat: ResultatTelechargement.partage),
       );
       await _exporter(tester);
 

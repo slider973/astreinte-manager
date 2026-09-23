@@ -60,10 +60,10 @@ void main() {
       // Cinq destinations, libellés visibles à côté des icônes.
       expect(find.byType(NavigationDrawerDestination), findsNWidgets(5));
       for (final libelle in <String>[
-        AppStrings.navMonMois,
-        AppStrings.navPropositions,
+        AppStrings.navAccueil,
+        AppStrings.navCalendrier,
         AppStrings.navAstreintes,
-        AppStrings.navProfil,
+        AppStrings.navBoite,
         AppStrings.navAdmin,
       ]) {
         expect(find.text(libelle), findsOneWidget);
@@ -93,7 +93,8 @@ void main() {
       }
 
       expect(
-        tester.widget<NavigationDrawer>(find.byType(NavigationDrawer))
+        tester
+            .widget<NavigationDrawer>(find.byType(NavigationDrawer))
             .selectedIndex,
         4,
       );
@@ -104,12 +105,12 @@ void main() {
         scheme.onPrimaryContainer,
       );
       expect(
-        _encreDuLibelle(tester, AppStrings.navMonMois),
+        _encreDuLibelle(tester, AppStrings.navAccueil),
         scheme.onSurfaceVariant,
       );
     });
 
-    testWidgets('la pastille des propositions reste chiffrée', (tester) async {
+    testWidgets('la pastille de la Boîte reste chiffrée', (tester) async {
       await chargerPolicesDuProduit();
       await monterEcran(tester, _ossature(), taille: _poste);
 
@@ -167,7 +168,10 @@ void main() {
       // Les actions de l'écran précèdent la cloche et le compte, et toutes
       // sont à droite du titre.
       final titre = tester.getTopRight(find.text('CIS Saint-Martin')).dx;
-      expect(tester.getTopLeft(find.byIcon(Icons.refresh)).dx, greaterThan(titre));
+      expect(
+        tester.getTopLeft(find.byIcon(Icons.refresh)).dx,
+        greaterThan(titre),
+      );
       expect(
         tester.getTopLeft(find.byType(AvatarInitiales)).dx,
         greaterThan(tester.getTopRight(find.byIcon(Icons.refresh)).dx),

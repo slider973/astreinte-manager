@@ -17,14 +17,7 @@ const Appartenance _adminCaserneA = Appartenance(
   statut: StatutMembre.actif,
 );
 
-/// Ouvre l'onglet « Profil », qui porte l'identité et la sortie depuis que
-/// l'onglet 0 est devenu l'écran « Mon mois » (ticket 011).
-Future<void> ouvrirProfil(WidgetTester tester) async {
-  await tester.tap(find.text(AppStrings.navProfil));
-  await tester.pumpAndSettle();
-}
-
-/// L'onglet « Profil » défile depuis que le réglage des notifications s'y est
+/// L'écran « Profil » défile depuis que le réglage des notifications s'y est
 /// posé (ticket 024) : la sortie est sous la ligne de flottaison.
 Future<void> faireDefilerJusqua(WidgetTester tester, Finder cible) =>
     defilerJusqua(tester, cible);

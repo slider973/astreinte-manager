@@ -15,10 +15,7 @@ Widget _ossature({
 }) {
   return AppScaffold(
     titre: 'Octobre 2026',
-    destinations: AppDestination.pour(
-      admin: admin,
-      boiteNonLues: nonLues,
-    ),
+    destinations: AppDestination.pour(admin: admin, boiteNonLues: nonLues),
     indexSelectionne: 0,
     onDestination: onDestination ?? (_) {},
     banniere: banniere,
@@ -101,8 +98,8 @@ void main() {
         NavigationBarTheme.of(barre).labelBehavior,
         NavigationDestinationLabelBehavior.alwaysShow,
       );
-      expect(find.text(AppStrings.navMonMois), findsOneWidget);
-      expect(find.text(AppStrings.navPropositions), findsOneWidget);
+      expect(find.text(AppStrings.navAccueil), findsOneWidget);
+      expect(find.text(AppStrings.navCalendrier), findsOneWidget);
     });
 
     testWidgets('la bannière se place entre la barre et le contenu', (

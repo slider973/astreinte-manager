@@ -138,8 +138,7 @@ void main() {
         appartenancesLocales: appartenancesLocales,
       );
 
-      await tester.tap(find.text(AppStrings.navProfil));
-      await tester.pumpAndSettle();
+      await ouvrirProfil(tester);
       await defilerJusqua(tester, find.text(AppStrings.seDeconnecter));
       await tester.tap(find.text(AppStrings.seDeconnecter));
       await tester.pumpAndSettle();
@@ -182,8 +181,7 @@ void main() {
       );
       faux.auth.erreurDeconnexion = AuthErreur.reseau;
 
-      await tester.tap(find.text(AppStrings.navProfil));
-      await tester.pumpAndSettle();
+      await ouvrirProfil(tester);
       await defilerJusqua(tester, find.text(AppStrings.seDeconnecter));
       await tester.tap(find.text(AppStrings.seDeconnecter));
       await tester.pumpAndSettle();
@@ -293,7 +291,7 @@ void main() {
       );
 
       // L'application s'ouvre : c'est tout l'intérêt du repli.
-      expect(find.text(AppStrings.navMonMois), findsWidgets);
+      expect(find.text(AppStrings.navAccueil), findsWidgets);
       expect(find.text(AppStrings.navAstreintes), findsWidgets);
       // Mais la cinquième destination n'est pas là : un rôle qu'on n'a pas pu
       // revérifier n'accorde rien.
@@ -347,7 +345,7 @@ void main() {
         astreintes: FauxAstreintesRepository(),
       );
 
-      expect(find.text(AppStrings.navMonMois), findsNothing);
+      expect(find.text(AppStrings.navAccueil), findsNothing);
       expect(find.text(AppStrings.erreurReseauTexte), findsOneWidget);
     });
   });

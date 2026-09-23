@@ -18,6 +18,7 @@ import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entete_section.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
+import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../domain/astreinte.dart';
 import '../domain/astreintes_providers.dart';
 import '../domain/planning_caserne.dart';
@@ -173,6 +174,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
               : AppStrings.astreintesRafraichir,
         ),
         const BoutonNotifications(),
+        const BoutonCompte(),
       ],
       banniere: caserne
           ? _banniereCaserne(enLigne: enLigne)

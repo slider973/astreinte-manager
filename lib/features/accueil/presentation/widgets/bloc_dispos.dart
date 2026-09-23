@@ -89,10 +89,7 @@ class _Appel extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    Icon(
-                      Icons.chevron_right,
-                      color: scheme.onPrimaryContainer,
-                    ),
+                    Icon(Icons.chevron_right, color: scheme.onPrimaryContainer),
                   ],
                 ),
               ),

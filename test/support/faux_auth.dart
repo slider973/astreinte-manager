@@ -54,6 +54,7 @@ import 'package:astreinte_sp/features/profil/data/profil_repository.dart';
 import 'package:astreinte_sp/features/profil/domain/calendrier_providers.dart';
 import 'package:astreinte_sp/features/profil/domain/export_providers.dart';
 import 'package:astreinte_sp/features/profil/domain/profil_providers.dart';
+import 'package:astreinte_sp/features/profil/presentation/widgets/bouton_compte.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/propositions_providers.dart';
 import 'package:astreinte_sp/features/superadmin/data/superadmin_repository.dart';
@@ -527,6 +528,17 @@ Future<void> ouvrirRoute(
     await tester.pump();
     await tester.pump();
   }
+}
+
+/// Ouvre le profil **comme un pompier le fait** : par l'avatar de l'en-tête.
+///
+/// Depuis le ticket 064 il n'est plus une destination de la barre : il se
+/// pousse, et `BoutonRetour` le referme. Le disque est présent sur tous les
+/// écrans de la coquille — dans l'en-tête du tableau de bord en `compact`,
+/// dans l'en-tête de travail dès `expanded`.
+Future<void> ouvrirProfil(WidgetTester tester) async {
+  await tester.tap(find.byType(BoutonCompte).first);
+  await tester.pumpAndSettle();
 }
 
 /// Fait défiler jusqu'à [cible], **dans la liste de l'écran**.

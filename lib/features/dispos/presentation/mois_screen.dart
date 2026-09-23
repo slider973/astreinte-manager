@@ -19,6 +19,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/peinture_grille.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
+import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../domain/dispos_providers.dart';
 import '../domain/periode_saisie.dart';
 import 'controllers/saisie_controller.dart';
@@ -226,9 +227,9 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
       ),
       onDestination: (index) =>
           allerVersDestination(context, destinations, index),
-      // La cloche du centre de notifications (ticket 026). Elle vit ici et non
-      // dans la navigation : cinq destinations, c'est plein.
-      actions: const <Widget>[BoutonNotifications()],
+      // La cloche de la Boîte (ticket 026) et l'avatar du compte (ticket 064).
+      // Dès `expanded`, les deux passent dans l'en-tête de travail.
+      actions: const <Widget>[BoutonNotifications(), BoutonCompte()],
       banniere: _banniere(etat, periodes),
       filActions: etat == null || classe.estLarge
           ? null

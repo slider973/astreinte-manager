@@ -108,7 +108,8 @@ final Provider<AsyncValue<TableauBord>> tableauBordProvider =
 /// Vide quand la caserne n'a pas de nom d'usage — la salutation tient alors
 /// toute seule, sans inventer un prénom à partir d'une adresse électronique.
 final Provider<String> prenomProvider = Provider<String>((ref) {
-  final nom = (ref.watch(appartenanceCouranteProvider)?.nomAffiche ?? '').trim();
+  final nom = (ref.watch(appartenanceCouranteProvider)?.nomAffiche ?? '')
+      .trim();
   if (nom.isEmpty) return '';
   return nom.split(RegExp(r'\s+')).first;
 });

@@ -296,7 +296,12 @@ class _Squelette extends StatelessWidget {
 
     return LoadingSkeleton(
       child: ListView(
-        padding: EdgeInsets.fromLTRB(marge, AppSpacing.lg, marge, AppSpacing.xl),
+        padding: EdgeInsets.fromLTRB(
+          marge,
+          AppSpacing.lg,
+          marge,
+          AppSpacing.xl,
+        ),
         children: <Widget>[
           const SkeletonLigne(largeur: 180, hauteur: AppSpacing.xxl),
           const SizedBox(height: AppSpacing.xl),
@@ -304,16 +309,20 @@ class _Squelette extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           SizedBox(
             height: CarteJourVue.hauteur(context),
-            child: Row(
-              children: <Widget>[
-                for (var index = 0; index < 3; index++) ...<Widget>[
-                  const SizedBox(
-                    width: CarteJourVue.largeur,
-                    child: SkeletonBloc(hauteur: double.infinity),
-                  ),
+            // La même liste horizontale que la rangée réelle : un `Row` de
+            // trois cartes de 144 déborde d'un téléphone de 390, et un
+            // squelette qui déborde est un défaut avant même que les données
+            // arrivent.
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 3,
+              separatorBuilder: (context, index) =>
                   const SizedBox(width: AppSpacing.md),
-                ],
-              ],
+              itemBuilder: (context, index) => const SizedBox(
+                width: CarteJourVue.largeur,
+                child: SkeletonBloc(hauteur: double.infinity),
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.xl),

@@ -3108,7 +3108,13 @@ abstract final class AppStrings {
 
   static const String astreintesVueLabel = 'Vue de mes astreintes';
   static const String astreintesVueListe = 'Liste';
-  static const String astreintesVueCalendrier = 'Calendrier';
+
+  /// **« Mois » et non « Calendrier » depuis le ticket 064** : la deuxième
+  /// destination de la barre s'appelle « Calendrier », et deux fois le même
+  /// mot sur un même écran pour deux gestes différents — changer de vue, ou
+  /// changer d'écran — est un piège, avec des gants et au soleil. La forme,
+  /// elle, ne change pas : c'est bien la grille du mois.
+  static const String astreintesVueCalendrier = 'Mois';
 
   /// Au-delà de ×1,6, le calendrier **change de forme** plutôt que de rogner
   /// son texte (`DESIGN.md § Typography — Named Rules`). Un bouton désactivé

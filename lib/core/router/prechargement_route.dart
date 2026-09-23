@@ -42,7 +42,9 @@ List<ProviderSubscription<Object?> Function(Ref ref)> donneesDEcran(
       AppRoutes.abonnement => <ProviderSubscription<Object?> Function(Ref)>[
         (Ref ref) => ref.listen(abonnementControllerProvider, (_, _) {}),
       ],
-      AppRoutes.notifications => <ProviderSubscription<Object?> Function(Ref)>[
+      // La Boîte (ticket 064) : le centre de notifications, à sa route de
+      // destination. `/notifications` n'existe plus que comme renvoi.
+      AppRoutes.boite => <ProviderSubscription<Object?> Function(Ref)>[
         (Ref ref) => ref.listen(centreNotificationsProvider, (_, _) {}),
       ],
       _ => const <ProviderSubscription<Object?> Function(Ref)>[],

@@ -144,7 +144,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ),
         const BoutonCompte(),
       ],
-      actionsEnTete: const <Widget>[BoutonCompte()],
       // Une erreur survenue alors que la liste est déjà affichée se dit en
       // bannière : vider l'écran pour annoncer un échec de relecture ferait
       // perdre ce qui était juste.
