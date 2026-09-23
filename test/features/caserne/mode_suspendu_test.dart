@@ -1,5 +1,6 @@
 import 'package:astreinte_sp/core/caserne/etat_caserne.dart';
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
 import 'package:astreinte_sp/core/widgets/empty_state.dart';
@@ -77,10 +78,14 @@ AppBanner _banniere(WidgetTester tester) =>
 
 void main() {
   group('Caserne suspendue — le bandeau', () {
-    testWidgets('« Mon mois » l\'annonce avant le premier geste', (
+    testWidgets('l\'accueil l\'annonce avant le premier geste', (
       tester,
     ) async {
-      await _ouvrir(tester, chemin: '/', caserne: caserneSuspendue);
+      await _ouvrir(
+        tester,
+        chemin: AppRoutes.accueil,
+        caserne: caserneSuspendue,
+      );
 
       final banniere = _banniere(tester);
       expect(banniere.variante, AppBannerVariante.lectureSeule);
@@ -91,7 +96,11 @@ void main() {
     testWidgets('la grille reste lisible, et l\'appui dit pourquoi', (
       tester,
     ) async {
-      await _ouvrir(tester, chemin: '/', caserne: caserneSuspendue);
+      await _ouvrir(
+        tester,
+        chemin: AppRoutes.calendrier,
+        caserne: caserneSuspendue,
+      );
 
       // Les cases sont là : on consulte. C'est le cœur du critère
       // d'acceptation du ticket.
@@ -190,14 +199,18 @@ void main() {
     testWidgets('l\'admin a une sortie, le membre a une phrase', (
       tester,
     ) async {
-      await _ouvrir(tester, chemin: '/', caserne: caserneSuspendue);
+      await _ouvrir(
+        tester,
+        chemin: AppRoutes.accueil,
+        caserne: caserneSuspendue,
+      );
       expect(_banniere(tester).onAction, isNull);
       expect(_banniere(tester).detail, AppStrings.lectureSeuleMembreDetail);
       await demonter(tester);
 
       await _ouvrir(
         tester,
-        chemin: '/',
+        chemin: AppRoutes.accueil,
         caserne: caserneSuspendue,
         appartenance: appartenanceAdmin,
       );
@@ -209,7 +222,11 @@ void main() {
     testWidgets('« Mes astreintes » s\'ouvre et montre ses gardes', (
       tester,
     ) async {
-      await _ouvrir(tester, chemin: '/?onglet=2', caserne: caserneSuspendue);
+      await _ouvrir(
+        tester,
+        chemin: AppRoutes.astreintes,
+        caserne: caserneSuspendue,
+      );
 
       // Aucun écran vide, aucune erreur : la suspension est une lecture seule,
       // jamais une coupure (`docs/PRD.md § 6.6`).
@@ -220,7 +237,11 @@ void main() {
     testWidgets('aucun écran de lecture ne porte de bannière d\'erreur', (
       tester,
     ) async {
-      for (final chemin in <String>['/', '/proposals', '/?onglet=2']) {
+      for (final chemin in <String>[
+        AppRoutes.accueil,
+        '/proposals',
+        AppRoutes.astreintes,
+      ]) {
         await _ouvrir(tester, chemin: chemin, caserne: caserneSuspendue);
         final bannieres = tester.widgetList<AppBanner>(find.byType(AppBanner));
         for (final banniere in bannieres) {
@@ -239,7 +260,7 @@ void main() {
     testWidgets('rien à soixante jours', (tester) async {
       await _ouvrir(
         tester,
-        chemin: '/',
+        chemin: AppRoutes.accueil,
         caserne: caserneEssaiDans(60),
         appartenance: appartenanceAdmin,
       );
@@ -249,7 +270,7 @@ void main() {
     testWidgets('à J-14, une information ; à J-3, l\'ocre', (tester) async {
       await _ouvrir(
         tester,
-        chemin: '/',
+        chemin: AppRoutes.accueil,
         caserne: caserneEssaiDans(14),
         appartenance: appartenanceAdmin,
       );
@@ -259,7 +280,7 @@ void main() {
 
       await _ouvrir(
         tester,
-        chemin: '/',
+        chemin: AppRoutes.accueil,
         caserne: caserneEssaiDans(3),
         appartenance: appartenanceAdmin,
       );
@@ -270,14 +291,18 @@ void main() {
     testWidgets('un membre ordinaire ne voit rien de tout cela', (
       tester,
     ) async {
-      await _ouvrir(tester, chemin: '/', caserne: caserneEssaiDans(3));
+      await _ouvrir(
+        tester,
+        chemin: AppRoutes.accueil,
+        caserne: caserneEssaiDans(3),
+      );
       expect(find.byType(AppBanner), findsNothing);
     });
 
     testWidgets('l\'essai qui se termine ne grise aucune case', (tester) async {
       await _ouvrir(
         tester,
-        chemin: '/',
+        chemin: AppRoutes.calendrier,
         caserne: caserneEssaiDans(3),
         appartenance: appartenanceAdmin,
       );

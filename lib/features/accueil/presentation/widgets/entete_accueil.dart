@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_strings.dart';
+import '../../../../core/session/session_providers.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../../profil/presentation/widgets/bouton_compte.dart';
-import '../../domain/accueil_providers.dart';
+import '../../domain/composition_accueil.dart';
 
 /// L'en-tête du tableau de bord (`design/064 § 3.1`).
 ///
@@ -40,7 +41,7 @@ class EnteteAccueil extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final prenom = ref.watch(prenomProvider);
+    final prenom = prenomDe(ref.watch(appartenanceCouranteProvider)?.nomAffiche);
     final salutation = salutationDe(maintenant);
 
     return Row(

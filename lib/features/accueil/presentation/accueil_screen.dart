@@ -4,19 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/router/destinations.dart';
+import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../astreintes/domain/astreintes_providers.dart';
+import '../../dispos/domain/dispos_providers.dart';
+import '../../dispos/domain/periode_saisie.dart';
+import '../../dispos/presentation/controllers/saisie_controller.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../../propositions/domain/propositions_providers.dart';
-import '../domain/accueil_providers.dart';
+import '../domain/composition_accueil.dart';
 import '../domain/tableau_bord.dart';
 import 'widgets/bande_semaine.dart';
 import 'widgets/bloc_dispos.dart';
@@ -42,8 +47,9 @@ class AccueilScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final destinations = ref.watch(destinationsProvider);
-    final tableau = ref.watch(tableauBordProvider);
     final classe = AppWindowClass.of(context);
+    final maintenant = ref.watch(horlogeAstreintesProvider)();
+    final tableau = ref.watch(tableauBordProvider);
 
     return AppScaffold(
       titre: AppStrings.accueilTitre,
@@ -56,9 +62,15 @@ class AccueilScreen extends ConsumerWidget {
       // trente points de « Bonsoir, Marie ».
       sansBarreApplication: true,
       actionsEnTete: const <Widget>[BoutonNotifications(), BoutonCompte()],
+      // **Le fait qui change tout ce qui est en dessous.** Une caserne
+      // suspendue ou un essai qui s'achève se disait jusqu'ici sur le premier
+      // écran du produit, qui était la saisie. C'est l'accueil désormais, et
+      // il ne doit pas laisser découvrir la suspension deux écrans plus loin.
+      banniere: faitCaserneEcran(context, ref)?.banniere,
       child: switch (tableau) {
         AsyncData<TableauBord>(:final value) => _Contenu(
           tableau: value,
+          maintenant: maintenant,
           avecEntete: !classe.supporteDeuxVolets,
         ),
         AsyncError<TableauBord>() => EmptyState.erreur(
@@ -80,9 +92,16 @@ class AccueilScreen extends ConsumerWidget {
 }
 
 class _Contenu extends ConsumerWidget {
-  const _Contenu({required this.tableau, required this.avecEntete});
+  const _Contenu({
+    required this.tableau,
+    required this.maintenant,
+    required this.avecEntete,
+  });
 
   final TableauBord tableau;
+
+  /// L'horloge de l'écran, déjà lue par son parent.
+  final DateTime maintenant;
 
   /// L'en-tête de salutation vit dans le contenu sous `expanded`. Au-delà,
   /// c'est l'en-tête de travail du 061 qui titre, et il porte déjà l'avatar
@@ -92,7 +111,6 @@ class _Contenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final marge = AppWindowClass.of(context).margePage;
-    final maintenant = ref.watch(horlogeAstreintesProvider)();
     final dispos = tableau.dispos;
 
     return RefreshIndicator(

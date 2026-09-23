@@ -45,12 +45,11 @@ void main() {
       );
       expect((badge.label! as Text).data, '2');
 
-      // Le chiffre est doublé d'un libellé annoncé, comme la pastille des
-      // propositions.
-      expect(
-        find.byTooltip(AppStrings.centreNonLuesBadge(2)),
-        findsOneWidget,
-      );
+      // Le chiffre est doublé d'un libellé annoncé. Il apparaît **deux
+      // fois** depuis le ticket 064 — la cloche de l'en-tête et la
+      // destination « Boîte » de la barre —, et les deux le lisent au même
+      // endroit : ils ne peuvent pas diverger.
+      expect(find.byTooltip(AppStrings.centreNonLuesBadge(2)), findsNWidgets(2));
     });
 
     testWidgets('disparaît quand tout est lu', (tester) async {

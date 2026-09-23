@@ -44,6 +44,7 @@
 
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/session/session_utilisateur.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
@@ -205,6 +206,7 @@ void main() {
 
     testWidgets('3. elle saisit ses disponibilités du mois', (tester) async {
       await _monterMembre(tester, _marieId, _adresseRecrue);
+      await ouvrirRoute(tester, AppRoutes.calendrier);
       expect(find.byType(MoisScreen), findsOneWidget);
 
       // Le 1er du mois, de jour puis de nuit. Une touche, un état.

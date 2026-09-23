@@ -1,4 +1,5 @@
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
+import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/features/notifications/domain/notification_interne.dart';
 import 'package:astreinte_sp/features/notifications/presentation/notifications_screen.dart';
@@ -194,7 +195,10 @@ void main() {
 
       // `/availability/<mois>` est la seule des quatre destinations qui mène
       // déjà exactement où il faut (ticket 024).
-      expect(emplacementCourant(tester), '/?onglet=0&mois=2026-10');
+      expect(
+        emplacementCourant(tester),
+        '${AppRoutes.calendrier}?mois=2026-10',
+      );
     });
 
     testWidgets(

@@ -5,6 +5,7 @@ import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/aucune_caserne_screen.dart';
 import 'package:astreinte_sp/features/auth/presentation/connexion_screen.dart';
 import 'package:astreinte_sp/features/demarrage/presentation/demarrage_screen.dart';
+import 'package:astreinte_sp/features/profil/presentation/profil_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -104,7 +105,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(AuthErreur.reseau.message), findsOneWidget);
-      expect(find.byType(AccueilScreen), findsOneWidget);
+      // La session est toujours ouverte : on est resté sur le profil, d'où
+      // l'on peut réessayer.
+      expect(find.byType(ProfilScreen), findsOneWidget);
     });
   });
 
