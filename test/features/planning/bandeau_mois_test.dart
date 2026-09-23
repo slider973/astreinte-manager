@@ -152,6 +152,46 @@ void main() {
       expect(resume.couverts, 2);
     });
 
+    test('publié, deux propositions sans réponse font deux réponses en '
+        'attente — et la grille montre les deux mêmes blocs', () {
+      // La question est venue d'une inspection : quatre blocs « en attente »
+      // dans la grille et « Réponses en attente : 0 » dans le bandeau. Les
+      // deux lisent bien le **même** `PlanningMois` ; ce qui les séparait
+      // était l'état du planning, et la règle est celle du ticket 061b — en
+      // brouillon, une attribution vaut `proposed` sans que personne n'ait
+      // été prévenu. Parti, le compte suit.
+      final planning = _planning(
+        etat: PlanningEtat.publie,
+        attributions: <Attribution>[
+          _attribution('c-1-j'),
+          _attribution('c-2-j'),
+        ],
+      );
+
+      expect(
+        ResumeMois.construire(
+          planning: planning,
+          nombreDeJours: _jours,
+        ).enAttente,
+        2,
+      );
+
+      // Et le même planning, en brouillon : les mêmes deux blocs à l'écran,
+      // zéro réponse attendue. Les deux affirmations sont vraies ensemble.
+      expect(
+        ResumeMois.construire(
+          planning: _planning(
+            attributions: <Attribution>[
+              _attribution('c-1-j'),
+              _attribution('c-2-j'),
+            ],
+          ),
+          nombreDeJours: _jours,
+        ).enAttente,
+        0,
+      );
+    });
+
     test('un refus laisse le créneau à réattribuer, pas à pourvoir', () {
       final resume = ResumeMois.construire(
         planning: _planning(
