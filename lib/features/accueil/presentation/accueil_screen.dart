@@ -139,7 +139,20 @@ class _Contenu extends ConsumerWidget {
                 onAction: () => context.goNamed(AppRoutes.astreintesName),
               ),
               const SizedBox(height: AppSpacing.md),
-              if (!tableau.rangeeUtile)
+              // **Une lecture en panne ne devient jamais un état vide.**
+              // Affirmer « Aucune astreinte à venir » alors qu'on n'a rien pu
+              // lire est le pire des deux mondes : c'est faux, et ça se
+              // croit.
+              if (tableau.echecAstreintes)
+                EmptyState.erreur(
+                  texte: AppStrings.accueilErreurAstreintes,
+                  onAction: () => unawaited(
+                    ref
+                        .read(astreintesControllerProvider.notifier)
+                        .rafraichir(),
+                  ),
+                )
+              else if (!tableau.rangeeUtile)
                 EmptyState(
                   titre: AppStrings.accueilVideAstreintesTitre,
                   texte: AppStrings.accueilVideAstreintesTexte,
@@ -164,7 +177,16 @@ class _Contenu extends ConsumerWidget {
               const SizedBox(height: AppSpacing.md),
               BandeSemaine(jours: tableau.semaine),
               const SizedBox(height: AppSpacing.md),
-              if (tableau.propositions.isEmpty)
+              if (tableau.echecPropositions)
+                EmptyState.erreur(
+                  texte: AppStrings.accueilErreurPropositions,
+                  onAction: () => unawaited(
+                    ref
+                        .read(propositionsControllerProvider.notifier)
+                        .rafraichir(),
+                  ),
+                )
+              else if (tableau.propositions.isEmpty)
                 const EmptyState(
                   titre: AppStrings.accueilVidePropositionsTitre,
                   texte: AppStrings.accueilVidePropositionsTexte,

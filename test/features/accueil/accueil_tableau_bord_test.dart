@@ -420,7 +420,9 @@ void main() {
       expect(find.byType(LoadingSkeleton), findsNothing);
     });
 
-    testWidgets('une lecture en échec nomme la sortie', (tester) async {
+    testWidgets('les deux lectures en échec : un écran d\'erreur entier', (
+      tester,
+    ) async {
       await monterApp(
         tester,
         session: sessionMembre,
@@ -434,6 +436,64 @@ void main() {
 
       expect(find.text(AppStrings.accueilErreurTexte), findsOneWidget);
       expect(find.text(AppStrings.actionReessayer), findsOneWidget);
+    });
+
+    testWidgets('les astreintes seules en échec : la section le dit, et le '
+        'reste de l\'écran tient', (tester) async {
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        appartenances: const <Appartenance>[appartenanceMembre],
+        astreintes: FauxAstreintesRepository(erreur: ErreurAstreintes.reseau),
+        propositions: FauxPropositionsRepository(
+          propositions: <Proposition>[_proposition('a-1', 16)],
+        ),
+        dispos: FauxDisposRepository(
+          periodes: <PeriodeSaisie>[_novembreOuvert()],
+        ),
+        horloge: () => _matin,
+      );
+
+      // **Jamais « Aucune astreinte à venir » sur une lecture en panne** :
+      // c'est faux, et ça se croit.
+      expect(
+        find.text(AppStrings.accueilVideAstreintesTitre),
+        findsNothing,
+      );
+      expect(find.text(AppStrings.accueilErreurAstreintes), findsOneWidget);
+      expect(find.text(AppStrings.actionReessayer), findsOneWidget);
+
+      // Et ce qui a été lu reste à l'écran : la section des propositions est
+      // juste, elle n'a pas à disparaître parce que sa voisine est tombée.
+      expect(find.byType(LignePropositionAccueil), findsOneWidget);
+      expect(find.byType(BandeSemaine), findsOneWidget);
+    });
+
+    testWidgets('les propositions seules en échec : symétrique', (
+      tester,
+    ) async {
+      await monterApp(
+        tester,
+        session: sessionMembre,
+        appartenances: const <Appartenance>[appartenanceMembre],
+        astreintes: FauxAstreintesRepository(
+          astreintes: <Astreinte>[_demain()],
+        ),
+        propositions: FauxPropositionsRepository(
+          erreurLecture: ErreurProposition.reseau,
+        ),
+        dispos: FauxDisposRepository(
+          periodes: <PeriodeSaisie>[_novembreOuvert()],
+        ),
+        horloge: () => _matin,
+      );
+
+      expect(
+        find.text(AppStrings.accueilVidePropositionsTitre),
+        findsNothing,
+      );
+      expect(find.text(AppStrings.accueilErreurPropositions), findsOneWidget);
+      expect(find.byType(CarteJourVue), findsWidgets);
     });
   });
 

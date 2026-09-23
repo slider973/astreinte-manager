@@ -565,6 +565,15 @@ abstract final class AppStrings {
       'Impossible de lire tes astreintes et tes propositions. Vérifie ta '
       'connexion, puis réessaie.';
 
+  /// Quand **une seule** des deux sources est tombée. L'écran reste, l'autre
+  /// section est juste, et celle-ci dit ce qu'elle n'a pas pu lire plutôt que
+  /// d'affirmer qu'il n'y a rien.
+  static const String accueilErreurAstreintes =
+      'Impossible de lire tes astreintes. Ce que tu vois plus bas reste juste.';
+  static const String accueilErreurPropositions =
+      'Impossible de lire tes propositions. Ce que tu vois plus haut reste '
+      'juste.';
+
   /// « d'octobre » ou « de janvier ».
   static String _elision(String nomMois) =>
       RegExp('^[aeiouâàéèêîôûù]', caseSensitive: false).hasMatch(nomMois)

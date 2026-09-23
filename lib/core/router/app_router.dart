@@ -313,8 +313,8 @@ abstract final class AppRoutes {
 /// La page d'une **destination de premier niveau** : elle prend la place de
 /// la précédente sans transition (ticket 063).
 ///
-/// Passer d'une destination à sa sœur — « Admin », puis « Profil » — n'est pas
-/// une poussée : il n'y a ni avant ni après, rien d'où revenir. Or le thème
+/// Passer d'une destination à sa sœur — « Accueil », puis « Calendrier » —
+/// n'est pas une poussée : il n'y a ni avant ni après, rien d'où revenir. Or le thème
 /// (`core/theme/app_theme.dart`) donne à toute page par défaut la transition
 /// de la plateforme, un glissement de droite à gauche sur iOS et macOS. Sur
 /// une coquille qui ne bouge pas — colonne de navigation, en-tête, barre du
@@ -323,17 +323,19 @@ abstract final class AppRoutes {
 /// Pas de fondu non plus : deux coquilles identiques qui se croisent en
 /// opacité font clignoter la colonne.
 ///
-/// Les écrans qu'on **pousse** et dont on revient (inviter, importer, le
-/// centre de notifications, les autres écrans d'administration) gardent la
-/// page par défaut et donc la transition du thème. Seules les routes servies
-/// par `AppDestination` passent par ici : `/` et `/admin/planning`. `/admin/
-/// suivi` n'en est pas une — on y va par la barre d'application, la coquille
-/// n'y mène jamais comme destination.
+/// Les écrans qu'on **pousse** et dont on revient — le profil, les
+/// propositions, inviter, importer, les pages légales, les autres écrans
+/// d'administration — gardent la page par défaut et donc la transition du
+/// thème. Seules les cinq routes servies par `AppDestination` passent par
+/// ici : `/`, `/calendrier`, `/astreintes`, `/boite` et `/admin/planning`.
+/// `/admin/suivi` n'en est pas une — on y va par la barre d'application, la
+/// coquille n'y mène jamais comme destination.
 ///
 /// Les trois attributs recopient ce que `go_router` donne à une page bâtie
-/// depuis un `builder` (`go_router/src/builder.dart`) : même clé, donc même
-/// `State` d'un changement de chaîne de requête à l'autre — c'est ce dont
-/// `AccueilScreen.didUpdateWidget` dépend pour suivre `?onglet=`.
+/// depuis un `builder` (`go_router/src/builder.dart`). La clé est celle de
+/// l'emplacement : un changement de chaîne de requête — le mois du
+/// Calendrier, `?mois=AAAA-MM` — garde donc le même `State`, et l'écran suit
+/// l'URL sans être reconstruit.
 Page<void> pageDestination(GoRouterState state, Widget enfant) =>
     NoTransitionPage<void>(
       key: state.pageKey,

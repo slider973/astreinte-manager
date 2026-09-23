@@ -96,9 +96,7 @@ final Provider<AsyncValue<TableauBord>> tableauBordProvider =
     Provider<AsyncValue<TableauBord>>(
       (ref) => tableauBordDe(
         astreintes: ref.watch(astreintesControllerProvider),
-        propositions: ref
-            .watch(propositionsControllerProvider)
-            .whenData((EtatPropositions etat) => etat.propositions),
+        propositions: ref.watch(propositionsControllerProvider),
         aujourdhui: ref.watch(horlogeAstreintesProvider)(),
         nomCaserne:
             ref.watch(appartenanceCouranteProvider)?.nomCaserne ?? '',
@@ -109,13 +107,18 @@ final Provider<AsyncValue<TableauBord>> tableauBordProvider =
 /// La même, en fonction pure : c'est elle qui est testée.
 AsyncValue<TableauBord> tableauBordDe({
   required AsyncValue<EtatAstreintes> astreintes,
-  required AsyncValue<List<Proposition>> propositions,
+  required AsyncValue<EtatPropositions> propositions,
   required DateTime aujourdhui,
   required String nomCaserne,
   AppelDispos? dispos,
 }) {
   final donnees = astreintes.value?.donnees;
-  final liste = propositions.value;
+  final liste = propositions.value?.propositions;
+  // **L'état complet des deux sources, pas leur contenu projeté.** Un
+  // `whenData` pour ne garder que la liste efface l'erreur au passage : la
+  // section des propositions se croyait vide alors que la lecture avait
+  // échoué. Vu en test, et c'est exactement le piège du ticket 023 sous un
+  // autre visage.
 
   if (donnees == null && liste == null) {
     final erreur = astreintes.error ?? propositions.error;
@@ -133,6 +136,16 @@ AsyncValue<TableauBord> tableauBordDe({
       propositions: liste ?? const <Proposition>[],
       nomCaserne: nomCaserne,
       dispos: dispos,
+      // **La condition porte sur le contenu, jamais sur `hasValue`.** Un
+      // `AsyncValue` en erreur garde la valeur du calcul précédent, et les
+      // deux contrôleurs en produisent une avant même d'avoir lu : ils
+      // rendent un état vide tant que la session ou l'appartenance manque.
+      // Tester la seule présence d'une valeur laissait donc une lecture en
+      // panne passer pour « tu n'as rien » — le piège déjà consigné au
+      // ticket 023 (`DESIGN.md § Écarts`).
+      echecAstreintes:
+          astreintes.hasError && (donnees?.astreintes.isEmpty ?? true),
+      echecPropositions: propositions.hasError && (liste?.isEmpty ?? true),
     ),
   );
 }

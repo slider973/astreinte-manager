@@ -161,6 +161,8 @@ class TableauBord {
     required this.heures,
     required this.nomCaserne,
     this.dispos,
+    this.echecAstreintes = false,
+    this.echecPropositions = false,
   });
 
   /// La rangée horizontale : la prochaine astreinte acceptée d'abord, puis les
@@ -187,6 +189,14 @@ class TableauBord {
   /// `null` quand aucune période n'est ouverte : la section n'existe pas.
   final AppelDispos? dispos;
 
+  /// **Une lecture en panne ne devient jamais un état vide.** L'accueil a deux
+  /// sources ; quand l'une échoue et que l'autre répond, l'écran s'affiche —
+  /// il serait absurde de cacher des propositions parfaitement lues. Mais la
+  /// section privée de sa source ne doit pas affirmer « Aucune astreinte à
+  /// venir » : elle dit qu'elle n'a pas pu lire, et propose de réessayer.
+  final bool echecAstreintes;
+  final bool echecPropositions;
+
   /// Vrai quand la rangée a quelque chose à dire.
   ///
   /// Sept cartes « Libre » ne sont pas une rangée : c'est un état vide déguisé
@@ -209,6 +219,8 @@ TableauBord composerTableauBord({
   required List<Proposition> propositions,
   required String nomCaserne,
   AppelDispos? dispos,
+  bool echecAstreintes = false,
+  bool echecPropositions = false,
 }) {
   final minuit = DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day);
   final aVenir = astreintes.aVenir(minuit);
@@ -304,5 +316,7 @@ TableauBord composerTableauBord({
     heures: astreintes.heures,
     nomCaserne: nomCaserne,
     dispos: dispos,
+    echecAstreintes: echecAstreintes,
+    echecPropositions: echecPropositions,
   );
 }
