@@ -6,7 +6,7 @@ montre tous, dans tous leurs états, en clair et en sombre.
 
 | Fichier | Widget | Rôle |
 |---|---|---|
-| `app_scaffold.dart` | `AppScaffold`, `AppDestination` | Ossature d'écran : barre, bannière, contenu, navigation. Barre basse en compact, rail au-delà, panneau latéral en large. Les destinations sont **quatre** pour un pompier depuis le ticket 064 — Accueil, Calendrier, Astreintes, Boîte — et cinq pour un admin ; leur `route` est un **nom** de route `go_router`, et `core/router/destinations.dart` porte le provider partagé, l'index courant et le geste. `sansBarreApplication` efface la barre sous `expanded` pour le seul écran qui porte son propre en-tête, l'accueil. |
+| `app_scaffold.dart` | `AppScaffold`, `AppDestination` | Ossature d'écran : barre, bannière, contenu, navigation. Barre basse en compact, rail au-delà, panneau latéral en large. Les destinations sont **quatre** pour un pompier depuis le ticket 064 — Accueil, Calendrier, Astreintes, Boîte — et cinq pour un admin ; leur `route` est un **nom** de route `go_router`, et `core/router/destinations.dart` porte le provider partagé, l'index courant et le geste. `sansBarreApplication` efface la barre sous `expanded` pour le seul écran qui porte son propre en-tête, l'accueil. `fondDoux` pose la matière du monde du pompier — page en `surface-container-low`, cartes en `surface` à filet — sur l'accueil et sur la Boîte. |
 | `app_banner.dart` | `AppBanner` | **Composant signature.** Les faits qui changent tout ce qui est en dessous. Une seule à la fois, par ordre de priorité. |
 | `primary_button.dart` | `PrimaryButton` | Bloc à rayon 8, hauteur 52, libellé 16 sp. Un bouton désactivé **doit** dire pourquoi. |
 | `slot_chip.dart` | `SlotChip` | **Composant signature.** La case du registre. Trois densités, trois remplissages. |
@@ -61,6 +61,10 @@ installée mangent la fin du contenu — « Se déconnecter » et « Supprimer m
 celle de `DocumentLegalScreen`, l'écran poussé à liste qui l'avait déjà : `body: SafeArea(top:
 false, …)`. Pas de widget commun : les écrans poussés ne partagent pas d'ossature, seulement cette
 règle et cette forme.
+
+Au chantier 064b, les propositions sont retournées dans `AppScaffold` — elles sont un onglet de la
+Boîte, qui est une destination — et la règle ne concerne donc plus qu'eux : le profil, les pages
+légales, inviter, importer et les écrans d'administration.
 
 ## Ce qu'aucun de ces widgets ne fait
 

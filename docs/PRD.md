@@ -121,8 +121,9 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 ### 5.4 Publication et validation
 1. L'admin publie. Chaque membre attribué reçoit un push par créneau ou groupé
    (« 3 astreintes proposées en octobre »).
-2. Le membre ouvre l'écran « Propositions », voit chaque créneau, accepte ou refuse.
-   Un refus demande un motif court facultatif.
+2. Le membre ouvre la **Boîte**, onglet « Propositions » — ou touche la ligne annoncée sur
+   l'accueil —, voit chaque créneau, l'ouvre et accepte ou refuse. Un refus demande un motif
+   court facultatif.
 3. L'admin voit en temps réel l'état de chaque créneau : en attente, accepté, refusé.
 4. Sans réponse après le délai configuré (défaut 24 h), un rappel push part. Après un
    second délai (défaut 48 h), un email part. L'admin voit les retardataires.

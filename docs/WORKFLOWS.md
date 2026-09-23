@@ -237,11 +237,12 @@ Deep links (`notifications.data.route`). **Ce sont des liens publics** : ils par
 notifications et survivent aux refontes d'écran. `destinationInterne`
 (`features/notifications/domain/destination_push.dart`) les traduit en emplacement interne, et
 c'est le seul endroit à changer quand les écrans bougent. La colonne de droite dit où ils mènent
-depuis le ticket 064, qui a fait éclater la coquille d'accueil en routes.
+depuis le ticket 064, qui a fait éclater la coquille d'accueil en routes puis réuni les
+notifications et les propositions dans la Boîte (chantier 064b).
 
 | Lien public | Emplacement interne |
 |---|---|
-| `/proposals` | `/propositions` |
+| `/proposals` | `/boite?onglet=propositions` |
 | `/schedule/<period>` | `/astreintes` |
 | `/admin/schedule/<period>` | `/admin/suivi?mois=<period>` *(admin seulement)* |
 | `/availability/<period>` | `/calendrier?mois=<period>` |
@@ -253,5 +254,18 @@ une rétrogradation.
 
 Les adresses de la coquille d'avant le ticket 064 — `/?onglet=N`, `/?mois=AAAA-MM`,
 `/notifications` — sont redirigées vers les nouvelles routes (`core/router/destinations.dart`,
-`ongletHerite`). Elles dorment dans des historiques de navigateur et dans des onglets restaurés :
-aucune ne rend un écran vide.
+`ongletHerite`). S'y ajoute `/propositions`, l'adresse de l'écran des propositions pendant le
+chantier 064a, qui renvoie sur `/boite?onglet=propositions`. Elles dorment dans des historiques de
+navigateur et dans des onglets restaurés : aucune ne rend un écran vide.
+
+**L'onglet de la Boîte est dans l'adresse**, `?onglet=tout|propositions|rappels`, jamais dans un
+cache local : un onglet retenu sur l'appareil aurait fait ouvrir la Boîte ailleurs que là où le
+lien promettait, et il aurait survécu à une déconnexion. Une valeur inconnue tombe sur « Tout »,
+qui contient les deux autres.
+
+**Ce que la Boîte montre de ces notifications.** L'onglet « Rappels » — et donc « Tout » — affiche
+toutes les lignes `inapp` **sauf** `assignment_proposed` et `assignment_reminder` : ces deux-là
+posent la même question que la ligne de proposition qui vit à côté, laquelle porte la réponse. Le
+compte de non-lues de la cloche, de la pastille de la barre et du titre suit la même règle, pour
+qu'aucune non-lue ne reste invisible et incomptée. `assignment_changed` n'en fait pas partie : une
+réattribution est un fait, et c'est un rappel, bien que son lien mène aussi aux propositions.
