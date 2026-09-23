@@ -682,4 +682,164 @@ void main() {
       );
     });
   });
+
+  // -------------------------------------------------------------------
+  // Les blocs pleins d'attribution, dans la case de la matrice
+  // -------------------------------------------------------------------
+
+  /// **Deux mesures par état, et aucune n'est optionnelle** (chantier 061c-2) :
+  /// le glyphe doit se voir sur son bloc, et le bloc doit se détacher du papier
+  /// de la grille. Ce sont des éléments non textuels porteurs d'information :
+  /// le seuil est 3:1 (WCAG 1.4.11), pas 4,5:1.
+  ///
+  /// La grille a **deux papiers** : `surface` en semaine, `surface-dim` sur les
+  /// colonnes de weekend et de jour férié (`FondJour`). Les deux sont mesurés —
+  /// un bloc qui ne se verrait que du lundi au vendredi serait un bloc qui
+  /// disparaît les jours où l'astreinte compte le plus.
+  group('Contraste — les blocs pleins d\'attribution', () {
+    const etats = <AttributionEtat>[
+      AttributionEtat.propose,
+      AttributionEtat.accepte,
+      AttributionEtat.refuse,
+    ];
+
+    test('clair : le glyphe se voit sur son bloc', () {
+      for (final etat in etats) {
+        final bloc = AppStatusColors.clair.attribution(etat);
+        verifier(
+          'glyphe/bloc ${etat.name}',
+          bloc.blocEncre,
+          bloc.blocFond,
+          seuil: seuilFilet,
+        );
+      }
+    });
+
+    test('sombre : le glyphe se voit sur son bloc', () {
+      for (final etat in etats) {
+        final bloc = AppStatusColors.sombre.attribution(etat);
+        verifier(
+          'glyphe/bloc ${etat.name}',
+          bloc.blocEncre,
+          bloc.blocFond,
+          seuil: seuilFilet,
+        );
+      }
+    });
+
+    test('la limite du bloc se détache des deux papiers de la grille', () {
+      for (final (nom, statuts, papier, weekend)
+          in <(String, AppStatusColors, Color, Color)>[
+        (
+          'clair',
+          AppStatusColors.clair,
+          AppColors.surface,
+          AppColors.surfaceDim,
+        ),
+        (
+          'sombre',
+          AppStatusColors.sombre,
+          AppColors.darkSurface,
+          AppColors.darkSurfaceDim,
+        ),
+      ]) {
+        for (final etat in etats) {
+          final bloc = statuts.attribution(etat);
+          // **Le contour compte quand le remplissage ne suffit pas.** L'orange
+          // vif de la charte ne fait que 1,90:1 sur le fond de weekend ; c'est
+          // son filet ocre qui porte la limite, et c'est lui qu'on mesure
+          // alors. Aucun des trois n'a le droit de se passer des deux.
+          final limite = bloc.filet ?? bloc.blocFond;
+          verifier(
+            '$nom bloc/papier ${etat.name}',
+            limite,
+            papier,
+            seuil: seuilFilet,
+          );
+          verifier(
+            '$nom bloc/weekend ${etat.name}',
+            limite,
+            weekend,
+            seuil: seuilFilet,
+          );
+        }
+      }
+    });
+
+    test('les ratios consignés dans `DESIGN.md § 061c-2` sont les vrais', () {
+      const clair = AppStatusColors.clair;
+      const sombre = AppStatusColors.sombre;
+
+      double glyphe(AppStatusColors s, AttributionEtat e) =>
+          ratio(s.attribution(e).blocEncre, s.attribution(e).blocFond);
+      double papier(AppStatusColors s, AttributionEtat e, Color fond) =>
+          ratio(s.attribution(e).blocFond, fond);
+
+      // Clair — glyphe sur le bloc.
+      expect(glyphe(clair, AttributionEtat.propose), closeTo(7.64, 0.02));
+      expect(glyphe(clair, AttributionEtat.accepte), closeTo(5.12, 0.02));
+      expect(glyphe(clair, AttributionEtat.refuse), closeTo(4.78, 0.02));
+
+      // Clair — le bloc sur le papier blanc de la grille.
+      expect(
+        papier(clair, AttributionEtat.propose, AppColors.surface),
+        closeTo(2.26, 0.02),
+      );
+      expect(
+        ratio(AppColors.etatAttente, AppColors.surface),
+        closeTo(4.94, 0.02),
+      );
+      expect(
+        papier(clair, AttributionEtat.accepte, AppColors.surface),
+        closeTo(5.12, 0.02),
+      );
+      expect(
+        papier(clair, AttributionEtat.refuse, AppColors.surface),
+        closeTo(3.60, 0.02),
+      );
+      expect(
+        papier(clair, AttributionEtat.refuse, AppColors.surfaceDim),
+        closeTo(3.03, 0.02),
+      );
+
+      // Sombre — glyphe sur le bloc, puis le bloc sur le papier de nuit.
+      expect(glyphe(sombre, AttributionEtat.propose), closeTo(7.64, 0.02));
+      expect(glyphe(sombre, AttributionEtat.accepte), closeTo(6.35, 0.02));
+      expect(glyphe(sombre, AttributionEtat.refuse), closeTo(7.03, 0.02));
+      expect(
+        papier(sombre, AttributionEtat.propose, AppColors.darkSurface),
+        closeTo(8.08, 0.02),
+      );
+      expect(
+        papier(sombre, AttributionEtat.accepte, AppColors.darkSurface),
+        closeTo(6.72, 0.02),
+      );
+      expect(
+        papier(sombre, AttributionEtat.refuse, AppColors.darkSurface),
+        closeTo(7.44, 0.02),
+      );
+    });
+
+    test('les trois blocs se distinguent entre eux, et de la case '
+        '« disponible » qu\'ils remplacent', () {
+      const clair = AppStatusColors.clair;
+      final disponible = clair.disponibilite(DisponibiliteEtat.disponible).fond;
+
+      // **Le bloc pèse au moins autant que la coche qu'il remplace** : c'est
+      // toute la correction du 061c-2. Aucune des trois teintes fortes n'est
+      // plus proche du papier que l'indigo plein ne l'est.
+      final indigo = ratio(disponible, AppColors.surface);
+      for (final etat in etats) {
+        final bloc = clair.attribution(etat);
+        final limite = bloc.filet ?? bloc.blocFond;
+        expect(
+          ratio(limite, AppColors.surface),
+          greaterThanOrEqualTo(indigo - 2.5),
+          reason:
+              '${etat.name} s\'efface devant la coche « disponible » '
+              '(${indigo.toStringAsFixed(2)}:1).',
+        );
+      }
+    });
+  });
 }

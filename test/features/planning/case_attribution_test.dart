@@ -169,7 +169,16 @@ void main() {
         final descripteur = statuts.attribution(etat);
 
         expect(cible, findsOneWidget, reason: 'État $etat absent.');
-        expect(_decoration(tester, cible).color, descripteur.fond);
+
+        // **Le bloc est plein, à la teinte forte de sa famille** — pas au fond
+        // pâle du badge, qui s'effaçait devant la coche indigo de
+        // « disponible » (chantier 061c-2).
+        expect(_decoration(tester, cible).color, descripteur.blocFond);
+        expect(
+          _decoration(tester, cible).color,
+          isNot(descripteur.fond),
+          reason: 'Le bloc $etat a repris le fond pâle du badge.',
+        );
 
         // **Jamais la couleur seule** : l'icône de la famille est dans la
         // case, et les trois familles n'en partagent aucune.
@@ -177,7 +186,7 @@ void main() {
           find.descendant(of: cible, matching: find.byType(Icon)),
         );
         expect(glyphe.icon, descripteur.icone);
-        expect(glyphe.color, descripteur.encre);
+        expect(glyphe.color, descripteur.blocEncre);
 
         // La case garde la mesure de la case dense du registre.
         expect(
@@ -187,7 +196,8 @@ void main() {
       }
     });
 
-    testWidgets('« proposé » garde son contour ocre, « accepté » est plein', (
+    testWidgets('« proposé » garde son contour ocre — c\'est lui qui porte la '
+        'limite du bloc — et « accepté » s\'en passe', (
       tester,
     ) async {
       await _monterLaGrille(

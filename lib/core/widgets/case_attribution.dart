@@ -11,8 +11,15 @@ import 'slot_chip.dart';
 /// lui a donné. Fond, encre, contour et glyphe viennent d'un seul endroit,
 /// `context.statuts.attribution(etat)` : aucune couleur n'est écrite ici, et
 /// l'icône de la famille (`hourglass_top`, `task_alt`, `cancel`) porte l'état
-/// avant la teinte — les trois fonds pâles sont voisins en niveaux de gris, le
-/// glyphe ne l'est jamais (chantier 061c).
+/// avant la teinte — le glyphe reste le premier signal (chantier 061c).
+///
+/// **Le bloc est plein, à la teinte forte de sa famille**
+/// ([StatusDescriptor.blocFond]), et non au fond pâle du badge. Un badge se lit
+/// de près, dans une phrase ; ce bloc se repère de loin, en balayant soixante-
+/// deux colonnes, et il doit peser au moins autant que la coche indigo pleine
+/// de « disponible » qu'il remplace. Aux fonds pâles, l'écran disait l'inverse
+/// de ce qu'il fallait lire — une déclaration l'emportait sur une astreinte
+/// posée (chantier 061c-2).
 ///
 /// **28 px, donc pointeur seulement**, comme la case dense et comme la ligne
 /// des créneaux : au doigt le bloc se lit, et le panneau s'ouvre depuis la vue
@@ -62,15 +69,16 @@ class CaseAttribution extends StatelessWidget {
     final actionnable = _actionnable(context);
 
     // Un seul contour à la fois : l'erreur d'abord, puis le filet propre à
-    // l'état — le contour ocre de « proposé », qui le sépare du plein
-    // d'« accepté » avant toute question de teinte.
+    // l'état. Sur « proposé », ce filet n'est pas un ornement : l'orange vif
+    // ne fait que 2,26:1 sur le papier, et c'est lui qui porte la limite du
+    // bloc (WCAG 1.4.11). Les deux autres teintes passent seules.
     final filet = erreur ? theme.colorScheme.error : descripteur.filet;
 
     final corps = SizedBox.square(
       dimension: cote,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: descripteur.fond,
+          color: descripteur.blocFond,
           borderRadius: AppRadius.caseRegistreRadius,
           border: filet == null
               ? null
@@ -79,7 +87,7 @@ class CaseAttribution extends StatelessWidget {
         child: Icon(
           descripteur.icone,
           size: AppTouch.glypheDense,
-          color: descripteur.encre,
+          color: descripteur.blocEncre,
         ),
       ),
     );
