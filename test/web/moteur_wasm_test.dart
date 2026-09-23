@@ -37,8 +37,23 @@ void main() {
   };
 
   group('Construction Wasm', () {
+    // **La ligne exécutée, pas celle qui l'annonce.** `build_web.sh` fait
+    // précéder la construction d'un `echo` qui répète la commande mot pour
+    // mot : un `contains` est satisfait par l'annonce seule, et passerait sur
+    // un script qui dit `--wasm` en construisant sans. L'ancre est donc le
+    // début de ligne, et `echo` est exclu explicitement.
     test('la PWA est construite avec --wasm', () {
-      expect(construction, contains('flutter build web --release --wasm'));
+      final lancement = RegExp(
+        r'^flutter build web --release --wasm\b',
+        multiLine: true,
+      );
+      expect(
+        lancement.hasMatch(construction),
+        isTrue,
+        reason:
+            'aucune ligne de scripts/build_web.sh ne lance '
+            '`flutter build web --release --wasm` (un echo ne compte pas)',
+      );
     });
 
     // Le repli est la moitié qu'on oublie : un navigateur sans WasmGC charge

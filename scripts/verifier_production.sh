@@ -447,8 +447,13 @@ print(valeur)' "$1" "$2"
   # Il l'est deux fois : `nosniff` est posé partout, et avec lui
   # `WebAssembly.compileStreaming` **refuse** ce qui n'est pas
   # `application/wasm` — la page reste alors blanche, sans message.
+  #   $1 chemin servi
+  #   $2 type(s) acceptable(s), séparés par `|`
+  #   $3 règle de `vercel.json` qui couvre ce chemin — c'est d'elle que vient
+  #      le `Content-Encoding` attendu, quand elle en déclare un
+  #   $4 ce que sa disparition coûterait, en clair
   moteur_servi() {
-    local chemin="$1" attendu="$2" role="$3" lu type
+    local chemin="$1" attendu="$2" source="$3" role="$4" lu type compression
     if ! lu="$(entetes_servis -H 'Accept-Encoding: br' "$base$chemin")"; then
       ecart "Aucune réponse de $base$chemin."
       pwa_en_ecart=1
@@ -475,20 +480,39 @@ print(valeur)' "$1" "$2"
         pwa_en_ecart=1
         ;;
     esac
+
+    # **La compression de transport, là où le dépôt la déclare.** Les moteurs
+    # et `main.dart.wasm` sont livrés **déjà** compressés par
+    # `scripts/build_web.sh` : l'en-tête n'est pas un gain, c'est la clé de
+    # lecture. Servis sans lui, ce sont des octets brotli présentés comme du
+    # WebAssembly — `WebAssembly.compileStreaming(): expected magic word`, et
+    # la page reste blanche, sans qu'aucun écran le dise. Une règle perdue
+    # dans `vercel.json` suffit, et c'est exactement ce qu'on compare ici.
+    compression="$(attendu_entete "$source" Content-Encoding)"
+    if [ -n "$compression" ] &&
+      ! printf '%s' "$lu" | grep -q "content-encoding: $(printf '%s' "$compression" | tr '[:upper:]' '[:lower:]')"; then
+      ecart "$base$chemin n'est pas servi en « Content-Encoding: $compression » que déclare vercel.json ($source) : le fichier est livré déjà compressé, et sans cet en-tête le navigateur lit des octets brotli comme du WebAssembly — « expected magic word », page blanche."
+      pwa_en_ecart=1
+    fi
   }
 
   # Ce qu'un navigateur à jour demande : l'application et son rastériseur.
-  moteur_servi /main.dart.wasm application/wasm \
+  moteur_servi /main.dart.wasm application/wasm '/main.dart.wasm' \
     "La production ne sert pas de construction Wasm — la PWA retombe sur le moteur JavaScript et saccade (ticket 065)."
-  moteur_servi /canvaskit/skwasm.wasm application/wasm \
+  moteur_servi /canvaskit/skwasm.wasm application/wasm '/canvaskit/(.*)' \
     "Skwasm n'a pas été déployé : la construction Wasm se charge sans rastériseur."
 
   # Le repli. Un navigateur sans WasmGC — Safari d'avant 18.2, un vieil
   # Android — charge `main.dart.js` et CanvasKit. Les deux partent ensemble ou
   # ne partent pas.
-  moteur_servi /main.dart.js 'application/javascript|text/javascript' \
+  #
+  # `main.dart.js` n'est couvert par **aucune** règle de compression : il part
+  # en clair et c'est le CDN qui le comprime à la volée, comme tout le
+  # JavaScript. Sa règle est donc `/(.*)`, qui n'en déclare pas — le contrôle
+  # de `Content-Encoding` se tait de lui-même, sans exception à écrire.
+  moteur_servi /main.dart.js 'application/javascript|text/javascript' '/(.*)' \
     "Le repli des navigateurs sans WasmGC n'est pas servi : ils resteraient à la porte."
-  moteur_servi /canvaskit/chromium/canvaskit.wasm application/wasm \
+  moteur_servi /canvaskit/chromium/canvaskit.wasm application/wasm '/canvaskit/(.*)' \
     "Le moteur du repli n'est pas servi : un navigateur sans WasmGC n'aurait rien pour dessiner."
 
   [ "$pwa_en_ecart" -eq 0 ] &&
