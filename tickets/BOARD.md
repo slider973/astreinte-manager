@@ -6,7 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-23. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 064 | [Un monde visuel pour le pompier, à partir d'un tableau de bord](in-progress/064-monde-visuel-pompier.md) | P1 | 061 063 | — |
+| 064 | [Un monde visuel pour le pompier, à partir d'un tableau de bord](in-progress/064-monde-visuel-pompier.md) | P1 | 061 063 | https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a) |
 
 ## À faire
 
@@ -18,6 +18,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-23. Ne pas éditer à la main
 | 056 | [L'éditeur sans caserne perd sa destination au démarrage à froid](backlog/056-superadmin-destination-perdue-a-froid.md) | P2 | 045 053 | — |
 | 057 | [Le jeton d'appareil des notifications n'est pas branché sur l'oubli](backlog/057-jeton-appareil-hors-oubli.md) | P2 | 024 053 | — |
 | 058 | [Lire l'adresse confirmée à la source, pas dans les métadonnées](backlog/058-invitations-en-attente-adresse-confirmee.md) | P2 | 051 | — |
+| 065 | [Un défilement fluide sur la PWA installée](backlog/065-fluidite-defilement-pwa.md) | P1 | 060 | — |
 
 ## Terminés
 
