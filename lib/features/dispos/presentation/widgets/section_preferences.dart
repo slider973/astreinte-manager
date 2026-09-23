@@ -400,9 +400,17 @@ class _Compacte extends StatelessWidget {
 /// le chevron. Vingt-quatre points de texte entre deux rembourrages de seize :
 /// la carte fait 56 points, la hauteur d'un champ.
 ///
-/// Un seul paragraphe, deux styles : le titre en `titleMedium`, la valeur en
-/// `bodyLarge`. Deux `Text` dans une `Row` n'auraient pas partagé la même
-/// ligne de base, et la valeur aurait flotté sous son titre.
+/// Un seul paragraphe, deux styles : l'étiquette en `libelle-champ`, la
+/// valeur en `corps`. Deux `Text` dans une `Row` n'auraient pas partagé la
+/// même ligne de base, et la valeur aurait flotté sous son étiquette.
+///
+/// **L'étiquette est une étiquette, pas un titre**, et c'est une mesure qui
+/// l'a décidé : en `titleMedium`, « Au maximum · 12 astreintes, 4 weekends »
+/// demande 299 points là où la carte en offre 294 à 390 de large, et la
+/// valeur — la seule chose qu'on vient lire — s'éteignait sur ses derniers
+/// caractères, vu dans Chrome. En `libelle-champ`, la même phrase tient en
+/// 277. Le poids change de camp au passage, et c'est juste : le titre dit ce
+/// que la carte est, la valeur dit ce qu'elle vaut.
 class _Resume extends StatelessWidget {
   const _Resume({required this.valeur, required this.sansLimite});
 
@@ -421,11 +429,13 @@ class _Resume extends StatelessWidget {
               children: <InlineSpan>[
                 TextSpan(
                   text: AppStrings.preferencesTitreCourt,
-                  style: theme.textTheme.titleMedium,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 TextSpan(
                   text: AppStrings.preferencesSeparateur,
-                  style: theme.textTheme.bodyLarge?.copyWith(
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),

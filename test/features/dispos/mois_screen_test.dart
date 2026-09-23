@@ -27,6 +27,7 @@ import 'package:astreinte_sp/features/dispos/presentation/widgets/carte_commenta
 import 'package:astreinte_sp/features/dispos/presentation/widgets/section_preferences.dart';
 import 'package:astreinte_sp/features/dispos/presentation/widgets/selecteur_mois.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -873,6 +874,40 @@ void main() {
         );
       },
     );
+
+    /// Le plus long résumé que ce produit puisse écrire : deux nombres à deux
+    /// chiffres, et les deux pluriels.
+    FauxDisposRepository moisAuPireResume() => FauxDisposRepository(
+      disponibilites: <CreneauCle, DisponibiliteEtat>{
+        jour(3): DisponibiliteEtat.disponible,
+      },
+      preferences: <String, PreferencesMois>{
+        'periode-2026-10': const PreferencesMois(
+          maxAstreintes: 12,
+          maxWeekends: 4,
+        ),
+      },
+    );
+
+    testWidgets('le résumé ne s\'éteint jamais sur ses nombres', (
+      tester,
+    ) async {
+      await ouvrirMois(tester, depot: moisAuPireResume());
+
+      // Le paragraphe entier tient sur une ligne : ni ellipse, ni seconde
+      // ligne. C'est la valeur — la seule chose qu'on vient lire — qui se
+      // perdait en premier, vue dans Chrome à 390.
+      final peintre = tester.renderObject<RenderParagraph>(
+        find
+            .descendant(
+              of: find.byType(SectionPreferences),
+              matching: find.byType(RichText),
+            )
+            .first,
+      );
+      expect(peintre.didExceedMaxLines, isFalse);
+      expect(peintre.size.height, lessThan(30), reason: 'une seule ligne');
+    });
 
     testWidgets('la carte des maximums tient sur une ligne de 56 points', (
       tester,
