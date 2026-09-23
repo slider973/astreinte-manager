@@ -4,7 +4,6 @@ import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
-import 'package:astreinte_sp/core/widgets/empty_state.dart';
 import 'package:astreinte_sp/core/widgets/loading_skeleton.dart';
 import 'package:astreinte_sp/features/accueil/domain/tableau_bord.dart';
 import 'package:astreinte_sp/features/accueil/presentation/widgets/bande_semaine.dart';
@@ -228,12 +227,28 @@ void main() {
       expect(emplacementCourant(tester), AppRoutes.propositions);
     });
 
-    testWidgets('« Tout voir » mène aux astreintes', (tester) async {
+    testWidgets('« Tout voir » mène aux astreintes, et se nomme', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
       await _ouvrir(tester, astreintes: <Astreinte>[_demain()]);
+
+      // Deux boutons « Tout voir » sur un écran ne se distinguent pas à
+      // l'oreille : chacun annonce sa destination.
+      expect(
+        find.bySemanticsLabel(AppStrings.accueilToutVoirAstreintes),
+        findsOneWidget,
+      );
+      expect(
+        find.bySemanticsLabel(AppStrings.accueilToutVoirPropositions),
+        findsOneWidget,
+      );
 
       await tester.tap(find.text(AppStrings.accueilToutVoir).first);
       await tester.pumpAndSettle();
       expect(emplacementCourant(tester), AppRoutes.astreintes);
+
+      handle.dispose();
     });
   });
 

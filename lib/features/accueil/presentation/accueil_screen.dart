@@ -8,16 +8,12 @@ import '../../../core/caserne/fait_caserne_ecran.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/router/destinations.dart';
-import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../astreintes/domain/astreintes_providers.dart';
-import '../../dispos/domain/dispos_providers.dart';
-import '../../dispos/domain/periode_saisie.dart';
-import '../../dispos/presentation/controllers/saisie_controller.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../../propositions/domain/propositions_providers.dart';
@@ -254,7 +250,14 @@ class _EnteteRangee extends StatelessWidget {
       const SizedBox(width: AppSpacing.sm),
       TextButton(
         onPressed: onAction,
-        child: const Text(AppStrings.accueilToutVoir, maxLines: 1),
+        // Le mot lu est « Tout voir », le mot annoncé nomme la destination :
+        // deux boutons du même nom sur un écran ne se distinguent pas à
+        // l'oreille.
+        child: Text(
+          AppStrings.accueilToutVoir,
+          semanticsLabel: libelleAction,
+          maxLines: 1,
+        ),
       ),
     ],
   );
