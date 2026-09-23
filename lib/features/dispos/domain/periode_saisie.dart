@@ -88,6 +88,14 @@ class PeriodeSaisie {
       ? AppStrings.moisOuvertJusquAuCourt(formaterDateCourte(dateLimite))
       : AppStrings.moisVerrouilleCourt;
 
+  /// La même, sur une ligne à côté du mois : « jusqu'au 15 sept. ».
+  ///
+  /// « Ouvert » y est redondant — l'icône `lock_open` le dit déjà, et le mot
+  /// coûtait quarante points dans une rangée qui n'en a pas.
+  String get ligneEtatBreve => ouverte
+      ? AppStrings.moisJusquAuCourt(formaterDateCourte(dateLimite))
+      : AppStrings.moisVerrouilleCourt;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

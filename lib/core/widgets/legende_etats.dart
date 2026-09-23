@@ -20,6 +20,7 @@ class LegendeEtats extends StatelessWidget {
     super.key,
     this.densite = SlotChipDensite.dense,
     this.creneau = CreneauType.jour,
+    this.espacement = AppSpacing.lg,
   });
 
   /// Densité des cases de la légende. [SlotChipDensite.dense] par défaut :
@@ -29,6 +30,11 @@ class LegendeEtats extends StatelessWidget {
   /// Créneau employé pour peindre la case « non saisi », seule à laisser voir
   /// son fond.
   final CreneauType creneau;
+
+  /// Écart entre deux entrées. `lg` dans un bloc, où la légende respire ;
+  /// la barre de commande de l'admin la resserre à `sm`, parce que sa rangée
+  /// se compte au point près (chantier 061c).
+  final double espacement;
 
   /// Les trois états, dans l'ordre du registre : cochée, barrée, vide.
   static const List<DisponibiliteEtat> etats = <DisponibiliteEtat>[
@@ -43,7 +49,7 @@ class LegendeEtats extends StatelessWidget {
     final statuts = context.statuts;
 
     return Wrap(
-      spacing: AppSpacing.lg,
+      spacing: espacement,
       runSpacing: AppSpacing.sm,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[

@@ -474,20 +474,26 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     return null;
   }
 
+  /// Le nombre de **téléphones qui vont sonner** si l'on publie : pas le
+  /// nombre d'attributions, mais celui des membres attribués.
+  int _membresAttribues(EtatPlanning etat) => <String>{
+    for (final creneau in etat.planning.creneaux)
+      for (final attribution in etat.planning.attributionsDe(creneau.id))
+        attribution.userId,
+  }.length;
+
   /// La barre d'actions du bas : le bouton « Publier », et rien d'autre.
   ///
-  /// `AppScaffold.filActions` est la seule zone de l'ossature qui ne défile pas
-  /// avec la matrice. Un bouton « Publier » perdu sous soixante-deux colonnes
-  /// serait un bouton qu'on cherche. Le 016 la lui avait réservée, le 017 l'a
-  /// laissée vide : la voici occupée.
+  /// **Sur téléphone seulement** depuis le chantier 061c. `filActions` est la
+  /// seule zone de l'ossature qui ne défile pas avec la vue par jour, et la
+  /// barre de commande y défile : un bouton « Publier » qui s'en irait au
+  /// défilement serait un bouton qu'on cherche. Sur grand écran, la barre de
+  /// commande ne défile pas — « Publier » y prend sa place en seconde rangée
+  /// et rend ces 70 points à la matrice.
   Widget? _filActions(EtatPlanning? etat) {
     if (etat == null || !etat.planning.modifiable) return null;
 
-    final membres = <String>{
-      for (final creneau in etat.planning.creneaux)
-        for (final attribution in etat.planning.attributionsDe(creneau.id))
-          attribution.userId,
-    }.length;
+    final membres = _membresAttribues(etat);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -601,7 +607,11 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       // réservée ; `filActions` reçoit enfin le bouton « Publier » que le 016
       // avait annoncé et que le 017 a laissé vide.
       panneauLateral: panneau == null ? null : _panneau(panneau),
-      filActions: _filActions(ref.watch(planningControllerProvider).value),
+      // Sur grand écran, « Publier » est remonté dans la barre de commande :
+      // le fil du bas n'a plus rien à porter (chantier 061c).
+      filActions: compact
+          ? _filActions(ref.watch(planningControllerProvider).value)
+          : null,
       child: _corps(admin: admin, asynchrone: asynchrone, etat: etat),
     );
   }
@@ -721,6 +731,16 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
                   ? null
                   : () => unawaited(_proposer(etatPlanning)),
               raisonProposition: _raisonProposition(etatPlanning),
+              // « Publier » vit dans la barre dès `expanded` (chantier 061c)
+              // et sous la grille en `compact`, où la barre défile.
+              publication: etatPlanning.publication,
+              onPublier: matriceVisible && etatPlanning.planning.modifiable
+                  ? () => unawaited(_publier(etatPlanning))
+                  : null,
+              raisonPublication: _raisonPublication(etatPlanning),
+              detailPublication: AppStrings.publierDetail(
+                _membresAttribues(etatPlanning),
+              ),
             ),
     );
 
