@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
@@ -143,10 +145,12 @@ void main() {
     testWidgets('le squelette n\'apparaît que sans rien en cache', (
       WidgetTester tester,
     ) async {
-      await _ouvrir(tester, stabiliser: false);
+      final depot = _DepotLent();
+      await _ouvrir(tester, depot: depot, stabiliser: false);
 
       expect(find.byType(LoadingSkeleton), findsOneWidget);
 
+      depot.liberer();
       await tester.pumpAndSettle();
       expect(find.byType(LoadingSkeleton), findsNothing);
     });
@@ -575,4 +579,28 @@ void main() {
       expect(find.text(AppStrings.astreintesPassees(1)), findsOneWidget);
     });
   });
+}
+
+/// Un dépôt dont la lecture ne rend la main que sur commande.
+///
+/// Le squelette reste alors à l'écran le temps qu'on l'y regarde, quel que
+/// soit le nombre d'images pompées : depuis que les destinations changent sans
+/// transition (ticket 063), la réponse arrive une image plus tôt, et l'attente
+/// ne dure plus assez pour qu'on compte dessus.
+class _DepotLent extends FauxAstreintesRepository {
+  _DepotLent() : super(astreintes: const <Astreinte>[]);
+
+  final Completer<void> _verrou = Completer<void>();
+
+  void liberer() => _verrou.complete();
+
+  @override
+  Future<MesAstreintes> lire({
+    required String userId,
+    required String stationId,
+    required DateTime depuis,
+  }) async {
+    await _verrou.future;
+    return super.lire(userId: userId, stationId: stationId, depuis: depuis);
+  }
 }

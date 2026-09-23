@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/widgets/app_banner.dart';
@@ -352,10 +354,15 @@ void main() {
     testWidgets('le chargement montre l\'ossature, jamais une roue', (
       tester,
     ) async {
-      await _ouvrir(tester, stabiliser: false);
+      final depot = _DepotLent();
+      await _ouvrir(tester, depot: depot, stabiliser: false);
 
       expect(find.byType(LoadingSkeleton), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      depot.liberer();
+      await tester.pumpAndSettle();
+      expect(find.byType(LoadingSkeleton), findsNothing);
 
       await demonter(tester);
     });
@@ -386,4 +393,22 @@ void main() {
       expect(emplacementCourant(tester), isNot(contains('abonnement')));
     });
   });
+}
+
+/// Un dépôt dont la lecture ne rend la main que sur commande.
+///
+/// L'ossature reste alors à l'écran le temps qu'on l'y regarde, quel que soit
+/// le nombre d'images pompées : depuis que les destinations changent sans
+/// transition (ticket 063), la réponse arrive une image plus tôt, et l'attente
+/// ne dure plus assez pour qu'on compte dessus.
+class _DepotLent extends FauxAbonnementRepository {
+  final Completer<void> _verrou = Completer<void>();
+
+  void liberer() => _verrou.complete();
+
+  @override
+  Future<EtatAbonnement> lire(String stationId) async {
+    await _verrou.future;
+    return super.lire(stationId);
+  }
 }
