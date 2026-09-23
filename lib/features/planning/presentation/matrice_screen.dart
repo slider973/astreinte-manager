@@ -16,6 +16,7 @@ import '../../../core/session/session_providers.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_status.dart';
+import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/app_banner.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -534,7 +535,9 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
         // sentir avant d'appuyer.
         Text(
           AppStrings.publierDetail(membres),
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          // **Le même style qu'au bandeau** : la phrase est la même, elle ne
+          // change pas de taille selon l'endroit d'où on la lit.
+          style: AppTextStyles.mention.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
@@ -738,8 +741,9 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
                 ? null
                 : () => unawaited(_proposer(etatPlanning)),
             raisonProposition: _raisonProposition(etatPlanning),
-            // « Publier » vit dans le bandeau dès `expanded` (chantier 061c)
-            // et sous la grille en `compact`, où la barre défile.
+            // « Publier » vit dans le bandeau quand la matrice est à
+            // l'écran (chantier 061c) et dans le fil du bas dès que la vue
+            // par jour prend la main, où la barre défile.
             publication: etatPlanning.publication,
             onPublier: matriceVisible && etatPlanning.planning.modifiable
                 ? () => unawaited(_publier(etatPlanning))

@@ -22,15 +22,17 @@ import 'indicateur_direct.dart';
 ///
 /// Elle ne défile pas : ses contrôles pilotent ce qui est en dessous.
 ///
-/// **Deux rangées de 48 points dès `expanded`** (chantier 061c) : le mois, la
-/// recherche et les puces en haut ; ce qui agit sur le planning en bas, la
-/// légende poussée au bord droit. Elle coûtait 230 à 266 points sur quatre
-/// étages, plus 70 pour le fil « Publier » qui vivait sous la grille ; la
-/// hauteur qu'elle rend va à la matrice, qui est l'écran.
+/// **Deux rangées de 48 points quand la matrice est à l'écran** (chantier
+/// 061c) : le mois, la recherche et le tri en haut ; la saisie par
+/// procuration et les puces de filtre en bas, la légende poussée au bord
+/// droit. Elle coûtait 230 à 266 points sur quatre étages, plus 70 pour le
+/// fil « Publier » qui vivait sous la grille ; la hauteur qu'elle rend va à
+/// la matrice, qui est l'écran.
 ///
-/// En `compact`, rien ne change : la barre y vit dans le défilement de la vue
-/// par jour, où la hauteur ne manque pas de la même façon, et deux rangées
-/// larges de 360 points n'auraient de toute façon pas tenu.
+/// **Sous la vue par jour, rien ne change** : la barre garde sa forme empilée
+/// du ticket 017, avec les gestes du planning que le bandeau ne porte pas
+/// là — la hauteur n'y manque pas de la même façon, et deux rangées larges de
+/// 360 points n'auraient de toute façon pas tenu.
 ///
 /// **Aucun de ces contrôles ne déclenche de requête.** Les soixante lignes
 /// sont déjà en mémoire ; une recherche qui irait au serveur serait une
@@ -96,8 +98,9 @@ class BarreCommandeMatrice extends StatefulWidget {
   /// C'est la seule découpe qui vaille pour cette barre, et non la classe de
   /// fenêtre : quand la matrice n'est pas là, le bandeau qui porte les gestes
   /// du planning n'y est pas non plus, et la barre doit les reprendre. La
-  /// légende suit la même règle — elle décrit les cases de la matrice, et la
-  /// vue par jour en montre déjà deux, nommées.
+  /// légende suit : elle décrit les cases de la matrice, et n'est donc rendue
+  /// que dans la forme à deux rangées — la vue par jour en montre déjà deux,
+  /// nommées.
   final bool matriceVisible;
 
   /// Ce que la barre dit du planning : le créer, le publier, son état, et
@@ -244,10 +247,8 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
                 ],
               ),
             ),
-            if (widget.matriceVisible) ...<Widget>[
-              const SizedBox(width: AppSpacing.sm),
-              const LegendeEtats(espacement: AppSpacing.sm),
-            ],
+            const SizedBox(width: AppSpacing.sm),
+            const LegendeEtats(espacement: AppSpacing.sm),
             const SizedBox(width: AppSpacing.sm),
             SaveIndicator(
               etat: widget.sync,
@@ -313,7 +314,6 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
             // défile, et un bouton qui s'en va au défilement est un bouton
             // qu'on cherche.
             ..._actionPlanning(context),
-            if (widget.matriceVisible) const LegendeEtats(),
             SaveIndicator(
               etat: widget.sync,
               compact: true,
@@ -392,10 +392,10 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
     ];
   }
 
-  /// L'emplacement de l'action du planning, **en `compact` seulement**.
+  /// L'emplacement de l'action du planning, **sous la vue par jour**.
   ///
   /// C'est le premier geste du mois, au même endroit que les autres contrôles
-  /// du mois. Sur grand écran, il a déménagé dans le bandeau
+  /// du mois. Quand la matrice est à l'écran, il a déménagé dans le bandeau
   /// (`ZonePlanning`, chantier 061c) : la seconde rangée demandait 418 points
   /// pour ces contrôles quand il en restait 95.
   List<Widget> _actionPlanning(BuildContext context) {

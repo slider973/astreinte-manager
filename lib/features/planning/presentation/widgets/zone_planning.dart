@@ -20,9 +20,11 @@ import 'indicateur_direct.dart';
 /// il en restait 95 : « Publier » partait seul sur une troisième ligne et la
 /// puce d'état s'écrasait contre « Proposer automatiquement ».
 ///
-/// **Sur grand écran seulement.** En `compact`, la création reste dans la
-/// barre et « Publier » dans le fil d'actions du bas, qui ne défile pas avec
-/// la vue par jour.
+/// **Seulement quand la matrice est à l'écran** — deux volets et une échelle
+/// de texte sous 1,6 (`MatriceScreen._matriceVisible`). Dès que la vue par
+/// jour prend la main, la création, l'état et le remplissage automatique
+/// reviennent dans la barre, et « Publier » dans le fil d'actions du bas, qui
+/// ne défile pas avec elle.
 class ZonePlanning extends StatelessWidget {
   const ZonePlanning({
     required this.planning,
