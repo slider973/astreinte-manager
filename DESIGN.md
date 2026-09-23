@@ -353,6 +353,7 @@ Inchangés depuis le ticket 004 : `surface #FFFFFF`, `on-surface #131C23`, `on-s
 - **Absent, refusé, conflit** : famille rose. Texte `etat-absent #BB285D`, fond `etat-absent-fond #FED7E5`, texte sur fond encre.
 - **Non saisi, neutre, annulé, archivé, verrouillé** : gris inchangés.
 - **Sélection** : `primary-container` sur `on-primary-container`, pour tout composant Material qui exprime un choix, réglé dans `app_theme.dart`. Le vert ne dit jamais « choisi ».
+- **Le papier doux du pompier** (ticket 064) : page `surface-container-low`, cartes en `surface`, filet `outline-variant` 1 dp. Les deux marques vont ensemble — **un cran de cette palette ne vaut que 1,06:1**, c'est le filet qui détache la carte et le cran qui l'habille. La coquille de l'admin garde son papier blanc : une grille dense de 3 720 cases se lit sur du blanc, trois cartes ne s'y détachent pas.
 - Texte coloré sur blanc : indigo `accent-texte`, vert `etat-accepte`, et les deux teintes assombries `tertiary #9F6224` (4,94:1) et `error #BB285D` (5,87:1) pour un libellé d'état qui doit être lu. Les teintes vives `orange-vif`, `rose-vif` et `accent-decoratif`, jamais : un test les y refuse (§ Écarts, ticket 061).
 
 #### Disponibilité — la grammaire de la case
@@ -618,7 +619,8 @@ Le registre est fait de cases, pas de pastilles.
 | `filet` | 0 | traits de réglure, en-têtes collants, séparateurs |
 | `case` | 4 | **case de créneau, badge d'état, puce** — la forme signature |
 | `controle` | 8 | bouton, champ de saisie, panneau, « carte » |
-| `feuille` | 12 (haut uniquement pour les feuilles de bas d'écran) | dialogue, feuille, menu |
+| `feuille` | 12 (haut uniquement pour les feuilles de bas d'écran) | dialogue, feuille, menu ; **et le carré d'initiale** des lignes de liste du pompier, sur ses quatre coins |
+| `carte` | 20 | **la carte du monde du pompier** (`CarteDouce`, ticket 064) — et elle seule : un bouton ou un champ à 20 serait une gélule |
 | `pastille` | 999 | avatar, pastille de compteur de notifications uniquement |
 
 Écart assumé au Material 3 par défaut : **pas de boutons en gélule**. Le bouton est un bloc à
@@ -670,15 +672,41 @@ Le composant signature. Une case = un créneau (date + jour/nuit) + un état de 
 
 ### Cards / Containers
 
-Il n'y a pas de composant « carte ». Il y a des **blocs réglés** : fond `surface`, filet 1 dp
-`outline-variant`, rayon 8, sans ombre. Les blocs ne s'imbriquent jamais. Une liste de blocs
-identiques faits d'une icône + un titre + un texte est interdite comme structure de page.
+**Deux mondes, deux formes.** Le registre de l'admin est fait de **blocs réglés** : fond
+`surface`, filet 1 dp `outline-variant`, rayon 8, sans ombre. Les écrans du pompier sont faits de
+**cartes** à rayon 20 sur le papier doux (section suivante). Ni les uns ni les autres ne
+s'imbriquent, et une liste d'éléments identiques faits d'une icône + un titre + un texte reste
+interdite comme structure de page.
 
 `DayCell` est un bloc réglé : numéro du jour en `nombre-petit`, nom du jour en `etiquette`,
 marqueur weekend (fond `surface-dim` + nom en gras) et marqueur férié (`Icons.star` 14 dp + nom du
 jour férié en info-bulle **et** en semantics), puis deux `SlotChip` empilés jour au-dessus, nuit
 en dessous. Le jour courant porte un filet `primary` de 2 dp sur son bord gauche et le libellé
 « Aujourd'hui » en semantics.
+
+### La carte du pompier — `CarteDouce`
+
+Le monde du pompier n'est pas fait de blocs réglés mais de **cartes** posées sur le papier doux :
+fond `surface`, rayon `carte` = 20, filet `outline-variant` 1 dp, **aucune ombre**. Elle **ne
+s'imbrique jamais** : ce qui vit dans une carte est un contrôle — une puce de raccourci à rayon 4,
+un carré d'initiale à rayon 12 —, jamais une seconde carte.
+
+- `CarteDouce.nue` quand l'enfant porte ses propres marges : une liste dont les lignes touchent
+  les bords, une grille qui a déjà les siennes.
+- `CarteDouceSliver` autour d'un groupe de slivers, pour une grille de soixante-deux lignes qui ne
+  peut pas entrer dans une boîte. Le papier se peint derrière, **le filet devant** : un en-tête
+  épinglé à fond plein recouvrirait sinon le bord de sa propre carte.
+- `enErreur` passe le filet à 2 dp `error`. Réservé à une carte qui **porte** une erreur de
+  saisie ; une erreur de chargement reste un état de contenu.
+
+**Les lignes de liste du pompier** — proposition, rappel, astreinte — sont cette carte, avec à
+gauche un `CarreCreneau` : 40 × 40, rayon 12, l'icône du créneau et sa lettre — « J » ou « N » —
+en `on-primary-container` sur `primary-container`, `attenue` d'un cran de surface pour une
+astreinte passée. Le carré est **décoratif** : la ligne qui le porte dit « Nuit » en toutes
+lettres.
+
+`EnteteSection.discret` ouvre un paquet de ces cartes : `titleMedium` — le plus petit titre en
+Archivo —, et **pas de filet**, parce qu'une liste de cartes se sépare toute seule.
 
 ### Inputs / Fields
 
@@ -700,18 +728,25 @@ sûres. Destinations, dans cet ordre :
 
 | Destination | Icône (sélectionnée / non) | Libellé | Route |
 |---|---|---|---|
-| Mon mois | `calendar_month` / `calendar_month_outlined` | « Mon mois » | `/mois` |
-| Propositions | `inbox` / `inbox_outlined` + pastille de compte | « Propositions » | `/propositions` |
-| Planning | `groups` / `groups_outlined` | « Planning » | `/planning` |
-| Profil | `person` / `person_outline` | « Profil » | `/profil` |
+| Accueil | `home` / `home_outlined` | « Accueil » | `/` |
+| Calendrier | `calendar_month` / `calendar_month_outlined` | « Calendrier » | `/calendrier` |
+| Astreintes | `event_available` / `event_available_outlined` | « Astreintes » | `/astreintes` |
+| Boîte | `inbox` / `inbox_outlined` + pastille de compte | « Boîte » | `/boite` |
 | Admin *(admins seuls)* | `admin_panel_settings` / `admin_panel_settings_outlined` | « Admin » | `/admin` |
+
+**Quatre destinations pour un pompier, cinq pour un admin** (ticket 064). Le profil n'y est plus :
+il s'ouvre depuis l'avatar de l'en-tête, présent sur les quatre destinations, et il se **pousse** —
+on l'ouvre deux fois par an là où les quatre autres se visitent tous les jours.
 
 - Libellés **toujours affichés** (`NavigationDestinationLabelBehavior.alwaysShow`) : le public a une
   aisance numérique variable, une icône seule ne suffit pas.
 - Maximum 5 destinations, ce qui est exactement le compte pour un admin. Aucune destination ne
   s'ajoute sans en retirer une.
-- La pastille « Propositions » affiche le nombre de propositions en attente, plafonné à « 9+ »,
-  et double le chiffre d'un libellé de semantics (« 3 propositions en attente »).
+- La pastille « Boîte » affiche le nombre de rappels non lus, plafonné à « 9+ », et double le
+  chiffre d'un libellé de semantics (« 3 notifications non lues »). Elle est **indigo sur encre
+  blanche**, jamais le rose de Material : une notification à lire n'est ni un refus, ni une
+  erreur. Le compte des propositions en attente, lui, est écrit en toutes lettres sur l'accueil,
+  « Propositions · 3 », là où le geste suit.
 - Le bouton retour du navigateur et le geste retour iOS restent fonctionnels : chaque écran est une
   route nommée, jamais un état local.
 - L'élément choisi porte `primary-container` et `on-primary-container`, en barre, en rail, en tiroir et en boutons segmentés : la sélection est toujours indigo.
