@@ -2,7 +2,7 @@
 
 - **Épopée** : E0 Fondations
 - **Priorité** : P1
-- **Dépend de** : 061
+- **Dépend de** : 004
 - **Branche** : `feat/063-transition-entre-destinations`
 - **PR** : —
 - **Statut** : à faire
