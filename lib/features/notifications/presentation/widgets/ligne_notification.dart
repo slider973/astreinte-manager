@@ -222,9 +222,7 @@ class _Texte extends StatelessWidget {
               Expanded(
                 child: Text(
                   AppStrings.centreEnvoiEchoue,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: rouge,
-                  ),
+                  style: theme.textTheme.labelMedium?.copyWith(color: rouge),
                 ),
               ),
             ],

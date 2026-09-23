@@ -884,21 +884,11 @@ class _SectionOssature extends StatelessWidget {
         ),
         DevSpecimen(
           nom: 'compact, admin, 12 non lues (pastille « 9+ »)',
-          child: _Fenetre(
-            largeur: 360,
-            hauteur: 380,
-            admin: true,
-            nonLues: 12,
-          ),
+          child: _Fenetre(largeur: 360, hauteur: 380, admin: true, nonLues: 12),
         ),
         DevSpecimen(
           nom: 'medium, rail',
-          child: _Fenetre(
-            largeur: 640,
-            hauteur: 380,
-            admin: true,
-            nonLues: 0,
-          ),
+          child: _Fenetre(largeur: 640, hauteur: 380, admin: true, nonLues: 0),
         ),
       ],
     );

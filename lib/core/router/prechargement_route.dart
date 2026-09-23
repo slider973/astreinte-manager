@@ -20,49 +20,48 @@ import 'app_router.dart';
 /// retenues par un autre lecteur.
 List<ProviderSubscription<Object?> Function(Ref ref)> donneesDEcran(
   String chemin,
-) =>
-    switch (chemin) {
-      // **L'écran le plus ouvert du produit** (ticket 064). Rien n'abonnait
-      // ces deux contrôleurs avant que le tableau de bord ne se construise :
-      // ses deux lectures partaient donc une image trop tard, sur la route où
-      // ça se voit le plus — celle qu'on ouvre en lançant l'application.
-      AppRoutes.accueil => <ProviderSubscription<Object?> Function(Ref)>[
-        (Ref ref) => ref.listen(astreintesControllerProvider, (_, _) {}),
-        (Ref ref) => ref.listen(propositionsControllerProvider, (_, _) {}),
-      ],
-      // La matrice lit le mois **et** le planning du mois : les deux requêtes
-      // partent ensemble, comme quand l'écran les demande lui-même.
-      AppRoutes.planningAdmin => <ProviderSubscription<Object?> Function(Ref)>[
-        (Ref ref) => ref.listen(matriceControllerProvider, (_, _) {}),
-        (Ref ref) => ref.listen(planningControllerProvider, (_, _) {}),
-      ],
-      AppRoutes.suivi => <ProviderSubscription<Object?> Function(Ref)>[
-        (Ref ref) => ref.listen(suiviControllerProvider, (_, _) {}),
-        (Ref ref) => ref.listen(planningControllerProvider, (_, _) {}),
-      ],
-      AppRoutes.membres => <ProviderSubscription<Object?> Function(Ref)>[
-        (Ref ref) => ref.listen(membresControllerProvider, (_, _) {}),
-      ],
-      AppRoutes.periodes => <ProviderSubscription<Object?> Function(Ref)>[
-        (Ref ref) => ref.listen(periodesControllerProvider, (_, _) {}),
-      ],
-      AppRoutes.parametres => <ProviderSubscription<Object?> Function(Ref)>[
-        (Ref ref) => ref.listen(parametresControllerProvider, (_, _) {}),
-      ],
-      AppRoutes.abonnement => <ProviderSubscription<Object?> Function(Ref)>[
-        (Ref ref) => ref.listen(abonnementControllerProvider, (_, _) {}),
-      ],
-      // La Boîte (chantier 064b) : les rappels **et** les propositions, ses
-      // deux sources. `/notifications` et `/propositions` n'existent plus que
-      // comme renvois. Les deux lectures sont celles que les deux écrans
-      // d'avant faisaient chacun de leur côté : le compte de requêtes d'une
-      // ouverture de Boîte ne bouge pas, il change seulement d'écran.
-      AppRoutes.boite => <ProviderSubscription<Object?> Function(Ref)>[
-        (Ref ref) => ref.listen(centreNotificationsProvider, (_, _) {}),
-        (Ref ref) => ref.listen(propositionsControllerProvider, (_, _) {}),
-      ],
-      _ => const <ProviderSubscription<Object?> Function(Ref)>[],
-    };
+) => switch (chemin) {
+  // **L'écran le plus ouvert du produit** (ticket 064). Rien n'abonnait
+  // ces deux contrôleurs avant que le tableau de bord ne se construise :
+  // ses deux lectures partaient donc une image trop tard, sur la route où
+  // ça se voit le plus — celle qu'on ouvre en lançant l'application.
+  AppRoutes.accueil => <ProviderSubscription<Object?> Function(Ref)>[
+    (Ref ref) => ref.listen(astreintesControllerProvider, (_, _) {}),
+    (Ref ref) => ref.listen(propositionsControllerProvider, (_, _) {}),
+  ],
+  // La matrice lit le mois **et** le planning du mois : les deux requêtes
+  // partent ensemble, comme quand l'écran les demande lui-même.
+  AppRoutes.planningAdmin => <ProviderSubscription<Object?> Function(Ref)>[
+    (Ref ref) => ref.listen(matriceControllerProvider, (_, _) {}),
+    (Ref ref) => ref.listen(planningControllerProvider, (_, _) {}),
+  ],
+  AppRoutes.suivi => <ProviderSubscription<Object?> Function(Ref)>[
+    (Ref ref) => ref.listen(suiviControllerProvider, (_, _) {}),
+    (Ref ref) => ref.listen(planningControllerProvider, (_, _) {}),
+  ],
+  AppRoutes.membres => <ProviderSubscription<Object?> Function(Ref)>[
+    (Ref ref) => ref.listen(membresControllerProvider, (_, _) {}),
+  ],
+  AppRoutes.periodes => <ProviderSubscription<Object?> Function(Ref)>[
+    (Ref ref) => ref.listen(periodesControllerProvider, (_, _) {}),
+  ],
+  AppRoutes.parametres => <ProviderSubscription<Object?> Function(Ref)>[
+    (Ref ref) => ref.listen(parametresControllerProvider, (_, _) {}),
+  ],
+  AppRoutes.abonnement => <ProviderSubscription<Object?> Function(Ref)>[
+    (Ref ref) => ref.listen(abonnementControllerProvider, (_, _) {}),
+  ],
+  // La Boîte (chantier 064b) : les rappels **et** les propositions, ses
+  // deux sources. `/notifications` et `/propositions` n'existent plus que
+  // comme renvois. Les deux lectures sont celles que les deux écrans
+  // d'avant faisaient chacun de leur côté : le compte de requêtes d'une
+  // ouverture de Boîte ne bouge pas, il change seulement d'écran.
+  AppRoutes.boite => <ProviderSubscription<Object?> Function(Ref)>[
+    (Ref ref) => ref.listen(centreNotificationsProvider, (_, _) {}),
+    (Ref ref) => ref.listen(propositionsControllerProvider, (_, _) {}),
+  ],
+  _ => const <ProviderSubscription<Object?> Function(Ref)>[],
+};
 
 /// Réveille les données de l'écran visé **au moment où la route change**,
 /// sans attendre que sa première image soit construite.

@@ -63,10 +63,7 @@ void main() {
               creeLe: DateTime(2026, 9, 18, 8),
               lueLe: DateTime(2026, 9, 18, 9),
             ),
-            notification(
-              id: 'n-recente',
-              creeLe: DateTime(2026, 9, 20, 9),
-            ),
+            notification(id: 'n-recente', creeLe: DateTime(2026, 9, 20, 9)),
           ],
         ),
       );
@@ -116,9 +113,11 @@ void main() {
               matching: find.byType(Semantics),
             ),
           )
-          .where((s) => s.properties.label?.startsWith(
-                AppStrings.centreNonLue,
-              ) ?? false);
+          .where(
+            (s) =>
+                s.properties.label?.startsWith(AppStrings.centreNonLue) ??
+                false,
+          );
       expect(annoncees, isNotEmpty);
 
       final lues = tester
@@ -128,9 +127,10 @@ void main() {
               matching: find.byType(Semantics),
             ),
           )
-          .where((s) => s.properties.label?.contains(
-                AppStrings.centreNonLue,
-              ) ?? false);
+          .where(
+            (s) =>
+                s.properties.label?.contains(AppStrings.centreNonLue) ?? false,
+          );
       expect(lues, isEmpty);
     });
 
@@ -308,8 +308,10 @@ void main() {
       expect(depot.marquagesGlobaux, 1);
       expect(depot.notifications.every((n) => n.lue), isTrue);
       expect(_titre(tester), AppStrings.boiteTitre(0));
-      expect(find.text(AppStrings.centreToutMarqueLuConfirmation),
-          findsOneWidget);
+      expect(
+        find.text(AppStrings.centreToutMarqueLuConfirmation),
+        findsOneWidget,
+      );
 
       // Plus rien à marquer : le bouton disparaît.
       expect(find.text(AppStrings.centreToutMarquerLu), findsNothing);

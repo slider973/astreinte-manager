@@ -75,6 +75,7 @@ abstract final class AppRadius {
   static const BorderRadius feuilleRadius = BorderRadius.vertical(
     top: Radius.circular(feuille),
   );
+
   /// Le rayon `feuille` sur les **quatre** coins : le carré d'initiale des
   /// lignes de liste du monde du pompier (ticket 064). [feuilleRadius] ne
   /// porte que les deux coins hauts, parce qu'il sert aux feuilles de bas

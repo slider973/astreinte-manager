@@ -554,8 +554,7 @@ abstract final class AppStrings {
   static const String accueilVideAstreintesTexte =
       'Rien ne t\'attend pour l\'instant. Saisis tes disponibilités : c\'est '
       'comme ça que le chef de centre sait sur qui compter.';
-  static const String accueilVideAstreintesAction =
-      'Saisir mes disponibilités';
+  static const String accueilVideAstreintesAction = 'Saisir mes disponibilités';
 
   static const String accueilVidePropositionsTitre =
       'Aucune proposition en attente';
@@ -2137,8 +2136,7 @@ abstract final class AppStrings {
   static String boiteTitre(int nonLus) =>
       nonLus == 0 ? navBoite : '$navBoite · ${boiteNonLus(nonLus)}';
 
-  static String boiteNonLus(int n) =>
-      n <= 1 ? '$n non lue' : '$n non lues';
+  static String boiteNonLus(int n) => n <= 1 ? '$n non lue' : '$n non lues';
 
   static const String boiteOngletTout = 'Tout';
   static const String boiteOngletPropositions = 'Propositions';
@@ -2146,8 +2144,7 @@ abstract final class AppStrings {
 
   /// Les onglets sont annoncés par leur contenu, pas par leur seul mot :
   /// « Tout » tout seul ne dit pas de quoi.
-  static const String boiteOngletToutAnnonce =
-      'Tout : propositions et rappels';
+  static const String boiteOngletToutAnnonce = 'Tout : propositions et rappels';
   static const String boiteOngletPropositionsAnnonce =
       'Propositions à répondre';
   static const String boiteOngletRappelsAnnonce = 'Rappels et informations';

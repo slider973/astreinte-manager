@@ -730,19 +730,19 @@ void main() {
     test('la limite du bloc se détache des deux papiers de la grille', () {
       for (final (nom, statuts, papier, weekend)
           in <(String, AppStatusColors, Color, Color)>[
-        (
-          'clair',
-          AppStatusColors.clair,
-          AppColors.surface,
-          AppColors.surfaceDim,
-        ),
-        (
-          'sombre',
-          AppStatusColors.sombre,
-          AppColors.darkSurface,
-          AppColors.darkSurfaceDim,
-        ),
-      ]) {
+            (
+              'clair',
+              AppStatusColors.clair,
+              AppColors.surface,
+              AppColors.surfaceDim,
+            ),
+            (
+              'sombre',
+              AppStatusColors.sombre,
+              AppColors.darkSurface,
+              AppColors.darkSurfaceDim,
+            ),
+          ]) {
         for (final etat in etats) {
           final bloc = statuts.attribution(etat);
           // **Le contour compte quand le remplissage ne suffit pas.** L'orange

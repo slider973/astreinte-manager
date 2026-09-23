@@ -123,8 +123,7 @@ String _titre(WidgetTester tester) => tester
     )
     .data!;
 
-Finder _onglet(OngletBoite onglet) =>
-    find.widgetWithText(Tab, onglet.libelle);
+Finder _onglet(OngletBoite onglet) => find.widgetWithText(Tab, onglet.libelle);
 
 /// Vrai si le texte de [cible] ne tient pas dans la place qu'il occupe.
 ///
@@ -135,9 +134,7 @@ bool _tronque(WidgetTester tester, Finder cible) {
   // Un `Text` à libellé annoncé s'enveloppe d'un nœud de sémantique : c'est
   // le `RichText` de dessous qui est le paragraphe rendu.
   final rendu = tester.renderObject<RenderParagraph>(
-    find
-        .descendant(of: cible, matching: find.byType(RichText))
-        .first,
+    find.descendant(of: cible, matching: find.byType(RichText)).first,
   );
   final peintre = TextPainter(
     text: rendu.text,
@@ -158,10 +155,7 @@ void main() {
       for (final onglet in OngletBoite.values) {
         expect(_onglet(onglet), findsOneWidget, reason: onglet.libelle);
       }
-      expect(
-        tester.widget<TabBar>(find.byType(TabBar)).tabs,
-        hasLength(3),
-      );
+      expect(tester.widget<TabBar>(find.byType(TabBar)).tabs, hasLength(3));
     });
 
     testWidgets('l\'adresse ouvre l\'onglet qu\'elle nomme', (tester) async {
@@ -401,9 +395,7 @@ void main() {
       expect(_titre(tester), AppStrings.boiteTitre(2));
     });
 
-    testWidgets('la pastille de la barre porte le même nombre', (
-      tester,
-    ) async {
+    testWidgets('la pastille de la barre porte le même nombre', (tester) async {
       await _ouvrir(tester);
 
       // Deux nombres qui divergeraient seraient deux vérités : ils lisent la
@@ -477,9 +469,7 @@ void main() {
       // l'écran ne passe donc jamais assez longtemps par son squelette pour
       // qu'un test d'écran l'y attrape.
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(body: SqueletteBoite()),
-        ),
+        const MaterialApp(home: Scaffold(body: SqueletteBoite())),
       );
       await tester.pump();
 
@@ -564,11 +554,7 @@ void main() {
     testWidgets('la réponse s\'ouvre dans le volet, pas dans une feuille', (
       tester,
     ) async {
-      await _ouvrir(
-        tester,
-        onglet: OngletBoite.propositions,
-        taille: _poste,
-      );
+      await _ouvrir(tester, onglet: OngletBoite.propositions, taille: _poste);
 
       expect(find.byType(PanneauReponse), findsNothing);
 
@@ -584,11 +570,7 @@ void main() {
     });
 
     testWidgets('sans choix, le volet invite à en faire un', (tester) async {
-      await _ouvrir(
-        tester,
-        onglet: OngletBoite.propositions,
-        taille: _poste,
-      );
+      await _ouvrir(tester, onglet: OngletBoite.propositions, taille: _poste);
 
       // **Le volet ne s'ouvre pas sur du vide.** Il est permanent en `large`
       // (`DESIGN.md § Points de rupture`) : sans phrase, c'est une colonne de
@@ -626,11 +608,7 @@ void main() {
       tester,
     ) async {
       await chargerPolicesDuProduit();
-      await _ouvrir(
-        tester,
-        onglet: OngletBoite.propositions,
-        taille: _poste,
-      );
+      await _ouvrir(tester, onglet: OngletBoite.propositions, taille: _poste);
 
       await tester.tap(find.byType(CarteProposition).first);
       await tester.pumpAndSettle();
@@ -650,22 +628,20 @@ void main() {
       // `AppScaffold` la range dans une `Row`, qui centre par défaut.
       final haut = tester.getTopLeft(find.byType(PanneauReponse)).dy;
       expect(
-        tester.getTopLeft(
-          find.descendant(
-            of: find.byType(PanneauReponse),
-            matching: find.text('lundi 12 octobre'),
-          ),
-        ).dy,
+        tester
+            .getTopLeft(
+              find.descendant(
+                of: find.byType(PanneauReponse),
+                matching: find.text('lundi 12 octobre'),
+              ),
+            )
+            .dy,
         lessThan(haut + 100),
       );
     });
 
     testWidgets('le volet se referme et la liste reste', (tester) async {
-      await _ouvrir(
-        tester,
-        onglet: OngletBoite.propositions,
-        taille: _poste,
-      );
+      await _ouvrir(tester, onglet: OngletBoite.propositions, taille: _poste);
 
       await tester.tap(find.byType(CarteProposition).first);
       await tester.pumpAndSettle();

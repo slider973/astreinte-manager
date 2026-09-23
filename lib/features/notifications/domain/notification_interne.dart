@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 /// Les types de `notification_type` (`docs/SCHEMA.md § 1`), plus le cas qui
 /// compte vraiment : **celui qu'on ne connaît pas**.
 ///
@@ -48,8 +49,7 @@ enum TypeNotification {
   /// pas une question, même si son lien public mène aussi aux propositions
   /// (`supabase/functions/README.md § Liens profonds`). La règle porte donc
   /// sur le type, jamais sur la route.
-  bool get estProposition =>
-      this == astreinteProposee || this == rappelReponse;
+  bool get estProposition => this == astreinteProposee || this == rappelReponse;
 
   /// Ne lève jamais : un type inconnu est [inconnu].
   static TypeNotification depuisSql(String? valeur) {
@@ -176,8 +176,17 @@ class NotificationInterne {
       other.erreur == erreur;
 
   @override
-  int get hashCode =>
-      Object.hash(id, type, titre, corps, creeLe, route, periode, lueLe, erreur);
+  int get hashCode => Object.hash(
+    id,
+    type,
+    titre,
+    corps,
+    creeLe,
+    route,
+    periode,
+    lueLe,
+    erreur,
+  );
 
   @override
   String toString() => 'NotificationInterne($id, ${type.name}, lue: $lue)';

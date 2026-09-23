@@ -103,11 +103,7 @@ void main() {
         await tester.tap(find.text(entree.key).last);
         await tester.pumpAndSettle();
 
-        expect(
-          emplacementCourant(tester),
-          entree.value.$1,
-          reason: entree.key,
-        );
+        expect(emplacementCourant(tester), entree.value.$1, reason: entree.key);
         expect(
           find.byType(entree.value.$2),
           findsOneWidget,
@@ -195,11 +191,7 @@ void main() {
         await _monter(tester);
         await ouvrirRoute(tester, lien.key);
 
-        expect(
-          emplacementCourant(tester),
-          lien.value.$1,
-          reason: lien.key,
-        );
+        expect(emplacementCourant(tester), lien.value.$1, reason: lien.key);
         expect(find.byType(lien.value.$2), findsOneWidget, reason: lien.key);
         await demonter(tester);
       }
@@ -249,16 +241,19 @@ void main() {
   });
 
   group('La traduction des onglets hérités', () {
-    test('elle est pure, et ne touche que ce qui vient de l\'ancienne forme', () {
-      expect(ongletHerite(Uri.parse('/')), isNull);
-      expect(ongletHerite(Uri.parse('/?onglet=1')), _ongletPropositions);
-      expect(ongletHerite(Uri.parse('/?onglet=2')), AppRoutes.astreintes);
-      expect(ongletHerite(Uri.parse('/?onglet=3')), AppRoutes.profil);
-      expect(
-        ongletHerite(Uri.parse('/?onglet=0&mois=2026-10')),
-        '${AppRoutes.calendrier}?mois=2026-10',
-      );
-      expect(ongletHerite(Uri.parse('/?onglet=42')), AppRoutes.accueil);
-    });
+    test(
+      'elle est pure, et ne touche que ce qui vient de l\'ancienne forme',
+      () {
+        expect(ongletHerite(Uri.parse('/')), isNull);
+        expect(ongletHerite(Uri.parse('/?onglet=1')), _ongletPropositions);
+        expect(ongletHerite(Uri.parse('/?onglet=2')), AppRoutes.astreintes);
+        expect(ongletHerite(Uri.parse('/?onglet=3')), AppRoutes.profil);
+        expect(
+          ongletHerite(Uri.parse('/?onglet=0&mois=2026-10')),
+          '${AppRoutes.calendrier}?mois=2026-10',
+        );
+        expect(ongletHerite(Uri.parse('/?onglet=42')), AppRoutes.accueil);
+      },
+    );
   });
 }

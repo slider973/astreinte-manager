@@ -41,7 +41,6 @@ class AbonnementScreen extends ConsumerStatefulWidget {
 }
 
 class _AbonnementScreenState extends ConsumerState<AbonnementScreen> {
-
   /// Le retour n'est pris en compte qu'une fois : relire à chaque
   /// reconstruction ferait boucler l'écran sur lui-même.
   bool _retourTraite = false;
@@ -108,7 +107,6 @@ class _AbonnementScreenState extends ConsumerState<AbonnementScreen> {
         ),
       );
   }
-
 
   @override
   Widget build(BuildContext context) {

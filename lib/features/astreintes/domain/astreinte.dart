@@ -160,8 +160,7 @@ class Astreinte {
   bool get equipiersConnus => caserneEntiereLisible(planningEtat);
 
   /// La clé du mois : `2026-10`.
-  String get cleMois =>
-      '${jour.year}-${jour.month.toString().padLeft(2, '0')}';
+  String get cleMois => '${jour.year}-${jour.month.toString().padLeft(2, '0')}';
 
   /// « Octobre 2026 », pour l'en-tête de groupe.
   String get libelleMois => AppStrings.moisNomEtAnnee(jour.month, jour.year);
@@ -173,11 +172,7 @@ class Astreinte {
   /// même reste « à venir » toute la journée, elle ne bascule pas dans les
   /// passées à 8 h du matin (`design/027 § 7.2`).
   bool passee(DateTime aujourdhui) {
-    final minuit = DateTime(
-      aujourdhui.year,
-      aujourdhui.month,
-      aujourdhui.day,
-    );
+    final minuit = DateTime(aujourdhui.year, aujourdhui.month, aujourdhui.day);
     return jour.isBefore(minuit);
   }
 
@@ -428,9 +423,7 @@ List<ElementAstreintes> aplatirAstreintes({
 
   // Le repli **n'existe pas** quand il n'y a rien derrière : un accordéon vide
   // est un piège.
-  elements.add(
-    ReplisPassees(compte: passees.length, ouvert: passeesOuvertes),
-  );
+  elements.add(ReplisPassees(compte: passees.length, ouvert: passeesOuvertes));
   // L'en-tête du premier mois passé n'apparaît qu'une fois le repli ouvert :
   // annoncer une section qui n'est pas là serait un mensonge de mise en page.
   if (passeesOuvertes) _grouper(elements, passees, passee: true);

@@ -224,10 +224,7 @@ void main() {
       await _ouvrir(tester);
 
       expect(find.text('lundi 12 octobre'), findsOneWidget);
-      expect(
-        find.textContaining(AppStrings.creneauNuit),
-        findsWidgets,
-      );
+      expect(find.textContaining(AppStrings.creneauNuit), findsWidgets);
       // Les deux réponses ne sont plus sur la ligne : elles sont derrière un
       // appui, et une seule à la fois.
       expect(_accepter(), findsNothing);
@@ -282,10 +279,7 @@ void main() {
     testWidgets('il explique et propose d\'aller saisir son mois', (
       tester,
     ) async {
-      await _ouvrir(
-        tester,
-        depot: _depot(propositions: const <Proposition>[]),
-      );
+      await _ouvrir(tester, depot: _depot(propositions: const <Proposition>[]));
 
       expect(find.text(AppStrings.videPropositionsTitre), findsOneWidget);
       expect(find.text(AppStrings.videPropositionsTexte), findsOneWidget);
@@ -294,10 +288,7 @@ void main() {
     });
 
     testWidgets('son action ramène sur le Calendrier', (tester) async {
-      await _ouvrir(
-        tester,
-        depot: _depot(propositions: const <Proposition>[]),
-      );
+      await _ouvrir(tester, depot: _depot(propositions: const <Proposition>[]));
 
       await tester.tap(find.text(AppStrings.propositionsVideAction));
       await tester.pumpAndSettle();
@@ -552,10 +543,7 @@ void main() {
       expect(bouton.onPressed, isNull);
       // Un bouton grisé sans explication est un défaut (`DESIGN.md`).
       expect(bouton.raisonDesactivation, isNotNull);
-      expect(
-        find.text(AppStrings.propositionsHorsLigneRaison),
-        findsWidgets,
-      );
+      expect(find.text(AppStrings.propositionsHorsLigneRaison), findsWidgets);
     });
 
     testWidgets('une caserne suspendue bloque la réponse et l\'explique', (
@@ -578,10 +566,7 @@ void main() {
 
       // Et la réponse rouverte naît inerte, avec sa raison.
       await _ouvrirReponse(tester);
-      expect(
-        tester.widget<PrimaryButton>(_accepter()).onPressed,
-        isNull,
-      );
+      expect(tester.widget<PrimaryButton>(_accepter()).onPressed, isNull);
     });
   });
 
@@ -618,10 +603,7 @@ void main() {
     });
 
     testWidgets('il tombe à zéro quand il ne reste rien', (tester) async {
-      await _ouvrir(
-        tester,
-        depot: _depot(propositions: const <Proposition>[]),
-      );
+      await _ouvrir(tester, depot: _depot(propositions: const <Proposition>[]));
       await ouvrirRoute(tester, AppRoutes.accueil);
 
       expect(_comptePropositions(tester), 0);

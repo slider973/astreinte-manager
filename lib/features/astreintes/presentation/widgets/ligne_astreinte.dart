@@ -48,7 +48,8 @@ class LigneDAstreinte extends StatelessWidget {
     final scheme = theme.colorScheme;
     final creneau = context.statuts.creneau(astreinte.creneau);
     final jourEtDate = dateAvecJourSemaine(astreinte.jour);
-    final soutien = '${creneau.libelle} · ${heures.intervalle(astreinte.creneau)}';
+    final soutien =
+        '${creneau.libelle} · ${heures.intervalle(astreinte.creneau)}';
     final ferie = nomJourFerie(astreinte.jour);
 
     return Semantics(
@@ -161,9 +162,7 @@ class _CarreCreneau extends StatelessWidget {
       height: LigneDAstreinte.carre,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: attenue
-            ? scheme.surfaceContainerHigh
-            : scheme.primaryContainer,
+        color: attenue ? scheme.surfaceContainerHigh : scheme.primaryContainer,
         borderRadius: AppRadius.feuilleCarreeRadius,
       ),
       child: FittedBox(

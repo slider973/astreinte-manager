@@ -182,10 +182,7 @@ void main() {
 
       // Le 10 octobre au soir : deux personnes demandées, personne d'accepté.
       // C'est un trou du planning, donc une information.
-      expect(
-        find.text(AppStrings.planningCaserneCreneauVide),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.planningCaserneCreneauVide), findsOneWidget);
     });
 
     testWidgets('affiche les heures de la caserne, pas 7 h – 19 h en dur', (
@@ -250,10 +247,7 @@ void main() {
         // Le 7 novembre, le lecteur est de nuit. Son créneau de jour existe et
         // porte sûrement quelqu'un : la base ne l'a simplement pas rendu.
         expect(find.text(AppStrings.planningCaserneToi), findsOneWidget);
-        expect(
-          find.text(AppStrings.planningCaserneCreneauVide),
-          findsNothing,
-        );
+        expect(find.text(AppStrings.planningCaserneCreneauVide), findsNothing);
         // Le créneau de jour n'est pas affiché du tout.
         expect(find.text('07:00 – 19:00'), findsNothing);
         expect(find.text('19:00 – 07:00'), findsOneWidget);
@@ -276,9 +270,7 @@ void main() {
 
         expect(find.byType(BlocAttenteValidation), findsOneWidget);
         expect(
-          find.text(
-            AppStrings.planningCaserneSansMoiTitre(_novembre.libelle),
-          ),
+          find.text(AppStrings.planningCaserneSansMoiTitre(_novembre.libelle)),
           findsOneWidget,
         );
       },
@@ -312,7 +304,10 @@ void main() {
         // rendues par `assignments_select_station_archived`.
         expect(find.text('Camille G.'), findsOneWidget);
         expect(find.text(AppStrings.planningCaserneToi), findsOneWidget);
-        expect(find.text(AppStrings.planningCaserneCreneauVide), findsOneWidget);
+        expect(
+          find.text(AppStrings.planningCaserneCreneauVide),
+          findsOneWidget,
+        );
         // Et **aucune** attente de validation : le mois est terminé, plus
         // personne ne le validera.
         expect(find.byType(BlocAttenteValidation), findsNothing);

@@ -355,7 +355,11 @@ void main() {
         ),
         propositions: FauxPropositionsRepository(
           propositions: <Proposition>[
-            proposition(id: 'a-12', creneauId: 'c-12', jour: DateTime(2026, 10, 12)),
+            proposition(
+              id: 'a-12',
+              creneauId: 'c-12',
+              jour: DateTime(2026, 10, 12),
+            ),
           ],
         ),
       );

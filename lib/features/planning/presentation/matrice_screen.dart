@@ -120,7 +120,6 @@ class MatriceScreen extends ConsumerStatefulWidget {
 }
 
 class _MatriceScreenState extends ConsumerState<MatriceScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -574,7 +573,6 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
     if (!etat.planning.modifiable) return AppStrings.planningPublieDetail;
     return null;
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -1087,12 +1085,13 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
       // **Non fermable tant que le mode est armé**, et sans action : elle
       // décrit un état persistant, et l'interrupteur qui le lève est juste
       // au-dessus d'elle. `Échap` le lève aussi.
-      AppBannerVariante.attention => etat.modeArme
-          ? const AppBanner(
-              variante: AppBannerVariante.attention,
-              texte: AppStrings.matriceModeSaisieActif,
-            )
-          : fait?.banniere,
+      AppBannerVariante.attention =>
+        etat.modeArme
+            ? const AppBanner(
+                variante: AppBannerVariante.attention,
+                texte: AppStrings.matriceModeSaisieActif,
+              )
+            : fait?.banniere,
       AppBannerVariante.information =>
         fait?.variante == AppBannerVariante.information && !etat.matrice.vierge
             ? fait!.banniere

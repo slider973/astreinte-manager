@@ -98,8 +98,7 @@ final Provider<AsyncValue<TableauBord>> tableauBordProvider =
         astreintes: ref.watch(astreintesControllerProvider),
         propositions: ref.watch(propositionsControllerProvider),
         aujourdhui: ref.watch(horlogeAstreintesProvider)(),
-        nomCaserne:
-            ref.watch(appartenanceCouranteProvider)?.nomCaserne ?? '',
+        nomCaserne: ref.watch(appartenanceCouranteProvider)?.nomCaserne ?? '',
         dispos: ref.watch(appelDisposProvider),
       ),
     );

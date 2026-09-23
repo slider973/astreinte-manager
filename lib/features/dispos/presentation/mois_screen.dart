@@ -563,15 +563,16 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
           ),
         ),
       ),
-      AppBannerVariante.attention => _bientotFermee(etat.periode)
-          ? AppBanner(
-              variante: AppBannerVariante.attention,
-              texte: AppStrings.periodeBientotFermee(
-                etat.periode.joursAvantLimite(DateTime.now()) ?? 0,
-                AppStrings.moisLongs[etat.periode.mois - 1],
-              ),
-            )
-          : fait?.banniere,
+      AppBannerVariante.attention =>
+        _bientotFermee(etat.periode)
+            ? AppBanner(
+                variante: AppBannerVariante.attention,
+                texte: AppStrings.periodeBientotFermee(
+                  etat.periode.joursAvantLimite(DateTime.now()) ?? 0,
+                  AppStrings.moisLongs[etat.periode.mois - 1],
+                ),
+              )
+            : fait?.banniere,
       AppBannerVariante.information => fait?.banniere,
     };
   }
