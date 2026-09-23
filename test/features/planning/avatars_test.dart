@@ -2,10 +2,14 @@ import 'package:astreinte_sp/core/theme/app_spacing.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/avatar_initiales.dart';
 import 'package:astreinte_sp/features/planning/domain/candidat.dart';
+import 'package:astreinte_sp/features/planning/domain/cle_cellule.dart';
 import 'package:astreinte_sp/features/planning/domain/ligne_matrice.dart';
+import 'package:astreinte_sp/features/planning/domain/matrice_mois.dart';
+import 'package:astreinte_sp/features/planning/domain/planning_mois.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/entete_ligne_membre.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/geometrie_matrice.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/ligne_candidat.dart';
+import 'package:astreinte_sp/features/planning/presentation/widgets/vue_jour.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -141,6 +145,40 @@ void main() {
         tester.getSize(find.byType(AvatarInitiales)),
         const Size(GeoMatrice.tailleAvatar, GeoMatrice.tailleAvatar),
       );
+    });
+  });
+
+  group('VueJour — pas de disque sur téléphone', () {
+    testWidgets('la vue par jour n\'en porte aucun', (tester) async {
+      await chargerPolicesDuProduit();
+      final lignes = <LigneMatrice>[for (final nom in _nomsDuSeed) _ligne(nom)];
+
+      await monter(
+        tester,
+        VueJour(
+          matrice: MatriceMois(lignes: lignes, nombreDeJours: 31),
+          lignes: lignes,
+          annee: 2026,
+          mois: 10,
+          aujourdhui: DateTime(2026, 10, 14),
+          commentaires: false,
+          erreurs: const <CleCellule>{},
+          saisieActive: false,
+          onCase: (_) {},
+          planning: PlanningMois.vide(),
+          creneauSelectionne: null,
+          onCreneau: (_) {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // **Décidé au brief** (`design/061 § 8 bis`) : le disque sert à
+      // distinguer soixante lignes voisines dans une grille dense. La vue par
+      // jour en montre une poignée, en cibles de 48, et chaque point de sa
+      // largeur de 390 va au nom et aux cases.
+      expect(find.byType(VueJour), findsOneWidget);
+      expect(find.byType(AvatarInitiales), findsNothing);
+      expect(tester.takeException(), isNull);
     });
   });
 

@@ -132,40 +132,38 @@ void main() {
   group('CaseAttribution — l\'attribution se lit dans la case du membre', () {
     testWidgets('les trois états portent le fond, l\'encre et l\'icône de '
         'leur famille', (tester) async {
-      await _monterLaGrille(
+      // **Monté directement, et non par la grille.** `CaseAttribution` est un
+      // composant de `core` : il sait dessiner les trois états, et ses trois
+      // paires de couleurs sont des jetons du système, mesurés dans
+      // `test/core/theme/contraste_test.dart`. Ce que la grille en montre
+      // aujourd'hui est une autre question — elle suit le dépôt, qui ne rend
+      // que les attributions actives (voir le test suivant).
+      const statuts = AppStatusColors.clair;
+      const etats = <AttributionEtat>[
+        AttributionEtat.propose,
+        AttributionEtat.accepte,
+        AttributionEtat.refuse,
+      ];
+
+      await monter(
         tester,
-        planning: _planning(<Attribution>[
-          _attribution(id: 'a1', creneauId: 'c-1-j', userId: 'u1'),
-          _attribution(
-            id: 'a2',
-            creneauId: 'c-2-j',
-            userId: 'u1',
-            etat: AttributionEtat.accepte,
-          ),
-          _attribution(
-            id: 'a3',
-            creneauId: 'c-3-j',
-            userId: 'u1',
-            etat: AttributionEtat.refuse,
-          ),
-        ]),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (final etat in etats)
+              CaseAttribution(
+                etat: etat,
+                libelleSemantique: statuts.attribution(etat).libelle,
+              ),
+          ],
+        ),
+        taille: const Size(1440, 900),
       );
 
-      const statuts = AppStatusColors.clair;
       expect(find.byType(CaseAttribution), findsNWidgets(3));
 
-      for (final (int jour, AttributionEtat etat) in <(int, AttributionEtat)>[
-        (1, AttributionEtat.propose),
-        (2, AttributionEtat.accepte),
-        (3, AttributionEtat.refuse),
-      ]) {
-        final cible = _caseDe(
-          membre: 'Dubois Jean-Marc',
-          jour: jour,
-          creneau: CreneauType.jour,
-          etat: etat,
-          disponibilite: DisponibiliteEtat.disponible,
-        );
+      for (final etat in etats) {
+        final cible = find.bySemanticsLabel(statuts.attribution(etat).libelle);
         final descripteur = statuts.attribution(etat);
 
         expect(cible, findsOneWidget, reason: 'État $etat absent.');
@@ -196,10 +194,40 @@ void main() {
       }
     });
 
-    testWidgets('« proposé » garde son contour ocre — c\'est lui qui porte la '
-        'limite du bloc — et « accepté » s\'en passe', (
+    testWidgets('la grille suit le dépôt : un refus n\'occupe aucune case', (
       tester,
     ) async {
+      // Le dépôt du planning ne lit que les attributions actives, proposées et
+      // acceptées. Une astreinte refusée ne tient plus la place, et l'écran ne
+      // doit pas laisser croire le contraire (`DESIGN.md § Écarts, 061c-2`).
+      await _monterLaGrille(
+        tester,
+        planning: _planning(<Attribution>[
+          _attribution(id: 'a1', creneauId: 'c-1-j', userId: 'u1'),
+          _attribution(
+            id: 'a2',
+            creneauId: 'c-2-j',
+            userId: 'u1',
+            etat: AttributionEtat.refuse,
+          ),
+        ]),
+      );
+
+      expect(find.byType(CaseAttribution), findsOneWidget);
+      expect(
+        _caseDe(
+          membre: 'Dubois Jean-Marc',
+          jour: 2,
+          creneau: CreneauType.jour,
+          etat: AttributionEtat.refuse,
+          disponibilite: DisponibiliteEtat.disponible,
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('« proposé » garde son contour ocre — c\'est lui qui porte la '
+        'limite du bloc — et « accepté » s\'en passe', (tester) async {
       await _monterLaGrille(
         tester,
         planning: _planning(<Attribution>[
@@ -322,9 +350,8 @@ void main() {
       expect(find.byType(SlotChip), findsNWidgets(_jours * 2 * 2));
     });
 
-    testWidgets('une attribution annulée ou remplacée n\'occupe aucune case', (
-      tester,
-    ) async {
+    testWidgets('une attribution annulée ou remplacée n\'occupe aucune case '
+        'non plus', (tester) async {
       await _monterLaGrille(
         tester,
         planning: _planning(<Attribution>[
@@ -375,22 +402,48 @@ void main() {
   });
 
   group('LegendeEtats — les deux familles ne se mélangent pas', () {
-    testWidgets('la légende des attributions nomme les trois états, marque '
-        'décorative et libellé seul annoncé', (tester) async {
+    testWidgets('la légende nomme ce que la grille montre, marque décorative '
+        'et libellé seul annoncé', (tester) async {
       await monter(
         tester,
         const LegendeEtats.attributions(),
         taille: const Size(1440, 900),
       );
 
-      expect(find.byType(CaseAttribution), findsNWidgets(3));
       expect(find.byType(SlotChip), findsNothing);
+      expect(
+        find.byType(CaseAttribution),
+        findsNWidgets(LegendeEtats.etatsAttribution.length),
+      );
       for (final etat in LegendeEtats.etatsAttribution) {
         final libelle = AppStatusColors.clair.attribution(etat).libelle;
         expect(find.text(libelle), findsOneWidget);
         // Une entrée, un nœud : la marque est exclue, le mot reste.
         expect(find.bySemanticsLabel(libelle), findsOneWidget);
       }
+    });
+
+    testWidgets('« Refusé » n\'y est pas : le dépôt ne rend pas les refus, et '
+        'une légende sans marque à l\'écran est un code à chercher en vain', (
+      tester,
+    ) async {
+      await monter(
+        tester,
+        const LegendeEtats.attributions(),
+        taille: const Size(1440, 900),
+      );
+
+      expect(
+        LegendeEtats.etatsAttribution,
+        isNot(contains(AttributionEtat.refuse)),
+      );
+      expect(
+        find.text(
+          AppStatusColors.clair.attribution(AttributionEtat.refuse).libelle,
+        ),
+        findsNothing,
+      );
+      expect(find.byType(CaseAttribution), findsNWidgets(2));
     });
 
     testWidgets('la légende des disponibilités ne change pas', (tester) async {

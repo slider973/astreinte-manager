@@ -216,17 +216,19 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(_hauteurBarre(tester), lessThanOrEqualTo(_plafondBarre));
-      // Et le bandeau qui accueille les actions reste sous son plafond — 150
-      // au 061c-1, 172 depuis que la légende des blocs d'attribution s'y
-      // adosse : la barre de commande la facturait 56 points, le bandeau 22
+      // Et le bandeau qui accueille les actions **vaut exactement** la
+      // constante dont l'écran se sert pour décider s'il a la place : 150 au
+      // 061c-1, 166 depuis que la légende des blocs d'attribution s'y adosse —
+      // la barre de commande la facturait 56 points, le bandeau 22
       // (`DESIGN.md § Écarts, 061c-2`).
+      //
+      // `closeTo` et non `lessThanOrEqualTo` : une constante qui surestime le
+      // bloc est un mensonge aussi coûteux qu'une constante qui le
+      // sous-estime — elle efface le bandeau sur des fenêtres qui l'auraient
+      // porté.
       expect(
         tester.getSize(find.byType(BandeauMois)).height,
-        lessThanOrEqualTo(172),
-      );
-      expect(
-        tester.getSize(find.byType(BandeauMois)).height,
-        lessThanOrEqualTo(BandeauMois.hauteurCompletAvecLegende),
+        closeTo(BandeauMois.hauteurCompletAvecLegende, 1),
       );
     });
 

@@ -203,9 +203,16 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
   /// et la table se refait seulement quand le planning change d'objet — une
   /// attribution posée, retirée, ou reçue du temps réel.
   ///
-  /// Une attribution **remplacée ou annulée n'y entre pas** : ce sont les
-  /// statuts que le dépôt écarte déjà à la lecture (`_statutsActifs`), et une
-  /// astreinte qui ne compte plus ne doit pas occuper la case d'un membre.
+  /// **La case suit le dépôt, elle ne le devance pas.** Seules les
+  /// attributions actives — proposées et acceptées — occupent une case : ce
+  /// sont les seules que le dépôt du planning lit, à la lecture comme en temps
+  /// réel. Une astreinte refusée, remplacée ou annulée ne compte plus, et rien
+  /// à l'écran ne doit laisser croire qu'elle tient encore la place.
+  ///
+  /// `CaseAttribution` sait dessiner le bloc rose du refus, et son contraste
+  /// est mesuré : c'est un jeton du système, pas une promesse d'écran. Le jour
+  /// où le dépôt rendra les refus, ce filtre s'allongera d'une ligne et le
+  /// bloc s'allumera sans qu'une autre ligne bouge (chantier 061c-2).
   Map<CleCellule, Attribution> _tableAttributions() {
     if (identical(_attributionsPour, widget.planning)) return _attributions;
 
@@ -227,10 +234,10 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
   }
 
   static bool _affichee(AttributionEtat etat) => switch (etat) {
-    AttributionEtat.propose ||
-    AttributionEtat.accepte ||
-    AttributionEtat.refuse => true,
-    AttributionEtat.remplace || AttributionEtat.annule => false,
+    AttributionEtat.propose || AttributionEtat.accepte => true,
+    AttributionEtat.refuse ||
+    AttributionEtat.remplace ||
+    AttributionEtat.annule => false,
   };
 
   @override

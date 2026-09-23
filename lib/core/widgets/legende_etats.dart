@@ -20,8 +20,9 @@ import 'slot_chip.dart';
 /// Quand le planning du mois existe, les cases de la matrice ne disent plus
 /// seulement une disponibilité : trois d'entre elles portent une attribution.
 /// [LegendeEtats.attributions] les nomme — une marque nouvelle à l'écran sans
-/// son libellé serait un code à deviner. Les deux familles ne se mélangent pas
-/// dans une même rangée : mesurée, la légende complète pousse la barre de
+/// son libellé serait un code à deviner. Elle ne nomme **que ce que la grille
+/// peut montrer** : voir [etatsAttribution]. Les deux familles ne se mélangent
+/// pas dans une même rangée : mesurée, la légende complète pousse la barre de
 /// commande de l'admin de 120 à 176 points (`DESIGN.md § Écarts, 061c-2`).
 class LegendeEtats extends StatelessWidget {
   const LegendeEtats({
@@ -31,9 +32,8 @@ class LegendeEtats extends StatelessWidget {
     this.espacement = AppSpacing.lg,
   }) : _attributions = false;
 
-  /// Les trois états d'**attribution** seuls : proposé, accepté, refusé. La
-  /// forme que porte le bandeau du mois, sous la légende de répartition, dès
-  /// que le planning existe.
+  /// Les états d'**attribution** seuls. La forme que porte le bandeau du mois,
+  /// sous la légende de répartition, dès que le planning existe.
   const LegendeEtats.attributions({super.key, this.espacement = AppSpacing.lg})
     : densite = SlotChipDensite.dense,
       creneau = CreneauType.jour,
@@ -63,14 +63,18 @@ class LegendeEtats extends StatelessWidget {
     DisponibiliteEtat.nonSaisi,
   ];
 
-  /// Les trois états d'attribution qu'une case peut porter, dans l'ordre du
-  /// travail : ce qui attend une réponse, ce qui est acquis, ce qui a cassé.
-  /// « Remplacé » et « annulé » n'y sont pas — ils ne s'affichent nulle part
-  /// dans la grille.
+  /// Les états d'attribution qu'une case **porte aujourd'hui**, dans l'ordre
+  /// du travail : ce qui attend une réponse, puis ce qui est acquis.
+  ///
+  /// **« Refusé » n'y est pas, et ce n'est pas un oubli** : le dépôt du
+  /// planning ne lit que les attributions actives, `proposed` et `accepted`.
+  /// Aucune case de la grille ne peut donc porter un refus, et une légende qui
+  /// nommerait une marque absente de l'écran serait un code à chercher en
+  /// vain. `CaseAttribution` sait le dessiner ; cette liste s'allongera d'une
+  /// ligne le jour où le dépôt rendra les refus (chantier 061c-2).
   static const List<AttributionEtat> etatsAttribution = <AttributionEtat>[
     AttributionEtat.propose,
     AttributionEtat.accepte,
-    AttributionEtat.refuse,
   ];
 
   @override
