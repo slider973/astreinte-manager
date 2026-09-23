@@ -58,7 +58,7 @@ void main() {
         AppRoutes.periodes,
         AppRoutes.parametres,
         AppRoutes.abonnement,
-        AppRoutes.notifications,
+        AppRoutes.boite,
       ]) {
         expect(donneesDEcran(chemin), isNotEmpty, reason: chemin);
       }

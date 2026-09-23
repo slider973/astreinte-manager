@@ -10,6 +10,7 @@ import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/reseau/connectivite.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/router/destinations.dart';
 import '../../../core/theme/app_breakpoints.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_status.dart';
@@ -59,7 +60,6 @@ class SuiviScreen extends ConsumerStatefulWidget {
 }
 
 class _SuiviScreenState extends ConsumerState<SuiviScreen> {
-  static const String _routeAdmin = 'admin';
 
   @override
   void initState() {
@@ -320,16 +320,6 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     unawaited(_controleur.rafraichir());
   }
 
-  void _versDestination(int index, List<AppDestination> destinations) {
-    if (destinations[index].route == _routeAdmin) {
-      context.goNamed(AppRoutes.planningAdminName);
-      return;
-    }
-    context.goNamed(
-      AppRoutes.accueilName,
-      queryParameters: <String, String>{AppRoutes.parametreOnglet: '$index'},
-    );
-  }
 
   void _annoncer(String message) {
     if (!mounted) return;
@@ -349,17 +339,18 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     final admin = ref.watch(estAdminCaserneProvider);
     final asynchrone = ref.watch(suiviControllerProvider);
     final etat = asynchrone.value;
-    final destinations = AppDestination.pour(admin: admin);
-    final indexAdmin = destinations.indexWhere(
-      (AppDestination d) => d.route == _routeAdmin,
-    );
+    final destinations = ref.watch(destinationsProvider);
     final compact = AppWindowClass.of(context).estCompact;
 
     return AppScaffold(
       titre: AppStrings.suiviTitre,
       destinations: destinations,
-      indexSelectionne: indexAdmin < 0 ? 0 : indexAdmin,
-      onDestination: (int index) => _versDestination(index, destinations),
+      indexSelectionne: indexDestination(
+        destinations,
+        AppRoutes.planningAdminName,
+      ),
+      onDestination: (int index) =>
+          allerVersDestination(context, destinations, index),
       actions: <Widget>[
         if (admin && compact) const _MenuAdmin(),
         if (admin && !compact)
