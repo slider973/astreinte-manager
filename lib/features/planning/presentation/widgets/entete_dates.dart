@@ -9,13 +9,23 @@ import '../../../../core/theme/app_typography.dart';
 import 'fond_jour.dart';
 import 'geometrie_matrice.dart';
 
-/// L'en-tête des dates, deux niveaux, 56 px.
+/// L'en-tête des dates, deux niveaux, 60 px.
 ///
-/// Niveau 1, sur les deux colonnes de la journée : la lettre du jour puis son
-/// numéro. Niveau 2, une par colonne : `light_mode` et `bedtime`. **C'est le
-/// seul endroit où les icônes de créneau sont écrites** — soixante-deux
-/// petits soleils répétés dans la grille seraient du bruit, exactement comme
-/// au ticket 011.
+/// Niveau 1, sur les deux colonnes de la journée : **la pastille du jour** —
+/// l'abréviation du jour au-dessus de son numéro, en indigo pâle quand c'est
+/// aujourd'hui. C'est la forme que le chantier 061b avait donnée à la bande
+/// de semaine ; au 061c elle revient ici, et la bande disparaît. La référence
+/// du brief n'a qu'une rangée de dates, et c'est l'en-tête de sa grille.
+///
+/// Niveau 2, une par colonne : `light_mode` et `bedtime`. **C'est le seul
+/// endroit où les icônes de créneau sont écrites** — soixante-deux petits
+/// soleils répétés dans la grille seraient du bruit, exactement comme au
+/// ticket 011.
+///
+/// **L'en-tête ne se touche pas.** Il nomme les colonnes, il ne les commande
+/// pas : ni `InkWell`, ni `button` dans la sémantique. Le seul geste que la
+/// bande apportait — amener une colonne au bord gauche — déplaçait le contenu
+/// sous le pointeur, ce qu'une grille qu'on lit en diagonale ne pardonne pas.
 class EnteteJour extends StatelessWidget {
   const EnteteJour({required this.date, required this.aujourdhui, super.key});
 
@@ -25,14 +35,22 @@ class EnteteJour extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final ferie = nomJourFerie(date);
+    // Le weekend et les fériés portent déjà leur fond `surface-dim` sur toute
+    // la colonne (`FondJour`) : l'en-tête n'y ajoute que la graisse.
     final marque = FondJour.marque(date);
+    final courant = _estAujourdhui;
 
-    final encre = theme.colorScheme.onSurfaceVariant;
+    final encre = courant ? scheme.onPrimaryContainer : scheme.onSurface;
+    final encreSoutien = courant
+        ? scheme.onPrimaryContainer
+        : scheme.onSurfaceVariant;
+
     final libelle = <String>[
       dateAvecJourSemaine(date),
       if (ferie != null) AppStrings.jourFerieNomme(ferie),
-      if (_estAujourdhui) AppStrings.jourAujourdhui,
+      if (courant) AppStrings.jourAujourdhui,
     ].join(', ');
 
     final entete = Semantics(
@@ -43,36 +61,82 @@ class EnteteJour extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                if (ferie != null) ...<Widget>[
-                  Icon(Icons.star, size: 12, color: theme.colorScheme.tertiary),
-                  const SizedBox(width: AppSpacing.xxs),
-                ],
-                Text(
-                  AppStrings.grilleJoursInitiales[date.weekday - 1],
-                  style: AppTextStyles.etiquette.copyWith(
-                    color: encre,
-                    // Le weekend se dit aussi par la graisse, pas seulement
-                    // par le fond : jamais la couleur seule.
-                    fontWeight: marque ? FontWeight.w700 : FontWeight.w400,
-                  ),
+            // La pastille d'aujourd'hui **couvre les deux créneaux** de la
+            // journée : le jour courant est une colonne entière, pas une
+            // moitié de colonne.
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: courant ? scheme.primaryContainer : Colors.transparent,
+                borderRadius: AppRadius.controleRadius,
+              ),
+              child: SizedBox(
+                width: GeoMatrice.largeurPastille,
+                height: GeoMatrice.hauteurPastille,
+                // Les deux lignes se réduisent jusqu'à la pastille plutôt que
+                // de la déborder : à grande échelle de texte, une date un peu
+                // plus dense vaut mieux qu'un numéro coupé.
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            if (ferie != null) ...<Widget>[
+                              Icon(
+                                Icons.star,
+                                size: 12,
+                                color: courant
+                                    ? scheme.onPrimaryContainer
+                                    : scheme.tertiary,
+                              ),
+                              const SizedBox(width: AppSpacing.xxs),
+                            ],
+                            Text(
+                              AppStrings.grilleJoursCourts[date.weekday - 1],
+                              style: AppTextStyles.etiquette.copyWith(
+                                color: encreSoutien,
+                                // Le weekend se dit aussi par la graisse, pas
+                                // seulement par le fond : jamais la couleur
+                                // seule.
+                                fontWeight: marque
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '${date.day}',
+                          style: AppTextStyles.nombrePetit.copyWith(
+                            color: encre,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            Text(
-              '${date.day}',
-              style: AppTextStyles.nombrePetit.copyWith(
-                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: AppSpacing.xxs),
             Row(
               children: <Widget>[
-                _IconeCreneau(creneau: CreneauType.jour, encre: encre),
+                _IconeCreneau(
+                  creneau: CreneauType.jour,
+                  encre: scheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: GeoMatrice.ecartCreneaux),
-                _IconeCreneau(creneau: CreneauType.nuit, encre: encre),
+                _IconeCreneau(
+                  creneau: CreneauType.nuit,
+                  encre: scheme.onSurfaceVariant,
+                ),
               ],
             ),
           ],

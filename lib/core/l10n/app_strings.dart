@@ -2210,6 +2210,7 @@ abstract final class AppStrings {
 
   /// Ce que le bouton va faire, écrit avant qu'on l'actionne. Le nombre est
   /// celui du mois affiché : 56, 60 ou 62, jamais un 62 supposé.
+  ///
   static String planningCreerDetail(int creneaux) =>
       '$creneaux créneaux seront créés, un par jour et par créneau, avec '
       'l\'effectif requis de tes réglages.';
@@ -2218,7 +2219,7 @@ abstract final class AppStrings {
       'Planning ${moisAvecDe(mois)} créé : $creneaux créneaux.';
 
   // -------------------------------------------------------------------
-  // Le compte, le bandeau du mois et la bande de semaine (ticket 061b)
+  // Le compte et le bandeau du mois (ticket 061b)
   // -------------------------------------------------------------------
 
   static const String compteOuvrir = 'Mon profil';
@@ -2249,10 +2250,6 @@ abstract final class AppStrings {
   /// elle, ne dit rien — une longueur n'est pas un état.
   static String bandeauPartSemantique(String libelle, int n, int total) =>
       '$libelle : $n créneau${n > 1 ? 'x' : ''} sur $total';
-
-  // --- La bande de semaine ----------------------------------------------
-
-  static const String bandeAllerAuJour = 'Appuie pour voir ce jour';
 
   // --- La ligne des créneaux --------------------------------------------
 

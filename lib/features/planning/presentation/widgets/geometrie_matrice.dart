@@ -32,8 +32,21 @@ abstract final class GeoMatrice {
   /// La même, quand le commentaire du mois se déplie en seconde ligne.
   static const double hauteurLigneCommentee = 52;
 
-  /// En-tête des dates : la lettre du jour, son numéro, les deux créneaux.
-  static const double hauteurEntete = 56;
+  /// La pastille de date : les deux colonnes de la journée, sans l'écart qui
+  /// sépare cette journée de la suivante.
+  static const double largeurPastille = colonne * 2 + ecartCreneaux;
+
+  /// Sa hauteur : l'abréviation du jour (16) puis son numéro (18), plus deux
+  /// points de respiration. Mesurée avec les vraies polices du produit.
+  static const double hauteurPastille = 36;
+
+  /// En-tête des dates : la pastille du jour, puis les deux icônes de
+  /// créneau. 36 + 2 + 14 = 52, centrés dans 60.
+  ///
+  /// Quatre points de plus qu'au ticket 016, où l'en-tête portait une
+  /// initiale nue : la pastille du 061b y est entrée, et la bande de semaine
+  /// qui la portait est partie (chantier 061c).
+  static const double hauteurEntete = 60;
 
   /// La ligne « Disponibles », dernière du bloc épinglé.
   static const double hauteurDisponibles = colonne;
@@ -43,7 +56,7 @@ abstract final class GeoMatrice {
   /// avait réservée, à la hauteur qu'il avait annoncée.
   static const double hauteurCreneaux = colonne;
 
-  /// Le bloc épinglé entier : 84 px sans planning, 112 px avec.
+  /// Le bloc épinglé entier : 88 px sans planning, 116 px avec.
   ///
   /// La ligne des créneaux n'existe que lorsque le planning du mois existe —
   /// une fraction sur un mois sans créneaux ne voudrait rien dire. La hauteur
