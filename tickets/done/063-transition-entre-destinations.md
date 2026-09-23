@@ -5,7 +5,7 @@
 - **Dépend de** : 004
 - **Branche** : `feat/063-transition-entre-destinations`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-23
+- **Statut** : terminé le 2026-09-23 (PR créée)
 
 ## Contexte
 
