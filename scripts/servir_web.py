@@ -5,13 +5,20 @@
     scripts/servir_web.py            # puis http://127.0.0.1:8099
 
 Un serveur statique ordinaire ne suffit pas pour cette vérification : les
-polices **et le moteur CanvasKit** sont livrés déjà compressés
+polices, **les moteurs** et `main.dart.wasm` sont livrés déjà compressés
 (`scripts/build_web.sh`) et ne sont lisibles qu'avec l'en-tête
-`Content-Encoding: br` que pose `vercel.json`. Servi sans lui, CanvasKit ne
+`Content-Encoding: br` que pose `vercel.json`. Servi sans lui, le moteur ne
 démarre pas du tout (« expected magic word ») ; les polices, elles, échouent au
 décodage **en silence** et l'application retombe sur un Roboto téléchargé chez
 Google — la panne que le ticket 037 a supprimée, et celle qu'on ne voit pas si
 on ne la cherche pas.
+
+Depuis le ticket 065 il y a une seconde raison, et elle ne se voit pas non
+plus : `vercel.json` sert `Cross-Origin-Opener-Policy: same-origin` et
+`Cross-Origin-Embedder-Policy: require-corp`. Sans eux, la page n'a pas
+`SharedArrayBuffer`, Skwasm retombe sur sa variante à un seul fil, et la
+construction qu'on regarde n'est pas celle que le téléphone recevra. Un coup
+d'œil en console le dit : `crossOriginIsolated` doit valoir `true`.
 
 Ce serveur rejoue donc `vercel.json` : redirections, en-têtes, réécriture de
 toute adresse inconnue vers `index.html`. Il ajoute la compression à la volée
