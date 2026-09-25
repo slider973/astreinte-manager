@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 061, 063
 - **Branche** : `feat/064-monde-visuel-pompier`
-- **PR** : https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a), https://github.com/slider973/astreinte-manager/pull/60 (chantier 064c), https://github.com/slider973/astreinte-manager/pull/61 (chantier 064b)
+- **PR** : https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a), https://github.com/slider973/astreinte-manager/pull/60 (chantier 064c), https://github.com/slider973/astreinte-manager/pull/61 (chantier 064b), https://github.com/slider973/astreinte-manager/pull/63 (chantier 064d)
 - **Statut** : terminé le 2026-09-26 (PR créée)
 
 ## Contexte
