@@ -1,0 +1,4 @@
+[submodule "foco"]
+	path = foco
+	url = https://github.com/slider973/Foco.git
+	branch = main

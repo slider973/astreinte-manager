@@ -94,6 +94,17 @@ status() {
 
 require_clean() { [ -z "$(git -C "$ROOT" status --porcelain)" ] || die "arbre de travail non propre, commitez ou stashez d'abord"; }
 
+# Les submodules (`foco/`, l'app iOS du ticket 066) suivent le commit courant :
+# sans cela, un `checkout main` laisse `foco/` sur le commit d'une autre
+# branche, et le prochain `require_clean` refuse un arbre qu'on n'a pas touché.
+# `foco/` est privé : sans accès à slider973/Foco, on prévient sans bloquer,
+# puisque rien du cycle des tickets n'en dépend.
+sync_submodules() {
+  [ -f "$ROOT/.gitmodules" ] || return 0
+  git -C "$ROOT" submodule update --init --recursive -q 2>/dev/null \
+    || echo "attention : submodules non synchronisés (accès à slider973/Foco ?)" >&2
+}
+
 start() {
   local n="$1" force="${2:-}"
   local f; f="$(find_ticket "$n")"; [ -n "$f" ] || die "ticket $n introuvable"
@@ -104,6 +115,7 @@ start() {
   require_clean
   git -C "$ROOT" checkout -q main
   git -C "$ROOT" pull -q --ff-only origin main 2>/dev/null || true
+  sync_submodules
   local base slug branch dest
   base="$(basename "$f")"; slug="$(slug_of "$f")"; branch="feat/$(num_of "$f")-$slug"
   dest="$TICKETS/in-progress/$base"
