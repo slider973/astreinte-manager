@@ -5,7 +5,7 @@
 - **Dépend de** : 064, 065
 - **Branche** : `feat/066-app-ios-native`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-26
 
 ## Contexte
 

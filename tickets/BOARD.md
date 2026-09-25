@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 066 | [L'app iOS native Foco, branchée sur la même base que la PWA](in-progress/066-app-ios-native.md) | P1 | 064 065 | — |
 
 ## À faire
 
@@ -17,7 +18,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 | 056 | [L'éditeur sans caserne perd sa destination au démarrage à froid](backlog/056-superadmin-destination-perdue-a-froid.md) | P2 | 045 053 | — |
 | 057 | [Le jeton d'appareil des notifications n'est pas branché sur l'oubli](backlog/057-jeton-appareil-hors-oubli.md) | P2 | 024 053 | — |
 | 058 | [Lire l'adresse confirmée à la source, pas dans les métadonnées](backlog/058-invitations-en-attente-adresse-confirmee.md) | P2 | 051 | — |
-| 066 | [L'app iOS native Foco, branchée sur la même base que la PWA](backlog/066-app-ios-native.md) | P1 | 064 065 | — |
 
 ## Terminés
 
@@ -78,6 +78,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 | 061 | [Un nouveau monde visuel, à partir de l'écran de l'admin](done/061-monde-visuel-admin.md) | P1 | 004 016 017 | https://github.com/slider973/astreinte-manager/pull/54 (chantier 061a), https://github.com/slider973/astreinte-manager/pull/55 (chantier 061b), https://github.com/slider973/astreinte-manager/pull/56 (chantier 061c-1), https://github.com/slider973/astreinte-manager/pull/57 (chantier 061c-2) |
 | 062 | [La vérification de la PWA vise un alias protégé au lieu du domaine](done/062-verification-pwa-sur-le-domaine.md) | P0 | 060 | https://github.com/slider973/astreinte-manager/pull/53 |
 | 063 | [Passer d'une destination à l'autre sans glissement](done/063-transition-entre-destinations.md) | P1 | 004 | https://github.com/slider973/astreinte-manager/pull/58 |
-| 064 | [Un monde visuel pour le pompier, à partir d'un tableau de bord](done/064-monde-visuel-pompier.md) | P1 | 061 063 | https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a), https://github.com/slider973/astreinte-manager/pull/60 (chantier 064c), https://github.com/slider973/astreinte-manager/pull/61 (chantier 064b) |
+| 064 | [Un monde visuel pour le pompier, à partir d'un tableau de bord](done/064-monde-visuel-pompier.md) | P1 | 061 063 | https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a), https://github.com/slider973/astreinte-manager/pull/60 (chantier 064c), https://github.com/slider973/astreinte-manager/pull/61 (chantier 064b), https://github.com/slider973/astreinte-manager/pull/63 (chantier 064d) |
 | 065 | [Un défilement fluide sur la PWA installée](done/065-fluidite-defilement-pwa.md) | P1 | 060 | https://github.com/slider973/astreinte-manager/pull/62 |
 
