@@ -66,16 +66,17 @@ List<ElementBoite> fusionner({
   required List<Proposition> propositions,
   required List<NotificationInterne> rappels,
 }) {
-  final elements = <ElementBoite>[
-    for (final proposition in propositions) PropositionBoite(proposition),
-    for (final rappel in rappels) RappelBoite(rappel),
-  ]..sort((ElementBoite a, ElementBoite b) {
-    final parInstant = b.instant.compareTo(a.instant);
-    if (parInstant != 0) return parInstant;
-    if (a is PropositionBoite && b is! PropositionBoite) return -1;
-    if (b is PropositionBoite && a is! PropositionBoite) return 1;
-    return 0;
-  });
+  final elements =
+      <ElementBoite>[
+        for (final proposition in propositions) PropositionBoite(proposition),
+        for (final rappel in rappels) RappelBoite(rappel),
+      ]..sort((ElementBoite a, ElementBoite b) {
+        final parInstant = b.instant.compareTo(a.instant);
+        if (parInstant != 0) return parInstant;
+        if (a is PropositionBoite && b is! PropositionBoite) return -1;
+        if (b is PropositionBoite && a is! PropositionBoite) return 1;
+        return 0;
+      });
   return List<ElementBoite>.unmodifiable(elements);
 }
 
@@ -181,8 +182,9 @@ class PropositionEnReponse extends Notifier<String?> {
 }
 
 final NotifierProvider<PropositionEnReponse, String?>
-propositionEnReponseProvider =
-    NotifierProvider<PropositionEnReponse, String?>(PropositionEnReponse.new);
+propositionEnReponseProvider = NotifierProvider<PropositionEnReponse, String?>(
+  PropositionEnReponse.new,
+);
 
 /// La proposition dont la réponse est ouverte, résolue **contre la liste
 /// courante**.
@@ -194,8 +196,7 @@ final Provider<Proposition?> propositionOuverteProvider =
     Provider<Proposition?>((ref) {
       final id = ref.watch(propositionEnReponseProvider);
       if (id == null) return null;
-      for (final proposition
-          in ref.watch(etatBoiteProvider).propositions) {
+      for (final proposition in ref.watch(etatBoiteProvider).propositions) {
         if (proposition.id == id) return proposition;
       }
       return null;

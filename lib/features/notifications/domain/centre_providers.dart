@@ -9,7 +9,8 @@ import 'notification_interne.dart';
 /// Le dépôt des notifications internes. Surchargé par un faux dans les tests.
 final Provider<NotificationsRepository> notificationsRepositoryProvider =
     Provider<NotificationsRepository>(
-      (ref) => SupabaseNotificationsRepository(ref.watch(supabaseClientProvider)),
+      (ref) =>
+          SupabaseNotificationsRepository(ref.watch(supabaseClientProvider)),
     );
 
 /// Ce que le centre affiche : les lignes `inapp` du membre, la plus récente

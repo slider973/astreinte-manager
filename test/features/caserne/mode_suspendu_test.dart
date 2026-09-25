@@ -78,9 +78,7 @@ AppBanner _banniere(WidgetTester tester) =>
 
 void main() {
   group('Caserne suspendue — le bandeau', () {
-    testWidgets('l\'accueil l\'annonce avant le premier geste', (
-      tester,
-    ) async {
+    testWidgets('l\'accueil l\'annonce avant le premier geste', (tester) async {
       await _ouvrir(
         tester,
         chemin: AppRoutes.accueil,

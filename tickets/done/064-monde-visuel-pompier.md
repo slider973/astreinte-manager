@@ -4,8 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 061, 063
 - **Branche** : `feat/064-monde-visuel-pompier`
-- **PR** : https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a), https://github.com/slider973/astreinte-manager/pull/60 (chantier 064c), https://github.com/slider973/astreinte-manager/pull/61 (chantier 064b)
-- **Statut** : en cours depuis 2026-09-23
+- **PR** : https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a), https://github.com/slider973/astreinte-manager/pull/60 (chantier 064c), https://github.com/slider973/astreinte-manager/pull/61 (chantier 064b), https://github.com/slider973/astreinte-manager/pull/63 (chantier 064d)
+- **Statut** : terminé le 2026-09-26 (PR créée)
 
 ## Contexte
 
@@ -63,3 +63,16 @@ passe de fini : la passe de fini devient le dernier chantier de celui-ci.
 - `flutter analyze` sans avertissement, `flutter test` verts, `flutter build web` qui passe,
   détecteur Impeccable à vide, inspection à l'écran à 390 et sur un téléphone avec la PWA
   installée.
+
+## Livraison
+
+Le monde visuel du pompier a été livré en quatre chantiers, un par PR :
+
+- **064a** — la navigation à quatre destinations et l'Accueil en tableau de bord (PR 59).
+- **064b** — la Boîte à onglets Tout / Propositions / Rappels (PR 61).
+- **064c** — le Calendrier et les Astreintes dans la matière du pompier (PR 60).
+- **064d** — la passe de fini : audit et polish Impeccable, grille du Calendrier remontée
+  au-dessus du pli sur téléphone, `DESIGN.md` rattrapé.
+
+Les écarts au brief sont consignés dans `DESIGN.md`, sections « Écarts d'implémentation »
+des chantiers 064a à 064d. Ce ticket se ferme avec le chantier 064d.

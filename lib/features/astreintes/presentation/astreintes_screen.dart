@@ -56,7 +56,6 @@ class AstreintesScreen extends ConsumerStatefulWidget {
   /// (`DESIGN.md § Typography — Named Rules`).
   static const double echelleMaxCalendrier = 1.6;
 
-
   @override
   ConsumerState<AstreintesScreen> createState() => _AstreintesScreenState();
 }
@@ -374,10 +373,9 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
                   // Rien à consulter veut dire : il y a peut-être quelque
                   // chose à répondre. L'état vide mène là où se trouve la
                   // suite.
-                  onVersPropositions: () =>
-                      unawaited(context.pushNamed<void>(
-                        AppRoutes.propositionsName,
-                      )),
+                  onVersPropositions: () => unawaited(
+                    context.pushNamed<void>(AppRoutes.propositionsName),
+                  ),
                 ),
         ),
       ],
@@ -488,5 +486,4 @@ class _Liste extends StatelessWidget {
       ),
     );
   }
-
 }

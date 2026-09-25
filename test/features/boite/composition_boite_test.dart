@@ -58,10 +58,11 @@ void main() {
         ],
       );
 
-      expect(
-        elements.map((ElementBoite e) => e.cle).toList(),
-        <String>['p-fraiche', 'n-milieu', 'p-vieille'],
-      );
+      expect(elements.map((ElementBoite e) => e.cle).toList(), <String>[
+        'p-fraiche',
+        'n-milieu',
+        'p-vieille',
+      ]);
     });
 
     test('une proposition est classée par sa date de proposition', () {
@@ -94,9 +95,7 @@ void main() {
             proposeeLe: instant,
           ),
         ],
-        rappels: <NotificationInterne>[
-          notification(id: 'n', creeLe: instant),
-        ],
+        rappels: <NotificationInterne>[notification(id: 'n', creeLe: instant)],
       );
 
       expect(elements.map((ElementBoite e) => e.cle).toList(), <String>[
@@ -150,14 +149,8 @@ void main() {
       final centre = EtatCentre(
         notifications: <NotificationInterne>[
           notification(id: 'n-1'),
-          notification(
-            id: 'n-2',
-            type: TypeNotification.astreinteProposee,
-          ),
-          notification(
-            id: 'n-3',
-            lueLe: DateTime(2026, 9, 20, 12),
-          ),
+          notification(id: 'n-2', type: TypeNotification.astreinteProposee),
+          notification(id: 'n-3', lueLe: DateTime(2026, 9, 20, 12)),
         ],
       );
 
@@ -293,9 +286,7 @@ void main() {
         final conteneur = await centreLu(depot);
 
         depot.erreurLecture = true;
-        await conteneur
-            .read(centreNotificationsProvider.notifier)
-            .rafraichir();
+        await conteneur.read(centreNotificationsProvider.notifier).rafraichir();
 
         final apres = conteneur.read(centreNotificationsProvider);
         expect(apres.hasError, isTrue);
@@ -316,37 +307,40 @@ void main() {
       },
     );
 
-    test('le centre garde sa liste, et la Boîte ne se croit pas vide', () async {
-      // **Le piège du 064a, sous un autre visage**, éprouvé sur le vrai
-      // contrôleur : `AsyncValue.guard` rend une erreur, et Riverpod lui
-      // rattache la valeur précédente. Tester `hasError` seul — ou passer par
-      // un `whenData` — effacerait une liste parfaitement juste.
-      final depot = FauxNotificationsRepository(
-        notifications: <NotificationInterne>[notification(id: 'n-1')],
-      );
-      final conteneur = await centreLu(depot);
+    test(
+      'le centre garde sa liste, et la Boîte ne se croit pas vide',
+      () async {
+        // **Le piège du 064a, sous un autre visage**, éprouvé sur le vrai
+        // contrôleur : `AsyncValue.guard` rend une erreur, et Riverpod lui
+        // rattache la valeur précédente. Tester `hasError` seul — ou passer par
+        // un `whenData` — effacerait une liste parfaitement juste.
+        final depot = FauxNotificationsRepository(
+          notifications: <NotificationInterne>[notification(id: 'n-1')],
+        );
+        final conteneur = await centreLu(depot);
 
-      depot.erreurLecture = true;
-      await conteneur.read(centreNotificationsProvider.notifier).rafraichir();
+        depot.erreurLecture = true;
+        await conteneur.read(centreNotificationsProvider.notifier).rafraichir();
 
-      final apres = conteneur.read(centreNotificationsProvider);
-      expect(apres.hasError, isTrue);
-      expect(
-        apres.value,
-        isNotNull,
-        reason: 'Riverpod rattache la valeur précédente à l\'erreur',
-      );
+        final apres = conteneur.read(centreNotificationsProvider);
+        expect(apres.hasError, isTrue);
+        expect(
+          apres.value,
+          isNotNull,
+          reason: 'Riverpod rattache la valeur précédente à l\'erreur',
+        );
 
-      final etat = etatBoiteDe(
-        propositions: const AsyncValue<EtatPropositions>.data(
-          EtatPropositions(),
-        ),
-        centre: apres,
-      );
-      // La liste est là, donc ce n'est pas un échec de section : l'onglet
-      // « Rappels » garde ce qui était juste au lieu de se croire vide.
-      expect(etat.echecRappels, isFalse);
-      expect(etat.rappels, hasLength(1));
-    });
+        final etat = etatBoiteDe(
+          propositions: const AsyncValue<EtatPropositions>.data(
+            EtatPropositions(),
+          ),
+          centre: apres,
+        );
+        // La liste est là, donc ce n'est pas un échec de section : l'onglet
+        // « Rappels » garde ce qui était juste au lieu de se croire vide.
+        expect(etat.echecRappels, isFalse);
+        expect(etat.rappels, hasLength(1));
+      },
+    );
   });
 }

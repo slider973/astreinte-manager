@@ -31,7 +31,9 @@ Future<void> ouvrirMois(
     session: sessionMembre,
     appartenances: const <Appartenance>[appartenanceMembre],
     dispos: depot ?? FauxDisposRepository(),
-    reperes: ReperesLocauxMemoire(<RepereAccueil>{RepereAccueil.peintureDispos}),
+    reperes: ReperesLocauxMemoire(<RepereAccueil>{
+      RepereAccueil.peintureDispos,
+    }),
     taille: taille,
   );
   // Le Calendrier a sa route depuis le ticket 064 : `/` porte le tableau de
@@ -50,10 +52,8 @@ Future<void> ouvrirPortee(WidgetTester tester, PorteeRaccourci portee) async {
 
 /// Un texte **dans la feuille** : « Jour » et « Nuit » vivent aussi dans
 /// l'en-tête de colonnes de la grille, qui reste à l'écran derrière elle.
-Finder dansLaFeuille(String texte) => find.descendant(
-  of: find.byType(BottomSheet),
-  matching: find.text(texte),
-);
+Finder dansLaFeuille(String texte) =>
+    find.descendant(of: find.byType(BottomSheet), matching: find.text(texte));
 
 /// Choisit un créneau dans la feuille ouverte.
 Future<void> choisirCible(WidgetTester tester, CibleCreneau cible) async {
@@ -115,11 +115,7 @@ void main() {
       await tester.pump(apresLeDelai);
 
       expect(depot.base.length, 22);
-      expect(
-        depot.requetes,
-        1,
-        reason: 'une requête, pas vingt-deux',
-      );
+      expect(depot.requetes, 1, reason: 'une requête, pas vingt-deux');
       expect(find.text(AppStrings.raccourciResultat(22)), findsNothing);
       expect(
         find.textContaining(AppStrings.raccourciResultat(22)),
@@ -130,7 +126,30 @@ void main() {
   });
 
   group('La confirmation', () {
-    testWidgets('« tout effacer » demande confirmation quand le mois est saisi', (
+    testWidgets(
+      '« tout effacer » demande confirmation quand le mois est saisi',
+      (tester) async {
+        final depot = FauxDisposRepository(disponibilites: moisComplet());
+        await ouvrirMois(tester, depot: depot);
+
+        await ouvrirPortee(tester, PorteeRaccourci.effacer);
+        await choisirCible(tester, CibleCreneau.lesDeux);
+
+        expect(
+          find.text(AppStrings.raccourciConfirmerEffacerTitre(62)),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.text(AppStrings.actionAnnuler));
+        await tester.pumpAndSettle();
+        await tester.pump(apresLeDelai);
+
+        expect(depot.base.length, 62, reason: 'refuser ne change rien');
+        expect(depot.requetes, 0);
+      },
+    );
+
+    testWidgets('confirmée, elle efface le mois en une requête', (
       tester,
     ) async {
       final depot = FauxDisposRepository(disponibilites: moisComplet());
@@ -138,29 +157,7 @@ void main() {
 
       await ouvrirPortee(tester, PorteeRaccourci.effacer);
       await choisirCible(tester, CibleCreneau.lesDeux);
-
-      expect(
-        find.text(AppStrings.raccourciConfirmerEffacerTitre(62)),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.text(AppStrings.actionAnnuler));
-      await tester.pumpAndSettle();
-      await tester.pump(apresLeDelai);
-
-      expect(depot.base.length, 62, reason: 'refuser ne change rien');
-      expect(depot.requetes, 0);
-    });
-
-    testWidgets('confirmée, elle efface le mois en une requête', (tester) async {
-      final depot = FauxDisposRepository(disponibilites: moisComplet());
-      await ouvrirMois(tester, depot: depot);
-
-      await ouvrirPortee(tester, PorteeRaccourci.effacer);
-      await choisirCible(tester, CibleCreneau.lesDeux);
-      await tester.tap(
-        find.text(AppStrings.raccourciConfirmerEffacerAction),
-      );
+      await tester.tap(find.text(AppStrings.raccourciConfirmerEffacerAction));
       await tester.pumpAndSettle();
       await tester.pump(apresLeDelai);
 
@@ -180,10 +177,7 @@ void main() {
         findsNothing,
         reason: 'rien à protéger : pas de modale',
       );
-      expect(
-        find.text(AppStrings.raccourciAucunChangement),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.raccourciAucunChangement), findsOneWidget);
     });
 
     testWidgets('« copier le mois précédent » demande confirmation', (
@@ -298,10 +292,7 @@ void main() {
       final semantique = tester.getSemantics(
         find.text(AppStrings.raccourciEffacer),
       );
-      expect(
-        semantique,
-        containsSemantics(isButton: true, isEnabled: false),
-      );
+      expect(semantique, containsSemantics(isButton: true, isEnabled: false));
     });
   });
 }

@@ -199,94 +199,101 @@ void main() {
   });
 
   group('le cloisonnement par utilisateur', () {
-    test('deux membres ne lisent jamais la caserne l\'un de l\'autre',
-        () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      const local = AppartenancesLocalesPartagees();
+    test(
+      'deux membres ne lisent jamais la caserne l\'un de l\'autre',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        const local = AppartenancesLocalesPartagees();
 
-      await local.ecrire(sessionMembre.userId, <Appartenance>[
-        appartenanceMembre,
-      ]);
+        await local.ecrire(sessionMembre.userId, <Appartenance>[
+          appartenanceMembre,
+        ]);
 
-      expect(await local.lire(sessionMembre.userId), hasLength(1));
-      expect(await local.lire(_autreUserId), isEmpty);
+        expect(await local.lire(sessionMembre.userId), hasLength(1));
+        expect(await local.lire(_autreUserId), isEmpty);
 
-      // Et l'effacement de l'un ne touche pas l'autre.
-      await local.ecrire(_autreUserId, <Appartenance>[_adminDeLaCaserne]);
-      await local.effacer(sessionMembre.userId);
-      expect(await local.lire(sessionMembre.userId), isEmpty);
-      expect(await local.lire(_autreUserId), hasLength(1));
-    });
+        // Et l'effacement de l'un ne touche pas l'autre.
+        await local.ecrire(_autreUserId, <Appartenance>[_adminDeLaCaserne]);
+        await local.effacer(sessionMembre.userId);
+        expect(await local.lire(sessionMembre.userId), isEmpty);
+        expect(await local.lire(_autreUserId), hasLength(1));
+      },
+    );
 
-    test('deux membres ne lisent jamais les astreintes l\'un de l\'autre',
-        () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      const cache = CacheAstreintesPartage();
-      const stationId = 'aaaaaaaa-0000-4000-8000-000000000001';
+    test(
+      'deux membres ne lisent jamais les astreintes l\'un de l\'autre',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        const cache = CacheAstreintesPartage();
+        const stationId = 'aaaaaaaa-0000-4000-8000-000000000001';
 
-      await cache.ecrire(
-        stationId: stationId,
-        userId: sessionMembre.userId,
-        donnees: _uneAstreinte(),
-      );
-
-      expect(
-        await cache.lire(stationId: stationId, userId: sessionMembre.userId),
-        isNotNull,
-      );
-      // Même caserne, autre membre : rien. Le document porte les noms des
-      // équipiers, il ne se partage pas.
-      expect(
-        await cache.lire(stationId: stationId, userId: _autreUserId),
-        isNull,
-      );
-      // Même membre, autre caserne : rien non plus.
-      expect(
-        await cache.lire(
-          stationId: 'bbbbbbbb-0000-4000-8000-000000000001',
+        await cache.ecrire(
+          stationId: stationId,
           userId: sessionMembre.userId,
-        ),
-        isNull,
-      );
-    });
+          donnees: _uneAstreinte(),
+        );
 
-    test('les mémoires de test rangent par les mêmes clés que les vraies',
-        () async {
-      final local = AppartenancesLocalesMemoire(<Appartenance>[
-        appartenanceMembre,
-      ]);
-      expect(await local.lire(sessionMembre.userId), hasLength(1));
-      expect(await local.lire(_autreUserId), isEmpty);
+        expect(
+          await cache.lire(stationId: stationId, userId: sessionMembre.userId),
+          isNotNull,
+        );
+        // Même caserne, autre membre : rien. Le document porte les noms des
+        // équipiers, il ne se partage pas.
+        expect(
+          await cache.lire(stationId: stationId, userId: _autreUserId),
+          isNull,
+        );
+        // Même membre, autre caserne : rien non plus.
+        expect(
+          await cache.lire(
+            stationId: 'bbbbbbbb-0000-4000-8000-000000000001',
+            userId: sessionMembre.userId,
+          ),
+          isNull,
+        );
+      },
+    );
 
-      final cache = CacheAstreintesMemoire(_uneAstreinte());
-      expect(
-        await cache.lire(
-          stationId: appartenanceMembre.stationId,
-          userId: sessionMembre.userId,
-        ),
-        isNotNull,
-      );
-      expect(
-        await cache.lire(
-          stationId: appartenanceMembre.stationId,
-          userId: _autreUserId,
-        ),
-        isNull,
-      );
-    });
+    test(
+      'les mémoires de test rangent par les mêmes clés que les vraies',
+      () async {
+        final local = AppartenancesLocalesMemoire(<Appartenance>[
+          appartenanceMembre,
+        ]);
+        expect(await local.lire(sessionMembre.userId), hasLength(1));
+        expect(await local.lire(_autreUserId), isEmpty);
+
+        final cache = CacheAstreintesMemoire(_uneAstreinte());
+        expect(
+          await cache.lire(
+            stationId: appartenanceMembre.stationId,
+            userId: sessionMembre.userId,
+          ),
+          isNotNull,
+        );
+        expect(
+          await cache.lire(
+            stationId: appartenanceMembre.stationId,
+            userId: _autreUserId,
+          ),
+          isNull,
+        );
+      },
+    );
   });
 
   group('le repli sur ce qui est gardé', () {
-    testWidgets('rend la main à l\'application, mais pas les droits d\'admin',
-        (WidgetTester tester) async {
+    testWidgets('rend la main à l\'application, mais pas les droits d\'admin', (
+      WidgetTester tester,
+    ) async {
       // Un chef de centre, hors réseau, au démarrage à froid.
       await monterApp(
         tester,
         session: sessionMembre,
         erreurAppartenances: AuthErreur.reseau,
-        appartenancesLocales: AppartenancesLocalesMemoire(
-          const <Appartenance>[_adminDeLaCaserne],
-        ),
+        appartenancesLocales: AppartenancesLocalesMemoire(const <Appartenance>[
+          _adminDeLaCaserne,
+        ]),
         astreintes: FauxAstreintesRepository(),
       );
 
@@ -298,36 +305,35 @@ void main() {
       expect(find.text(AppStrings.navAdmin), findsNothing);
     });
 
-    testWidgets(
-      'une lecture qui **se tait** n\'est pas « aucune caserne »',
-      (WidgetTester tester) async {
-        // Le réseau des zones rurales n'est pas un refus, c'est un trou noir :
-        // la requête part et ne revient jamais.
-        //
-        // `appartenancesProvider` observe `sessionProvider` : il est d'abord
-        // calculé sans session — liste vide — puis recalculé quand la session
-        // est restaurée. Riverpod **garde la valeur précédente** pendant ce
-        // recalcul, et décider dessus envoyait un membre parfaitement rattaché
-        // sur « Aucune caserne », écran qui ne propose que la déconnexion.
-        // Vu dans Chrome, API coupée (`design/023 § 10`).
-        final faux = await monterApp(
-          tester,
-          sessionEnAttente: true,
-          appartenancesSuspendues: true,
-          astreintes: FauxAstreintesRepository(),
-          stabiliser: false,
-        );
-        expect(find.byType(DemarrageScreen), findsOneWidget);
+    testWidgets('une lecture qui **se tait** n\'est pas « aucune caserne »', (
+      WidgetTester tester,
+    ) async {
+      // Le réseau des zones rurales n'est pas un refus, c'est un trou noir :
+      // la requête part et ne revient jamais.
+      //
+      // `appartenancesProvider` observe `sessionProvider` : il est d'abord
+      // calculé sans session — liste vide — puis recalculé quand la session
+      // est restaurée. Riverpod **garde la valeur précédente** pendant ce
+      // recalcul, et décider dessus envoyait un membre parfaitement rattaché
+      // sur « Aucune caserne », écran qui ne propose que la déconnexion.
+      // Vu dans Chrome, API coupée (`design/023 § 10`).
+      final faux = await monterApp(
+        tester,
+        sessionEnAttente: true,
+        appartenancesSuspendues: true,
+        astreintes: FauxAstreintesRepository(),
+        stabiliser: false,
+      );
+      expect(find.byType(DemarrageScreen), findsOneWidget);
 
-        // La session se restaure. La caserne, elle, ne répond pas.
-        faux.auth.ouvrirSession(sessionMembre);
-        await tester.pump();
-        await tester.pump(const Duration(seconds: 2));
+      // La session se restaure. La caserne, elle, ne répond pas.
+      faux.auth.ouvrirSession(sessionMembre);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
 
-        expect(find.text(AppStrings.aucuneCaserneTitre), findsNothing);
-        expect(find.byType(DemarrageScreen), findsOneWidget);
-      },
-    );
+      expect(find.text(AppStrings.aucuneCaserneTitre), findsNothing);
+      expect(find.byType(DemarrageScreen), findsOneWidget);
+    });
 
     testWidgets('un refus n\'est jamais masqué par le cache', (
       WidgetTester tester,
@@ -339,9 +345,9 @@ void main() {
         tester,
         session: sessionMembre,
         erreurAppartenances: AuthErreur.inconnue,
-        appartenancesLocales: AppartenancesLocalesMemoire(
-          const <Appartenance>[appartenanceMembre],
-        ),
+        appartenancesLocales: AppartenancesLocalesMemoire(const <Appartenance>[
+          appartenanceMembre,
+        ]),
         astreintes: FauxAstreintesRepository(),
       );
 

@@ -22,10 +22,7 @@ TableauBord _composer({
   AppelDispos? dispos,
 }) => composerTableauBord(
   aujourdhui: _aujourdhui,
-  astreintes: MesAstreintes(
-    astreintes: astreintes,
-    luLe: _aujourdhui,
-  ),
+  astreintes: MesAstreintes(astreintes: astreintes, luLe: _aujourdhui),
   propositions: propositions,
   nomCaserne: 'CIS Saint-Martin',
   dispos: dispos,
@@ -76,10 +73,7 @@ void main() {
     test('une proposition en attente passe devant un jour libre', () {
       final tableau = _composer(
         propositions: <Proposition>[
-          proposition(
-            id: 'a-1',
-            jour: DateTime(2026, 10, 15),
-          ),
+          proposition(id: 'a-1', jour: DateTime(2026, 10, 15)),
         ],
       );
 
@@ -91,19 +85,22 @@ void main() {
       expect(le15.propositionId, 'a-1');
     });
 
-    test('une astreinte passée n\'entre ni dans la rangée ni dans le compte', () {
-      final tableau = _composer(
-        astreintes: <Astreinte>[
-          astreinte(id: 'g-vieux', jour: DateTime(2026, 10)),
-        ],
-      );
+    test(
+      'une astreinte passée n\'entre ni dans la rangée ni dans le compte',
+      () {
+        final tableau = _composer(
+          astreintes: <Astreinte>[
+            astreinte(id: 'g-vieux', jour: DateTime(2026, 10)),
+          ],
+        );
 
-      expect(tableau.astreintesAVenir, 0);
-      expect(
-        tableau.cartes.every((CarteJour c) => c.etat == EtatCarte.libre),
-        isTrue,
-      );
-    });
+        expect(tableau.astreintesAVenir, 0);
+        expect(
+          tableau.cartes.every((CarteJour c) => c.etat == EtatCarte.libre),
+          isTrue,
+        );
+      },
+    );
 
     test('le compte annoncé porte toutes les astreintes à venir', () {
       final tableau = _composer(
@@ -141,10 +138,7 @@ void main() {
           ),
         ],
         propositions: <Proposition>[
-          proposition(
-            id: 'a-1',
-            jour: DateTime(2026, 10, 17),
-          ),
+          proposition(id: 'a-1', jour: DateTime(2026, 10, 17)),
         ],
       );
 
@@ -157,21 +151,24 @@ void main() {
   });
 
   group('Les propositions', () {
-    test('une proposition sur un planning archivé n\'est plus une question', () {
-      final tableau = _composer(
-        propositions: <Proposition>[
-          proposition(
-            id: 'a-vieux',
-            jour: DateTime(2026, 10, 16),
-            planningEtat: PlanningEtat.archive,
-          ),
-        ],
-      );
+    test(
+      'une proposition sur un planning archivé n\'est plus une question',
+      () {
+        final tableau = _composer(
+          propositions: <Proposition>[
+            proposition(
+              id: 'a-vieux',
+              jour: DateTime(2026, 10, 16),
+              planningEtat: PlanningEtat.archive,
+            ),
+          ],
+        );
 
-      // La base refuserait la réponse : afficher la ligne, c'est afficher un
-      // bouton qui ne fait rien (`Proposition.repondable`).
-      expect(tableau.propositions, isEmpty);
-    });
+        // La base refuserait la réponse : afficher la ligne, c'est afficher un
+        // bouton qui ne fait rien (`Proposition.repondable`).
+        expect(tableau.propositions, isEmpty);
+      },
+    );
 
     test('elles sont rangées dans l\'ordre du calendrier', () {
       final tableau = _composer(
@@ -208,9 +205,7 @@ void main() {
     test('aucune période ouverte : la section n\'existe pas', () {
       expect(
         appelDispos(
-          periodes: <PeriodeSaisie>[
-            periodeVerrouillee(annee: 2026, mois: 9),
-          ],
+          periodes: <PeriodeSaisie>[periodeVerrouillee(annee: 2026, mois: 9)],
           maintenant: _aujourdhui,
         ),
         isNull,

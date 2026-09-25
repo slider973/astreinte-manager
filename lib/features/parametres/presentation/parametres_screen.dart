@@ -43,7 +43,6 @@ class ParametresScreen extends ConsumerStatefulWidget {
 }
 
 class _ParametresScreenState extends ConsumerState<ParametresScreen> {
-
   ParametresController get _controleur =>
       ref.read(parametresControllerProvider.notifier);
 
@@ -122,7 +121,6 @@ class _ParametresScreenState extends ConsumerState<ParametresScreen> {
     for (final SurchargeEffectif surcharge in etat.brouillon.surcharges)
       surcharge.cle,
   };
-
 
   @override
   Widget build(BuildContext context) {

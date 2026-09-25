@@ -50,11 +50,14 @@ void main() {
       expect(donneesDEcran(AppRoutes.suivi), hasLength(2));
     });
 
-    test('l\'accueil en réveille deux : les astreintes et les propositions', () {
-      // Les deux lectures du tableau de bord (ticket 064). Rien ne les
-      // abonnait avant que l'écran ne se construise.
-      expect(donneesDEcran(AppRoutes.accueil), hasLength(2));
-    });
+    test(
+      'l\'accueil en réveille deux : les astreintes et les propositions',
+      () {
+        // Les deux lectures du tableau de bord (ticket 064). Rien ne les
+        // abonnait avant que l'écran ne se construise.
+        expect(donneesDEcran(AppRoutes.accueil), hasLength(2));
+      },
+    );
 
     test('chaque écran qui lit la base a sa ligne', () {
       for (final chemin in <String>[

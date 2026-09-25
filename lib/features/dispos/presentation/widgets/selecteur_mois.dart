@@ -126,9 +126,7 @@ class _Bouton extends StatelessWidget {
     final bordure = pastille
         ? null
         : Border.all(
-            color: choisi
-                ? theme.colorScheme.primary
-                : statuts.filetDecoratif,
+            color: choisi ? theme.colorScheme.primary : statuts.filetDecoratif,
             width: choisi ? AppStroke.etat : AppStroke.filet,
           );
 

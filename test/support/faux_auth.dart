@@ -60,6 +60,7 @@ import 'package:astreinte_sp/features/propositions/domain/propositions_providers
 import 'package:astreinte_sp/features/superadmin/data/superadmin_repository.dart';
 import 'package:astreinte_sp/features/superadmin/domain/superadmin_providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -560,6 +561,29 @@ Future<void> defilerJusqua(
     cible,
     pas,
     scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+}
+
+/// **Le bouton précédent du navigateur**, tel que le moteur web l'annonce.
+///
+/// Revenir en arrière sur le web n'est pas un `pop` : le navigateur remonte
+/// son historique et le moteur pousse la nouvelle adresse par le canal
+/// `flutter/navigation`, méthode `pushRouteInformation`. C'est `GoRouter` qui
+/// reconstruit sa pile dessus.
+///
+/// `handlePopRoute` ne conviendrait pas pour une **destination** : sa pile
+/// n'a qu'une page, `popRoute` rendrait `false` et le test ne mesurerait que
+/// le refus de fermer l'application.
+Future<void> retourNavigateur(WidgetTester tester, String adresse) async {
+  await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+    'flutter/navigation',
+    const JSONMethodCodec().encodeMethodCall(
+      MethodCall('pushRouteInformation', <String, Object?>{
+        'location': adresse,
+      }),
+    ),
+    (_) {},
   );
   await tester.pumpAndSettle();
 }

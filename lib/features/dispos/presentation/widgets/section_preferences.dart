@@ -82,10 +82,13 @@ class _SectionPreferencesState extends ConsumerState<SectionPreferences> {
       _commentaireOuvert = false;
     }
 
-    final marge = widget.dansPanneau
-        ? 0.0
-        : AppWindowClass.of(context).margePage;
+    final classe = AppWindowClass.of(context);
+    final marge = widget.dansPanneau ? 0.0 : classe.margePage;
     final complete = _ouverte || widget.dansPanneau;
+    // **Sur téléphone, la carte se résume à une ligne** (chantier 064d) : la
+    // grille est la tâche, et tout ce qui la pousse sous le pli se paie. Le
+    // commentaire, lui, descend sous la grille dans sa propre carte.
+    final surUneLigne = !widget.dansPanneau && classe.estCompact;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(marge, AppSpacing.md, marge, 0),
@@ -94,10 +97,11 @@ class _SectionPreferencesState extends ConsumerState<SectionPreferences> {
         child: _Bloc(
           enErreur: preferences.enErreur,
           child: complete
-              ? _corpsComplet(etat, preferences)
+              ? _corpsComplet(etat, preferences, horsCarte: surUneLigne)
               : _Compacte(
                   preferences: preferences,
                   compteurs: etat.compteurs,
+                  surUneLigne: surUneLigne,
                   // La leçon arrive **quand elle a du sens** : sur un mois
                   // encore vierge, il n'y a rien à ne pas s'engager à faire,
                   // et le bloc d'aide du 011 apprend déjà le geste juste en
@@ -129,7 +133,11 @@ class _SectionPreferencesState extends ConsumerState<SectionPreferences> {
         etat.preferences.reprise;
   }
 
-  Widget _corpsComplet(EtatSaisie etat, EtatPreferences preferences) {
+  Widget _corpsComplet(
+    EtatSaisie etat,
+    EtatPreferences preferences, {
+    required bool horsCarte,
+  }) {
     final valeurs = preferences.valeurs;
     final compteurs = etat.compteurs;
     final modifiable = etat.modifiable;
@@ -197,17 +205,20 @@ class _SectionPreferencesState extends ConsumerState<SectionPreferences> {
           onOuvrir: () => unawaited(_choisirWeekends(etat)),
         ),
         _Ecart(valeurs: valeurs, compteurs: compteurs),
-        if (modifiable)
-          ChampCommentaire(
-            texte: valeurs.commentaire,
-            ouvert: _commentaireOuvert,
-            onOuvrir: () => setState(() => _commentaireOuvert = true),
-            onChange: ref
-                .read(saisieControllerProvider.notifier)
-                .definirCommentaire,
-          )
-        else
-          CommentaireLecture(texte: valeurs.commentaire, valeurs: valeurs),
+        // Sur téléphone, le commentaire n'est plus ici : il a sa carte sous
+        // la grille (`CarteCommentaire`, chantier 064d).
+        if (!horsCarte)
+          if (modifiable)
+            ChampCommentaire(
+              texte: valeurs.commentaire,
+              ouvert: _commentaireOuvert,
+              onOuvrir: () => setState(() => _commentaireOuvert = true),
+              onChange: ref
+                  .read(saisieControllerProvider.notifier)
+                  .definirCommentaire,
+            )
+          else
+            CommentaireLecture(texte: valeurs.commentaire, valeurs: valeurs),
         if (raison != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -290,6 +301,7 @@ class _Compacte extends StatelessWidget {
     required this.montrerLecon,
     required this.modifiable,
     required this.onOuvrir,
+    required this.surUneLigne,
   });
 
   final EtatPreferences preferences;
@@ -297,6 +309,13 @@ class _Compacte extends StatelessWidget {
   final bool montrerLecon;
   final bool modifiable;
   final VoidCallback onOuvrir;
+
+  /// **Sur téléphone** (chantier 064d) : le titre court et les valeurs sur une
+  /// seule ligne de 56 points, et rien d'autre que les encarts qui s'appliquent.
+  /// La leçon s'en va — elle reste dans la forme ouverte, à une touche —, et
+  /// l'aperçu du commentaire aussi, puisque le commentaire a sa carte sous la
+  /// grille.
+  final bool surUneLigne;
 
   @override
   Widget build(BuildContext context) {
@@ -316,48 +335,24 @@ class _Compacte extends StatelessWidget {
       excludeSemantics: true,
       child: InkWell(
         onTap: onOuvrir,
-        borderRadius: AppRadius.controleRadius,
+        borderRadius: AppRadius.carteRadius,
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(
-                          AppStrings.preferencesTitre,
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: AppSpacing.xxs),
-                        Text(
-                          valeur,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: valeurs.sansAucuneLimite
-                                ? theme.colorScheme.onSurfaceVariant
-                                : theme.colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    size: AppTouch.icone,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
+              if (surUneLigne)
+                _Resume(valeur: valeur, sansLimite: valeurs.sansAucuneLimite)
+              else
+                _Empile(valeur: valeur, sansLimite: valeurs.sansAucuneLimite),
               // La leçon ne s'affiche que tant qu'elle a quelque chose à
               // apprendre : une fois que le membre s'est prononcé pour ce
-              // mois, elle a fait son travail.
-              if (montrerLecon) ...<Widget>[
+              // mois, elle a fait son travail. Sur téléphone, elle ne
+              // s'affiche plus du tout : elle est dans la forme ouverte, à
+              // une touche, et la grille vaut plus que deux lignes de prose
+              // au-dessus d'elle.
+              if (montrerLecon && !surUneLigne) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 420),
@@ -369,6 +364,9 @@ class _Compacte extends StatelessWidget {
                   ),
                 ),
               ],
+              // La reprise n'est **jamais** silencieuse (ticket 013) : elle
+              // reste, sur téléphone comme ailleurs, et ne coûte une ligne
+              // que le mois où elle a lieu.
               if (preferences.reprise) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 LigneMention(
@@ -376,7 +374,9 @@ class _Compacte extends StatelessWidget {
                   texte: AppStrings.preferencesReprise(preferences.repriseDe!),
                 ),
               ],
-              if (valeurs.commentaire.isNotEmpty) ...<Widget>[
+              // L'aperçu du commentaire s'en va avec le commentaire : il a sa
+              // carte sous la grille (chantier 064d).
+              if (valeurs.commentaire.isNotEmpty && !surUneLigne) ...<Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                   valeurs.commentaire,
@@ -392,6 +392,120 @@ class _Compacte extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// **Le résumé d'une ligne** : « Au maximum · 8 astreintes, 2 weekends », et
+/// le chevron. Vingt-quatre points de texte entre deux rembourrages de seize :
+/// la carte fait 56 points, la hauteur d'un champ.
+///
+/// Un seul paragraphe, deux styles : l'étiquette en `libelle-champ`, la
+/// valeur en `corps`. Deux `Text` dans une `Row` n'auraient pas partagé la
+/// même ligne de base, et la valeur aurait flotté sous son étiquette.
+///
+/// **L'étiquette est une étiquette, pas un titre**, et c'est une mesure qui
+/// l'a décidé : en `titleMedium`, « Au maximum · 12 astreintes, 4 weekends »
+/// demande 299 points là où la carte en offre 294 à 390 de large, et la
+/// valeur — la seule chose qu'on vient lire — s'éteignait sur ses derniers
+/// caractères, vu dans Chrome. En `libelle-champ`, la même phrase tient en
+/// 277. Le poids change de camp au passage, et c'est juste : le titre dit ce
+/// que la carte est, la valeur dit ce qu'elle vaut.
+class _Resume extends StatelessWidget {
+  const _Resume({required this.valeur, required this.sansLimite});
+
+  final String valeur;
+  final bool sansLimite;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: <InlineSpan>[
+                TextSpan(
+                  text: AppStrings.preferencesTitreCourt,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                TextSpan(
+                  text: AppStrings.preferencesSeparateur,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                TextSpan(
+                  text: valeur,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: sansLimite
+                        ? theme.colorScheme.onSurfaceVariant
+                        : theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Icon(
+          Icons.chevron_right,
+          size: AppTouch.icone,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ],
+    );
+  }
+}
+
+/// Le titre au-dessus de sa valeur : la forme de `medium` et au-delà, là où
+/// la grille n'a pas besoin des quarante points que la ligne unique gagne.
+class _Empile extends StatelessWidget {
+  const _Empile({required this.valeur, required this.sansLimite});
+
+  final String valeur;
+  final bool sansLimite;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                AppStrings.preferencesTitre,
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                valeur,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: sansLimite
+                      ? theme.colorScheme.onSurfaceVariant
+                      : theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Icon(
+          Icons.chevron_right,
+          size: AppTouch.icone,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ],
     );
   }
 }

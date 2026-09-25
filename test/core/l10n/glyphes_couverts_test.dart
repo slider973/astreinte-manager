@@ -67,7 +67,8 @@ void main() {
         expect(
           _heuresPermises.hasMatch(heures),
           isTrue,
-          reason: '« $heures » porte un caractère que les polices du produit '
+          reason:
+              '« $heures » porte un caractère que les polices du produit '
               'ne dessinent peut-être pas.',
         );
         expect(
@@ -101,11 +102,7 @@ void main() {
           if (point < 0x20 || point > 0x7E) {
             final caractere = String.fromCharCode(point);
             if (!_glyphesCouverts.contains(caractere)) {
-              inconnus.update(
-                caractere,
-                (int n) => n + 1,
-                ifAbsent: () => 1,
-              );
+              inconnus.update(caractere, (int n) => n + 1, ifAbsent: () => 1);
             }
           }
         }

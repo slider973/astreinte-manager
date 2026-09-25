@@ -21,15 +21,20 @@ import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
 import 'package:astreinte_sp/features/dispos/data/file_locale.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
+import 'package:astreinte_sp/features/dispos/domain/preferences_mois.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
+import 'package:astreinte_sp/features/dispos/presentation/widgets/carte_commentaire.dart';
+import 'package:astreinte_sp/features/dispos/presentation/widgets/section_preferences.dart';
 import 'package:astreinte_sp/features/dispos/presentation/widgets/selecteur_mois.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
 import '../../support/faux_dispos.dart';
+import '../../support/polices.dart';
 
 CreneauCle jour(int numero) =>
     CreneauCle(DateTime(2026, 10, numero), CreneauType.jour);
@@ -99,6 +104,11 @@ Future<void> peindre(
 }
 
 void main() {
+  // Les mesures de ce fichier portent sur des hauteurs de texte : elles se
+  // font avec les vraies coupes du produit, pas avec la police d'essai carrée
+  // de `flutter test`.
+  setUpAll(chargerPolicesDuProduit);
+
   group('MoisScreen — le registre', () {
     testWidgets('montre le sélecteur, l\'en-tête et les jours du mois', (
       tester,
@@ -814,6 +824,184 @@ void main() {
         ),
         findsNothing,
       );
+    });
+  });
+
+  // La grille au-dessus du pli (chantier 064d)
+  // -------------------------------------------------------------------
+
+  group('MoisScreen — la grille au-dessus du pli', () {
+    /// Un mois déjà saisi, avec des maximums et un mot pour le chef : le cas
+    /// courant d'un membre qui revient sur son mois.
+    FauxDisposRepository moisSaisi({String commentaire = ''}) =>
+        FauxDisposRepository(
+          disponibilites: <CreneauCle, DisponibiliteEtat>{
+            jour(3): DisponibiliteEtat.disponible,
+            nuit(4): DisponibiliteEtat.disponible,
+          },
+          preferences: <String, PreferencesMois>{
+            'periode-2026-10': PreferencesMois(
+              maxAstreintes: 8,
+              maxWeekends: 2,
+              commentaire: commentaire,
+            ),
+          },
+        );
+
+    /// La hauteur occupée au-dessus de la première ligne de jours, en part de
+    /// la hauteur de fenêtre — mesurée contre `tester.view`, jamais contre une
+    /// constante : c'est la fenêtre qui décide de ce qui est sous le pli.
+    double partAuDessusDeLaGrille(WidgetTester tester) {
+      final haut = tester.getTopLeft(find.byType(DayCell).first).dy;
+      final hauteur =
+          tester.view.physicalSize.height / tester.view.devicePixelRatio;
+      return haut / hauteur;
+    }
+
+    testWidgets(
+      'à 390, la première ligne de jours reste au-dessus de la moitié',
+      (tester) async {
+        await ouvrirMois(tester, depot: moisSaisi(commentaire: 'Formation.'));
+
+        final part = partAuDessusDeLaGrille(tester);
+        expect(
+          part,
+          lessThan(0.5),
+          reason:
+              'la grille est la tâche : avant le 064d, la carte des maximums '
+              'à quatre lignes et son aperçu de commentaire poussaient la '
+              'première ligne à 446 points sur 844, soit 52,8 %',
+        );
+      },
+    );
+
+    /// Le plus long résumé que ce produit puisse écrire : deux nombres à deux
+    /// chiffres, et les deux pluriels.
+    FauxDisposRepository moisAuPireResume() => FauxDisposRepository(
+      disponibilites: <CreneauCle, DisponibiliteEtat>{
+        jour(3): DisponibiliteEtat.disponible,
+      },
+      preferences: <String, PreferencesMois>{
+        'periode-2026-10': const PreferencesMois(
+          maxAstreintes: 12,
+          maxWeekends: 4,
+        ),
+      },
+    );
+
+    testWidgets('le résumé ne s\'éteint jamais sur ses nombres', (
+      tester,
+    ) async {
+      await ouvrirMois(tester, depot: moisAuPireResume());
+
+      // Le paragraphe entier tient sur une ligne : ni ellipse, ni seconde
+      // ligne. C'est la valeur — la seule chose qu'on vient lire — qui se
+      // perdait en premier, vue dans Chrome à 390.
+      final peintre = tester.renderObject<RenderParagraph>(
+        find
+            .descendant(
+              of: find.byType(SectionPreferences),
+              matching: find.byType(RichText),
+            )
+            .first,
+      );
+      expect(peintre.didExceedMaxLines, isFalse);
+      expect(peintre.size.height, lessThan(30), reason: 'une seule ligne');
+    });
+
+    testWidgets('la carte des maximums tient sur une ligne de 56 points', (
+      tester,
+    ) async {
+      await ouvrirMois(tester, depot: moisSaisi());
+
+      expect(
+        find.text(AppStrings.preferencesResumeLigne(8, 2), findRichText: true),
+        findsOneWidget,
+      );
+      // La carte elle-même, sans la marge qui la sépare des raccourcis :
+      // seize de rembourrage, une ligne de texte, seize.
+      expect(
+        tester
+            .getSize(
+              find.descendant(
+                of: find.byType(SectionPreferences),
+                matching: find.byType(CarteDouce),
+              ),
+            )
+            .height,
+        lessThanOrEqualTo(57),
+        reason: 'seize de rembourrage, vingt-quatre de texte, seize',
+      );
+    });
+
+    testWidgets('le commentaire vit sous la grille, et s\'écrit', (
+      tester,
+    ) async {
+      final depot = moisSaisi();
+      await ouvrirMois(tester, depot: depot);
+
+      // Il n'est **pas** au-dessus de la grille : il faut défiler le mois
+      // pour l'atteindre, et c'est le prix assumé du chantier.
+      expect(find.byType(CarteCommentaire), findsNothing);
+
+      await tester.scrollUntilVisible(
+        find.byType(CarteCommentaire),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      // Sous la dernière ligne de jours, jamais à côté d'elle.
+      expect(
+        tester.getTopLeft(find.byType(CarteCommentaire)).dy,
+        greaterThan(tester.getBottomLeft(find.byType(DayCell).last).dy),
+      );
+      await tester.tap(find.text(AppStrings.preferencesCommentaireCarte));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'Garde des enfants.');
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(
+        depot.basePreferences['periode-2026-10']!.commentaire,
+        'Garde des enfants.',
+        reason: 'la même édition qu\'avant, à un autre endroit',
+      );
+    });
+
+    testWidgets('l\'astuce part avec la première case du mois', (tester) async {
+      // Jamais peint sur cet appareil : les deux lignes de l'astuce.
+      await ouvrirMois(tester, reperes: ReperesLocauxMemoire());
+      expect(find.text(AppStrings.astuceSaisieTouche), findsOneWidget);
+      expect(find.text(AppStrings.astuceSaisieGlissement), findsOneWidget);
+
+      await tester.tap(caseDe(0, CreneauType.jour));
+      await tester.pump();
+
+      expect(
+        find.text(AppStrings.astuceSaisieGlissement),
+        findsNothing,
+        reason:
+            'la leçon du glissement survivait à la première case posée, et '
+            'coûtait soixante points au-dessus de la grille à quelqu\'un qui '
+            'venait de comprendre comment on coche',
+      );
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('grand écran : le commentaire reste dans la carte', (
+      tester,
+    ) async {
+      await ouvrirMois(
+        tester,
+        depot: moisSaisi(commentaire: 'Formation.'),
+        taille: const Size(1280, 1000),
+      );
+
+      expect(find.byType(CarteCommentaire), findsNothing);
+      expect(find.text('Formation.'), findsOneWidget);
+      expect(find.text(AppStrings.preferencesTitre), findsOneWidget);
     });
   });
 

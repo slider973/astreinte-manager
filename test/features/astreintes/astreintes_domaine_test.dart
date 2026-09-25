@@ -19,18 +19,24 @@ MesAstreintes _donnees(List<Astreinte> astreintes, {DateTime? luLe}) =>
 void main() {
   group('Astreinte', () {
     test('lit une ligne PostgREST sans inventer de colonne', () {
-      final lue = Astreinte.depuisJson(<String, dynamic>{
-        'id': 'a-1',
-        'shift_id': 'c-1',
-        'status': 'accepted',
-        'shifts': <String, dynamic>{
-          'id': 'c-1',
-          'date': '2026-10-17',
-          'slot': 'night',
-          'schedule_id': 'plan-10',
-          'schedules': <String, dynamic>{'id': 'plan-10', 'status': 'validated'},
+      final lue = Astreinte.depuisJson(
+        <String, dynamic>{
+          'id': 'a-1',
+          'shift_id': 'c-1',
+          'status': 'accepted',
+          'shifts': <String, dynamic>{
+            'id': 'c-1',
+            'date': '2026-10-17',
+            'slot': 'night',
+            'schedule_id': 'plan-10',
+            'schedules': <String, dynamic>{
+              'id': 'plan-10',
+              'status': 'validated',
+            },
+          },
         },
-      }, equipiers: <String>['Thomas B.']);
+        equipiers: <String>['Thomas B.'],
+      );
 
       expect(lue, isNotNull);
       expect(lue!.id, 'a-1');
@@ -42,12 +48,15 @@ void main() {
       expect(lue.equipiers, <String>['Thomas B.']);
     });
 
-    test('une attribution dont le créneau est masqué n\'est pas une erreur', () {
-      expect(
-        Astreinte.depuisJson(<String, dynamic>{'id': 'a-1', 'shifts': null}),
-        isNull,
-      );
-    });
+    test(
+      'une attribution dont le créneau est masqué n\'est pas une erreur',
+      () {
+        expect(
+          Astreinte.depuisJson(<String, dynamic>{'id': 'a-1', 'shifts': null}),
+          isNull,
+        );
+      },
+    );
 
     test('les équipiers ne sont connus qu\'une fois le planning validé', () {
       final publiee = astreinte(
@@ -100,10 +109,11 @@ void main() {
 
       final triees = <Astreinte>[suivant, nuit, jour]
         ..sort((Astreinte a, Astreinte b) => a.comparer(b));
-      expect(
-        triees.map((Astreinte a) => a.id).toList(),
-        <String>['j', 'n', 's'],
-      );
+      expect(triees.map((Astreinte a) => a.id).toList(), <String>[
+        'j',
+        'n',
+        's',
+      ]);
     });
   });
 
@@ -140,10 +150,10 @@ void main() {
 
       final parJour = donnees.parJourDuMois(2026, 10);
       expect(parJour.keys, <int>[17]);
-      expect(
-        parJour[17]!.map((Astreinte a) => a.id).toList(),
-        <String>['jour', 'nuit'],
-      );
+      expect(parJour[17]!.map((Astreinte a) => a.id).toList(), <String>[
+        'jour',
+        'nuit',
+      ]);
     });
 
     test('l\'étendue du calendrier contient toujours le mois courant', () {
@@ -284,7 +294,10 @@ void main() {
 
       expect(relu, isNotNull);
       expect(relu!.astreintes, hasLength(2));
-      expect(relu.astreintes.first.equipiers, <String>['Thomas B.', 'Marie L.']);
+      expect(relu.astreintes.first.equipiers, <String>[
+        'Thomas B.',
+        'Marie L.',
+      ]);
       expect(relu.astreintes.last.planningEtat, PlanningEtat.publie);
       // Les heures d'affichage sont dans le cache : sans elles, le détail
       // serait amputé hors ligne.

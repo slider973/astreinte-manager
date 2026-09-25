@@ -100,12 +100,7 @@ class BarreRaccourcis extends ConsumerWidget {
             ),
           if (raison != null)
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                marge,
-                AppSpacing.sm,
-                marge,
-                0,
-              ),
+              padding: EdgeInsets.fromLTRB(marge, AppSpacing.sm, marge, 0),
               child: _Raison(texte: raison),
             )
           else
@@ -265,7 +260,9 @@ class _BoutonPortee extends StatelessWidget {
                   // Dans la bande horizontale, il garde sa largeur naturelle
                   // et c'est le défilement qui l'accueille.
                   if (pleineLargeur)
-                    Expanded(child: _Libelle(portee: portee, encre: encre))
+                    Expanded(
+                      child: _Libelle(portee: portee, encre: encre),
+                    )
                   else
                     _Libelle(portee: portee, encre: encre),
                 ],
@@ -289,9 +286,7 @@ class _Libelle extends StatelessWidget {
     portee.libelle,
     maxLines: 2,
     overflow: TextOverflow.ellipsis,
-    style: Theme.of(
-      context,
-    ).textTheme.labelLarge?.copyWith(color: encre),
+    style: Theme.of(context).textTheme.labelLarge?.copyWith(color: encre),
   );
 }
 

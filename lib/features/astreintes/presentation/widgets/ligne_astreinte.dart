@@ -5,6 +5,7 @@ import '../../../../core/l10n/format_date.dart';
 import '../../../../core/l10n/jours_feries.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_status.dart';
+import '../../../../core/widgets/carre_creneau.dart';
 import '../../../../core/widgets/carte_douce.dart';
 import '../../domain/astreinte.dart';
 
@@ -31,10 +32,6 @@ class LigneDAstreinte extends StatelessWidget {
     this.passee = false,
   });
 
-  /// Côté du carré d'initiale. La même valeur qu'à la ligne de proposition de
-  /// l'accueil : une seule ligne de liste dans tout le monde du pompier.
-  static const double carre = 40;
-
   final Astreinte astreinte;
   final HeuresAffichage heures;
   final VoidCallback onOuvrir;
@@ -48,7 +45,8 @@ class LigneDAstreinte extends StatelessWidget {
     final scheme = theme.colorScheme;
     final creneau = context.statuts.creneau(astreinte.creneau);
     final jourEtDate = dateAvecJourSemaine(astreinte.jour);
-    final soutien = '${creneau.libelle} · ${heures.intervalle(astreinte.creneau)}';
+    final soutien =
+        '${creneau.libelle} · ${heures.intervalle(astreinte.creneau)}';
     final ferie = nomJourFerie(astreinte.jour);
 
     return Semantics(
@@ -71,11 +69,7 @@ class LigneDAstreinte extends StatelessWidget {
         hauteurMin: AppTouch.cible,
         child: Row(
           children: <Widget>[
-            _CarreCreneau(
-              initiale: creneau.libelle.characters.first.toUpperCase(),
-              icone: creneau.icone,
-              attenue: passee,
-            ),
+            CarreCreneau(creneau: astreinte.creneau, attenue: passee),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
@@ -123,60 +117,6 @@ class LigneDAstreinte extends StatelessWidget {
               Icons.chevron_right,
               size: AppTouch.icone,
               color: scheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Le carré d'initiale : « J » ou « N », et l'icône du créneau à côté.
-///
-/// L'initiale seule serait une lettre sans système — « J » et « N » ne se
-/// devinent pas. L'icône du créneau la double, et la phrase annoncée de la
-/// ligne dit « jour » ou « nuit » en toutes lettres.
-class _CarreCreneau extends StatelessWidget {
-  const _CarreCreneau({
-    required this.initiale,
-    required this.icone,
-    required this.attenue,
-  });
-
-  final String initiale;
-  final IconData icone;
-
-  /// Une astreinte passée : le carré descend d'un cran de surface plutôt que
-  /// de garder l'indigo, réservé à ce qui vient.
-  final bool attenue;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final encre = attenue ? scheme.onSurfaceVariant : scheme.onPrimaryContainer;
-
-    return Container(
-      width: LigneDAstreinte.carre,
-      height: LigneDAstreinte.carre,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: attenue
-            ? scheme.surfaceContainerHigh
-            : scheme.primaryContainer,
-        borderRadius: AppRadius.feuilleCarreeRadius,
-      ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(icone, size: AppTouch.iconePetite, color: encre),
-            const SizedBox(width: AppSpacing.xxs),
-            Text(
-              initiale,
-              style: theme.textTheme.labelLarge?.copyWith(color: encre),
-              maxLines: 1,
             ),
           ],
         ),

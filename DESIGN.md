@@ -353,6 +353,7 @@ Inchangés depuis le ticket 004 : `surface #FFFFFF`, `on-surface #131C23`, `on-s
 - **Absent, refusé, conflit** : famille rose. Texte `etat-absent #BB285D`, fond `etat-absent-fond #FED7E5`, texte sur fond encre.
 - **Non saisi, neutre, annulé, archivé, verrouillé** : gris inchangés.
 - **Sélection** : `primary-container` sur `on-primary-container`, pour tout composant Material qui exprime un choix, réglé dans `app_theme.dart`. Le vert ne dit jamais « choisi ».
+- **Le papier doux du pompier** (ticket 064) : page `surface-container-low`, cartes en `surface`, filet `outline-variant` 1 dp. Les deux marques vont ensemble — **un cran de cette palette ne vaut que 1,06:1**, c'est le filet qui détache la carte et le cran qui l'habille. La coquille de l'admin garde son papier blanc : une grille dense de 3 720 cases se lit sur du blanc, trois cartes ne s'y détachent pas.
 - Texte coloré sur blanc : indigo `accent-texte`, vert `etat-accepte`, et les deux teintes assombries `tertiary #9F6224` (4,94:1) et `error #BB285D` (5,87:1) pour un libellé d'état qui doit être lu. Les teintes vives `orange-vif`, `rose-vif` et `accent-decoratif`, jamais : un test les y refuse (§ Écarts, ticket 061).
 
 #### Disponibilité — la grammaire de la case
@@ -618,7 +619,8 @@ Le registre est fait de cases, pas de pastilles.
 | `filet` | 0 | traits de réglure, en-têtes collants, séparateurs |
 | `case` | 4 | **case de créneau, badge d'état, puce** — la forme signature |
 | `controle` | 8 | bouton, champ de saisie, panneau, « carte » |
-| `feuille` | 12 (haut uniquement pour les feuilles de bas d'écran) | dialogue, feuille, menu |
+| `feuille` | 12 (haut uniquement pour les feuilles de bas d'écran) | dialogue, feuille, menu ; **et le carré d'initiale** des lignes de liste du pompier, sur ses quatre coins |
+| `carte` | 20 | **la carte du monde du pompier** (`CarteDouce`, ticket 064) — et elle seule : un bouton ou un champ à 20 serait une gélule |
 | `pastille` | 999 | avatar, pastille de compteur de notifications uniquement |
 
 Écart assumé au Material 3 par défaut : **pas de boutons en gélule**. Le bouton est un bloc à
@@ -670,15 +672,41 @@ Le composant signature. Une case = un créneau (date + jour/nuit) + un état de 
 
 ### Cards / Containers
 
-Il n'y a pas de composant « carte ». Il y a des **blocs réglés** : fond `surface`, filet 1 dp
-`outline-variant`, rayon 8, sans ombre. Les blocs ne s'imbriquent jamais. Une liste de blocs
-identiques faits d'une icône + un titre + un texte est interdite comme structure de page.
+**Deux mondes, deux formes.** Le registre de l'admin est fait de **blocs réglés** : fond
+`surface`, filet 1 dp `outline-variant`, rayon 8, sans ombre. Les écrans du pompier sont faits de
+**cartes** à rayon 20 sur le papier doux (section suivante). Ni les uns ni les autres ne
+s'imbriquent, et une liste d'éléments identiques faits d'une icône + un titre + un texte reste
+interdite comme structure de page.
 
 `DayCell` est un bloc réglé : numéro du jour en `nombre-petit`, nom du jour en `etiquette`,
 marqueur weekend (fond `surface-dim` + nom en gras) et marqueur férié (`Icons.star` 14 dp + nom du
 jour férié en info-bulle **et** en semantics), puis deux `SlotChip` empilés jour au-dessus, nuit
 en dessous. Le jour courant porte un filet `primary` de 2 dp sur son bord gauche et le libellé
 « Aujourd'hui » en semantics.
+
+### La carte du pompier — `CarteDouce`
+
+Le monde du pompier n'est pas fait de blocs réglés mais de **cartes** posées sur le papier doux :
+fond `surface`, rayon `carte` = 20, filet `outline-variant` 1 dp, **aucune ombre**. Elle **ne
+s'imbrique jamais** : ce qui vit dans une carte est un contrôle — une puce de raccourci à rayon 4,
+un carré d'initiale à rayon 12 —, jamais une seconde carte.
+
+- `CarteDouce.nue` quand l'enfant porte ses propres marges : une liste dont les lignes touchent
+  les bords, une grille qui a déjà les siennes.
+- `CarteDouceSliver` autour d'un groupe de slivers, pour une grille de soixante-deux lignes qui ne
+  peut pas entrer dans une boîte. Le papier se peint derrière, **le filet devant** : un en-tête
+  épinglé à fond plein recouvrirait sinon le bord de sa propre carte.
+- `enErreur` passe le filet à 2 dp `error`. Réservé à une carte qui **porte** une erreur de
+  saisie ; une erreur de chargement reste un état de contenu.
+
+**Les lignes de liste du pompier** — proposition, rappel, astreinte — sont cette carte, avec à
+gauche un `CarreCreneau` : 40 × 40, rayon 12, l'icône du créneau et sa lettre — « J » ou « N » —
+en `on-primary-container` sur `primary-container`, `attenue` d'un cran de surface pour une
+astreinte passée. Le carré est **décoratif** : la ligne qui le porte dit « Nuit » en toutes
+lettres.
+
+`EnteteSection.discret` ouvre un paquet de ces cartes : `titleMedium` — le plus petit titre en
+Archivo —, et **pas de filet**, parce qu'une liste de cartes se sépare toute seule.
 
 ### Inputs / Fields
 
@@ -700,18 +728,25 @@ sûres. Destinations, dans cet ordre :
 
 | Destination | Icône (sélectionnée / non) | Libellé | Route |
 |---|---|---|---|
-| Mon mois | `calendar_month` / `calendar_month_outlined` | « Mon mois » | `/mois` |
-| Propositions | `inbox` / `inbox_outlined` + pastille de compte | « Propositions » | `/propositions` |
-| Planning | `groups` / `groups_outlined` | « Planning » | `/planning` |
-| Profil | `person` / `person_outline` | « Profil » | `/profil` |
+| Accueil | `home` / `home_outlined` | « Accueil » | `/` |
+| Calendrier | `calendar_month` / `calendar_month_outlined` | « Calendrier » | `/calendrier` |
+| Astreintes | `event_available` / `event_available_outlined` | « Astreintes » | `/astreintes` |
+| Boîte | `inbox` / `inbox_outlined` + pastille de compte | « Boîte » | `/boite` |
 | Admin *(admins seuls)* | `admin_panel_settings` / `admin_panel_settings_outlined` | « Admin » | `/admin` |
+
+**Quatre destinations pour un pompier, cinq pour un admin** (ticket 064). Le profil n'y est plus :
+il s'ouvre depuis l'avatar de l'en-tête, présent sur les quatre destinations, et il se **pousse** —
+on l'ouvre deux fois par an là où les quatre autres se visitent tous les jours.
 
 - Libellés **toujours affichés** (`NavigationDestinationLabelBehavior.alwaysShow`) : le public a une
   aisance numérique variable, une icône seule ne suffit pas.
 - Maximum 5 destinations, ce qui est exactement le compte pour un admin. Aucune destination ne
   s'ajoute sans en retirer une.
-- La pastille « Propositions » affiche le nombre de propositions en attente, plafonné à « 9+ »,
-  et double le chiffre d'un libellé de semantics (« 3 propositions en attente »).
+- La pastille « Boîte » affiche le nombre de rappels non lus, plafonné à « 9+ », et double le
+  chiffre d'un libellé de semantics (« 3 notifications non lues »). Elle est **indigo sur encre
+  blanche**, jamais le rose de Material : une notification à lire n'est ni un refus, ni une
+  erreur. Le compte des propositions en attente, lui, est écrit en toutes lettres sur l'accueil,
+  « Propositions · 3 », là où le geste suit.
 - Le bouton retour du navigateur et le geste retour iOS restent fonctionnels : chaque écran est une
   route nommée, jamais un état local.
 - L'élément choisi porte `primary-container` et `on-primary-container`, en barre, en rail, en tiroir et en boutons segmentés : la sélection est toujours indigo.
@@ -1067,3 +1102,67 @@ verrouillage, la bascule « Mois » et l'export ICS font exactement ce qu'ils fa
 | La grille du calendrier des astreintes | `§ 3.3` : « sa grille en carte, sans autre changement » | la carte prend la marge que la grille portait (8 en compact), et ses cases **touchent le filet** | Le ticket 027 a calculé cette marge : à 16, une case du calendrier tombe à 43,4 dp sur un téléphone de 360, sous le plancher. Rentrer la grille d'un rembourrage de carte en plus l'y aurait ramenée. Avec la carte posée à la place de la marge et les cases au ras du filet, une case fait 45,4 dp — le calcul tient. |
 | Le squelette des astreintes | `§ 3.3` : « squelette inchangé dans le fond, dans la matière du monde » | des **cartes fantômes** : filet à rayon 20, carré de 40 à gauche, deux lignes à droite | Un squelette est l'ossature du contenu attendu (`§ Don't`). Il montrait des lignes de registre pour une liste qui est devenue des cartes : il aurait annoncé le mauvais écran pendant la seconde où on le regarde. |
 | Les contrastes | ticket : « ajoute ceux des pastilles du sélecteur si une paire nouvelle apparaît » | **aucune paire nouvelle** | Le sélecteur en pastille n'apporte que `on-primary-container` sur `primary-container` (6,74:1) et `on-surface` sur le papier doux, tous deux déjà mesurés dans `test/core/theme/contraste_test.dart` ; la pastille contre le papier est la même paire que la carte d'appel à saisir du 064a. Le carré atténué d'une astreinte passée est `on-surface-variant` sur `surface-container-high`, couvert par la boucle « texte sur chaque cran de surface ». |
+
+## Écarts d'implémentation (ticket 064d)
+
+La passe de fini du monde du pompier : `audit` puis `polish` sur l'Accueil, le Calendrier, les
+Astreintes, la Boîte et le Profil ; audit léger — contraste, glyphes, cibles, débordements à
+×1,6 — sur la connexion, l'invitation, l'accueil d'un nouveau membre et l'aide à l'installation,
+sans les restyler. **Aucune règle de fonctionnement ne change** : la saisie, les raccourcis, les
+plafonds, le commentaire, le verrouillage, la réponse aux propositions et l'export ICS font
+exactement ce qu'ils faisaient.
+
+`PRODUCT.md` n'a pas bougé : la vérité produit que ce ticket a changée — l'accueil est un tableau
+de bord, la saisie est la deuxième destination — y est écrite depuis le chantier 064a.
+
+### 064d-1 — La grille du mois au-dessus du pli, mesurée
+
+Le Calendrier s'ouvrait sur tout sauf sa grille. Mesuré **à 390 × 844, avec les vraies coupes du
+produit** (`test/support/polices.dart` : la police d'essai de `flutter test` dessine chaque glyphe
+dans un carré d'un cadratin et fausse toute hauteur de texte), hauteur occupée au-dessus de la
+première ligne de jours :
+
+| Cas | Avant | Après |
+|---|---|---|
+| Mois vierge, sans bannière | 336 pt — 39,8 % | 336 pt — 39,8 % |
+| Mois saisi, sans commentaire, sans bannière | 354 pt — 41,9 % | **329 pt — 39,0 %** |
+| Mois saisi **avec commentaire**, sans bannière | 402 pt — 47,6 % | **329 pt — 39,0 %** |
+| Mois saisi avec commentaire, **avec bannière** | 446 pt — 52,8 % | **373 pt — 44,2 %** |
+| **Le pire cas** : bannière, écart de plafond, commentaire, et les deux lignes d'astuce parce que l'appareil n'a jamais servi | 618 pt — **73,2 %** | **469 pt — 55,6 %** |
+
+Trois coupes, **sur téléphone seulement** — `medium` et au-delà gardent la composition du 064c,
+où rien n'est en concurrence avec la grille.
+
+| Point | Ce que disait le brief | Ce que fait le code | Pourquoi |
+|---|---|---|---|
+| La carte des maximums, au repos | ticket 013 : titre, valeur, leçon tant qu'elle n'a pas été apprise, écart | en `compact`, **une ligne de 56 points** : « Au maximum · 8 astreintes, 2 weekends » et son chevron, plus l'encart d'écart et la mention de reprise **quand ils s'appliquent** | La leçon reste à une touche, dans la forme ouverte, et le pompier que le 013 vise l'a lue le premier mois. Les deux encarts conditionnels, eux, restent : `preferencesReprise` « n'est jamais silencieuse » (013) et l'écart est le cœur pédagogique du même ticket — ni l'un ni l'autre ne coûte quoi que ce soit le mois où il ne s'applique pas, c'est-à-dire presque toujours. |
+| Le libellé du résumé | ticket : « Ce mois, au maximum · 8 astreintes, 2 weekends » | **« Au maximum · … »**, et l'étiquette est en `libelle-champ` `on-surface-variant`, pas en `titre-bloc` | Mesuré, pas choisi. À 390, la carte offre 294 points de texte ; la phrase entière en demande 342, et « Au maximum » en `titre-bloc` la laissait à 292 pour huit astreintes — 299 dès deux nombres à deux chiffres, et la valeur s'éteignait sur ses derniers caractères, vu dans Chrome. En `libelle-champ`, le pire résumé tient en 277. « Ce mois » part parce que le sélecteur de mois le dit douze points plus haut. Le poids change de camp avec la taille, et c'est juste : l'étiquette dit ce que la carte est, la valeur dit ce qu'elle vaut. Une mesure le garde (`RenderParagraph.didExceedMaxLines`). |
+| Le commentaire du membre | ticket 013 : au bas de la carte des maximums | **sous la grille**, dans sa carte « Ton commentaire pour le chef » (`CarteCommentaire`), avec la même édition — rangée de 56 repliée, champ multiligne en place ouvert, même limite, même compteur | On l'écrit une fois par mois ; la grille se remplit à chaque ouverture. Son aperçu de deux lignes coûtait 48 points au-dessus du registre à chaque fois. **Le prix est connu et assumé** : pour l'atteindre, il faut défiler le mois. Il porte pour cela le nom de son destinataire : à trente lignes de la carte des maximums, « Un mot pour ton chef » ne disait plus de quoi il était le commentaire. En `medium` et au-delà, il ne bouge pas. |
+| L'astuce de saisie | ticket 011 : la ligne de la touche part à la première saisie du mois, celle du glissement à la première peinture réussie **sur l'appareil** | les deux partent ensemble, **à la première case du mois** | Soixante points au-dessus de la grille pour apprendre le glissement à quelqu'un qui vient manifestement de comprendre comment on coche. Ce que la leçon avait d'utile est déjà joué : elle est là tant que le mois est vierge, c'est-à-dire exactement le moment où on ne sait pas encore. |
+
+### 064d-2 — Ce que l'audit a trouvé
+
+L'audit éprouve chaque écran du pompier et les quatre écrans d'entrée à **×1,6** — le réglage
+« Grande » d'iOS, et le seuil au-delà duquel le Calendrier change de composition — sur un
+téléphone de 390, avec les vraies coupes. Il a trouvé deux débordements, et rien d'autre
+(`test/features/fini_pompier_test.dart`).
+
+| Point | Ce qui n'allait pas | Ce que fait le code | Pourquoi |
+|---|---|---|---|
+| La ligne d'un **jour férié** du registre | elle déborde de **dix points** à ×1,6 : sa colonne de date porte deux rangs — le numéro et le nom du jour, puis le nom du férié en clair — là où les autres n'en ont qu'un, et la liste était à extension fixe de 56 | `SliverVariedExtentList` : seule une ligne de férié grandit, de ce qui lui manque et pas d'un point de plus | La Toussaint et l'Armistice sortaient de leur ligne, et rien dans l'arbre de widgets ne le disait — c'est la peinture qui l'a dit. Le nom du férié en clair est une décision du ticket 027 qu'on ne reprend pas : une info-bulle au survol n'est pas un accès. La virtualisation reste entière, l'extension étant un calcul par indice et non une construction. Les hauteurs de rang sont **arrondies au point supérieur**, comme le moteur de texte arrondit une ligne : calculées au dixième, elles laissaient la ligne déborder de quatre dixièmes. |
+| La fenêtre des étapes du **guide d'accueil** | elle déborde de **six points** à ×1,6 : un `PageView` demande une hauteur imposée, et 320 était celle de la plus longue étape à l'échelle 1 | la hauteur suit le texte, le glyphe de 48 mis à part | Un écran d'entrée n'est vu qu'une fois et personne n'y revient vérifier. C'est une correction de fini, pas un restylage : rien d'autre n'y change. |
+| Le **filet de la carte** du monde du pompier | `CarteDouceSliver` peignait son papier **et** son trait derrière son groupe de slivers : le premier sliver à fond plein recouvrait le filet. Mesuré au pixel, le bord haut de la carte de la grille du mois valait `surface` et non `outline-variant` — l'en-tête de colonnes épinglé remplit le rayon haut en opaque | **deux décorations** : le papier derrière, le filet devant | Un cran de cette palette ne vaut que 1,06:1 (064a) : c'est le filet qui détache la carte, et une carte dont le filet disparaît sur un bord disparaît avec lui. La correction vaut pour tout ce qu'on posera dans la carte, pas seulement pour cet en-tête-là — une ligne de week-end à fond plein touchant un bord aurait fait la même chose. |
+| L'alignement de la **barre d'actions** en `medium` | `AppScaffold` rembourrait `filActions` de 16 en dur alors que le contenu au-dessus prend `classe.margePage`, qui vaut 24 dès 600 | `EdgeInsets.all(classe.margePage)` | À 768, toute barre d'actions qui prend sa pleine largeur — « Publier » de la matrice, « Inviter » des membres, « Ouvrir le mois » des périodes — sortait de huit points par rapport au contenu qu'elle ferme. La barre des compteurs du Calendrier, elle, se dimensionne sur son contenu et ne bougeait pas : le défaut n'était pas partout, il était dans la règle. Mesuré à 390 et à 768, contre les bords de la zone de contenu et non de la fenêtre — en `medium`, le rail occupe déjà la gauche. |
+| Le **carré de créneau** | deux copies privées — `CarteProposition`, qui sert l'accueil et la Boîte, et `LigneDAstreinte` | un composant de `core`, **`CarreCreneau`**, listé dans `core/widgets/README.md` et montré dans `/dev/components` avec `EnteteSection` et son état `discret` | Deux copies d'une même marque divergent au premier réglage, et le pompier lirait alors deux formes du même carré à deux écrans d'intervalle. Il est **décoratif** (`ExcludeSemantics`) : la ligne qui le porte dit « Nuit » en toutes lettres, et un lecteur d'écran qui épellerait « N » par-dessus lirait deux fois la même chose. |
+| Le **trait** de la carte fantôme et du sliver | `Border.all` sans épaisseur, donc le `1.0` par défaut de Flutter | `CarteDouce.filet`, un `BorderSide` à `AppStroke.filet` | Les deux valent la même chose aujourd'hui et cesseraient de la valoir le jour où le trait du système bouge. |
+
+### 064d-3 — Ce que l'audit a laissé, et pourquoi
+
+| Point | Pourquoi on n'y touche pas |
+|---|---|
+| **Contraste** | Aucune paire nouvelle. La seule encre que ce chantier déplace est `on-surface-variant` sur `surface` — l'étiquette du résumé —, déjà mesurée par la boucle « texte sur chaque cran de surface » de `test/core/theme/contraste_test.dart`. |
+| **Glyphes** | Le point médian `·` et le tiret demi-cadratin `–` du résumé sont dans la liste vérifiée de `test/core/l10n/glyphes_couverts_test.dart`, qui lit la source d'`AppStrings` et refuse tout caractère absent de la table `cmap` des six coupes. Aucun glyphe nouveau n'entre. |
+| **Cibles tactiles** | La carte du résumé fait 56, la rangée du commentaire 56, le carré de créneau est décoratif. Rien ne descend sous le plancher. |
+| L'**écart de plafond en encre verte** | `_Ecart` prend le descripteur de la période ouverte, donc la famille `etat-info`. Le vert de ce système dit « accepté, validé » — et c'est bien ce que la phrase annonce : « tu as coché plus que ton maximum, **c'est normal** ». Le ticket 013 l'a tranché (« jamais en rouge ni en ocre : un avertissement apprendrait au membre à décocher »), et ce chantier ne rouvre pas une décision de sens. |
+| La **redondance de la carte d'astreinte** — « 15 » en gros, puis « jeu. 15 » | C'est le brief : `design/064 § 2` demande « le numéro du jour en `displaySmall` » **et** « "Aujourd'hui" ou "mar. 24" ». Le doublon est celui de la référence, et il sert : le chiffre se voit de loin, la ligne dessous donne le jour de la semaine, qui est ce qu'on cherche pour se repérer. |
+| Les **quatre écrans d'entrée** | Audit léger seulement, comme le ticket le demande : un seul défaut trouvé (le guide), corrigé, et rien d'autre touché. Ils appartiennent au monde d'avant le 064 et un restylage serait un ticket. |

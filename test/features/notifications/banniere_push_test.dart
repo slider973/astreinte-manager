@@ -106,7 +106,9 @@ void main() {
       semantique.dispose();
     });
 
-    testWidgets('elle s\'efface d\'elle-même : rien ne se perd', (tester) async {
+    testWidgets('elle s\'efface d\'elle-même : rien ne se perd', (
+      tester,
+    ) async {
       final faux = await _lancer(tester);
 
       await _recevoir(

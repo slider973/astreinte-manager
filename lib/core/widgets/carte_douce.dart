@@ -53,6 +53,19 @@ class CarteDouce extends StatelessWidget {
   /// Hauteur minimale du corps. `AppTouch.cible` pour une carte qu'on touche.
   final double hauteurMin;
 
+  /// **Le filet de la carte**, à l'épaisseur nommée du système.
+  ///
+  /// Public parce que deux autres formes dessinent la même carte sans passer
+  /// par ce widget : [CarteDouceSliver], qui l'enroule autour d'un groupe de
+  /// slivers, et la carte fantôme du squelette des astreintes, qui la dessine
+  /// en creux. Trois `Border.all` écrits à la main cessent d'être la même
+  /// carte au premier réglage.
+  static BorderSide filet(ColorScheme scheme, {bool enErreur = false}) =>
+      BorderSide(
+        color: enErreur ? scheme.error : scheme.outlineVariant,
+        width: enErreur ? AppStroke.etat : AppStroke.filet,
+      );
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -66,10 +79,7 @@ class CarteDouce extends StatelessWidget {
       color: scheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: AppRadius.carteRadius,
-        side: BorderSide(
-          color: enErreur ? scheme.error : scheme.outlineVariant,
-          width: enErreur ? AppStroke.etat : AppStroke.filet,
-        ),
+        side: filet(scheme, enErreur: enErreur),
       ),
       child: onTap == null
           ? corps
@@ -99,13 +109,29 @@ class CarteDouceSliver extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    // **Deux décorations, et le filet par-dessus** (chantier 064d).
+    //
+    // Écrites en une seule, fond et filet se peignaient tous deux *derrière*
+    // le groupe : le premier sliver venu recouvrait le trait. C'était le cas
+    // de l'en-tête de colonnes épinglé de la grille du mois, qui remplit le
+    // rayon haut en `surface` opaque — mesuré au pixel, le bord haut de la
+    // carte valait `surface` et non `outline-variant` —, et ce l'aurait été
+    // de toute ligne à fond plein touchant un bord, la ligne de week-end du
+    // registre par exemple. Le papier reste derrière, le filet passe devant,
+    // et la carte est continue quoi qu'on pose dedans.
     return DecoratedSliver(
       decoration: BoxDecoration(
         color: scheme.surface,
         borderRadius: AppRadius.carteRadius,
-        border: Border.all(color: scheme.outlineVariant),
       ),
-      sliver: SliverMainAxisGroup(slivers: slivers),
+      sliver: DecoratedSliver(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          borderRadius: AppRadius.carteRadius,
+          border: Border.fromBorderSide(CarteDouce.filet(scheme)),
+        ),
+        sliver: SliverMainAxisGroup(slivers: slivers),
+      ),
     );
   }
 }

@@ -65,10 +65,7 @@ Future<void> _ouvrir(
   );
 }
 
-Astreinte _demain() => astreinte(
-  id: 'g-1',
-  jour: DateTime(2026, 10, 15),
-);
+Astreinte _demain() => astreinte(id: 'g-1', jour: DateTime(2026, 10, 15));
 
 Proposition _proposition(String id, int jour) => proposition(
   id: id,
@@ -134,10 +131,7 @@ void main() {
     ) async {
       await _ouvrir(tester, periodes: <PeriodeSaisie>[]);
 
-      expect(
-        find.text(AppStrings.accueilVideAstreintesTitre),
-        findsOneWidget,
-      );
+      expect(find.text(AppStrings.accueilVideAstreintesTitre), findsOneWidget);
       await tester.tap(find.text(AppStrings.accueilVideAstreintesAction));
       await tester.pumpAndSettle();
       expect(emplacementCourant(tester), AppRoutes.calendrier);
@@ -281,9 +275,7 @@ void main() {
       );
 
       final lignes = tester
-          .widgetList<CarteProposition>(
-            find.byType(CarteProposition),
-          )
+          .widgetList<CarteProposition>(find.byType(CarteProposition))
           .toList(growable: false);
       expect(lignes, hasLength(3));
       expect(
@@ -464,10 +456,7 @@ void main() {
 
       // **Jamais « Aucune astreinte à venir » sur une lecture en panne** :
       // c'est faux, et ça se croit.
-      expect(
-        find.text(AppStrings.accueilVideAstreintesTitre),
-        findsNothing,
-      );
+      expect(find.text(AppStrings.accueilVideAstreintesTitre), findsNothing);
       expect(find.text(AppStrings.accueilErreurAstreintes), findsOneWidget);
       expect(find.text(AppStrings.actionReessayer), findsOneWidget);
 
@@ -496,10 +485,7 @@ void main() {
         horloge: () => _matin,
       );
 
-      expect(
-        find.text(AppStrings.accueilVidePropositionsTitre),
-        findsNothing,
-      );
+      expect(find.text(AppStrings.accueilVidePropositionsTitre), findsNothing);
       expect(find.text(AppStrings.accueilErreurPropositions), findsOneWidget);
       expect(find.byType(CarteJourVue), findsWidgets);
     });

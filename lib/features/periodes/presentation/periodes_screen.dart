@@ -45,7 +45,6 @@ class PeriodesScreen extends ConsumerStatefulWidget {
 }
 
 class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
-
   /// Le mois dont une action est en vol : son bouton porte l'indicateur, et
   /// aucun autre ne part tant qu'elle n'est pas rendue.
   String? _occupee;
@@ -128,7 +127,6 @@ class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
         ),
       );
   }
-
 
   @override
   Widget build(BuildContext context) {

@@ -41,7 +41,9 @@ class EnteteAccueil extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final prenom = prenomDe(ref.watch(appartenanceCouranteProvider)?.nomAffiche);
+    final prenom = prenomDe(
+      ref.watch(appartenanceCouranteProvider)?.nomAffiche,
+    );
     final salutation = salutationDe(maintenant);
 
     return Row(

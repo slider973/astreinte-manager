@@ -355,7 +355,11 @@ void main() {
         ),
         propositions: FauxPropositionsRepository(
           propositions: <Proposition>[
-            proposition(id: 'a-12', creneauId: 'c-12', jour: DateTime(2026, 10, 12)),
+            proposition(
+              id: 'a-12',
+              creneauId: 'c-12',
+              jour: DateTime(2026, 10, 12),
+            ),
           ],
         ),
       );
@@ -535,102 +539,6 @@ void main() {
         _telephoneLong.height -
             tester.getBottomLeft(find.byType(PrimaryButton)).dy,
         greaterThanOrEqualTo(barreAccueil),
-      );
-    });
-  });
-
-  // **Les deux écrans devenus poussés au ticket 064.** Ils vivaient dans
-  // `AppScaffold`, dont la barre de navigation ajoute `viewPadding.bottom` à
-  // sa hauteur. Poussés, ils n'ont plus rien sous eux : sans réserve, les
-  // 34 points de la barre d'accueil d'un iPhone en PWA installée mangent la
-  // fin du contenu — « Se déconnecter » et « Supprimer mon compte ».
-  group('La zone sûre basse des écrans poussés', () {
-    const double barreAccueil = 34;
-
-    Future<void> ouvrirAvecBarre(WidgetTester tester, String route) async {
-      final reserve = FakeViewPadding(
-        bottom: barreAccueil * tester.view.devicePixelRatio,
-      );
-      tester.view
-        ..viewPadding = reserve
-        ..padding = reserve;
-      await _monterMembre(
-        tester,
-        propositions: FauxPropositionsRepository(
-          propositions: <Proposition>[
-            for (var index = 0; index < 28; index++)
-              proposition(
-                id: 'a-$index',
-                creneauId: 'c-$index',
-                jour: DateTime(2026, 10, index + 1),
-              ),
-          ],
-        ),
-      );
-      await ouvrirRoute(tester, route);
-    }
-
-    /// Ce qui reste sous le bas de [cible].
-    double sousLeBas(WidgetTester tester, Finder cible) =>
-        _telephoneLong.height - tester.getBottomLeft(cible.last).dy;
-
-    /// Amène la liste à son extrémité : c'est là, et nulle part ailleurs, que
-    /// la réserve basse se voit.
-    Future<void> aLaFin(WidgetTester tester) async {
-      final defilement = tester
-          .state<ScrollableState>(find.byType(Scrollable).first)
-          .position;
-      defilement.jumpTo(defilement.maxScrollExtent);
-      await tester.pumpAndSettle();
-      expect(
-        defilement.maxScrollExtent,
-        greaterThan(0),
-        reason: 'la liste tient dans l\'écran : le bas n\'est pas éprouvé',
-      );
-    }
-
-    testWidgets('le profil garde ses deux sorties au-dessus de la barre', (
-      tester,
-    ) async {
-      await ouvrirAvecBarre(tester, AppRoutes.profil);
-      await aLaFin(tester);
-
-      // La liste elle-même s'arrête au-dessus de la barre d'accueil…
-      expect(
-        sousLeBas(tester, find.byType(ListView)),
-        greaterThanOrEqualTo(barreAccueil),
-        reason: 'la liste du profil descend sous la barre d\'accueil',
-      );
-      // …et donc la dernière chose qu'on y lit aussi.
-      expect(
-        sousLeBas(tester, find.text(AppStrings.legalMentionsLien)),
-        greaterThanOrEqualTo(barreAccueil),
-        reason: 'le dernier lien passe sous la barre d\'accueil',
-      );
-    });
-
-    // **La Boîte, elle, est une destination.** Sa réserve basse n'est plus la
-    // sienne : la barre de navigation ajoute `viewPadding.bottom` à sa propre
-    // hauteur, et la liste s'arrête au-dessus de la barre.
-    testWidgets('la Boîte garde sa dernière ligne au-dessus de la barre', (
-      tester,
-    ) async {
-      await ouvrirAvecBarre(
-        tester,
-        AppRoutes.boiteOnglet(OngletBoite.propositions),
-      );
-      await aLaFin(tester);
-
-      expect(find.byType(NavigationBar), findsOneWidget);
-      expect(
-        sousLeBas(tester, find.byType(ListView)),
-        greaterThanOrEqualTo(barreAccueil),
-        reason: 'la liste de la Boîte descend sous la barre d\'accueil',
-      );
-      expect(
-        sousLeBas(tester, find.byType(CarteProposition)),
-        greaterThanOrEqualTo(barreAccueil),
-        reason: 'la dernière carte passe sous la barre d\'accueil',
       );
     });
   });

@@ -60,7 +60,6 @@ class SuiviScreen extends ConsumerStatefulWidget {
 }
 
 class _SuiviScreenState extends ConsumerState<SuiviScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -83,8 +82,7 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     });
   }
 
-  SuiviController get _controleur =>
-      ref.read(suiviControllerProvider.notifier);
+  SuiviController get _controleur => ref.read(suiviControllerProvider.notifier);
 
   PlanningController get _planning =>
       ref.read(planningControllerProvider.notifier);
@@ -139,9 +137,7 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     ref.read(creneauSelectionneProvider.notifier).choisir(creneau.creneau.id);
     // Ce que la réattribution vient réparer, désigné plutôt que deviné : le
     // lien `replaced_by` pointera ce refus-là.
-    ref
-        .read(cibleReattributionProvider.notifier)
-        .viser(creneau.aRemplacer?.id);
+    ref.read(cibleReattributionProvider.notifier).viser(creneau.aRemplacer?.id);
     if (!AppWindowClass.of(context).estLarge) unawaited(_ouvrirFeuille());
   }
 
@@ -153,9 +149,8 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
       builder: (BuildContext contexteFeuille) => FractionallySizedBox(
         heightFactor: 0.85,
         child: Consumer(
-          builder: (BuildContext context, WidgetRef ref, Widget? _) => _panneau(
-            onFermer: () => Navigator.of(contexteFeuille).pop(),
-          ),
+          builder: (BuildContext context, WidgetRef ref, Widget? _) =>
+              _panneau(onFermer: () => Navigator.of(contexteFeuille).pop()),
         ),
       ),
     );
@@ -231,7 +226,11 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     final cible = ref.read(cibleReattributionProvider);
     final sortant = cible == null
         ? null
-        : ref.read(suiviControllerProvider).value?.suivi.attributionParId(cible);
+        : ref
+              .read(suiviControllerProvider)
+              .value
+              ?.suivi
+              .attributionParId(cible);
 
     final confirme = await confirmerReattribution(
       context,
@@ -319,7 +318,6 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     );
     unawaited(_controleur.rafraichir());
   }
-
 
   void _annoncer(String message) {
     if (!mounted) return;
@@ -423,7 +421,10 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
           ),
           child: Row(
             children: <Widget>[
-              StatusBadge.planning(etat.suivi.etat, tampon: etat.valideSousNosYeux),
+              StatusBadge.planning(
+                etat.suivi.etat,
+                tampon: etat.valideSousNosYeux,
+              ),
               const Spacer(),
               IndicateurDirect(branche: etat.canalBranche),
             ],
@@ -525,7 +526,8 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
           journee: journees[index - 1],
           // Rien à ouvrir sur un brouillon ni sur un mois archivé : le bouton
           // ne s'affiche pas plutôt que de s'afficher inerte.
-          onReparer: etat.suivi.etat == PlanningEtat.publie ||
+          onReparer:
+              etat.suivi.etat == PlanningEtat.publie ||
                   etat.suivi.etat == PlanningEtat.valide
               ? _ouvrirCreneau
               : null,
@@ -571,21 +573,22 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     return switch (gagnante) {
       // Un envoi manqué passe devant une erreur de lecture : la lecture se
       // rattrape d'un bouton, les pompiers non prévenus attendent une action.
-      AppBannerVariante.erreur => envoiManque
-          ? AppBanner(
-              variante: AppBannerVariante.erreur,
-              texte: AppStrings.suiviEnvoiManque,
-              libelleAction: AppStrings.suiviPrevenir,
-              onAction: etat.relance || _raisonRelance(etat) != null
-                  ? null
-                  : () => unawaited(_relancer(tout: true)),
-            )
-          : AppBanner(
-              variante: AppBannerVariante.erreur,
-              texte: etat.messageErreur!,
-              libelleAction: AppStrings.actionReessayer,
-              onAction: () => unawaited(_controleur.rafraichir()),
-            ),
+      AppBannerVariante.erreur =>
+        envoiManque
+            ? AppBanner(
+                variante: AppBannerVariante.erreur,
+                texte: AppStrings.suiviEnvoiManque,
+                libelleAction: AppStrings.suiviPrevenir,
+                onAction: etat.relance || _raisonRelance(etat) != null
+                    ? null
+                    : () => unawaited(_relancer(tout: true)),
+              )
+            : AppBanner(
+                variante: AppBannerVariante.erreur,
+                texte: etat.messageErreur!,
+                libelleAction: AppStrings.actionReessayer,
+                onAction: () => unawaited(_controleur.rafraichir()),
+              ),
       AppBannerVariante.horsLigne => const AppBanner(
         variante: AppBannerVariante.horsLigne,
         texte: AppStrings.horsLigneDetail,
@@ -600,12 +603,13 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
       // L'aboutissement du mois : il se dit en toutes lettres et il reste. Un
       // essai qui se termine ne le chasse pas — le mois validé est le fait de
       // l'écran, l'échéance de facturation n'en est pas un.
-      AppBannerVariante.information => valide != null
-          ? AppBanner(
-              variante: AppBannerVariante.information,
-              texte: AppStrings.suiviValideLe(formaterDateLongue(valide)),
-            )
-          : fait?.banniere,
+      AppBannerVariante.information =>
+        valide != null
+            ? AppBanner(
+                variante: AppBannerVariante.information,
+                texte: AppStrings.suiviValideLe(formaterDateLongue(valide)),
+              )
+            : fait?.banniere,
       AppBannerVariante.attention => fait?.banniere,
       AppBannerVariante.verrouille => null,
     };
