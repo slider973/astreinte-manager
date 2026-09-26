@@ -5,7 +5,7 @@
 - **Dépend de** : 051
 - **Branche** : `feat/058-invitations-en-attente-adresse-confirmee`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-26
+- **Statut** : terminé le 2026-09-26 (PR créée)
 
 ## Contexte
 
