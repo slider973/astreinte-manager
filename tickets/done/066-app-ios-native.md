@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 064, 065
 - **Branche** : `feat/066-app-ios-native`
-- **PR** : https://github.com/slider973/astreinte-manager/pull/64 (chantier 066a), https://github.com/slider973/astreinte-manager/pull/65 (chantier 066b), https://github.com/slider973/astreinte-manager/pull/66 (chantier 066c)
+- **PR** : https://github.com/slider973/astreinte-manager/pull/64 (chantier 066a), https://github.com/slider973/astreinte-manager/pull/65 (chantier 066b), https://github.com/slider973/astreinte-manager/pull/66 (chantier 066c), https://github.com/slider973/astreinte-manager/pull/67 (chantier 066d)
 - **Statut** : terminé le 2026-09-26 (PR créée)
 
 ## Contexte
@@ -113,7 +113,7 @@ L'app iOS native Foco a été livrée en quatre chantiers, un par PR :
   masqués, CI macOS (PR 64).
 - **066b** — les disponibilités et les préférences de charge sur les vraies données (PR 65).
 - **066c** — les propositions, mes astreintes, le planning de la caserne et l'accueil (PR 66).
-- **066d** — les notifications, le push FCM iOS et la passe de fini.
+- **066d** — les notifications, le push FCM iOS et la passe de fini (PR 67).
 
 La CI iOS vit dans le fork privé `slider973/Foco` ([Actions](https://github.com/slider973/Foco/actions)) ;
 astreinte-manager, public, ne compile pas son submodule. Le guide de l'app iOS est `docs/IOS.md`.
