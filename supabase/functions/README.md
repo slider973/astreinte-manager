@@ -368,11 +368,10 @@ Les deux ensemble ne sont pas une requête plus riche, c'est une requête ambigu
 `invalid_body`. Un `invitation_id` qui n'est pas un UUID est refusé de la même façon — un corps
 malformé n'est pas une panne serveur.
 
-L'entrée par identifiant passe par `accept_invitation_by_id` (migration `0036`), qui refuse
-d'abord un compte dont `auth.users.email_confirmed_at` est nul (`0038`, même `email_mismatch`
-qu'un identifiant inconnu), confronte l'adresse de la session à celle de l'invitation **avant
-tout le reste**, résout le jeton en base et
-rejoue `accept_invitation`. Conséquences, qui sont le contrat :
+L'entrée par identifiant passe par `accept_invitation_by_id` (migration `0036`), qui refuse d'abord
+un compte dont `auth.users.email_confirmed_at` est nul (`0038`, même `email_mismatch` qu'un
+identifiant inconnu), confronte l'adresse de la session à celle de l'invitation **avant tout le
+reste**, résout le jeton en base et rejoue `accept_invitation`. Conséquences, qui sont le contrat :
 
 - **la réponse est la même**, succès comme échec : mêmes clés, mêmes codes, mêmes statuts HTTP,
   mêmes phrases françaises. L'écran d'invitation traite les deux entrées sans les distinguer ;
