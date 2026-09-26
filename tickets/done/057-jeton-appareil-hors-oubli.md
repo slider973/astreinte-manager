@@ -5,7 +5,7 @@
 - **Dépend de** : 024, 053
 - **Branche** : `feat/057-jeton-appareil-hors-oubli`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-26
+- **Statut** : terminé le 2026-09-26 (PR créée)
 
 ## Contexte
 
