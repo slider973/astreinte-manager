@@ -12,6 +12,7 @@ Réponds en français. Tous les textes de l'app sont en français.
 | `docs/WORKFLOWS.md` | Machines à états et séquences. Deep links des notifications. |
 | `PRODUCT.md` | Vérité produit au format Impeccable (design). |
 | `DESIGN.md` | Système de design en vigueur, créé par Impeccable au ticket 004. |
+| `docs/IOS.md` | L'app iOS native `foco/` : configuration, contrat, CI du fork, écarts avec la PWA. |
 | `design/<ticket>.md` | Brief de design d'un ticket, écrit avant le code. |
 | `tickets/` | Un ticket = une PR. `backlog/`, `in-progress/`, `done/`. Tableau dans `tickets/BOARD.md`. |
 
@@ -69,11 +70,19 @@ bloquants non résolus reste en brouillon et attend un humain.
 
 ## Canal principal : la PWA
 
-La PWA web est le produit. Développer et vérifier sur Chrome (`flutter run -d chrome
---dart-define-from-file=env/dev.json`) et, pour les écrans clés, sur un téléphone avec la PWA
-installée. Les builds iOS et Android natifs ne sont produits qu'à la demande d'une caserne :
-aucun ticket du MVP ne doit exiger un simulateur ou un émulateur, et aucun plugin uniquement natif
-ne doit être ajouté sans équivalent web.
+La PWA web est le produit, **et le seul canal de l'admin**. Développer et vérifier sur Chrome
+(`flutter run -d chrome --dart-define-from-file=env/dev.json`) et, pour les écrans clés, sur un
+téléphone avec la PWA installée. Les builds iOS et Android natifs **de l'app Flutter** ne sont
+produits qu'à la demande d'une caserne : aucun ticket Flutter ne doit exiger un simulateur ou un
+émulateur, et aucun plugin uniquement natif ne doit être ajouté sans équivalent web.
+
+**Second client du pompier : l'app iOS native `foco/`** (ticket 066, décision du propriétaire du
+26 septembre 2026). SwiftUI, submodule du fork privé `slider973/Foco`, branchée sur la même base
+avec le même contrat que la PWA — aucune requête, colonne ou fonction que la PWA n'utilise pas ;
+un besoin nouveau passe par un ticket `supabase-dev`. Elle se compile et se teste **dans la CI du
+fork seulement** (le dépôt public ne peut pas compiler un submodule privé) : toute mise à jour du
+pointeur `foco/` vise un commit du fork dont la course `iOS` est verte. Guide : `docs/IOS.md`. La
+règle des caches locaux s'y applique aussi (`LocalWipe`, `foco/Foco/Core/Session/Deconnexion.swift`).
 
 ## Conventions de code
 

@@ -252,6 +252,26 @@ Un lien inconnu, mal formé, ou visant un écran que ce compte n'a pas le droit 
 l'accueil **sans message d'erreur** : le membre n'a rien fait de mal, et le lien peut dater d'avant
 une rétrogradation.
 
+**Dans l'app iOS native** (Foco, `foco/`, ticket 066d), les mêmes liens publics ouvrent l'écran
+natif. La traduction vit à un seul endroit, `PushDestination.from`
+(`foco/Foco/Core/Notifications/PushDestination.swift`), recopie de `destinationInterne` ; elle sert
+le push touché (app froide comme chaude) et la ligne touchée dans le centre de notifications.
+
+| Lien public | Écran de l'app iOS |
+|---|---|
+| `/proposals` | Propositions |
+| `/schedule/<period>` | Mes astreintes |
+| `/availability/<period>` | Disponibilités, sur le mois `<period>` |
+| `/admin/schedule/<period>` | la PWA dans Safari, `/admin/suivi?mois=<period>` *(admin seulement)* |
+| `/admin/subscription` | la PWA dans Safari, `/admin/abonnement` *(admin seulement)* |
+
+L'admin reste dans la PWA (décision 7 du ticket 066) : ses deux liens ouvrent la PWA plutôt qu'un
+écran natif qui n'existe pas. Mêmes règles que la PWA : `<period>` est un `AAAA-MM` valide ou le lien
+est ignoré, et un lien inconnu, mal formé ou interdit laisse le membre sur l'accueil, sans message.
+Au lancement froid, le lien **attend** que les appartenances soient lues : c'est le rôle, pas le
+lien, qui décide des deux liens de l'admin. Le lien voyage dans `data.route` du message FCM, à la
+racine du `userInfo` iOS.
+
 Les adresses de la coquille d'avant le ticket 064 — `/?onglet=N`, `/?mois=AAAA-MM`,
 `/notifications` — sont redirigées vers les nouvelles routes (`core/router/destinations.dart`,
 `ongletHerite`). S'y ajoute `/propositions`, l'adresse de l'écran des propositions pendant le
@@ -263,7 +283,8 @@ cache local : un onglet retenu sur l'appareil aurait fait ouvrir la Boîte aille
 lien promettait, et il aurait survécu à une déconnexion. Une valeur inconnue tombe sur « Tout »,
 qui contient les deux autres.
 
-**Ce que la Boîte montre de ces notifications.** L'onglet « Rappels » — et donc « Tout » — affiche
+**Ce que la Boîte montre de ces notifications** — et le centre de notifications de l'app iOS,
+avec la même règle et le même compte pour sa cloche. L'onglet « Rappels » — et donc « Tout » — affiche
 toutes les lignes `inapp` **sauf** `assignment_proposed` et `assignment_reminder` : ces deux-là
 posent la même question que la ligne de proposition qui vit à côté, laquelle porte la réponse. Le
 compte de non-lues de la cloche, de la pastille de la barre et du titre suit la même règle, pour
