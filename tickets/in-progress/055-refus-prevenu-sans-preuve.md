@@ -5,7 +5,7 @@
 - **Dépend de** : 050
 - **Branche** : `feat/055-refus-prevenu-sans-preuve`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-26
 
 ## Contexte
 
