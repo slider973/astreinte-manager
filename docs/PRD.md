@@ -76,8 +76,13 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 - ~~Import des membres par CSV~~ — livré au MVP, ticket 047.
 
 ### 4.3 Hors périmètre (pour l'instant)
-- Apps iOS et Android sur les stores : uniquement à la demande explicite d'une caserne. Le code
-  Flutter les permet, mais aucun ticket du MVP n'en dépend.
+- **La PWA reste le produit, et le seul canal de l'admin.** Depuis le ticket 066 (décision du
+  propriétaire, 26 septembre 2026), une **app iOS native**, Foco (SwiftUI, submodule `foco/`),
+  est un **second client du pompier** : même base Supabase, même contrat, mêmes règles, compilée
+  et testée dans la CI de son dépôt privé (`docs/IOS.md`). Un admin connecté sur iOS garde son
+  parcours pompier et ouvre la PWA pour gérer la caserne.
+- Builds Android et iOS natifs de l'app Flutter sur les stores : uniquement à la demande explicite
+  d'une caserne. Le code Flutter les permet, mais aucun ticket du MVP n'en dépend.
 - Gestion des interventions, du matériel, des formations.
 - Feuilles de temps ou paie.
 - SMS (coût par message incompatible avec un abonnement bon marché).
@@ -258,11 +263,11 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 
 | Couche | Choix | Notes |
 |---|---|---|
-| Front | Flutter 3.x, une base de code | Web/PWA en priorité ; iOS et Android natifs à la demande |
+| Front | Flutter 3.x, une base de code | Web/PWA en priorité ; iOS et Android natifs à la demande. App iOS native du pompier : Foco, SwiftUI, submodule `foco/` (ticket 066) |
 | État | Riverpod | Voir ticket 004 |
 | Navigation | go_router | Deep links pour les notifications |
 | Backend | Supabase | Postgres, Auth, Realtime, Storage, Edge Functions |
-| Push | FCM Web (VAPID) via `firebase_messaging` | Natif APNs/Android seulement si une caserne demande l'app. Tokens dans `push_tokens` |
+| Push | FCM Web (VAPID) via `firebase_messaging` ; FCM iOS (APNs) dans Foco, `firebase-ios-sdk` | Tokens dans `push_tokens`, `platform` = `web` ou `ios` |
 | Email | Resend | Appelé depuis les Edge Functions |
 | Cron | pg_cron | Relances, verrouillage, rappels |
 | Paiement | Stripe | Checkout, Customer Portal, webhooks vers Edge Function |

@@ -32,7 +32,8 @@ Compte à prévoir : **30 minutes**, un compte Google, aucune carte bancaire. Le
 C'est l'étape qui produit quatre des cinq valeurs.
 
 1. Sur la page d'accueil du projet, sous « Commencez par ajouter Firebase à votre application »,
-   clique sur l'icône **`</>`** (« Web »). Pas iOS, pas Android : l'application est une PWA.
+   clique sur l'icône **`</>`** (« Web »). Pas Android : l'application est une PWA. (L'app iOS
+   native Foco a sa propre entrée, dans le **même projet** : voir § 9, après celle-ci.)
 2. Pseudo de l'application : `Astreinte SP (PWA)`.
 3. **Ne coche pas** « Configurer Firebase Hosting » : l'hébergement du site est ailleurs
    (ticket 032).
@@ -215,6 +216,83 @@ installée.
 change : les autorisations de notification sont attachées au domaine, et chaque pompier devra
 réactiver depuis son profil.
 
+## 9. L'app iOS native (Foco)
+
+Depuis le ticket 066, une app iOS native, **Foco** (`foco/`, `docs/IOS.md`), est un second client
+du pompier. Elle reçoit les notifications par **le même projet Firebase** et **la même Edge
+Function** que la PWA : rien à changer côté serveur, le bloc `apns` étant envoyé (§ e). Sans ce
+qui suit, l'app iOS fonctionne normalement et affiche dans ses réglages « Notifications : Indisponibles sur cette installation ».
+
+Compte à prévoir : **30 minutes**, et un **compte Apple Developer payant** (99 $/an) : Apple ne
+délivre de notifications qu'aux apps signées par un compte membre du programme.
+
+### a. Choisir l'identifiant de l'app
+
+Le projet Xcode porte encore l'identifiant de l'auteur de Foco (`com.mazestudio.foco`, équipe
+`7LTN3MGW4H`). Il faut le tien, par exemple `ch.staticflow.foco`.
+
+1. Ouvre `foco/Foco.xcodeproj` dans Xcode, cible **Foco**, onglet **Signing & Capabilities**.
+2. **Team** : ton équipe Apple. **Bundle Identifier** : ton identifiant. Garde *Automatically
+   manage signing* coché.
+3. Vérifie que la capacité **Push Notifications** et le mode d'arrière-plan **Remote
+   notifications** sont listés : ils sont déjà dans le projet (`Config/Foco.entitlements`,
+   `Config/Info.plist`). Xcode crée l'identifiant côté Apple avec le push activé.
+
+### b. Ajouter l'application iOS dans Firebase
+
+1. Console Firebase → **roue dentée** → **Paramètres du projet** → onglet **Général** → section
+   « Vos applications » → **Ajouter une application** → icône **iOS+**.
+2. **ID du bundle Apple** : exactement celui du § a. Pseudo : `Foco (iOS)`. L'ID App Store est
+   facultatif.
+3. **Télécharge `GoogleService-Info.plist`.** Ignore les étapes suivantes de l'assistant (SDK,
+   code d'initialisation) : le projet les contient déjà.
+4. Dépose le fichier en **`foco/Foco/GoogleService-Info.plist`**. Il **n'est jamais commité**
+   (`.gitignore` du fork ; un exemple vit dans `foco/Config/GoogleService-Info.example.plist`).
+   Comme les valeurs web du § 2, ce ne sont pas des secrets, mais elles identifient ton projet :
+   elles restent hors du dépôt.
+
+### c. Donner à Firebase la clé APNs (`.p8`)
+
+C'est la clé qui permet à Firebase de parler aux serveurs d'Apple. Elle sert pour toutes tes
+apps, en développement comme en production.
+
+1. Sur <https://developer.apple.com/account> → **Certificates, Identifiers & Profiles** →
+   **Keys** → **+**.
+2. Nom : `Foco APNs`. Coche **Apple Push Notifications service (APNs)** → **Continue** →
+   **Register**.
+3. **Télécharge le fichier `.p8`.** Apple ne le propose **qu'une seule fois** : range-le dans ton
+   gestionnaire de mots de passe. Note le **Key ID** (10 caractères) et ton **Team ID** (en haut à
+   droite de la page, 10 caractères).
+4. Console Firebase → **Paramètres du projet** → onglet **Cloud Messaging** → section
+   « Configuration des applications Apple » → ton app `Foco (iOS)` → **Clé d'authentification
+   APNs** → **Importer** : le `.p8`, le Key ID, le Team ID.
+
+Le `.p8` **est** un secret : jamais dans le dépôt, jamais dans un courriel.
+
+### d. Vérifier sur l'iPhone
+
+1. Branche l'iPhone, choisis-le comme destination dans Xcode, **⌘R** (build de développement ;
+   TestFlight ensuite, voir `docs/IOS.md § 9`).
+2. Connecte-toi avec ton adresse et le code reçu par courriel.
+3. L'accueil propose **« Reçois les propositions »** → **Activer les notifications** → accepte
+   la fenêtre d'iOS. (Ou : avatar → Réglages → bloc « Notifications » → **Activer**.)
+4. Le bloc « Notifications » des réglages affiche **« Activées sur cet appareil »**.
+5. Dans Supabase (**Table Editor** → `push_tokens`), une ligne apparaît avec ton `user_id`,
+   **`platform = ios`** et `device_label` « iPhone · app iOS ».
+6. Console Firebase → **Messaging** → nouvelle campagne → **« Envoyer un message de test »** →
+   colle le `token` de cette ligne. Dans **Options supplémentaires → Données personnalisées**,
+   ajoute la clé `route` avec la valeur `/proposals`.
+7. **App fermée** : la notification s'affiche ; touche-la, l'app s'ouvre sur **Propositions**.
+   **App ouverte** : la bannière d'iOS s'affiche quand même, et la cloche de l'accueil est relue.
+8. Déconnecte-toi : la ligne de `push_tokens` disparaît.
+
+### e. Le bloc `apns` côté serveur
+
+Depuis le chantier 066d, l'Edge Function envoie le bloc `apns` (`supabase/functions/_shared/fcm.ts`,
+`corpsMessage`) : `aps.sound = "default"` pour que la notification sonne, et, quand une étiquette
+existe, `aps.thread-id` et l'en-tête `apns-collapse-id` (tronqué à 64 octets). Rien ne change pour
+la PWA.
+
 ## Mettre à jour le SDK
 
 Le fichier `web/firebase-messaging-sw.js` charge le SDK JavaScript de Firebase depuis Google, à une
@@ -234,3 +312,8 @@ l'enregistrement du jeton échoue en arrière-plan sans message clair.
 | Les destinations des liens | `lib/features/notifications/domain/destination_push.dart` et `docs/WORKFLOWS.md § 8` |
 | La table des jetons | `docs/SCHEMA.md § 2.11` |
 | L'envoi côté serveur | `supabase/functions/send-notification/`, contrat dans `supabase/functions/README.md` |
+| **App iOS** : la configuration Firebase | `foco/Foco/GoogleService-Info.plist` (non commité ; exemple dans `foco/Config/`) |
+| **App iOS** : le seul fichier qui importe Firebase | `foco/Foco/App/FirebasePush.swift` |
+| **App iOS** : l'état, le jeton, `push_enabled` | `foco/Foco/Core/Notifications/PushCenter.swift` |
+| **App iOS** : les destinations des liens | `foco/Foco/Core/Notifications/PushDestination.swift` et `docs/WORKFLOWS.md § 8` |
+| **App iOS** : la version du SDK | `firebase-ios-sdk` épinglé en version exacte dans `foco/Foco.xcodeproj` (12.17.0) |

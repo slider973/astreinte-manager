@@ -4,8 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 064, 065
 - **Branche** : `feat/066-app-ios-native`
-- **PR** : https://github.com/slider973/astreinte-manager/pull/64 (chantier 066a), https://github.com/slider973/astreinte-manager/pull/65 (chantier 066b), https://github.com/slider973/astreinte-manager/pull/66 (chantier 066c)
-- **Statut** : en cours depuis 2026-09-26
+- **PR** : https://github.com/slider973/astreinte-manager/pull/64 (chantier 066a), https://github.com/slider973/astreinte-manager/pull/65 (chantier 066b), https://github.com/slider973/astreinte-manager/pull/66 (chantier 066c), https://github.com/slider973/astreinte-manager/pull/67 (chantier 066d)
+- **Statut** : terminé le 2026-09-26 (PR créée)
 
 ## Contexte
 
@@ -103,3 +103,22 @@ second client du pompier.
   ne changent pas.
 - Vérifié par le propriétaire sur son iPhone 17 Pro Max via un build de développement ou
   TestFlight.
+
+## Livraison
+
+L'app iOS native Foco a été livrée en quatre chantiers, un par PR :
+
+- **066a** — le socle : submodule `foco/`, `supabase-swift`, configuration, couche de données
+  derrière protocole, connexion par code, appartenance, déconnexion qui vide tout, extras
+  masqués, CI macOS (PR 64).
+- **066b** — les disponibilités et les préférences de charge sur les vraies données (PR 65).
+- **066c** — les propositions, mes astreintes, le planning de la caserne et l'accueil (PR 66).
+- **066d** — les notifications, le push FCM iOS et la passe de fini (PR 67).
+
+La CI iOS vit dans le fork privé `slider973/Foco` ([Actions](https://github.com/slider973/Foco/actions)) ;
+astreinte-manager, public, ne compile pas son submodule. Le guide de l'app iOS est `docs/IOS.md`.
+
+**Le critère « Vérifié par le propriétaire sur son iPhone 17 Pro Max » reste non coché** : il
+attend la signature Apple, la configuration de production, Firebase iOS et la clé APNs, puis un
+build de développement ou TestFlight, décrits dans `docs/IOS.md` § 9. Ce ticket se ferme avec le
+chantier 066d.

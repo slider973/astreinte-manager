@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 066 | [L'app iOS native Foco, branchée sur la même base que la PWA](in-progress/066-app-ios-native.md) | P1 | 064 065 | — |
 
 ## À faire
 
@@ -80,4 +79,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 | 063 | [Passer d'une destination à l'autre sans glissement](done/063-transition-entre-destinations.md) | P1 | 004 | https://github.com/slider973/astreinte-manager/pull/58 |
 | 064 | [Un monde visuel pour le pompier, à partir d'un tableau de bord](done/064-monde-visuel-pompier.md) | P1 | 061 063 | https://github.com/slider973/astreinte-manager/pull/59 (chantier 064a), https://github.com/slider973/astreinte-manager/pull/60 (chantier 064c), https://github.com/slider973/astreinte-manager/pull/61 (chantier 064b), https://github.com/slider973/astreinte-manager/pull/63 (chantier 064d) |
 | 065 | [Un défilement fluide sur la PWA installée](done/065-fluidite-defilement-pwa.md) | P1 | 060 | https://github.com/slider973/astreinte-manager/pull/62 |
+| 066 | [L'app iOS native Foco, branchée sur la même base que la PWA](done/066-app-ios-native.md) | P1 | 064 065 | https://github.com/slider973/astreinte-manager/pull/64 (chantier 066a), https://github.com/slider973/astreinte-manager/pull/65 (chantier 066b), https://github.com/slider973/astreinte-manager/pull/66 (chantier 066c), https://github.com/slider973/astreinte-manager/pull/67 (chantier 066d) |
 

@@ -278,6 +278,48 @@ export function lienPubliable(lien: string | undefined): boolean {
   }
 }
 
+/** Plafond d'Apple pour l'en-tête `apns-collapse-id`, en octets. */
+const COLLAPSE_ID_MAX_OCTETS = 64;
+
+/**
+ * Tronque une chaîne à `max` octets UTF-8 sans couper un caractère en deux.
+ *
+ * `apns-collapse-id` se mesure en octets, pas en caractères : une étiquette
+ * accentuée de 64 caractères dépasserait la limite et APNs refuserait le message.
+ */
+export function tronquerOctets(valeur: string, max: number): string {
+  const encodeur = new TextEncoder();
+  if (encodeur.encode(valeur).length <= max) return valeur;
+  let resultat = "";
+  let octets = 0;
+  for (const caractere of valeur) {
+    const taille = encodeur.encode(caractere).length;
+    if (octets + taille > max) break;
+    resultat += caractere;
+    octets += taille;
+  }
+  return resultat;
+}
+
+/**
+ * Le bloc `apns`, lu par les appareils iOS (app native Foco, ticket 066).
+ *
+ * Sans lui, iOS affiche la notification **sans son** : un pompier qui a rangé
+ * son téléphone ne l'entend pas. L'étiquette, quand elle existe, regroupe
+ * (`thread-id`) et remplace (`apns-collapse-id`) comme `Notification.tag` côté
+ * web. La clé `headers` est omise plutôt que mise à `undefined` : l'API v1
+ * refuse un `headers` nul ou vide.
+ */
+function blocApns(etiquette: string | undefined): Record<string, unknown> {
+  const aps: Record<string, string> = { sound: "default" };
+  if (!etiquette) return { payload: { aps } };
+  aps["thread-id"] = etiquette;
+  return {
+    headers: { "apns-collapse-id": tronquerOctets(etiquette, COLLAPSE_ID_MAX_OCTETS) },
+    payload: { aps },
+  };
+}
+
 export function corpsMessage(jeton: string, message: MessagePush): Record<string, unknown> {
   const donnees: Record<string, string> = {
     ...message.donnees,
@@ -299,6 +341,7 @@ export function corpsMessage(jeton: string, message: MessagePush): Record<string
         },
         fcm_options: lienPubliable(message.lien) ? { link: message.lien } : undefined,
       },
+      apns: blocApns(message.etiquette),
     },
   };
 }
