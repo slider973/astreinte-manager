@@ -1025,18 +1025,33 @@ caserne où il n'est pas encore entré. Deux fonctions, à la place.
 
 | Fonction | Signature | Rôle |
 |---|---|---|
-| `my_pending_invitations` | `() returns table (id uuid, station_name text, invited_by_name text, expires_at timestamptz, status text)` `security definer` `stable`, **ouverte à `authenticated`** | Les invitations non acceptées adressées à l'adresse de la session. Tri par `expires_at` **décroissant** — les encore valables d'abord, les expirées en dernier —, **au plus dix lignes**. Zéro ligne à qui n'a rien, jamais une exception |
-| `accept_invitation_by_id` | `(p_invitation uuid, p_user_id uuid, p_email text) returns jsonb` `security definer`, **réservée à `service_role`** | Confronte l'adresse de la session à celle de l'invitation **avant tout le reste**, résout le jeton en base et rejoue `accept_invitation` : mêmes contrôles, même transaction, mêmes six codes |
+| `my_pending_invitations` | `() returns table (id uuid, station_name text, invited_by_name text, expires_at timestamptz, status text)` `security definer` `stable`, **ouverte à `authenticated`** | Les invitations non acceptées adressées à l'adresse de la session, **si `auth.users.email_confirmed_at` est posé pour `auth.uid()`** (`0038`). Tri par `expires_at` **décroissant** — les encore valables d'abord, les expirées en dernier —, **au plus dix lignes**. Zéro ligne à qui n'a rien, jamais une exception |
+| `accept_invitation_by_id` | `(p_invitation uuid, p_user_id uuid, p_email text) returns jsonb` `security definer`, **réservée à `service_role`** | Refuse (`email_mismatch`) un `p_user_id` dont `auth.users.email_confirmed_at` est nul (`0038`), confronte l'adresse de la session à celle de l'invitation **avant tout le reste**, résout le jeton en base et rejoue `accept_invitation` : mêmes contrôles, même transaction, mêmes six codes |
 
 **`my_pending_invitations()` n'a pas de paramètre, et c'est la contrainte principale.**
 L'adresse vient de `auth.jwt() ->> 'email'`, jamais d'un argument. Une fonction qui accepterait
 une adresse serait un oracle d'énumération : n'importe quel compte connecté saurait, adresse
 par adresse, qui est invité où. La comparaison se fait sur `lower(email)`, comme l'index
-partiel `invitations_pending_uniq`, et le filtre est `accepted_at is null`. Une revendication
-`email_verified` **explicitement fausse** (au premier niveau du jeton ou dans `user_metadata`)
-rend zéro ligne ; absente, elle ne bloque rien — avec la connexion par code à six chiffres elle
-est vraie par construction, et l'exiger sur un projet dont GoTrue ne la pose pas remettrait
-l'écran à mentir.
+partiel `invitations_pending_uniq`, et le filtre est `accepted_at is null`.
+
+**L'adresse confirmée se lit à la source, pas dans le jeton** (`0038`, ticket 058). Les deux
+fonctions exigent `auth.users.email_confirmed_at is not null` — pour `auth.uid()` dans
+`my_pending_invitations()`, pour `p_user_id` dans `accept_invitation_by_id()`, appelée avec la
+clé de service par `accept-invitation`, où `auth.uid()` est nul et où `p_user_id` vient de
+`auth.getUser(jwt)`. Adresse non confirmée : zéro ligne d'un côté, `email_mismatch` de l'autre,
+**quelles que soient les métadonnées**. La revendication `email_verified` n'est plus lue, ni au
+premier niveau (GoTrue ne la pose pas sur ce projet) ni dans `user_metadata` : le titulaire écrit
+lui-même `user_metadata` par `auth.updateUser`, ce n'est pas une autorité. `0036` la lisait, avec
+« vrai » par défaut.
+
+Ce contrôle est sûr **parce que** personne ne peut obtenir un compte confirmé pour une adresse
+qu'il ne contrôle pas : `[auth] enable_signup = false` (seule `invite-member` crée des comptes,
+avec `email_confirm: true`) et `enable_anonymous_sign_ins = false`, dans `supabase/config.toml`.
+Rouvrir l'inscription laisserait `[auth.email] enable_confirmations` seule serrure — et, à faux,
+un inconnu pourrait ouvrir un compte « confirmé » à l'adresse d'un pompier invité, voir son
+invitation et l'accepter. `scripts/verifier_production.sh` fait donc un écart nommé d'une
+inscription libre (`disable_signup`) ou d'une connexion anonyme
+(`external_anonymous_users_enabled`) activée en production.
 
 Les cinq champs, et la raison de chacun :
 
@@ -1899,6 +1914,10 @@ Ordre proposé :
     `authenticated` seulement, reprise journalisée dans `audit_log` sans le jeton, jeton borné à
     4096 caractères. **Aucune politique RLS touchée** : l'upsert direct sur la ligne
     d'un autre reste refusé, le jeton ne change de main que par la fonction)
+38. `0038_adresse_confirmee_a_la_source.sql` (ticket 058 : `my_pending_invitations()` et
+    `accept_invitation_by_id()` redéfinies, signatures, `search_path` et droits inchangés.
+    L'adresse confirmée se lit dans `auth.users.email_confirmed_at`, plus dans la revendication
+    `email_verified` ni dans `user_metadata`)
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà

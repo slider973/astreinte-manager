@@ -4,8 +4,8 @@
 - **Priorité** : P2
 - **Dépend de** : 051
 - **Branche** : `feat/058-invitations-en-attente-adresse-confirmee`
-- **PR** : —
-- **Statut** : en cours depuis 2026-09-26
+- **PR** : https://github.com/slider973/astreinte-manager/pull/70
+- **Statut** : terminé le 2026-09-26 (PR créée)
 
 ## Contexte
 

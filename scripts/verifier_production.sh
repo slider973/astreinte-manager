@@ -345,13 +345,14 @@ masques="$(printf '%s' "$json_config" | jq -r '[.masked[] | join(".")] | join(",
 
 normaliser_gabarit() { tr -d '\r' | sed -e 's/[[:space:]]*$//' -e '/^$/d'; }
 
+# Une seule lecture, pour le gabarit et pour les deux portes plus bas.
+reponse_auth="$(curl -sS "https://api.supabase.com/v1/projects/$ref/config/auth" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" 2>&1)"
+
 gabarit_depot_fichier="supabase/templates/magic_link.html"
 if [ ! -f "$gabarit_depot_fichier" ]; then
   ecart "$gabarit_depot_fichier est absent du dépôt alors que supabase/config.toml le déclare : config push échouerait."
 else
-  reponse_auth="$(curl -sS "https://api.supabase.com/v1/projects/$ref/config/auth" \
-    -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" 2>&1)"
-
   if ! printf '%s' "$reponse_auth" | jq -e 'has("mailer_templates_magic_link_content")' >/dev/null 2>&1; then
     detail="$(printf '%s' "$reponse_auth" | jq -r '.message // .error // empty' 2>/dev/null)"
     ecart "Corps du gabarit magic_link : je n'ai pas pu conclure. La lecture de la configuration d'authentification de $ref n'a pas abouti${detail:+ ($detail)} — ce n'est pas la preuve que le gabarit est bon."
@@ -370,6 +371,68 @@ else
       ok "Le corps du gabarit magic_link est celui de $gabarit_depot_fichier, ligne pour ligne."
     fi
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# Les deux portes de création de comptes : inscription libre, connexion anonyme
+#
+# `my_pending_invitations()` et `accept_invitation_by_id()` (migration 0038,
+# ticket 058) tiennent une adresse pour sûre dès que `auth.users` la dit
+# confirmée. C'est sûr **parce que** personne ne peut faire naître un compte
+# confirmé pour une adresse qu'il ne contrôle pas : seule `invite-member`, avec
+# la clé de service, crée des comptes. Ce qui le garantit ne vit pas dans la
+# migration mais dans deux réglages de `supabase/config.toml` —
+# `[auth] enable_signup = false` et `enable_anonymous_sign_ins = false`.
+# Rouvrir l'un d'eux dans le tableau de bord ne casse rien de visible : c'est
+# exactement le genre d'écart que ce script existe pour nommer.
+#
+# `config diff` (plus haut) les compare aussi, mais noyés dans la liste des
+# propriétés, sans dire ce qu'ils protègent. Ils sont donc lus ici, par leur nom
+# dans l'API de gestion : `disable_signup` (vrai = inscription fermée, l'inverse
+# de `enable_signup`) et `external_anonymous_users_enabled`. Un champ absent ou
+# nul n'est pas pris pour une porte fermée : on ne conclut pas.
+# ---------------------------------------------------------------------------
+
+if ! printf '%s' "$reponse_auth" | jq -e 'type == "object" and has("disable_signup") and has("external_anonymous_users_enabled")' >/dev/null 2>&1; then
+  detail="$(printf '%s' "$reponse_auth" | jq -r '.message // .error // empty' 2>/dev/null)"
+  ecart "Inscription libre et connexion anonyme : je n'ai pas pu conclure. La lecture de la configuration d'authentification de $ref n'a pas abouti${detail:+ ($detail)} — ce n'est pas la preuve que les deux portes sont fermées."
+else
+  inscription_fermee="$(printf '%s' "$reponse_auth" | jq -r '.disable_signup | tostring')"
+  anonymes="$(printf '%s' "$reponse_auth" | jq -r '.external_anonymous_users_enabled | tostring')"
+  confirmation_auto="$(printf '%s' "$reponse_auth" | jq -r '.mailer_autoconfirm | tostring')"
+  portes_en_ecart=0
+
+  if [ "$inscription_fermee" = "null" ]; then
+    ecart "Inscription libre : je n'ai pas pu conclure, l'API rend disable_signup nul pour $ref."
+    portes_en_ecart=1
+  elif [ "$inscription_fermee" != "true" ]; then
+    # Trois issues pour la seconde serrure, et seule `false` permet de dire
+    # qu'elle tient : un champ absent ou nul n'est pas une confirmation exigée.
+    case "$confirmation_auto" in
+      true)
+        aggravant=" Et la confirmation d'adresse est automatique (mailer_autoconfirm) : un inconnu peut dès maintenant ouvrir un compte « confirmé » à l'adresse d'un pompier invité, voir son invitation et l'accepter."
+        ;;
+      false)
+        aggravant=" La confirmation d'adresse reste exigée : c'est désormais la seule serrure."
+        ;;
+      *)
+        aggravant=" Sur la confirmation d'adresse, je n'ai pas pu conclure (mailer_autoconfirm = $confirmation_auto) : rien ne dit qu'une seconde serrure tient encore."
+        ;;
+    esac
+    ecart "Inscription libre activée en production (disable_signup = $inscription_fermee) : n'importe qui peut créer un compte à n'importe quelle adresse, et les invitations en attente se lisent sur la foi d'une adresse confirmée (migration 0038).$aggravant Rattrapage : SUPABASE_AUTH_SMTP_PASSWORD=… supabase config push --project-ref $ref (auth.enable_signup = false)."
+    portes_en_ecart=1
+  fi
+
+  if [ "$anonymes" = "null" ]; then
+    ecart "Connexion anonyme : je n'ai pas pu conclure, l'API rend external_anonymous_users_enabled nul pour $ref."
+    portes_en_ecart=1
+  elif [ "$anonymes" != "false" ]; then
+    ecart "Connexion anonyme activée en production (external_anonymous_users_enabled = $anonymes) : n'importe qui obtient une session sans adresse, puis peut s'en donner une. Rattrapage : SUPABASE_AUTH_SMTP_PASSWORD=… supabase config push --project-ref $ref (auth.enable_anonymous_sign_ins = false)."
+    portes_en_ecart=1
+  fi
+
+  [ "$portes_en_ecart" -eq 0 ] &&
+    ok "Inscription libre et connexion anonyme fermées : seule invite-member fait naître un compte."
 fi
 
 # ---------------------------------------------------------------------------
