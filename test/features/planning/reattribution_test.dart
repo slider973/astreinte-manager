@@ -22,6 +22,7 @@ import '../../support/faux_matrice.dart';
 import '../../support/faux_planning.dart';
 import '../../support/faux_suivi.dart';
 import '../../support/polices.dart';
+import '../../support/promesse_envoi.dart';
 
 const String _chemin = '/admin/suivi';
 
@@ -440,7 +441,11 @@ void main() {
       expect(poste.planning.reattributions, isEmpty);
     });
 
-    testWidgets('la réattribution annonce qui a été prévenu', (tester) async {
+    // **« Sera prévenu » : la demande est en file, pas livrée** (ticket 055).
+    // `notified` rendu par `reassign-shift` (migration 0039) le prouve pour
+    // l'entrant ; rien ne prouve la livraison, et [aucunEnvoiPromis] refuse
+    // « est prévenu ».
+    testWidgets('la réattribution annonce qui sera prévenu', (tester) async {
       final poste = await _ouvrir(tester);
       await _toucher(tester, find.text(AppStrings.reattribuerAction));
       await _toucher(tester, _bouton('Camille G.'));
@@ -450,7 +455,33 @@ void main() {
         find.text(AppStrings.reattribuerFaite('Camille G.')),
         findsOneWidget,
       );
+      aucunEnvoiPromis(tester);
       expect(poste.suivi.lectures, greaterThan(1));
+    });
+
+    testWidgets('une réponse muette sur l\'entrant ne promet rien', (
+      tester,
+    ) async {
+      final planning = FauxPlanningRepository(
+        planning: planningPublie(),
+        creneaux: _creneaux(),
+        attributions: const <Attribution>[
+          Attribution(id: 'a-acceptee', creneauId: 'c-1-n', userId: 'lefebvre'),
+        ],
+        disponibles: <String>{'girard@c-1-j', 'bernard@c-1-j'},
+      )..entrantEnFile = false;
+
+      await _ouvrir(tester, depotPlanning: planning);
+      await _toucher(tester, find.text(AppStrings.reattribuerAction));
+      await _toucher(tester, _bouton('Camille G.'));
+      await _toucher(tester, find.text(AppStrings.reattribuerConfirmer));
+
+      expect(
+        find.text(AppStrings.reattribuerFaiteSansPreuve('Camille G.')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('prévenu'), findsNothing);
+      aucunEnvoiPromis(tester);
     });
 
     testWidgets(
@@ -556,6 +587,7 @@ void main() {
         find.text(AppStrings.annulerFaite('Marie L.')),
         findsOneWidget,
       );
+      aucunEnvoiPromis(tester);
     });
 
     testWidgets('hors ligne, le geste est refusé et il dit pourquoi', (

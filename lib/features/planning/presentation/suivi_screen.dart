@@ -264,14 +264,22 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     // Le panneau se referme : le créneau est réparé, et le laisser ouvert
     // inviterait à recommencer.
     ref.read(creneauSelectionneProvider.notifier).fermer();
-    _annoncer(
-      resultat.ancienPrevenu && sortant != null
-          ? AppStrings.reattribuerFaiteEtAncien(
-              candidat.membre.nomAffiche,
-              sortant.nom,
-            )
-          : AppStrings.reattribuerFaite(candidat.membre.nomAffiche),
-    );
+    // **Ne dire que ce que la réponse prouve** (ticket 055) : `notified` pour
+    // l'entrant, `previous.notified` pour le sortant — des demandes en file,
+    // d'où « sera prévenu ».
+    final entrant = candidat.membre.nomAffiche;
+    final ancien = resultat.ancienPrevenu ? sortant?.nom : null;
+    _annoncer(switch ((resultat.entrantEnFile, ancien)) {
+      (true, final String ancien) => AppStrings.reattribuerFaiteEtAncien(
+        entrant,
+        ancien,
+      ),
+      (true, null) => AppStrings.reattribuerFaite(entrant),
+      (false, final ancien) => AppStrings.reattribuerFaiteSansPreuve(
+        entrant,
+        ancien: ancien,
+      ),
+    });
     unawaited(_controleur.rafraichir());
   }
 

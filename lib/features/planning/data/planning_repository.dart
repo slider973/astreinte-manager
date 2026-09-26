@@ -84,11 +84,18 @@ enum ErreurPlanning {
 /// [ancienPrevenu] est vrai **seulement** quand la garde remplacée était
 /// acceptée : c'est la seule personne à qui on retire quelque chose. Celui qui
 /// avait refusé sait déjà.
+///
+/// **« Prévenu » veut dire ici « mis en file ».** [entrantEnFile] et
+/// [ancienPrevenu] recopient `notified` et `previous.notified` de
+/// `reassign-shift` : la base a écrit la demande dans `notification_outbox`,
+/// dans la transaction de la réattribution. Rien ne dit qu'elle est livrée —
+/// l'écran écrit donc « sera prévenu » (ticket 055).
 class ResultatReattribution {
   const ResultatReattribution({
     required this.attribution,
     this.ancienUserId,
     this.ancienPrevenu = false,
+    this.entrantEnFile = false,
     this.planningPublie = false,
   });
 
@@ -96,6 +103,10 @@ class ResultatReattribution {
 
   final String? ancienUserId;
   final bool ancienPrevenu;
+
+  /// Vrai quand la réponse dit que la notification de l'entrant est en file.
+  /// Faux par défaut : une réponse qui ne le dit pas ne le prouve pas.
+  final bool entrantEnFile;
 
   /// Vrai quand le planning est repassé de « validé » à « publié » : une
   /// acceptation vient de disparaître, et l'écran doit cesser de dire
@@ -469,6 +480,7 @@ class SupabasePlanningRepository implements PlanningRepository {
             : null,
         ancienPrevenu: ancienne is Map<String, dynamic> &&
             (ancienne['notified'] as bool?) == true,
+        entrantEnFile: (corps['notified'] as bool?) == true,
         planningPublie: planning is Map<String, dynamic> &&
             planning['status'] == 'published',
       );

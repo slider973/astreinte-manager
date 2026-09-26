@@ -18,6 +18,61 @@ import 'package:flutter_test/flutter_test.dart';
 /// l'écrire, et seulement quand tous les courriels sont sortis.
 final RegExp _promesseDEnvoi = RegExp('envoyée', caseSensitive: false);
 
+/// **Le fait affirmé au passé composé** : « est prévenu », « a été notifié »,
+/// « sont envoyés », et leurs accords. Ajouté au ticket 055, où l'écran des
+/// propositions disait « Ton chef de centre est prévenu » alors que la base
+/// n'avait rien mis en file, et la réattribution « `<membre>` est prévenu »
+/// alors qu'elle ne le prouvait que pour le sortant.
+///
+/// Ce que le motif laisse passer, parce que c'est ce que le serveur soutient :
+///
+/// - **le futur** — « sera prévenu », « seront prévenus » : une demande **en
+///   file**, écrite dans la transaction du geste, n'est pas une notification
+///   livrée, et le futur dit exactement cela ;
+/// - **la négation** — « n'est pas prévenu », « Personne n'a été prévenu » :
+///   l'auxiliaire précédé de « n' », ou suivi de « pas » ou « jamais », ne
+///   promet rien. C'est le constat le plus honnête qu'un écran puisse faire.
+///
+/// L'auxiliaire est exigé : « Courriel envoyé le 3 octobre » est une date
+/// relue en base (`email_sent_at`, ticket 048), pas une promesse.
+final RegExp _faitAffirme = RegExp(
+  // `\b` ne connaît que l'ASCII : devant « été » ou « êtes », il ne verrait
+  // pas de frontière. D'où `(?<!\p{L})`, la frontière de mot en français.
+  r"(?<![nN]['’])(?<!\p{L})(?:est|es|sont|suis|sommes|êtes"
+  r'|a été|as été|ont été|avons été|avez été|ai été)'
+  r'\s+(?:bien\s+|déjà\s+|aussi\s+)?'
+  r'(?:prévenu|notifié|envoyé)(?:e|s|es)?(?!\p{L})',
+  caseSensitive: false,
+  unicode: true,
+);
+
+/// **Le compte rendu elliptique d'un envoi** : « Nouveau code envoyé. »,
+/// « Chef prévenu. » — le participe seul, en fin de proposition, qu'aucun
+/// auxiliaire, futur ou négation ne précède. C'était la phrase de
+/// `codeRenvoye` avant le ticket 055 : aucun signal ne dit au client que le
+/// courriel est sorti. Les formes à auxiliaire sont l'affaire de
+/// [_faitAffirme].
+final RegExp _envoiElliptique = RegExp(
+  r'(?<!(?:été|est|es|sont|suis|sera|seras|seront|serez|pas|jamais|plus)\s)'
+  r'(?<!\p{L})(?:prévenu|notifié|envoyé)(?:e|s|es)?\s*[.!]\s*$',
+  caseSensitive: false,
+  unicode: true,
+);
+
+/// Vrai si [phrase] affirme qu'un envoi a eu lieu. Les trois motifs
+/// ci-dessus, et rien d'autre.
+bool promesseDEnvoi(String phrase) =>
+    _promesseDEnvoi.hasMatch(phrase) ||
+    _faitAffirme.hasMatch(phrase) ||
+    _propositions(phrase).any(_envoiElliptique.hasMatch);
+
+/// Une phrase par proposition : « Personne n'a été prévenu. Chef prévenu. »
+/// se juge en deux fois, pour que la négation de la première ne couvre pas la
+/// seconde.
+Iterable<String> _propositions(String phrase) => phrase
+    .split(RegExp(r'(?<=[.!?])\s+'))
+    .where((String p) => p.trim().isNotEmpty);
+
 /// Refuse à l'écran affiché la moindre promesse d'envoi.
 ///
 /// C'est l'assertion qui manquait à la revue du ticket 048 : vérifier que la
@@ -34,6 +89,13 @@ final RegExp _promesseDEnvoi = RegExp('envoyée', caseSensitive: false);
 /// n'avait pas été branché au 048, et il a porté la phrase corrigée ailleurs
 /// un ticket de plus : un garde-fou ne garde que les écrans qui l'appellent.
 ///
+/// Depuis le ticket 055, elle vaut aussi pour **l'écran des propositions**
+/// (le refus, `test/features/boite/reponse_propositions_test.dart`), **la
+/// réattribution et l'annulation** du suivi
+/// (`test/features/planning/reattribution_test.dart`) et **le code de
+/// connexion** (`test/features/auth/code_screen_test.dart`), avec les motifs
+/// [_faitAffirme] et [_envoiElliptique] en plus de « envoyée ».
+///
 /// **Ce que « rendent » veut dire.** Les [Text] affichés, et aussi les
 /// étiquettes de [Semantics] : le compte rendu pose ses lignes en
 /// `Semantics(label:, value:, excludeSemantics: true)`, si bien que ces
@@ -45,7 +107,7 @@ void aucunEnvoiPromis(WidgetTester tester) {
     tester,
   ).followedBy(_phrasesPrononcees(tester))) {
     expect(
-      _promesseDEnvoi.hasMatch(phrase),
+      promesseDEnvoi(phrase),
       isFalse,
       reason: '« $phrase » promet un envoi qui n\'a pas eu lieu.',
     );

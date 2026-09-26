@@ -297,11 +297,21 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
   void _recevoir(NouvellePropositions nouvelle) {
     switch (nouvelle) {
       case ReponseEnvoyee(:final proposition, :final accepte):
-        _annoncer(
-          accepte
-              ? AppStrings.propositionsAcceptee(_libelle(proposition))
-              : AppStrings.propositionsRefusee(_libelle(proposition)),
-        );
+        // **Le refus ne promet que ce que la base garantit** (ticket 055) :
+        // la ligne touchée prouve que `assignment_declined` est en file pour
+        // les administrateurs — sauf pour celui qui refuse, qui n'est pas
+        // prévenu de lui-même et peut être seul à administrer. À lui, rien
+        // n'est promis.
+        final admin = ref.read(appartenanceCouranteProvider)?.estAdmin ?? false;
+        _annoncer(switch ((accepte, admin)) {
+          (true, _) => AppStrings.propositionsAcceptee(_libelle(proposition)),
+          (false, false) => AppStrings.propositionsRefusee(
+            _libelle(proposition),
+          ),
+          (false, true) => AppStrings.propositionsRefuseeParAdmin(
+            _libelle(proposition),
+          ),
+        });
       case PropositionDisparue() || ReponseEchouee() || PlanningValide():
         setState(() => _bandeau = nouvelle);
     }
