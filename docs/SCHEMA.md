@@ -441,6 +441,12 @@ create index on push_tokens (user_id);
 
 Un token invalide renvoyé par FCM est supprimé par l'Edge Function d'envoi.
 
+**Un jeton identifie un appareil, pas un compte.** Les clients ne l'écrivent jamais par la
+table : ils l'enregistrent par `register_push_token` (§ 3, migration `0037`), qui le fait passer
+au compte de la session s'il était encore au nom d'un autre — le téléphone de caserne prêté,
+dont la personne précédente s'est déconnectée hors ligne. Ils le suppriment par la table
+(`push_tokens_delete_self`) à la déconnexion, **avant** de fermer la session *(ticket 057)*.
+
 ### 2.12 `notifications` — journal et centre de notifications
 
 ```sql
@@ -1188,6 +1194,31 @@ Function `ics-feed` est le seul chemin.
 dit « suspendu : lecture seule pour tous », et un flux calendrier est une lecture. Vider
 le flux d'une caserne suspendue ferait croire à des gardes annulées.
 
+### Jetons push (migration `0037`, ticket 057)
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `register_push_token` | `(p_token text, p_platform push_platform, p_device_label text default null) returns void` `security definer`, `search_path` figé, **ouverte à `authenticated` seulement** | Supprime toute ligne portant ce `token` qui appartient à un autre compte, puis insère ou met à jour celle de **l'utilisateur de la session** (`platform`, `device_label` nettoyé — vide devient `null` —, `last_seen_at = now()`). Refuse en `42501` sans session, en `22023` sur un jeton vide. Ne rend rien : ni la ligne de l'autre, ni qu'elle existait |
+
+**Le défaut corrigé.** À la déconnexion, la PWA et l'app iOS suppriment la ligne de l'appareil
+avant de fermer la session. Hors ligne, rien n'est supprimé : la ligne reste au nom du compte
+sorti. Le compte suivant se connecte sur le même téléphone, FCM lui rend **le même jeton**, et son
+`upsert` direct sur la colonne `unique` est refusé par la RLS — `push_tokens_update_self` ne laisse
+pas modifier la ligne d'un autre, `push_tokens_insert_self` ne peut pas en créer une seconde. Les
+push du compte sorti continuaient d'arriver sur l'appareil, et le compte qui le tient n'en recevait
+aucun.
+
+**Pourquoi la réattribution est légitime.** Un jeton FCM identifie l'appareil : FCM ne le remet
+qu'à l'application installée dessus. **Le posséder prouve qu'on tient l'appareil**, et un push va
+là où est l'appareil — le compte qui le tient est le seul à qui ses push doivent arriver. Retirer
+la ligne de l'ancien propriétaire ne lui retire rien qu'il puisse encore recevoir : ses autres
+appareils ont leurs propres jetons, et la fonction ne touche qu'au jeton passé.
+
+**Pas de `user_id` en paramètre** : c'est `auth.uid()` qui dit à qui va la ligne, jamais l'appelant.
+**La RLS de `push_tokens` n'est pas élargie** : un `upsert` direct sur la ligne d'un autre reste
+refusé, et la fonction est le seul chemin d'enregistrement des clients. `anon` et `authenticated`
+sont révoqués nommément avant le `grant` (même verrou que `0036`).
+
 ## 4. Row Level Security
 
 RLS activé sur toutes les tables. Principes :
@@ -1210,7 +1241,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `schedules` | membre si `status <> 'draft'` ; admin toujours | admin, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0019`), et sauf les transitions de statut interdites par `docs/WORKFLOWS.md § 2`, que `schedules_guard_transition` refuse à tout le monde |
 | `shifts` | membre si le schedule est publié, validé **ou archivé** (migration `0031`) ; admin toujours | admin, **sauf le `delete`, réservé aux créneaux d'un planning encore `draft`** (migration `0019`) : supprimer un créneau publié effacerait ses attributions par cascade. **`insert` et `update` refusés sur un planning `archived`** (migration `0031`) |
 | `assignments` | membre : les siennes si schedule publié, validé **ou archivé** ; tous les membres si validé ; **si archivé, les `accepted` de tous les membres et celles-là seulement** (migration `0031`) ; admin toutes | membre : `status` uniquement, de `proposed` vers `accepted` ou `declined`, sur les siennes, planning publié ou validé ; admin : tout, **sauf le `delete`, réservé aux plannings encore `draft`** (migration `0018`) et **sauf `insert` et `update` sur un planning `archived`** (migration `0031`) |
-| `push_tokens` | soi-même | soi-même |
+| `push_tokens` | soi-même | soi-même. L'enregistrement des clients passe par `register_push_token` (`0037`), qui seul peut retirer à un autre compte le jeton d'un appareil qu'on tient ; la RLS n'est pas élargie |
 | `notifications` | soi-même | soi-même (`read_at` uniquement, imposé par un grant de colonne : `revoke update on notifications from authenticated` puis `grant update (read_at)`) ; insert par service role |
 | `subscriptions` | admin de la caserne | service role uniquement (webhook Stripe) |
 | `invitation_rate_events` | admin de la caserne *(migration `0032`)* : il subit le refus, il doit pouvoir en voir la cause | personne — `insert`, `update` et `delete` retirés d'`anon` et d'`authenticated`. La seule main qui écrit est `create_invitation`, en `security definer` |
@@ -1852,6 +1883,9 @@ Ordre proposé :
     `authenticated`, et `accept_invitation_by_id()`, réservée à `service_role`. **Aucune
     politique RLS touchée**, aucune colonne ajoutée : l'invité lit par une fonction, jamais
     par la table)
+37. `0037_enregistrement_jeton_push.sql` (ticket 057 : `register_push_token()`, ouverte à
+    `authenticated` seulement. **Aucune politique RLS touchée** : l'upsert direct sur la ligne
+    d'un autre reste refusé, le jeton ne change de main que par la fonction)
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
@@ -1892,7 +1926,8 @@ et `0022` par `supabase/tests/notifications_test.sql`, les rappels de saisie de 
 par `supabase/tests/heure_locale_notifications_test.sql` et le nom porté par l'invitation de `0034`
 par `supabase/tests/import_membres_test.sql`, la trace d'envoi de `0035` par
 `supabase/tests/trace_envoi_invitation_test.sql` et les invitations en attente vues par
-l'invité de `0036` par `supabase/tests/invitations_en_attente_test.sql`, joués par le même
+l'invité de `0036` par `supabase/tests/invitations_en_attente_test.sql`, et l'enregistrement du
+jeton push de `0037` par `supabase/tests/enregistrement_jeton_push_test.sql`, joués par le même
 script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
