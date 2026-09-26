@@ -406,11 +406,19 @@ else
     ecart "Inscription libre : je n'ai pas pu conclure, l'API rend disable_signup nul pour $ref."
     portes_en_ecart=1
   elif [ "$inscription_fermee" != "true" ]; then
-    if [ "$confirmation_auto" = "true" ]; then
-      aggravant=" Et la confirmation d'adresse est automatique (mailer_autoconfirm) : un inconnu peut dès maintenant ouvrir un compte « confirmé » à l'adresse d'un pompier invité, voir son invitation et l'accepter."
-    else
-      aggravant=" La confirmation d'adresse reste exigée : c'est désormais la seule serrure."
-    fi
+    # Trois issues pour la seconde serrure, et seule `false` permet de dire
+    # qu'elle tient : un champ absent ou nul n'est pas une confirmation exigée.
+    case "$confirmation_auto" in
+      true)
+        aggravant=" Et la confirmation d'adresse est automatique (mailer_autoconfirm) : un inconnu peut dès maintenant ouvrir un compte « confirmé » à l'adresse d'un pompier invité, voir son invitation et l'accepter."
+        ;;
+      false)
+        aggravant=" La confirmation d'adresse reste exigée : c'est désormais la seule serrure."
+        ;;
+      *)
+        aggravant=" Sur la confirmation d'adresse, je n'ai pas pu conclure (mailer_autoconfirm = $confirmation_auto) : rien ne dit qu'une seconde serrure tient encore."
+        ;;
+    esac
     ecart "Inscription libre activée en production (disable_signup = $inscription_fermee) : n'importe qui peut créer un compte à n'importe quelle adresse, et les invitations en attente se lisent sur la foi d'une adresse confirmée (migration 0038).$aggravant Rattrapage : SUPABASE_AUTH_SMTP_PASSWORD=… supabase config push --project-ref $ref (auth.enable_signup = false)."
     portes_en_ecart=1
   fi

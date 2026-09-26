@@ -197,9 +197,11 @@ select tests_conf.check(
 
 -- Un `sub` qui ne désigne aucun compte, avec l'adresse invitée dans le jeton :
 -- rien non plus. L'adresse du jeton ne suffit jamais seule.
-select set_config('request.jwt.claims',
-  '{"sub":"cccccccc-0000-4000-8000-0000000005ff","role":"authenticated","email":"recrue58a@caserne-a.test","email_verified":true}',
-  true);
+-- `tests_conf.session` ne trouve aucun compte : seules les revendications
+-- passées en `p_extra` portent l'adresse. Elle rend `void`, donc rien ne
+-- s'affiche du jeton dans la sortie.
+select tests_conf.session('cccccccc-0000-4000-8000-0000000005ff',
+  '{"email": "recrue58a@caserne-a.test", "email_verified": true}'::jsonb);
 select tests_conf.check(
   (select count(*) from my_pending_invitations()) = 0,
   'un sub sans compte, même porteur d''une adresse invitée : zéro ligne');
