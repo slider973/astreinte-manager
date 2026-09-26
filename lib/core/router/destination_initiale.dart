@@ -42,6 +42,12 @@ class DestinationInitiale {
 
   String? _gardee;
 
+  /// La destination encore gardée, ou `null`, **sans la regarder** : la lire
+  /// ne programme aucun oubli, contrairement à [reprendre]. Le routeur s'en
+  /// sert pour savoir s'il doit attendre le droit de l'éditeur avant de la
+  /// condamner (ticket 056).
+  String? get gardee => _gardee;
+
   /// Vrai quand la passe courante est déjà passée par la destination : elle a
   /// fait son office, et la rejouer une fois de plus dans la **même** chaîne de
   /// redirection tournerait en rond.

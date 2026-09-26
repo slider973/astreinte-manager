@@ -495,6 +495,46 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         }
       }
 
+      // **Un compte sans caserne a une seule destination légitime** : l'écran
+      // de l'éditeur (ticket 056). Sans cette branche, `/superadmin` ouvert à
+      // froid par l'éditeur — le cas nominal du ticket 031 — finissait sur
+      // « Aucune caserne », et la destination restait gardée sans jamais être
+      // regardée, prête à ressortir le jour où le compte serait rattaché.
+      if (etat == EtatAuth.sansCaserne) {
+        final gardee = destinationInitiale.gardee;
+        final versLEditeur =
+            gardee != null && sousSuperAdmin(Uri.parse(gardee).path);
+        // Le droit se lit là où la garde de `/superadmin` le lit, jamais dans
+        // un cache : la base est la seule autorité.
+        //
+        // **Un recalcul en cours compte comme inconnu.** Avant la session, le
+        // provider rend `false` sans aller au serveur ; quand la session
+        // arrive, il repart, et Riverpod garde ce `false` lisible pendant
+        // l'appel. Trancher dessus refuserait l'éditeur sur la réponse faite à
+        // personne.
+        final droit = ref.read(estSuperAdminProvider);
+        final droitInconnu =
+            droit.isLoading || (!droit.hasValue && !droit.hasError);
+
+        // Tant que la base n'a pas répondu, on ne regarde pas la destination :
+        // la regarder la condamnerait, et l'arrivée du droit — que le routeur
+        // écoute — relancera cette passe. Toute autre destination n'a pas à
+        // attendre : elle est refusée quelle que soit la réponse.
+        if (!(versLEditeur && droitInconnu)) {
+          // Regarder **consomme**, que la destination soit rejouée ou non.
+          final reprise = destinationInitiale.reprendre(state.uri.toString());
+          // Une invitation en cours garde la main : elle a sa propre mémoire,
+          // et c'est elle que la garde vient de choisir.
+          if (reprise != null &&
+              jeton == null &&
+              sousSuperAdmin(Uri.parse(reprise).path) &&
+              droit.value == true &&
+              garde(Uri.parse(reprise).path) == null) {
+            return reprise;
+          }
+        }
+      }
+
       // **La destination est acceptée : ses données partent maintenant.**
       //
       // Cette fonction s'exécute dans la tâche du geste, avant l'image de la

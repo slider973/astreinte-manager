@@ -252,6 +252,11 @@ Un lien inconnu, mal formé, ou visant un écran que ce compte n'a pas le droit 
 l'accueil **sans message d'erreur** : le membre n'a rien fait de mal, et le lien peut dater d'avant
 une rétrogradation.
 
+Ouverte à froid par un compte **sans caserne**, une adresse n'est rejouée que si c'est
+`/superadmin` et que la base confirme le droit de l'éditeur ; toute autre retombe sur « Aucune
+caserne ». Dans les deux cas l'adresse est oubliée, pour qu'elle ne ressorte pas le jour où le
+compte est rattaché à une caserne *(ticket 056)*.
+
 **Dans l'app iOS native** (Foco, `foco/`, ticket 066d), les mêmes liens publics ouvrent l'écran
 natif. La traduction vit à un seul endroit, `PushDestination.from`
 (`foco/Foco/Core/Notifications/PushDestination.swift`), recopie de `destinationInterne` ; elle sert
