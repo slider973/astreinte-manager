@@ -126,7 +126,6 @@ class JetonPushController extends Notifier<String?> {
 
     try {
       await depot.enregistrer(
-        userId: session.userId,
         token: jeton,
         plateforme: PlateformePush.web,
         libelleAppareil: ref.read(contextePlateformeProvider).libelleAppareil,
@@ -144,6 +143,45 @@ class JetonPushController extends Notifier<String?> {
       // en faire et rien à corriger. La prochaine ouverture réessaiera.
       if (kDebugMode) debugPrint('Jeton non enregistré : $erreur');
     }
+  }
+
+  /// Le temps laissé à la base pour supprimer la ligne à la déconnexion.
+  ///
+  /// Le réseau d'une remise ou d'un véhicule ne refuse pas toujours : il se
+  /// tait. Sans limite, « Se déconnecter » attendrait une réponse qui ne
+  /// vient pas, sur le téléphone même qu'on veut rendre.
+  static const Duration delaiDesenregistrement = Duration(seconds: 5);
+
+  /// **À la déconnexion** : la ligne de `push_tokens` part côté serveur, puis
+  /// la mémoire du jeton (`notifications.jeton.appareil`) part de l'appareil.
+  ///
+  /// Dans cet ordre, et **avant** la fermeture de session : après, la RLS
+  /// (`push_tokens_delete_self`) ne laisse plus supprimer la ligne, et sans la
+  /// mémoire on ne saurait plus quel jeton viser. N'est appelée que par
+  /// `OubliLocal` (`core/session/oubli_local.dart`), le seul endroit où
+  /// s'écrit la règle des caches locaux.
+  ///
+  /// Une suppression qui échoue — hors ligne, le cas du téléphone prêté — ne
+  /// retient ni la clé locale ni la déconnexion : la ligne reste au nom du
+  /// compte sorti, et c'est `register_push_token` qui la fera passer au compte
+  /// suivant dès qu'il enregistrera le même jeton (`docs/WORKFLOWS.md § 8`).
+  Future<void> desenregistrer() async {
+    final local = ref.read(jetonLocalProvider);
+    final jeton = await local.lire() ?? state;
+
+    if (jeton != null) {
+      try {
+        await ref
+            .read(pushTokensRepositoryProvider)
+            .oublier(jeton)
+            .timeout(delaiDesenregistrement);
+      } on Object catch (erreur) {
+        if (kDebugMode) debugPrint('Jeton non désenregistré : $erreur');
+      }
+    }
+
+    await local.effacer();
+    state = null;
   }
 }
 
