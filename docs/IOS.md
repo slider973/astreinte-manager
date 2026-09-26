@@ -214,7 +214,7 @@ L'app relit à l'ouverture de chaque écran et au retour au premier plan (`scene
   **cloche** est la Boîte : tant que les notifications n'ont pas d'écran (066d), elle mène aux
   propositions et porte **leur nombre écrit** (plus un point de couleur).
 
-**CI** : PR [slider973/Foco#5](https://github.com/slider973/Foco/pull/5), courses vertes sur la PR ([36214822569](https://github.com/slider973/Foco/actions/runs/36214822569), [36215323242](https://github.com/slider973/Foco/actions/runs/36215323242), 143 tests), fusionnée en squash ; course verte sur `main` du fork ([36215903852](https://github.com/slider973/Foco/actions/runs/36215903852)) au commit `7ec81e5`, visé par le pointeur `foco/`.
+**CI** : PR [slider973/Foco#5](https://github.com/slider973/Foco/pull/5), courses vertes sur la PR ([36214822569](https://github.com/slider973/Foco/actions/runs/36214822569), [36215323242](https://github.com/slider973/Foco/actions/runs/36215323242), 143 tests), fusionnée en squash ; course verte sur `main` du fork ([36215903852](https://github.com/slider973/Foco/actions/runs/36215903852)) au commit `7ec81e5`. Revue : PR [slider973/Foco#6](https://github.com/slider973/Foco/pull/6), course verte ([36217029919](https://github.com/slider973/Foco/actions/runs/36217029919), 146 tests, aucun avertissement Swift), fusionnée en squash ; course verte sur `main` du fork ([36217571649](https://github.com/slider973/Foco/actions/runs/36217571649), 146 tests, 0 avertissement) au commit `573f5e0`, visé par le pointeur `foco/`.
 
 **Vérifié contre le Supabase local** (26 septembre 2026, `membre1@caserne-a.test`, code lu dans
 Mailpit ; données posées puis retirées, seed remis dans son état d'origine) :
@@ -261,7 +261,10 @@ Mailpit ; données posées puis retirées, seed remis dans son état d'origine) 
   « Régénérer le lien » : seul l'abonnement, ouvert en `webcal://` ou copié.
 - **Écran « Équipe »** : la PWA n'en a pas côté membre ; l'app y liste les noms que rend la
   requête de `_noms` (sans filtre de statut, comme elle), sans rôle pour les collègues (aucune
-  colonne lue ne le porte). Un membre désactivé peut y paraître.
+  colonne lue ne le porte). Seuls les membres actifs y paraissent pour un membre : la politique
+  `profiles_select_self_or_same_station` n'ouvre le profil d'un collègue que si son appartenance
+  est active, et `profiles!inner` écarte les lignes dont le profil est illisible (vérifié sur la
+  politique en base). Un admin, lui, lit aussi les profils des désactivés.
 - **Relectures** : une acceptation relit « Mes astreintes », et la dernière d'un planning la
   liste des mois — les mêmes requêtes que la PWA à l'ouverture de ces écrans, jouées tout de suite
   pour que l'accueil ne mente pas.
@@ -272,8 +275,8 @@ Mailpit ; données posées puis retirées, seed remis dans son état d'origine) 
   d'un jour passé.
 - **Mode démo** : la validation automatique d'un planning y est simplifiée (plus rien de proposé
   dans le mois).
-- **« VOUS »** : le badge de Foco sur une ligne reste « VOUS », là où la légende, la PWA et les
-  lignes d'équipe disent « Toi » (visible sur la capture du planning). À harmoniser au 066d.
+- **Tutoiement** : les badges disent « TOI » (`FocoStrings.you`) depuis la revue du 066c, comme
+  la légende et la PWA ; les chaînes de l'accueil et de l'équipe vivent dans `FocoStrings`.
 
 ### Écarts relevés dans la PWA au 066c (signalés, non corrigés : `lib/` n'est pas touché)
 
@@ -389,8 +392,11 @@ La CI Flutter (`ci.yml`) et le déploiement (`deploy.yml`) ne changent pas : leu
 - **Cache local des astreintes et du planning** (066c) : la PWA les garde pour le hors-ligne ;
   l'app iOS ne les garde qu'en mémoire. S'il est ajouté, il part avec `LocalWipe`.
 - **Fichier `.ics` par astreinte et « Régénérer le lien »** (066c) : absents de l'app iOS.
-- **Équipe** (066c) : lister les seuls membres actifs demanderait `memberships.status`, que la
-  requête de `_noms` ne lit pas ; à trancher avec le propriétaire.
+- **Caserne suspendue et réponse, dans la PWA** (066c, confirmé en `curl` et figé par un test du
+  fork) : le `PATCH` d'une réponse rend `200 []` et non `42501` ; si `station_access` n'a pas pu
+  être lu, `repondre` rend `disparue` et la PWA annonce « Ce créneau ne t'est plus proposé. » au
+  lieu de la lecture seule. L'app iOS fait de même. À corriger des deux côtés (ticket
+  `supabase-dev` ou relecture de `station_access` sur zéro ligne).
 - **Deux écarts de la PWA, confirmés par la revue du 066b** (détail plus bas, `lib/` non touché) :
   `_chargerPreferences` écrit la reprise sur une caserne suspendue ; `EtatSaisie.mois` compte la
   file d'un autre mois.
