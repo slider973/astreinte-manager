@@ -23,6 +23,13 @@
 -- de l'ancien propriétaire ne lui retire rien qu'il puisse encore recevoir — ses
 -- autres appareils ont leurs propres jetons, et ne sont pas touchés.
 --
+-- Chaque reprise est **journalisée** dans `audit_log` (`push_token.reassigned`) :
+-- `actor_id` est le compte qui prend l'appareil, `data.previous_user_id` celui qui
+-- le perd, `station_id` est nul — un appareil n'appartient à aucune caserne. **Le
+-- jeton n'y est jamais écrit** : c'est un porteur de droits sur l'appareil (qui le
+-- détient peut y faire arriver des push), et ce journal est fait pour être lu.
+-- Un simple rejeu par le même compte n'écrit rien.
+--
 -- Ce que la fonction ne fait pas : rendre la ligne de l'autre, ni dire qu'elle
 -- existait (elle ne rend rien) ; toucher à un autre jeton que celui passé ;
 -- accepter un `user_id` en paramètre — c'est `auth.uid()`, jamais l'appelant, qui
@@ -41,7 +48,9 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_user  uuid := auth.uid();
+  v_user     uuid := auth.uid();
+  v_previous uuid;
+  v_id       uuid;
   v_token text := nullif(btrim(coalesce(p_token, '')), '');
   v_label text := nullif(btrim(coalesce(p_device_label, '')), '');
 begin
@@ -57,6 +66,13 @@ begin
       using errcode = '22023';
   end if;
 
+  -- Un jeton FCM fait environ 160 caractères. La borne ne sert qu'à refuser une
+  -- chaîne arbitraire qui gonflerait la table et l'index unique.
+  if length(v_token) > 4096 then
+    raise exception 'register_push_token : jeton trop long'
+      using errcode = '22023';
+  end if;
+
   if p_platform is null then
     raise exception 'register_push_token : plateforme requise'
       using errcode = '22023';
@@ -65,7 +81,8 @@ begin
   -- 1. Le jeton quitte le compte qui ne tient plus l'appareil.
   delete from push_tokens
    where token = v_token
-     and user_id <> v_user;
+     and user_id <> v_user
+  returning user_id into v_previous;
 
   -- 2. Puis il est inscrit, ou rafraîchi, au nom de la session. `user_id` est
   -- repris dans la mise à jour : si un autre appel concurrent a réinséré la
@@ -76,7 +93,15 @@ begin
      set user_id      = excluded.user_id,
          platform     = excluded.platform,
          device_label = excluded.device_label,
-         last_seen_at = excluded.last_seen_at;
+         last_seen_at = excluded.last_seen_at
+  returning id into v_id;
+
+  -- 3. La reprise se journalise, sans le jeton.
+  if v_previous is not null then
+    insert into audit_log (station_id, actor_id, action, entity, entity_id, data)
+    values (null, v_user, 'push_token.reassigned', 'push_token', v_id,
+            jsonb_build_object('previous_user_id', v_previous));
+  end if;
 end $$;
 
 comment on function register_push_token(text, push_platform, text) is

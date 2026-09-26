@@ -205,6 +205,36 @@ select tests_jpt.check(
   tests_jpt.cibles('aaaaaaaa-0000-4000-8000-000000000102') = array['jeton-T'],
   'un push destiné à B arrive sur le téléphone qu''il tient');
 
+-- Le journal : une entrée pour la reprise, sans le jeton.
+select tests_jpt.check(
+  (select count(*) from audit_log
+    where action = 'push_token.reassigned'
+      and actor_id = 'aaaaaaaa-0000-4000-8000-000000000102'
+      and station_id is null
+      and entity = 'push_token'
+      and entity_id = (select id from push_tokens where token = 'jeton-T')
+      and data = jsonb_build_object('previous_user_id', 'aaaaaaaa-0000-4000-8000-000000000101')) = 1,
+  'la reprise est journalisée : qui prend, qui perd, aucune caserne');
+
+select tests_jpt.check(
+  (select count(*) from audit_log
+    where action = 'push_token.reassigned'
+      and (data::text like '%jeton-%' or entity_id::text like '%jeton-%')) = 0,
+  'le journal ne contient aucun jeton');
+
+select tests_jpt.check(
+  (select count(*) from audit_log where action = 'push_token.reassigned') = 1,
+  'les enregistrements de A (nouveaux jetons, rejeu) n''ont rien journalisé');
+
+-- Un simple rejeu de B n'écrit rien de plus.
+set local role authenticated;
+select tests_jpt.session('aaaaaaaa-0000-4000-8000-000000000102');
+select register_push_token('jeton-T', 'web', 'Pixel 7 · Chrome');
+reset role;
+select tests_jpt.check(
+  (select count(*) from audit_log where action = 'push_token.reassigned') = 1,
+  'un rejeu par le même compte ne journalise rien');
+
 -- ===========================================================================
 -- 4. L'étanchéité : A ne voit rien de B, et la RLS tient toujours
 -- ===========================================================================
@@ -251,7 +281,7 @@ select tests_jpt.check(
 -- 5. Les refus de la fonction
 -- ===========================================================================
 \echo ''
-\echo '--- 5. Refus : anonyme, sans session, jeton vide'
+\echo '--- 5. Refus : anonyme, sans session, jeton vide ou trop long'
 
 set local role anon;
 do $$ begin perform set_config('request.jwt.claims', '{"role": "anon"}', true); end $$;
@@ -272,6 +302,21 @@ select tests_jpt.refuse(
   $sql$select register_push_token('   ', 'web', null)$sql$,
   '22023',
   'un jeton vide est refusé');
+
+select tests_jpt.refuse(
+  $sql$select register_push_token(repeat('x', 4097), 'web', null)$sql$,
+  '22023',
+  'un jeton de plus de 4096 caractères est refusé');
+
+-- La borne est incluse : 4096 caractères passent.
+select register_push_token(repeat('y', 4096), 'web', null);
+reset role;
+select tests_jpt.check(
+  (select count(*) from push_tokens where length(token) = 4096) = 1,
+  'un jeton de 4096 caractères exactement est accepté');
+delete from push_tokens where length(token) = 4096;
+set local role authenticated;
+select tests_jpt.session('aaaaaaaa-0000-4000-8000-000000000102');
 
 reset role;
 select tests_jpt.check(

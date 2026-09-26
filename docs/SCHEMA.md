@@ -1198,7 +1198,7 @@ le flux d'une caserne suspendue ferait croire à des gardes annulées.
 
 | Fonction | Signature | Rôle |
 |---|---|---|
-| `register_push_token` | `(p_token text, p_platform push_platform, p_device_label text default null) returns void` `security definer`, `search_path` figé, **ouverte à `authenticated` seulement** | Supprime toute ligne portant ce `token` qui appartient à un autre compte, puis insère ou met à jour celle de **l'utilisateur de la session** (`platform`, `device_label` nettoyé — vide devient `null` —, `last_seen_at = now()`). Refuse en `42501` sans session, en `22023` sur un jeton vide. Ne rend rien : ni la ligne de l'autre, ni qu'elle existait |
+| `register_push_token` | `(p_token text, p_platform push_platform, p_device_label text default null) returns void` `security definer`, `search_path` figé, **ouverte à `authenticated` seulement** | Supprime toute ligne portant ce `token` qui appartient à un autre compte, puis insère ou met à jour celle de **l'utilisateur de la session** (`platform`, `device_label` nettoyé — vide devient `null` —, `last_seen_at = now()`). Une reprise écrit `push_token.reassigned` dans `audit_log`. Refuse en `42501` sans session, en `22023` sur un jeton vide ou de plus de **4096 caractères**. Ne rend rien : ni la ligne de l'autre, ni qu'elle existait |
 
 **Le défaut corrigé.** À la déconnexion, la PWA et l'app iOS suppriment la ligne de l'appareil
 avant de fermer la session. Hors ligne, rien n'est supprimé : la ligne reste au nom du compte
@@ -1213,6 +1213,18 @@ qu'à l'application installée dessus. **Le posséder prouve qu'on tient l'appar
 là où est l'appareil — le compte qui le tient est le seul à qui ses push doivent arriver. Retirer
 la ligne de l'ancien propriétaire ne lui retire rien qu'il puisse encore recevoir : ses autres
 appareils ont leurs propres jetons, et la fonction ne touche qu'au jeton passé.
+
+**Chaque reprise est journalisée** dans `audit_log` : `action = 'push_token.reassigned'`,
+`entity = 'push_token'`, `entity_id` la nouvelle ligne, `actor_id` le compte qui prend l'appareil,
+`data = {"previous_user_id": …}` celui qui le perd, `station_id` **nul** — un appareil n'appartient
+à aucune caserne, et `audit_log_select_admin` (`is_admin(station_id)`) ne l'ouvre donc à aucun
+administrateur. **Le jeton n'y est jamais écrit** : c'est un porteur de droits sur l'appareil (qui
+le détient peut y faire arriver des push), et un journal est fait pour être lu. Un simple rejeu par
+le même compte n'écrit rien.
+
+**Borne de longueur** : un jeton FCM fait environ 160 caractères ; au-delà de 4096, l'appel est
+refusé en `22023`, comme un jeton vide. Elle n'existe que pour refuser une chaîne arbitraire qui
+gonflerait la table et son index unique.
 
 **Pas de `user_id` en paramètre** : c'est `auth.uid()` qui dit à qui va la ligne, jamais l'appelant.
 **La RLS de `push_tokens` n'est pas élargie** : un `upsert` direct sur la ligne d'un autre reste
@@ -1884,7 +1896,8 @@ Ordre proposé :
     politique RLS touchée**, aucune colonne ajoutée : l'invité lit par une fonction, jamais
     par la table)
 37. `0037_enregistrement_jeton_push.sql` (ticket 057 : `register_push_token()`, ouverte à
-    `authenticated` seulement. **Aucune politique RLS touchée** : l'upsert direct sur la ligne
+    `authenticated` seulement, reprise journalisée dans `audit_log` sans le jeton, jeton borné à
+    4096 caractères. **Aucune politique RLS touchée** : l'upsert direct sur la ligne
     d'un autre reste refusé, le jeton ne change de main que par la fonction)
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
