@@ -80,7 +80,7 @@ résout `supabase-swift`.
 | Caserne | lue de `memberships` : aucune → « Aucune caserne » (ou « Accès désactivé ») ; une → l'accueil ; plusieurs → choix après connexion, changeable dans les réglages |
 | Admin | parcours pompier, plus « Gérer la caserne » qui ouvre la PWA dans Safari |
 | Données | protocole `FocoBackend` : `SupabaseBackend` ou `DemoBackend` ; l'`AppStore` ne sait pas lequel |
-| Parcours à venir | propositions, astreintes, planning, accueil (066c), notifications (066d) : écran « Bientôt dans l'app » avec un lien vers la PWA, jamais de données de démo mélangées aux vraies. Les disponibilités sont branchées depuis 066b |
+| Parcours à venir | notifications (066d) : écran « Bientôt dans l'app » avec un lien vers la PWA, jamais de données de démo mélangées aux vraies. Les disponibilités sont branchées depuis 066b ; propositions, astreintes, planning et accueil depuis 066c |
 | Extras | échanges, contrôles, discussion : derrière `FOCO_EXTRAS`, désactivé ; aucune table inventée |
 
 **Contrat** (`foco/Foco/Core/Backend/SupabaseRows.swift`) : exactement les requêtes de la PWA.
@@ -135,12 +135,153 @@ que la PWA appelle aussi sur cet écran.
 - File gardée sur l'appareil (`PendingQueueMemory`, `UserDefaults`), comme `file_locale.dart` :
   elle repart au lancement suivant et part à la déconnexion avec le domaine (§ 5).
 
-**CI** : PR [slider973/Foco#3](https://github.com/slider973/Foco/pull/3), course verte sur `main` du fork au commit `ad79bf7` ; revue : PR [slider973/Foco#4](https://github.com/slider973/Foco/pull/4), course verte sur `main` au commit `4963c4d`, visé par le pointeur `foco/`.
+**CI** : PR [slider973/Foco#3](https://github.com/slider973/Foco/pull/3), course verte sur `main` du fork au commit `ad79bf7` ; revue : PR [slider973/Foco#4](https://github.com/slider973/Foco/pull/4), course verte sur `main` au commit `4963c4d` (pointeur du 066b).
 
 **Vérifié contre le Supabase local** (26 septembre 2026, `membre1@caserne-a.test`, code lu dans
 Mailpit) : chaque requête ci-dessus rejouée en `curl`, l'écriture relue par la requête de la PWA
 et en base (`set_by` = le membre, posé par `availabilities_trace_auteur`) ; `upsert` sur octobre
 verrouillé → `403` `42501` ; `delete` sur octobre → `200 []`, d'où le comptage des lignes.
+
+## 4 ter. Ce que fait le chantier 066c — propositions, mes astreintes, planning, accueil
+
+Les écrans « Propositions », « Mes astreintes », « Planning de la caserne », « Aujourd'hui »,
+« Équipe », le détail d'une journée et l'accueil lisent la base. Le contrôleur est
+`foco/Foco/Core/Planning/PlanningJourney.swift`, recopie de `PropositionsController`,
+`AstreintesController`, du planning de la caserne et de `CalendrierController` ; les valeurs sont
+dans `PlanningModels.swift`, le contrat dans `foco/Foco/Core/Backend/PlanningContract.swift`.
+L'`AppStore` **recompose** ses créneaux, plannings, attributions et son équipe à partir de ces
+lectures (`rebuildPlanning`) : ce que la RLS ne laisse pas lire n'y entre pas. Le mode démo passe
+par les mêmes règles (`DemoBackend` imite la RLS : brouillon invisible, publié = ses lignes).
+
+**Contrat** — exactement les requêtes de `lib/features/propositions/data/`,
+`lib/features/astreintes/data/` et `lib/features/profil/data/calendrier_repository.dart` ; aucune
+colonne hors de `docs/SCHEMA.md`, aucune fonction RPC en dehors de `my_ics_token`.
+
+| Appel Swift | Requête | Côté PWA |
+|---|---|---|
+| `fetchProposals` | `GET assignments?select=id, status, proposed_at, reminder_count, last_reminder_at, shifts!inner(id, date, slot, schedule_id, schedules!inner(id, status))&user_id=eq&station_id=eq&status=eq.proposed&proposed_at=not.is.null` | `lister` ; un mois archivé est écarté (`repondable`) |
+| `respond` | `PATCH assignments?id=eq.<a>&status=eq.proposed&select=id`, corps `{status}` ou `{status, decline_reason}` | `repondre` ; 0 ligne = « plus proposée » |
+| `fetchScheduleStatus` | `GET schedules?select=status&id=eq.<p>` | `etatPlanning`, après la dernière acceptation |
+| `fetchDuties` | `GET stations?select=id, name, timezone, settings&id=eq` ; `GET assignments?select=id, shift_id, status, shifts!inner(…)&user_id=eq&station_id=eq&status=eq.accepted&shifts.date=gte.<un an>` ; si validé ou archivé : `GET assignments?select=shift_id, user_id, status&station_id=eq&status=eq.accepted&shift_id=in.(…)` puis `GET memberships?select=user_id, display_name, profiles!inner(first_name, last_name)&station_id=eq` | `lire`, `_equipiers` |
+| `fetchPlanningMonths` | `GET schedules?select=id, status, periods!inner(year, month)&station_id=eq&status=in.(published,validated,archived)` | `moisLisibles` |
+| `fetchPlanningMonth` | `GET shifts?select=id, date, slot, required_count&schedule_id=eq` ; `GET assignments?select=id, user_id, shift_id, shifts!inner(schedule_id)&station_id=eq&status=eq.accepted&shifts.schedule_id=eq` ; les noms si quelqu'un d'autre ; `stations` | `lireMois` |
+| `fetchMemberNames` | `GET memberships?select=user_id, display_name, profiles!inner(first_name, last_name)&station_id=eq` | `_noms` (écran « Équipe ») |
+| `fetchCalendarToken` | `POST rpc/my_ics_token` (aucun paramètre) | `lireJeton` |
+
+**Temps réel : aucun**, comme la PWA côté membre (`lib/features/propositions/README.md`,
+`lib/features/boite/README.md` : seuls la matrice et le suivi de l'admin ouvrent un canal).
+L'app relit à l'ouverture de chaque écran et au retour au premier plan (`scenePhase`).
+
+**Règles, comme la PWA**
+
+- **Réponse optimiste** : la ligne part tout de suite ; un échec réseau la remet **à sa place
+  exacte** avec « Ta réponse n'est pas partie. » et la phrase de la PWA ; un refus de la base
+  (`42501`, `station_suspended`) passe l'écran en lecture seule (« Caserne suspendue : les
+  réponses sont bloquées… ») ; zéro ligne touchée dit « Ce créneau ne t'est plus proposé. »
+  (reprise ou réattribution, `docs/WORKFLOWS.md § 3`). La dernière acceptation d'un planning
+  relit `schedules.status` et annonce « Planning d'octobre validé : tout le monde peut le voir
+  maintenant. ». Une seconde touche ne renvoie rien.
+- **Refus avec motif** : une feuille, deux touches ; titre « Refuser samedi 10 octobre, jour »,
+  « Un refus ne se reprend pas… », motif facultatif de 120 caractères, « Refuser le créneau »,
+  « Garder le créneau ». Le motif est coupé des blancs ; vide, il n'est pas écrit (pas même `null`).
+- **Délai de réponse** : « Sans réponse sous 24 h, un rappel est envoyé. » tire le nombre de
+  `response_reminder_hours` ; tant que la caserne n'est pas lue, la phrase se tait.
+- **Caserne suspendue** : `station_access`, déjà lu par la saisie (066b), grise les boutons avant
+  le premier geste, avec la raison écrite.
+- **Mes astreintes** : un an d'historique, à venir par mois, **passées repliées** (« Astreintes
+  passées (n) »), frontière au jour ; équipiers nommés seulement sur un planning validé ou
+  archivé, sinon « Autres noms à la validation du planning ». Une relecture ratée garde l'écran
+  et dit « Ces astreintes n'ont pas pu être actualisées. ».
+- **Heures** : celles de la caserne (`day_start`, `day_end`), 07:00 – 19:00 par défaut ; plus
+  aucun 06–18 écrit en dur.
+- **Lien d'abonnement** : « S'abonner dans Calendrier » ouvre `webcal://<hôte>/functions/v1/
+  ics-feed/<jeton>.ics` (le lien `https` de la PWA, schéma changé) ; « Copier le lien » ;
+  l'avertissement et le délai de la PWA. Dans « Mes astreintes », les réglages et le menu de
+  l'accueil. L'export `.ics` local de Foco est retiré.
+- **Planning de la caserne** : le mois d'ouverture de la PWA (courant, sinon le premier à venir,
+  sinon le plus récent) ; un mois se lit quand on l'atteint ; **brouillon invisible**, publié =
+  ses seuls créneaux avec « Planning publié, pas encore validé » et sa phrase, validé ou archivé =
+  toute la caserne. Vues mois, semaine et 3 jours gardées ; chaque état a son glyphe et son mot
+  (coche « Toi », point d'interrogation « Proposée », point d'exclamation « Non pourvu »,
+  soleil / lune), la couleur vient en plus ; flèches et boutons de 44 pt.
+- **Accueil** : la carte « Astreinte » dit « Un instant » tant que les astreintes ne sont pas lues,
+  « Ça n'a pas marché » si la lecture échoue, puis la prochaine astreinte réelle ou « Repos » ;
+  « À traiter » ne compte les propositions qu'une fois lues ; la carte « Aujourd'hui »
+  n'apparaît qu'une fois le jour lu, et dit ce que la base permet d'affirmer (« Aucun planning
+  publié ce mois-ci », « Tu n'as pas d'astreinte aujourd'hui », « Aucun créneau aujourd'hui ») ;
+  « N d'astreinte maintenant » seulement sur un planning validé ; les tuiles restent vides avant
+  lecture et disent « Lecture impossible » après un échec, jamais « Rien en attente ». La
+  **cloche** est la Boîte : tant que les notifications n'ont pas d'écran (066d), elle mène aux
+  propositions et porte **leur nombre écrit** (plus un point de couleur).
+
+**CI** : PR [slider973/Foco#5](https://github.com/slider973/Foco/pull/5), courses vertes sur la PR ([36214822569](https://github.com/slider973/Foco/actions/runs/36214822569), [36215323242](https://github.com/slider973/Foco/actions/runs/36215323242), 143 tests), fusionnée en squash ; course verte sur `main` du fork ([36215903852](https://github.com/slider973/Foco/actions/runs/36215903852)) au commit `7ec81e5`, visé par le pointeur `foco/`.
+
+**Vérifié contre le Supabase local** (26 septembre 2026, `membre1@caserne-a.test`, code lu dans
+Mailpit ; données posées puis retirées, seed remis dans son état d'origine) :
+
+- planning d'octobre **en brouillon** : `schedules?…status=in.(published,validated,archived)` →
+  `[]`, `shifts?…schedule_id=eq.<octobre>` → `[]` ;
+- publié (`publish_schedule`) : trois propositions, triées par l'app (10 jour, 10 nuit, 17 jour) ;
+  `shifts` du mois → 62 lignes ; attributions acceptées du mois → `[]` (aucune des siennes) ;
+- `PATCH …&status=eq.proposed&select=id` `{"status":"accepted"}` → `200 [{"id":…}]` ; refus
+  `{"status":"declined","decline_reason":"En formation ce week-end"}` → `200`, relu en base
+  (`declined`, motif, `responded_at` posé par la base) ; la même acceptation rejouée → `200 []` ;
+  la proposition d'un collègue → `200 []` ; `{"status":"cancelled"}` → `400 P0001
+  assignment_transition_reserved` ;
+- caserne suspendue (`subscriptions.status = suspended`) : `PATCH` → `200 []` (la politique filtre
+  sans lever ; voir les écarts), `rpc/station_access` → `{"writable": false, "status":
+  "suspended"}` ;
+- publié : « Mes astreintes » → la seule acceptée, sans équipier ; les attributions du mois → la
+  sienne seulement ;
+- validé : équipiers du 10 octobre → Marie L. et Thomas M. (le lecteur est écarté par l'app),
+  noms depuis `memberships` (`display_name` d'abord), attributions du mois → toute la caserne ;
+- `rpc/my_ics_token` → `200`, un jeton de 48 caractères hexadécimaux. `ics-feed` n'a pas été
+  appelé : l'Edge Runtime local était arrêté.
+
+### Écarts de 066c avec la PWA, et pourquoi
+
+- **« 1/3 pourvus »** : l'effectif pourvu d'un créneau n'est pas lisible par un membre sur un
+  planning publié (`assignments_select_own_published`, écart « 1/3 pourvus » du 064a dans
+  `DESIGN.md`). L'app ne l'écrit (« 1/2 pourvu »), ni ne marque « Non pourvu » / « Place libre »,
+  que sur un planning **validé ou archivé et lu** ; publié, la carte d'un créneau ne porte que ses
+  heures et « Les autres noms s'afficheront quand ton chef de centre aura validé le planning. ».
+- **« Vos réponses »** (les propositions déjà répondues) de Foco est retiré : la PWA ne lit aucune
+  attribution `declined` pour le membre, et ce serait une requête de plus.
+- **« Créneau non pourvu » dans « À traiter »** : passé derrière `FOCO_EXTRAS` (reprendre un
+  créneau est un échange, v1.1) ; un compte sur les seuls mois lus serait d'ailleurs partiel.
+- **La cloche** mène aux propositions et en porte le nombre tant que 066d n'est pas là ; la PWA,
+  elle, a une Boîte à trois onglets.
+- **Pas de cache local** des astreintes et du planning (la PWA garde `cache_astreintes` et
+  `cache_planning_caserne` pour le hors-ligne) : hors ligne à l'ouverture, l'écran dit l'erreur
+  avec « Réessayer » ; ce qui a été lu reste en mémoire pendant la session.
+- **Pas de blocage « hors ligne » avant le geste** (`enLigneProvider`, « Une réponse a besoin du
+  réseau… ») : sans moniteur réseau (écart du 066b), la réponse part, échoue et la ligne revient à
+  sa place avec la phrase du réseau.
+- **Pas de fichier `.ics` par astreinte** (« Ajouter à mon agenda » du détail) ni de
+  « Régénérer le lien » : seul l'abonnement, ouvert en `webcal://` ou copié.
+- **Écran « Équipe »** : la PWA n'en a pas côté membre ; l'app y liste les noms que rend la
+  requête de `_noms` (sans filtre de statut, comme elle), sans rôle pour les collègues (aucune
+  colonne lue ne le porte). Un membre désactivé peut y paraître.
+- **Relectures** : une acceptation relit « Mes astreintes », et la dernière d'un planning la
+  liste des mois — les mêmes requêtes que la PWA à l'ouverture de ces écrans, jouées tout de suite
+  pour que l'accueil ne mente pas.
+- **Boutons** : « Accepter » et « Refuser » de même largeur (pilules de Foco) au lieu de
+  l'asymétrie trois cinquièmes / deux cinquièmes ; `PillButton` porté à 44 pt de haut.
+- **L'accueil compte toutes les propositions répondables**, comme la pastille de la Boîte
+  (`propositionsEnAttenteProvider`) ; la section de l'accueil de la PWA écarte en plus celles
+  d'un jour passé.
+- **Mode démo** : la validation automatique d'un planning y est simplifiée (plus rien de proposé
+  dans le mois).
+- **« VOUS »** : le badge de Foco sur une ligne reste « VOUS », là où la légende, la PWA et les
+  lignes d'équipe disent « Toi » (visible sur la capture du planning). À harmoniser au 066d.
+
+### Écarts relevés dans la PWA au 066c (signalés, non corrigés : `lib/` n'est pas touché)
+
+- **Caserne suspendue et réponse.** Vérifié en `curl` : sur une caserne suspendue, le `PATCH` d'une
+  réponse rend `200 []` (la politique `using` filtre la ligne) et non `42501`. Si
+  `station_access` n'a pas pu être lu, `repondre` rend donc `disparue`, et la PWA annonce « Ce
+  créneau ne t'est plus proposé. » au lieu de la lecture seule. L'app iOS a le même comportement,
+  puisqu'elle suit la même règle.
 
 ## 5. Déconnexion et caches locaux
 
@@ -150,8 +291,11 @@ trousseau de l'app (la session Supabase), tout le domaine `UserDefaults`, `Cache
 (l'export `.ics`), `Application Support`, le cache HTTP et les cookies.
 
 - `signOut()` fait trois choses, dans cet ordre :
-  1. **la saisie** : `AvailabilityEntry.reset()` arrête minuteurs et envois, pour qu'aucune
-     écriture en vol ne réécrive sa file sur l'appareil après l'effacement ;
+  1. **la saisie et le planning** : `AvailabilityEntry.reset()` arrête minuteurs et envois, pour
+     qu'aucune écriture en vol ne réécrive sa file sur l'appareil après l'effacement ;
+     `PlanningJourney.reset()` oublie propositions, astreintes, mois lus, noms et lien
+     d'abonnement, et fait ignorer toute réponse arrivée après (066c, rien n'est écrit sur
+     l'appareil) ;
   2. **la session** : fermée côté serveur tant que le jeton est encore dans le trousseau ;
   3. **l'effacement** (`LocalWipe`), **même si le serveur ne répond pas**.
 - L'effacement porte sur des domaines entiers, pas sur des clés : un nouveau stockage local est
@@ -173,7 +317,12 @@ trois niveaux.
    (clé de service refusée), extras masqués ; et pour 066b : période ouverte, verrouillée, date
    limite, chaque raccourci, copie du mois précédent, préférences et écart, reprise, échec puis
    « Réessayer », refus puis « Recharger », hors ligne, file gardée puis rejouée, contrat figé et
-   décodage des réponses relevées sur le seed.
+   décodage des réponses relevées sur le seed ; et pour 066c : contrat figé et décodage des
+   réponses du seed, réponse acceptée, refusée avec motif, refusée par la base (`42501`), hors
+   ligne, plus proposée, dernière acceptation qui valide, double touche, astreintes par mois et
+   passées, équipiers seulement une fois validé, relecture ratée, planning non publié invisible,
+   publié réduit à ses créneaux, mois d'ouverture, accueil sans fait inventé (avant lecture, après,
+   après un échec), cloche, déconnexion qui vide le planning.
 2. **Test d'intégration facultatif** contre le Supabase local, désactivé en CI :
 
    ```sh
@@ -210,8 +359,10 @@ D'où la règle :
 
 `foco/scripts/ci.sh` est la recette : Xcode 26.4.1 (`sudo xcode-select`), un `Config.xcconfig`
 **factice** (`https://ci.invalid`, aucune vraie clé), l'iPhone 17 Pro sous le runtime iOS 26.4,
-`xcodebuild build test`, puis trois captures (mode démo : accueil et saisie des disponibilités,
-ouverte par `-FocoOpenAvailability` ; écran de connexion) gardées en artefact
+`xcodebuild build test`, puis six captures (mode démo : accueil, saisie des disponibilités
+ouverte par `-FocoOpenAvailability`, propositions par `-FocoOpenPropositions`, mes astreintes
+par `-FocoOpenDuties`, planning de la caserne par `-FocoOpenPlanning` ; écran de connexion)
+gardées en artefact
 avec le `Package.resolved` obtenu. Runner `macos-26` : c'est la seule image GitHub qui porte
 Xcode 26.4.1 et un simulateur iOS 26.4 ; `macos-15` s'arrête à Xcode 26.3. Le fork étant privé,
 ses minutes macOS comptent dans le quota du compte (×10).
@@ -235,6 +386,11 @@ La CI Flutter (`ci.yml`) et le déploiement (`deploy.yml`) ne changent pas : leu
 - **Classement des erreurs inconnues** : une réponse sans corps PostgREST (`HTTPError`) ou
   illisible est classée « inconnue » et relancée ; la PWA classe un code absent en panne réseau.
   À aligner (revue du 066b).
+- **Cache local des astreintes et du planning** (066c) : la PWA les garde pour le hors-ligne ;
+  l'app iOS ne les garde qu'en mémoire. S'il est ajouté, il part avec `LocalWipe`.
+- **Fichier `.ics` par astreinte et « Régénérer le lien »** (066c) : absents de l'app iOS.
+- **Équipe** (066c) : lister les seuls membres actifs demanderait `memberships.status`, que la
+  requête de `_noms` ne lit pas ; à trancher avec le propriétaire.
 - **Deux écarts de la PWA, confirmés par la revue du 066b** (détail plus bas, `lib/` non touché) :
   `_chargerPreferences` écrit la reprise sur une caserne suspendue ; `EtatSaisie.mois` compte la
   file d'un autre mois.
