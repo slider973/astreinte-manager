@@ -220,9 +220,8 @@ réactiver depuis son profil.
 
 Depuis le ticket 066, une app iOS native, **Foco** (`foco/`, `docs/IOS.md`), est un second client
 du pompier. Elle reçoit les notifications par **le même projet Firebase** et **la même Edge
-Function** que la PWA : rien à changer côté serveur, sinon le correctif `apns` signalé en fin de
-section. Sans ce qui suit, l'app iOS fonctionne normalement et affiche dans ses réglages
-« Notifications : Indisponibles sur cette installation ».
+Function** que la PWA : rien à changer côté serveur, le bloc `apns` étant envoyé (§ e). Sans ce
+qui suit, l'app iOS fonctionne normalement et affiche dans ses réglages « Notifications : Indisponibles sur cette installation ».
 
 Compte à prévoir : **30 minutes**, et un **compte Apple Developer payant** (99 $/an) : Apple ne
 délivre de notifications qu'aux apps signées par un compte membre du programme.
@@ -287,12 +286,12 @@ Le `.p8` **est** un secret : jamais dans le dépôt, jamais dans un courriel.
    **App ouverte** : la bannière d'iOS s'affiche quand même, et la cloche de l'accueil est relue.
 8. Déconnecte-toi : la ligne de `push_tokens` disparaît.
 
-### e. Le correctif serveur en attente (ticket `supabase-dev`)
+### e. Le bloc `apns` côté serveur
 
-`supabase/functions/_shared/fcm.ts` n'envoie pas encore de bloc `apns`. Sans lui, iOS affiche la
-notification **sans son** : un pompier qui a rangé son téléphone ne l'entend pas. Le correctif
-(ajouter `apns.payload.aps.sound = "default"` au corps du message) est décrit dans
-`docs/IOS.md § 9` ; il ne change rien pour la PWA.
+Depuis le chantier 066d, l'Edge Function envoie le bloc `apns` (`supabase/functions/_shared/fcm.ts`,
+`corpsMessage`) : `aps.sound = "default"` pour que la notification sonne, et, quand une étiquette
+existe, `aps.thread-id` et l'en-tête `apns-collapse-id` (tronqué à 64 octets). Rien ne change pour
+la PWA.
 
 ## Mettre à jour le SDK
 

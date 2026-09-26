@@ -15,6 +15,7 @@ import {
   lienPubliable,
   oublierJetonOAuth,
   type Transport,
+  tronquerOctets,
 } from "../_shared/fcm.ts";
 
 /**
@@ -183,6 +184,80 @@ Deno.test("un lien inutilisable est omis, pas envoyé — le message part quand 
     lien: "http://127.0.0.1:3000/proposals",
   }) as CorpsFcm;
   assertEquals(local.message.webpush.fcm_options, undefined);
+});
+
+type BlocApns = {
+  headers?: Record<string, string>;
+  payload: { aps: Record<string, string> };
+};
+
+/** Le message tel qu'il part sur le réseau : les clés `undefined` en disparaissent. */
+function surLeReseau(corps: Record<string, unknown>): {
+  message: { webpush: unknown; apns: BlocApns };
+} {
+  return JSON.parse(JSON.stringify(corps));
+}
+
+Deno.test("iOS : le bloc apns porte le son, le fil et le remplacement de l'étiquette", () => {
+  const corps = surLeReseau(corpsMessage("JETON", {
+    titre: "t",
+    corps: "c",
+    donnees: { route: "/proposals" },
+    etiquette: "assignment_proposed:2026-10",
+  }));
+
+  assertEquals(corps.message.apns, {
+    headers: { "apns-collapse-id": "assignment_proposed:2026-10" },
+    payload: { aps: { sound: "default", "thread-id": "assignment_proposed:2026-10" } },
+  });
+});
+
+Deno.test("iOS : sans étiquette, le son seul, et aucune clé headers", () => {
+  const brut = corpsMessage("JETON", { titre: "t", corps: "c", donnees: {} }) as {
+    message: { apns: BlocApns };
+  };
+  // L'API v1 refuse un `headers` nul ou vide : la clé ne doit pas exister du tout.
+  assert(!("headers" in brut.message.apns));
+  assertEquals(brut.message.apns, { payload: { aps: { sound: "default" } } });
+  assert(!("thread-id" in brut.message.apns.payload.aps));
+});
+
+Deno.test("iOS : apns-collapse-id est tronqué à 64 octets, thread-id garde l'étiquette", () => {
+  const longue = "assignment_proposed:" + "x".repeat(100);
+  const corps = surLeReseau(corpsMessage("JETON", {
+    titre: "t",
+    corps: "c",
+    donnees: {},
+    etiquette: longue,
+  }));
+  assertEquals(corps.message.apns.headers?.["apns-collapse-id"], longue.slice(0, 64));
+  assertEquals(corps.message.apns.payload.aps["thread-id"], longue);
+
+  // En octets, pas en caractères : un accent pèse deux octets et n'est jamais coupé.
+  assertEquals(tronquerOctets("é".repeat(40), 64), "é".repeat(32));
+  assertEquals(tronquerOctets("a" + "é".repeat(40), 64), "a" + "é".repeat(31));
+  assertEquals(tronquerOctets("court", 64), "court");
+});
+
+Deno.test("le bloc webpush est inchangé par l'ajout du bloc apns", () => {
+  const avecTout = surLeReseau(corpsMessage("JETON", {
+    titre: "Astreinte proposée le 12 octobre, nuit",
+    corps: "CIS Saint-Martin te propose une astreinte.",
+    donnees: { route: "/proposals" },
+    lien: "https://app.astreinte-sp.fr/proposals",
+    etiquette: "assignment_proposed:2026-10",
+  }));
+  assertEquals(avecTout.message.webpush, {
+    notification: {
+      title: "Astreinte proposée le 12 octobre, nuit",
+      body: "CIS Saint-Martin te propose une astreinte.",
+      tag: "assignment_proposed:2026-10",
+    },
+    fcm_options: { link: "https://app.astreinte-sp.fr/proposals" },
+  });
+
+  const minimal = surLeReseau(corpsMessage("JETON", { titre: "t", corps: "c", donnees: {} }));
+  assertEquals(minimal.message.webpush, { notification: { title: "t", body: "c" } });
 });
 
 Deno.test("sans compte de service, le push est indisponible et non en échec", async () => {
