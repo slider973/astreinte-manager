@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 064, 065
 - **Branche** : `feat/066-app-ios-native`
-- **PR** : https://github.com/slider973/astreinte-manager/pull/64 (chantier 066a), https://github.com/slider973/astreinte-manager/pull/65 (chantier 066b)
+- **PR** : https://github.com/slider973/astreinte-manager/pull/64 (chantier 066a), https://github.com/slider973/astreinte-manager/pull/65 (chantier 066b), https://github.com/slider973/astreinte-manager/pull/66 (chantier 066c)
 - **Statut** : en cours depuis 2026-09-26
 
 ## Contexte
