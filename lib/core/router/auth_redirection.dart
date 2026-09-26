@@ -79,7 +79,7 @@ String? redirectionAuth({
   if (_sousLegal(chemin)) return null;
 
   final surLaConnexion = chemin.startsWith(AppRoutes.connexion);
-  final surLEditeur = _sousSuperAdmin(chemin);
+  final surLEditeur = sousSuperAdmin(chemin);
 
   // Tant que le droit de l'éditeur n'est pas connu, la garde **attend** sur son
   // écran plutôt que de trancher : rediriger sur une supposition perdrait
@@ -128,6 +128,6 @@ bool _sousLegal(String chemin) =>
 /// Ce n'est **pas** un sous-chemin de `/admin` : les deux gardes ne portent pas
 /// sur le même droit, et un administrateur de caserne n'est pas l'éditeur du
 /// produit.
-bool _sousSuperAdmin(String chemin) =>
+bool sousSuperAdmin(String chemin) =>
     chemin == AppRoutes.superAdmin ||
     chemin.startsWith('${AppRoutes.superAdmin}/');

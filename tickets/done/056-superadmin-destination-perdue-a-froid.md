@@ -4,8 +4,8 @@
 - **Priorité** : P2
 - **Dépend de** : 045, 053
 - **Branche** : `feat/056-superadmin-destination-perdue-a-froid`
-- **PR** : —
-- **Statut** : en cours depuis 2026-09-26
+- **PR** : https://github.com/slider973/astreinte-manager/pull/68
+- **Statut** : terminé le 2026-09-26 (PR créée)
 
 ## Contexte
 
