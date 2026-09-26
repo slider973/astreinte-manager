@@ -124,7 +124,8 @@ sequenceDiagram
   participant M2 as Nouveau membre
 
   M1->>DB: status = declined, decline_reason
-  DB->>N: assignment_declined à l'admin
+  DB->>DB: assignments_notifier_refus — assignment_declined en file, même transaction
+  DB->>N: assignment_declined aux autres admins actifs
   N-->>A: push "X a refusé le 12 nuit"
   A->>EF: réattribuer shift_id à M2
   EF->>DB: reassign_shift — une transaction
@@ -138,6 +139,13 @@ sequenceDiagram
 nouveau membre. Le refus a déjà produit la sienne — `assignment_declined` aux administrateurs — au
 moment où il a été prononcé. Rien n'est renvoyé au reste de la caserne : c'est exactement ce que
 l'outil remplacé imposait, et la raison d'être du ticket 020.
+
+**Ce que le membre sait de son refus** (ticket 055, migration `0039`). Sa requête rend une ligne
+ou aucune ; une ligne prouve que la demande `assignment_declined` est **en file**, pas qu'elle est
+livrée. L'écran dit donc « Ton chef de centre sera prévenu », jamais « est prévenu ». De même
+côté administrateur : `reassign-shift` rend `notified` (l'entrant) et `previous.notified` (le
+sortant), et l'écran de suivi écrit « <membre> sera prévenu ». Détail dans `docs/SCHEMA.md § 5`,
+« Ce que garantit la réponse d'un membre ».
 
 Les variantes du même geste :
 

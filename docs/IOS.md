@@ -598,6 +598,22 @@ ouverts, par choix et consignés :
   file d'un autre mois. (Celui du 066d, le jeton web non supprimé à la déconnexion, est corrigé au
   ticket 057 : § 4 quinquies.)
 
+### À reprendre (ticket 055)
+
+Le ticket 055 a corrigé dans la PWA trois phrases qui affirmaient un envoi sans preuve.
+`foco/` n'a pas été touché : les équivalents iOS sont à aligner, **sans changement de requête**
+— le `PATCH` de réponse reste le même, et la base met désormais `assignment_declined` en file
+pour lui aussi (migration `0039`, `docs/SCHEMA.md § 5`).
+
+| iOS (`foco/`) | Aujourd'hui | À écrire (PWA, `AppStrings`) |
+|---|---|---|
+| `FocoStrings.swift:380` (refus) | « \(slot) : refusée. Ton chef de centre est prévenu. » | « … : refusée. Ton chef de centre sera prévenu. » (`propositionsRefusee`) ; pour un administrateur, ou tant que le rôle n'a pas été relu en base, « … : refusée. » sans promesse (`propositionsRefuseeNeutre`) |
+| `FocoStrings.swift:24` (`codeResent`) | « Nouveau code envoyé. Regarde tes e-mails. » | « Nouveau code demandé. Regarde tes e-mails d'ici une minute. » (`codeRenvoye`) |
+| `FocoTests/PlanningTests.swift:404` | attend l'ancienne phrase du refus | la nouvelle |
+
+La réattribution et l'annulation (« <membre> sera prévenu ») n'ont pas d'équivalent iOS : l'app
+n'a pas d'écran d'administration.
+
 ### Écarts de 066b avec la PWA, et pourquoi
 
 - ~~**Pas de moniteur réseau.**~~ Repris au 066d : `NWPathMonitor` rejoue la file au retour du

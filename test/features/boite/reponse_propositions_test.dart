@@ -37,7 +37,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
+import '../../support/faux_invitations.dart';
 import '../../support/faux_propositions.dart';
+import '../../support/promesse_envoi.dart';
 
 /// Un téléphone : la composition de référence de cet écran.
 const Size _telephone = Size(390, 844);
@@ -92,13 +94,14 @@ Future<FauxPropositionsRepository> _ouvrir(
   Size taille = _telephone,
   Connectivite? reseau,
   bool stabiliser = true,
+  Appartenance appartenance = appartenanceMembre,
 }) async {
   final propositions = depot ?? _depot();
 
   await monterApp(
     tester,
     session: sessionMembre,
-    appartenances: const <Appartenance>[appartenanceMembre],
+    appartenances: <Appartenance>[appartenance],
     propositions: propositions,
     reseau: reseau,
     taille: taille,
@@ -440,9 +443,12 @@ void main() {
       });
     });
 
-    testWidgets('la ligne disparaît et le message prévient que l\'admin sait', (
-      tester,
-    ) async {
+    // **« Sera prévenu », et rien de plus** (ticket 055). La ligne touchée
+    // prouve que `assignment_declined` est en file (migration 0039), pas
+    // qu'elle est livrée : [aucunEnvoiPromis] refuse « est prévenu » à
+    // l'écran comme dans ce que prononce le lecteur d'écran.
+    testWidgets('la ligne disparaît et le message dit que l\'admin sera '
+        'prévenu, sans rien affirmer de plus', (tester) async {
       await _ouvrir(tester);
       await ouvrirLaFeuille(tester);
 
@@ -458,6 +464,54 @@ void main() {
         ),
         findsOneWidget,
       );
+      aucunEnvoiPromis(tester);
+    });
+
+    testWidgets('un administrateur qui refuse ne se voit rien promettre', (
+      tester,
+    ) async {
+      // Le déclencheur ne le prévient pas de son propre refus, et s'il est
+      // seul à administrer la caserne, rien n'est mis en file.
+      await _ouvrir(tester, appartenance: appartenanceAdmin);
+      await ouvrirLaFeuille(tester);
+
+      await tester.tap(find.text(AppStrings.refusConfirmer));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          AppStrings.propositionsRefuseeNeutre(
+            'lundi 12 octobre, ${AppStrings.creneauNuit.toLowerCase()}',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('chef de centre'), findsNothing);
+      aucunEnvoiPromis(tester);
+    });
+
+    testWidgets('un rôle restauré depuis l\'appareil ne promet rien non plus', (
+      tester,
+    ) async {
+      // Hors ligne au démarrage, l'appartenance revient du stockage en simple
+      // membre (`commeMembre`) : ce n'est pas un fait, un chef seul dans sa
+      // caserne y lirait une promesse que la base ne soutient pas.
+      await _ouvrir(tester, appartenance: appartenanceAdmin.commeMembre);
+      await ouvrirLaFeuille(tester);
+
+      await tester.tap(find.text(AppStrings.refusConfirmer));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          AppStrings.propositionsRefuseeNeutre(
+            'lundi 12 octobre, ${AppStrings.creneauNuit.toLowerCase()}',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('chef de centre'), findsNothing);
+      aucunEnvoiPromis(tester);
     });
   });
 

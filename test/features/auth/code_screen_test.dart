@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
+import '../../support/promesse_envoi.dart';
 
 /// Va jusqu'à l'écran du code en passant par la saisie de l'adresse, comme un
 /// utilisateur.
@@ -142,6 +143,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(faux.auth.emailsAppeles, hasLength(2));
       expect(find.text(AppStrings.codeRenvoye), findsOneWidget);
+      // « Demandé », pas « envoyé » : rien ne dit au client que le courriel
+      // est sorti (ticket 055).
+      aucunEnvoiPromis(tester);
 
       await demonter(tester);
     });

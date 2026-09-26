@@ -110,6 +110,11 @@ class FauxPlanningRepository implements PlanningRepository {
   /// une garde acceptée ? Lui seul est prévenu.
   bool ancienPrevenu = false;
 
+  /// Ce que la base répond pour l'entrant : sa notification est-elle en file
+  /// (`notified`, migration 0039) ? Vrai, comme la base le rend toujours
+  /// quand la réattribution aboutit ; faux pour simuler une réponse muette.
+  bool entrantEnFile = true;
+
   /// Ce que `cancel_assignment` répond : le membre a-t-il été prévenu ? Faux
   /// pour une proposition retirée avant réponse.
   bool annulationPrevient = true;
@@ -327,6 +332,7 @@ class FauxPlanningRepository implements PlanningRepository {
       attribution: attribution,
       ancienUserId: ancienneId,
       ancienPrevenu: ancienPrevenu,
+      entrantEnFile: entrantEnFile,
       planningPublie: planningRetombe,
     );
   }

@@ -1265,6 +1265,8 @@ class _PlanningMemoire implements PlanningRepository {
       ),
       ancienUserId: ancienne?.userId,
       ancienPrevenu: ancienPrevenu,
+      // `notify(...)` a écrit la demande de l'entrant : `notified` (0039).
+      entrantEnFile: true,
       planningPublie: _base.etatPlanning == PlanningEtat.publie,
     );
   }
@@ -1559,10 +1561,16 @@ class _PropositionsMemoire implements PropositionsRepository {
 
     if (!accepte) {
       // L'administrateur apprend le refus : c'est lui qui devra réparer.
-      _base._notifier('assignment_declined', <String>[
+      // `assignments_notifier_refus` (0039) : les administrateurs actifs, sauf
+      // celui qui refuse, et rien du tout s'il n'en reste aucun.
+      final admins = <String>[
         for (final membre in _base.membres)
-          if (membre.actif && membre.role == RoleMembre.admin) membre.userId,
-      ]);
+          if (membre.actif &&
+              membre.role == RoleMembre.admin &&
+              membre.userId != ligne.userId)
+            membre.userId,
+      ];
+      if (admins.isNotEmpty) _base._notifier('assignment_declined', admins);
     }
 
     _base._reevaluer();

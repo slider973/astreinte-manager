@@ -865,7 +865,7 @@ pas.
 
 | Fonction | Signature | Rôle |
 |---|---|---|
-| `reassign_shift` | `(p_shift uuid, p_user uuid, p_actor uuid, p_previous uuid default null) returns jsonb` `security definer`, **réservée à `service_role`** | La réattribution, **en une transaction** : nouvelle attribution `proposed` avec `proposed_at = now()`, `created_by` et `was_available` posés par la fonction, ancienne marquée `replaced` (`accepted` ou `proposed`) ou **laissée telle quelle** (`declined`, `cancelled` : un statut terminal a déjà été notifié sous ce nom), `replaced_by` posé dans les quatre cas, notifications, `audit_log` et `schedule_reevaluer`. `p_previous` omis sur un créneau qui porte un trou non comblé — un refus ou une annulation : la fonction rattache la nouvelle au **plus ancien** d'entre eux. Seul `replaced` n'est pas remplaçable : ce qui a déjà trouvé son remplaçant ne s'en cherche pas un second. **Deux verrous, dans l'ordre d'une réponse de membre** — l'attribution remplacée, puis le planning —, et **le compte des places** après eux : une réattribution remplace, elle n'ajoute pas. Refus métier en `{"ok": false, "code": …}` : `shift_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `member_not_active`, `already_assigned`, `shift_already_filled`, `assignment_not_found`, `assignment_not_replaceable`. |
+| `reassign_shift` | `(p_shift uuid, p_user uuid, p_actor uuid, p_previous uuid default null) returns jsonb` `security definer`, **réservée à `service_role`** | La réattribution, **en une transaction** : nouvelle attribution `proposed` avec `proposed_at = now()`, `created_by` et `was_available` posés par la fonction, ancienne marquée `replaced` (`accepted` ou `proposed`) ou **laissée telle quelle** (`declined`, `cancelled` : un statut terminal a déjà été notifié sous ce nom), `replaced_by` posé dans les quatre cas, notifications, `audit_log` et `schedule_reevaluer`. **Rend `notified`** (migration `0039`, ticket 055) : vrai quand la demande `assignment_proposed` de l'entrant est en file, à côté de `previous_notified` pour le sortant — **mis en file, pas livré**, dans les deux cas (§ 5, « Ce que garantit la réponse d'un membre »). `p_previous` omis sur un créneau qui porte un trou non comblé — un refus ou une annulation : la fonction rattache la nouvelle au **plus ancien** d'entre eux. Seul `replaced` n'est pas remplaçable : ce qui a déjà trouvé son remplaçant ne s'en cherche pas un second. **Deux verrous, dans l'ordre d'une réponse de membre** — l'attribution remplacée, puis le planning —, et **le compte des places** après eux : une réattribution remplace, elle n'ajoute pas. Refus métier en `{"ok": false, "code": …}` : `shift_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `member_not_active`, `already_assigned`, `shift_already_filled`, `assignment_not_found`, `assignment_not_replaceable`. |
 | `apply_auto_proposal` | `(p_schedule uuid, p_actor uuid, p_picks jsonb) returns jsonb` `security definer`, **réservée à `service_role`** | Applique un plan de remplissage automatique sur un planning **en brouillon**, en une transaction. `p_picks` est un tableau ordonné de `{"shift_id", "user_id"}`, composé par l'application avec le tri des candidats du ticket 017 : la base ne choisit personne, elle **limite**. Chaque ligne est revérifiée — créneau du planning, membre actif, disponibilité **déclarée** (`availabilities.status = 'available'` : ni l'absent ni celui qui n'a rien saisi ne passent), pas de doublon, effectif requis pas dépassé, plafonds `max_shifts` et `max_weekends` pas dépassés (comptés comme `v_member_load` les compte, et **relus à chaque ligne**, donc les attributions posées par l'appel comptent) — puis insérée `proposed` avec `proposed_at` nul, `was_available = true` et `created_by = p_actor`. Une ligne qui ne passe pas est **écartée** avec son motif, les autres passent : `invalid_pick`, `shift_not_in_schedule`, `member_not_active`, `not_available`, `already_assigned`, `shift_already_filled`, `shift_quota_reached`, `weekend_quota_reached`. **Un verrou sur le planning**, comme `reassign_shift` : deux administrateurs qui appuient en même temps ne posent pas deux pompiers sur une place. Refus globaux : `invalid_picks`, `too_many_picks` (500), `schedule_not_found`, `not_admin`, `station_suspended`, `schedule_not_draft`. |
 | `cancel_assignment` | `(p_assignment uuid, p_reason text default null) returns jsonb` `security definer`, ouverte à `authenticated` | L'annulation d'une attribution d'un planning publié : statut `cancelled`, motif conservé dans `decline_reason`, notification `assignment_cancelled` **si la garde était acceptée**, `audit_log` et `schedule_reevaluer`. Refus : `assignment_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `assignment_not_active`. |
 
@@ -1399,6 +1399,14 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
 - `set_updated_at` sur toutes les tables avec `updated_at`.
 - `handle_new_user` sur `auth.users` : crée la ligne `profiles`.
 - `assignments_member_transition` (ci-dessus).
+- `assignments_notifier_refus` (migration `0039`, ticket 055) : `after update of status` sur
+  `assignments`, `when (old.status = 'proposed' and new.status = 'declined' and
+  new.proposed_at is not null)`. Met en file `assignment_declined` par `notify(...)` pour les
+  administrateurs **actifs** de la caserne, **sauf le titulaire de l'attribution et l'acteur
+  (`auth.uid()`)** ; rien s'il n'en reste aucun. Charge utile : `period`, `member_name` (nom dans la caserne, puis prénom et nom, puis
+  adresse), `decline_reason`, `shifts[]` ; `dedupe_key = 'declined:<attribution>'`.
+  `security definer` : `notify` est retirée à `authenticated`, et c'est le membre qui écrit.
+  Voir « Ce que garantit la réponse d'un membre » à la fin de cette section.
 - `memberships_guard_admin` (migration `0010`, ticket 009) : `before update or delete` sur
   `memberships`. Refuse la rétrogradation, la désactivation et la suppression du **dernier
   administrateur actif** d'une caserne (`membership_last_admin`), ainsi que celles qu'un
@@ -1550,6 +1558,61 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
   la cascade d'une caserne supprimée, où la ligne d'audit référencerait une caserne déjà
   disparue et ferait échouer la suppression sur une clé étrangère.
 
+### Ce que garantit la réponse d'un membre *(migration `0039`, ticket 055)*
+
+La réponse d'un membre est un `PATCH` PostgREST, **le même dans la PWA et dans l'app iOS** :
+
+```
+PATCH /rest/v1/assignments?id=eq.<attribution>&status=eq.proposed&select=id
+{"status": "declined", "decline_reason": "…"}      -- ou {"status": "accepted"}
+```
+
+Elle rend **une ligne** (`[{"id": …}]`) ou **aucune** (`[]`). Il n'y a rien d'autre à lire, et
+c'est voulu : changer la forme de la réponse forcerait les deux clients à suivre.
+
+| La réponse rend | Ce qui est garanti |
+|---|---|
+| une ligne, refus | L'attribution est `declined`, `responded_at` posé par la base, **et** une demande `assignment_declined` est dans `notification_outbox` pour les autres administrateurs actifs — écrite par `assignments_notifier_refus` **dans la même transaction**. Le refus n'existe pas sans sa demande. |
+| une ligne, acceptation | L'attribution est `accepted`, et le planning s'est réévalué (§ 2 de `docs/WORKFLOWS.md`). Rien n'est mis en file pour l'acceptation elle-même. |
+| aucune ligne | Plus rien n'était `proposed` : annulée, réattribuée, ou déjà répondue ailleurs. Rien n'a été écrit, rien n'est en file. |
+
+**« Mis en file » n'est pas « prévenu ».** La ligne de `notification_outbox` est une demande.
+`notify_post` la tente tout de suite par `pg_net`, `cron_dispatch_notifications` la reprend
+chaque minute, cinq fois, puis la marque `failed` (§ 2.16) ; la livraison n'est constatée que
+par la ligne `notifications` qu'écrit `send-notification` (`delivered`, `sent_at`), après la
+transaction et hors de portée du membre. Une file en panne — le 21 septembre 2026, l'adresse
+Docker dans le coffre — laisse la demande en attente sans que la réponse le sache.
+
+D'où les phrases de l'écran des propositions : « <créneau> : refusée. Ton chef de centre **sera**
+prévenu. » — vraie dès que la ligne revient —, et jamais « **est** prévenu », qui affirmerait une
+livraison.
+
+**Qui n'est pas destinataire.** Le déclencheur écarte trois comptes :
+
+- **les administrateurs désactivés** : seuls les `active` reçoivent ;
+- **le titulaire de l'attribution** : un administrateur qui refuse sa propre astreinte ne se
+  prévient pas lui-même ;
+- **l'acteur** (`auth.uid()`) : un administrateur peut enregistrer un refus **à la place** d'un
+  membre — le pompier a téléphoné — par `assignments_update_admin`. Il n'est pas prévenu de son
+  propre geste ; les **autres** administrateurs le sont, et la charge utile nomme toujours le
+  titulaire, jamais l'acteur. Une écriture serveur (`auth.uid()` nul) n'écarte personne de plus.
+
+S'il ne reste personne — un administrateur seul dans sa caserne qui refuse —, rien n'est mis en
+file et le refus passe quand même. Aucun client ne peut le lire dans la réponse, qui reste une
+ligne ou aucune ; l'écran le déduit du rôle, et **seulement d'un rôle lu en base** :
+« sera prévenu » n'est promis qu'à un membre dont l'appartenance vient d'une lecture de
+`memberships` (`Appartenance.roleConfirme`). Un administrateur, ou quiconque dont l'appartenance a
+été restaurée depuis l'appareil — elle revient toujours en simple membre, sans que ce soit un
+fait —, lit la phrase neutre « <créneau> : refusée. » (`AppStrings.propositionsRefuseeNeutre`).
+
+**Avant la migration `0039`, aucun refus ne prévenait personne.** Le type `assignment_declined`
+existait (§ 1), sa phrase aussi (`_shared/notification_content.ts`), le diagramme du § 5 de
+`docs/WORKFLOWS.md` aussi, mais aucune migration n'appelait `notify('assignment_declined', …)`.
+
+La même règle vaut pour `reassign_shift` (`notified`, `previous_notified`) et
+`cancel_assignment` (`notified`) : des demandes **mises en file** dans la transaction du geste,
+d'où « <membre> sera prévenu » sur l'écran de suivi.
+
 ## 6. Vues
 
 ### `availability_matrix(p_station, p_period)` — matrice admin d'un mois *(migration `0017`, ticket 016)*
@@ -1691,7 +1754,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 |---|---|---|
 | `send-notification` | appel interne : `public.notify(...)` → pg_net (déclencheurs, crons), ou HTTP direct depuis une autre Edge Function | Prend un `notification_type`, des destinataires, une caserne et une charge utile ; regroupe, construit le texte français, écrit la ligne `inapp`, envoie le push FCM à tous les appareils du membre, envoie le courriel si le canal est demandé ou si le membre n'a aucun appareil, supprime les jetons définitivement rejetés (ticket 025, contrat dans `supabase/functions/README.md`) |
 | `publish-schedule` | app admin | Appelle `publish_schedule` (SQL, atomique), puis `send-notification` avec les destinataires **déjà groupés par membre** : sept créneaux font une notification, pas sept (ticket 019, contrat dans `supabase/functions/README.md`) |
-| `reassign-shift` | app admin | Appelle `reassign_shift` (SQL, atomique) : l'ancienne attribution est marquée `replaced` ou reste `declined`, la nouvelle est créée `proposed` et horodatée, `replaced_by` relie les deux, et **une seule** notification part — au nouveau membre, plus l'ancien si sa garde était acceptée (ticket 020, contrat dans `supabase/functions/README.md`). L'annulation, elle, est une RPC (`cancel_assignment`) et non une Edge Function |
+| `reassign-shift` | app admin | Appelle `reassign_shift` (SQL, atomique) : l'ancienne attribution est marquée `replaced` ou reste `declined`, la nouvelle est créée `proposed` et horodatée, `replaced_by` relie les deux, et **une seule** notification part — au nouveau membre, plus l'ancien si sa garde était acceptée (ticket 020, contrat dans `supabase/functions/README.md`). Rend `notified` pour l'entrant et `previous.notified` pour le sortant : **des demandes mises en file**, pas des livraisons (ticket 055). L'annulation, elle, est une RPC (`cancel_assignment`) et non une Edge Function |
 | `auto-propose` | app admin | **Applique** un remplissage automatique du brouillon, il ne le compose pas : le plan — une liste ordonnée de couples (créneau, pompier) — est calculé dans l'application avec le **tri des candidats du ticket 017**, celui que l'administrateur lit dans le panneau d'un créneau, pour que le récapitulatif qu'il valide soit exactement ce qui part. `apply_auto_proposal` (SQL, atomique) revérifie chaque ligne — membre actif, disponibilité déclarée, plafonds d'astreintes et de weekends, effectif requis, doublons — et **écarte** celles qui ne passent pas avec leur motif au lieu de tout refuser. Aucune notification : un brouillon ne sort pas du bureau (ticket 018, contrat dans `supabase/functions/README.md`) |
 | `invite-member` | app admin | Crée l'invitation et envoie l'email (ticket 006, contrat dans `supabase/functions/README.md`). **Plafonnée en débit** (ticket 038) : `create_invitation` compte les envois par caserne et par heure et refuse avec le code `rate_limited` ; la fonction compose la phrase française qui dit **quand réessayer**, court-circuite les adresses restantes du lot — le budget est épuisé pour toutes — et rend `429` quand aucune adresse n'est passée. **Trace l'envoi sur l'invitation** (ticket 048) : `email_sent_at` / `email_error` (§ 2.4), écrites au retour de `sendMail`, en création comme en renvoi |
 | `accept-invitation` | app, après login | Vérifie le token, crée la membership (ticket 006). **Deux entrées, exactement l'une des deux** (ticket 051) : `{ "token": … }`, le lien du courriel, ou `{ "invitation_id": … }`, l'identifiant rendu par `my_pending_invitations()` à l'écran « Aucune caserne ». Le second passe par `accept_invitation_by_id` (`0036`), qui contrôle l'adresse puis rejoue le premier : mêmes codes, mêmes statuts, mêmes phrases françaises, et le jeton ne traverse pas le réseau |
@@ -1918,6 +1981,11 @@ Ordre proposé :
     `accept_invitation_by_id()` redéfinies, signatures, `search_path` et droits inchangés.
     L'adresse confirmée se lit dans `auth.users.email_confirmed_at`, plus dans la revendication
     `email_verified` ni dans `user_metadata`)
+39. `0039_refus_notifie.sql` (ticket 055 : déclencheur `assignments_notifier_refus`, qui met en
+    file `assignment_declined` dans la transaction du refus d'un membre — **aucun refus ne
+    prévenait personne avant lui** ; `reassign_shift` redéfinie à l'identique, plus la clé
+    `notified` pour l'entrant. **Aucune politique RLS touchée**, aucune colonne ajoutée, la
+    requête de réponse des clients inchangée)
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà

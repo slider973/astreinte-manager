@@ -51,6 +51,9 @@ type ResultatReattribution = {
   previous_user?: string | null;
   previous_status?: string | null;
   previous_notified?: boolean;
+  /** La demande de l'entrant est en file (migration 0039). Mis en file, pas
+   * livré : même sens que `previous_notified`. */
+  notified?: boolean;
   schedule_id?: string;
   station_id?: string;
   schedule_status?: string;
@@ -172,6 +175,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
      * avant le geste, la réponse le confirme et la base l'a journalisé. */
     was_available: resultat.was_available ?? true,
     proposed_at: resultat.proposed_at,
+    /** Vrai quand la base a **mis en file** la notification de l'entrant, dans
+     * la transaction de la réattribution (migration 0039). Une demande en file
+     * n'est pas une notification livrée : l'écran dit « sera prévenu », jamais
+     * « est prévenu ». Faux si la base ne l'a pas dit — un écran ne promet
+     * alors rien. */
+    notified: resultat.notified ?? false,
     /** L'attribution remplacée, quand il y en avait une — désignée par l'écran
      * ou retrouvée par la base parmi les refus non encore couverts. */
     previous: resultat.previous_id === null || resultat.previous_id === undefined ? null : {
@@ -179,7 +188,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       user_id: resultat.previous_user,
       status: resultat.previous_status,
       /** Vrai seulement si sa garde était **acquise** : c'est la seule personne
-       * à qui on retire quelque chose. Celui qui avait refusé sait déjà. */
+       * à qui on retire quelque chose. Celui qui avait refusé sait déjà. Mis en
+       * file, pas livré, comme `notified`. */
       notified: resultat.previous_notified ?? false,
     },
     schedule: {

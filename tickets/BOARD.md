@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 055 | [Un refus annonce « ton chef de centre est prévenu » sans preuve](in-progress/055-refus-prevenu-sans-preuve.md) | P2 | 050 | — |
 
 ## À faire
 
@@ -70,6 +69,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 | 052 | [Le centre de notifications n'a pas de retour](done/052-centre-notifications-sans-retour.md) | P1 | 026 | https://github.com/slider973/astreinte-manager/pull/47 |
 | 053 | [L'écran super-admin n'offre aucune déconnexion](done/053-superadmin-sans-deconnexion.md) | P2 | 031 | https://github.com/slider973/astreinte-manager/pull/50 |
 | 054 | [Le déploiement automatique des fonctions ignore la carte d'imports](done/054-deploiement-fonctions-carte-imports.md) | P0 | 049 | https://github.com/slider973/astreinte-manager/pull/48 |
+| 055 | [Un refus annonce « ton chef de centre est prévenu » sans preuve](done/055-refus-prevenu-sans-preuve.md) | P2 | 050 | https://github.com/slider973/astreinte-manager/pull/71 |
 | 056 | [L'éditeur sans caserne perd sa destination au démarrage à froid](done/056-superadmin-destination-perdue-a-froid.md) | P2 | 045 053 | https://github.com/slider973/astreinte-manager/pull/68 |
 | 057 | [Le jeton d'appareil des notifications n'est pas branché sur l'oubli](done/057-jeton-appareil-hors-oubli.md) | P2 | 024 053 | https://github.com/slider973/astreinte-manager/pull/69 |
 | 058 | [Lire l'adresse confirmée à la source, pas dans les métadonnées](done/058-invitations-en-attente-adresse-confirmee.md) | P2 | 051 | https://github.com/slider973/astreinte-manager/pull/70 |

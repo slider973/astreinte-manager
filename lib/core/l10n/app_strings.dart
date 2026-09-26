@@ -317,7 +317,12 @@ abstract final class AppStrings {
   static const String codeLienAlternative =
       'L\'e-mail contient aussi un lien : ouvre-le sur cet appareil au lieu de '
       'recopier le code.';
-  static const String codeRenvoye = 'Nouveau code envoyé. Regarde tes e-mails.';
+  /// **« Demandé », pas « envoyé ».** L'application ne sait qu'une chose :
+  /// GoTrue a accepté la demande. Que le courriel soit sorti, aucun signal ne
+  /// le rend au client (ticket 055) ; le dire serait promettre à la place du
+  /// serveur de courriel.
+  static const String codeRenvoye =
+      'Nouveau code demandé. Regarde tes e-mails d\'ici une minute.';
 
   static String codeIntro(String email) =>
       'Un code à six chiffres part vers $email. Il est valable une heure.';
@@ -2752,11 +2757,18 @@ abstract final class AppStrings {
 
   static const String publierEnCours = 'Publication…';
 
+  /// **Un nombre de destinataires mis en file, pas de livraisons** (ticket
+  /// 055). `publish-schedule` rend combien de pompiers ont une demande de
+  /// notification en file ; aucun accusé de livraison ne remonte. D'où le
+  /// futur.
   static String publiePourMois(String mois, int membres) => membres == 0
       ? 'Planning ${moisAvecDe(mois)} publié.'
       : 'Planning ${moisAvecDe(mois)} publié : '
-            '$membres pompier${membres > 1 ? 's' : ''} '
-            'notifié${membres > 1 ? 's' : ''}.';
+            '${_pompiersSerontPrevenus(membres)}.';
+
+  static String _pompiersSerontPrevenus(int membres) => membres == 1
+      ? '1 pompier sera prévenu'
+      : '$membres pompiers seront prévenus';
 
   /// **L'envoi a échoué, la publication non.** Le planning est parti en base,
   /// mais les téléphones n'ont pas sonné : le dire est la seule chose à faire,
@@ -2821,10 +2833,11 @@ abstract final class AppStrings {
       'Les notifications de publication ne sont pas parties : les pompiers '
       'attribués n\'ont pas été prévenus.';
 
+  /// Même règle que [publiePourMois] : le rattrapage rend un nombre de
+  /// destinataires **mis en file**, pas de livraisons (ticket 055).
   static String suiviRattrapageFait(int membres) => membres == 0
       ? 'Plus personne n\'attend de notification.'
-      : '$membres pompier${membres > 1 ? 's' : ''} '
-            'prévenu${membres > 1 ? 's' : ''}.';
+      : '${_pompiersSerontPrevenus(membres)}.';
   static const String suiviRelanceEnCours = 'Relance…';
 
   static String suiviRelanceFaite(int membres) => membres == 0
@@ -2952,16 +2965,32 @@ abstract final class AppStrings {
   static String reattribuerHorsDispo(String membre) =>
       '$membre s\'est déclaré indisponible ce jour-là.';
 
+  /// Avant la confirmation : rien n'est encore fait, et rien n'est encore
+  /// parti. Le futur, pour les deux.
   static String reattribuerRemplace(String qui) =>
-      'L\'astreinte de $qui est annulée et $qui en est prévenu.';
+      'L\'astreinte de $qui sera annulée et $qui en sera prévenu.';
 
   static const String reattribuerConfirmer = 'Réattribuer et notifier';
   static const String reattribuerAnnuler = 'Annuler';
 
-  static String reattribuerFaite(String membre) => '$membre est prévenu.';
+  /// **« Sera prévenu » : ce que `reassign-shift` prouve.** La réponse rend
+  /// `notified` (l'entrant) et `previous.notified` (le sortant) quand la base a
+  /// **mis en file** leur notification, dans la transaction de la
+  /// réattribution (migrations 0020 et 0039). Une demande en file n'est pas
+  /// une notification livrée : « est prévenu » affirmerait une livraison que
+  /// personne n'a vue (ticket 055).
+  static String reattribuerFaite(String membre) => '$membre sera prévenu.';
 
   static String reattribuerFaiteEtAncien(String membre, String ancien) =>
-      '$membre est prévenu, $ancien aussi.';
+      '$membre et $ancien seront prévenus.';
+
+  /// La réponse n'a pas dit que la notification de l'entrant était en file :
+  /// le créneau est confié, et l'écran ne promet rien de plus que ce que la
+  /// base a dit. [ancien] n'est nommé que si sa notification, elle, l'est.
+  static String reattribuerFaiteSansPreuve(String membre, {String? ancien}) =>
+      ancien == null
+      ? 'Réattribué : $membre reprend le créneau.'
+      : 'Réattribué : $membre reprend le créneau. $ancien sera prévenu.';
 
   // --- L'annulation d'une astreinte -------------------------------------
 
@@ -2999,8 +3028,10 @@ abstract final class AppStrings {
   static const String annulerConfirmer = 'Annuler l\'astreinte';
   static const String annulerRenoncer = 'Revenir';
 
+  /// Même règle que [reattribuerFaite] : `cancel_assignment` rend `notified`
+  /// quand la demande est **en file**, pas livrée.
   static String annulerFaite(String membre) =>
-      'Astreinte annulée. $membre est prévenu.';
+      'Astreinte annulée. $membre sera prévenu.';
 
   static String annulerFaiteSansEnvoi(String membre) =>
       'Proposition retirée. $membre n\'avait pas répondu : rien n\'est parti.';
@@ -3102,8 +3133,22 @@ abstract final class AppStrings {
   /// « Samedi 12 octobre, nuit : acceptée. »
   static String propositionsAcceptee(String creneau) => '$creneau : acceptée.';
 
+  /// **« Sera prévenu », jamais « est prévenu ».** Ce que la base garantit
+  /// quand la réponse touche la ligne : la demande `assignment_declined` est
+  /// **en file**, écrite par un déclencheur dans la transaction du refus
+  /// (migration 0039, `docs/SCHEMA.md § 5`). Mise en file n'est pas livrée :
+  /// la file peut être en panne, comme le 21 septembre. Le futur dit
+  /// exactement ce qui est acquis (ticket 055).
   static String propositionsRefusee(String creneau) =>
-      '$creneau : refusée. Ton chef de centre est prévenu.';
+      '$creneau : refusée. Ton chef de centre sera prévenu.';
+
+  /// La phrase neutre : rien n'est promis. Pour un administrateur — le
+  /// déclencheur ne le prévient pas de son propre refus, et s'il est seul à
+  /// administrer la caserne, **rien** n'est mis en file — et pour quiconque
+  /// dont le rôle n'a pas été confirmé par la base (appartenance restaurée
+  /// depuis l'appareil, `Appartenance.roleConfirme`).
+  static String propositionsRefuseeNeutre(String creneau) =>
+      '$creneau : refusée.';
 
   /// Le créneau n'est plus proposé : annulé ou confié à quelqu'un d'autre
   /// pendant que le pompier lisait sa notification. **Un fait, pas une

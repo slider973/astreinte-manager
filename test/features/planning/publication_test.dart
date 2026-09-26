@@ -15,6 +15,7 @@ import '../../support/faux_invitations.dart';
 import '../../support/faux_matrice.dart';
 import '../../support/faux_planning.dart';
 import '../../support/faux_suivi.dart';
+import '../../support/promesse_envoi.dart';
 
 const String _chemin = '/admin/planning';
 
@@ -227,7 +228,7 @@ void main() {
 
   group('Publier le planning — l\'envoi', () {
     testWidgets('« Publier et notifier » publie et annonce les membres '
-        'notifiés', (tester) async {
+        'qui seront prévenus', (tester) async {
       final suivi = FauxSuiviRepository()..membresPublies = 3;
       final faux = await _ouvrir(tester, suivi: suivi);
       await _ouvrirRecapitulatif(tester);
@@ -245,6 +246,9 @@ void main() {
         ),
         findsOneWidget,
       );
+      // Un nombre de demandes en file, pas de livraisons : « seront
+      // prévenus », jamais « notifiés » (ticket 055).
+      aucunEnvoiPromis(tester);
     });
 
     testWidgets('un envoi manqué se dit, et ouvre le rattrapage sur le suivi', (
@@ -293,6 +297,7 @@ void main() {
       expect(suivi.relances.single.tout, isTrue);
       expect(find.text(AppStrings.suiviRattrapageFait(3)), findsOneWidget);
       expect(find.text(AppStrings.suiviEnvoiManque), findsNothing);
+      aucunEnvoiPromis(tester);
     });
 
     testWidgets('un rattrapage dédoublonné laisse le bandeau : personne de '
