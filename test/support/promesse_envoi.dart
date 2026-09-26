@@ -18,6 +18,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// l'écrire, et seulement quand tous les courriels sont sortis.
 final RegExp _promesseDEnvoi = RegExp('envoyée', caseSensitive: false);
 
+/// Les adverbes qui se glissent entre l'auxiliaire et le participe sans rien
+/// retirer à l'affirmation. La négation (« pas », « jamais », « plus ») n'y est
+/// pas : « n'est pas prévenu » ne promet rien.
+const String _adverbe =
+    '(?:bien|déjà|aussitôt|aussi|immédiatement|directement|correctement'
+    '|tous|toutes|tout)';
+
 /// **Le fait affirmé au passé composé** : « est prévenu », « a été notifié »,
 /// « sont envoyés », et leurs accords. Ajouté au ticket 055, où l'écran des
 /// propositions disait « Ton chef de centre est prévenu » alors que la base
@@ -38,22 +45,32 @@ final RegExp _promesseDEnvoi = RegExp('envoyée', caseSensitive: false);
 final RegExp _faitAffirme = RegExp(
   // `\b` ne connaît que l'ASCII : devant « été » ou « êtes », il ne verrait
   // pas de frontière. D'où `(?<!\p{L})`, la frontière de mot en français.
-  r"(?<![nN]['’])(?<!\p{L})(?:est|es|sont|suis|sommes|êtes"
-  r'|a été|as été|ont été|avons été|avez été|ai été)'
-  r'\s+(?:bien\s+|déjà\s+|aussi\s+)?'
-  r'(?:prévenu|notifié|envoyé)(?:e|s|es)?(?!\p{L})',
+  //
+  // Trois formes, chacune tolérant des adverbes entre ses mots (« a bien été
+  // prévenue », « sont déjà notifiés », « a aussitôt prévenu ») :
+  //   - être + participe : « est prévenu », « sont notifiés » ;
+  //   - avoir + été + participe : « a été prévenu », « ont bien été notifiés » ;
+  //   - avoir + participe : « on a prévenu ton chef », « a déjà envoyé ».
+  r"(?<![nN]['’])(?<!\p{L})"
+  r'(?:(?:est|es|sont|suis|sommes|êtes)'
+  '|(?:a|as|ont|avons|avez|ai)(?:\\s+$_adverbe)*\\s+été'
+  r'|(?:a|as|ont|avons|avez|ai))'
+  '(?:\\s+$_adverbe)*'
+  r'\s+(?:prévenu|notifié|envoyé)(?:e|s|es)?(?!\p{L})',
   caseSensitive: false,
   unicode: true,
 );
 
 /// **Le compte rendu elliptique d'un envoi** : « Nouveau code envoyé. »,
 /// « Chef prévenu. » — le participe seul, en fin de proposition, qu'aucun
-/// auxiliaire, futur ou négation ne précède. C'était la phrase de
+/// auxiliaire, futur ou négation ne précède, adverbes compris (« sera bien
+/// prévenu. » passe). C'était la phrase de
 /// `codeRenvoye` avant le ticket 055 : aucun signal ne dit au client que le
 /// courriel est sorti. Les formes à auxiliaire sont l'affaire de
 /// [_faitAffirme].
 final RegExp _envoiElliptique = RegExp(
-  r'(?<!(?:été|est|es|sont|suis|sera|seras|seront|serez|pas|jamais|plus)\s)'
+  '(?<!(?:été|est|es|sont|suis|sera|seras|seront|serez|pas|jamais|plus)'
+  '(?:\\s+(?:$_adverbe|encore))*\\s)'
   r'(?<!\p{L})(?:prévenu|notifié|envoyé)(?:e|s|es)?\s*[.!]\s*$',
   caseSensitive: false,
   unicode: true,

@@ -136,6 +136,8 @@ class AppartenancesLocalesPartagees implements AppartenancesLocales {
               role: RoleMembre.membre,
               statut: StatutMembre.depuisSql(entree['st'] as String?),
               nomAffiche: entree['d'] as String?,
+              // Le rôle n'est pas gardé : « membre » n'est qu'une prudence.
+              roleConfirme: false,
             ),
       ];
     } on Object {

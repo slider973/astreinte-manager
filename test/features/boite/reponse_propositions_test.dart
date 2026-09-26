@@ -480,7 +480,31 @@ void main() {
 
       expect(
         find.text(
-          AppStrings.propositionsRefuseeParAdmin(
+          AppStrings.propositionsRefuseeNeutre(
+            'lundi 12 octobre, ${AppStrings.creneauNuit.toLowerCase()}',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('chef de centre'), findsNothing);
+      aucunEnvoiPromis(tester);
+    });
+
+    testWidgets('un rôle restauré depuis l\'appareil ne promet rien non plus', (
+      tester,
+    ) async {
+      // Hors ligne au démarrage, l'appartenance revient du stockage en simple
+      // membre (`commeMembre`) : ce n'est pas un fait, un chef seul dans sa
+      // caserne y lirait une promesse que la base ne soutient pas.
+      await _ouvrir(tester, appartenance: appartenanceAdmin.commeMembre);
+      await ouvrirLaFeuille(tester);
+
+      await tester.tap(find.text(AppStrings.refusConfirmer));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          AppStrings.propositionsRefuseeNeutre(
             'lundi 12 octobre, ${AppStrings.creneauNuit.toLowerCase()}',
           ),
         ),

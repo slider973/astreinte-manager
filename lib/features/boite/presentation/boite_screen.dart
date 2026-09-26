@@ -300,15 +300,21 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
         // **Le refus ne promet que ce que la base garantit** (ticket 055) :
         // la ligne touchée prouve que `assignment_declined` est en file pour
         // les administrateurs — sauf pour celui qui refuse, qui n'est pas
-        // prévenu de lui-même et peut être seul à administrer. À lui, rien
-        // n'est promis.
-        final admin = ref.read(appartenanceCouranteProvider)?.estAdmin ?? false;
-        _annoncer(switch ((accepte, admin)) {
+        // prévenu de lui-même et peut être seul à administrer. La promesse
+        // n'est donc faite qu'à un **membre confirmé par la base** : un rôle
+        // restauré depuis l'appareil revient toujours « membre », et un chef
+        // seul dans sa caserne y lirait une promesse fausse.
+        final appartenance = ref.read(appartenanceCouranteProvider);
+        final membreConfirme =
+            appartenance != null &&
+            appartenance.roleConfirme &&
+            !appartenance.estAdmin;
+        _annoncer(switch ((accepte, membreConfirme)) {
           (true, _) => AppStrings.propositionsAcceptee(_libelle(proposition)),
-          (false, false) => AppStrings.propositionsRefusee(
+          (false, true) => AppStrings.propositionsRefusee(
             _libelle(proposition),
           ),
-          (false, true) => AppStrings.propositionsRefuseeParAdmin(
+          (false, false) => AppStrings.propositionsRefuseeNeutre(
             _libelle(proposition),
           ),
         });

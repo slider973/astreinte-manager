@@ -2757,11 +2757,18 @@ abstract final class AppStrings {
 
   static const String publierEnCours = 'Publication…';
 
+  /// **Un nombre de destinataires mis en file, pas de livraisons** (ticket
+  /// 055). `publish-schedule` rend combien de pompiers ont une demande de
+  /// notification en file ; aucun accusé de livraison ne remonte. D'où le
+  /// futur.
   static String publiePourMois(String mois, int membres) => membres == 0
       ? 'Planning ${moisAvecDe(mois)} publié.'
       : 'Planning ${moisAvecDe(mois)} publié : '
-            '$membres pompier${membres > 1 ? 's' : ''} '
-            'notifié${membres > 1 ? 's' : ''}.';
+            '${_pompiersSerontPrevenus(membres)}.';
+
+  static String _pompiersSerontPrevenus(int membres) => membres == 1
+      ? '1 pompier sera prévenu'
+      : '$membres pompiers seront prévenus';
 
   /// **L'envoi a échoué, la publication non.** Le planning est parti en base,
   /// mais les téléphones n'ont pas sonné : le dire est la seule chose à faire,
@@ -2826,10 +2833,11 @@ abstract final class AppStrings {
       'Les notifications de publication ne sont pas parties : les pompiers '
       'attribués n\'ont pas été prévenus.';
 
+  /// Même règle que [publiePourMois] : le rattrapage rend un nombre de
+  /// destinataires **mis en file**, pas de livraisons (ticket 055).
   static String suiviRattrapageFait(int membres) => membres == 0
       ? 'Plus personne n\'attend de notification.'
-      : '$membres pompier${membres > 1 ? 's' : ''} '
-            'prévenu${membres > 1 ? 's' : ''}.';
+      : '${_pompiersSerontPrevenus(membres)}.';
   static const String suiviRelanceEnCours = 'Relance…';
 
   static String suiviRelanceFaite(int membres) => membres == 0
@@ -3134,10 +3142,12 @@ abstract final class AppStrings {
   static String propositionsRefusee(String creneau) =>
       '$creneau : refusée. Ton chef de centre sera prévenu.';
 
-  /// Le refus d'un administrateur : le déclencheur ne le prévient pas de son
-  /// propre refus, et s'il est seul à administrer la caserne, **rien** n'est
-  /// mis en file. L'écran ne promet donc rien.
-  static String propositionsRefuseeParAdmin(String creneau) =>
+  /// La phrase neutre : rien n'est promis. Pour un administrateur — le
+  /// déclencheur ne le prévient pas de son propre refus, et s'il est seul à
+  /// administrer la caserne, **rien** n'est mis en file — et pour quiconque
+  /// dont le rôle n'a pas été confirmé par la base (appartenance restaurée
+  /// depuis l'appareil, `Appartenance.roleConfirme`).
+  static String propositionsRefuseeNeutre(String creneau) =>
       '$creneau : refusée.';
 
   /// Le créneau n'est plus proposé : annulé ou confié à quelqu'un d'autre

@@ -46,6 +46,7 @@ class Appartenance {
     required this.role,
     required this.statut,
     this.nomAffiche,
+    this.roleConfirme = true,
   });
 
   /// Construit depuis la réponse PostgREST.
@@ -73,6 +74,17 @@ class Appartenance {
   final StatutMembre statut;
   final String? nomAffiche;
 
+  /// Vrai quand [role] vient d'une lecture de la base ; faux pour ce qui est
+  /// restauré depuis l'appareil ([commeMembre]), dont le rôle n'est **pas
+  /// connu** — « membre » y est une prudence, pas un fait.
+  ///
+  /// Un écran qui **affirme** quelque chose d'après le rôle doit le lire : le
+  /// refus d'une proposition ne promet « ton chef de centre sera prévenu »
+  /// que si l'on sait que le pompier n'est pas administrateur — un chef seul
+  /// dans sa caserne, restauré en membre, lirait sinon une promesse que la
+  /// base ne soutient pas (ticket 055).
+  final bool roleConfirme;
+
   bool get estActive => statut == StatutMembre.actif;
 
   bool get estAdmin => role == RoleMembre.admin;
@@ -84,16 +96,18 @@ class Appartenance {
   /// n'a pas pu revérifier n'accorde rien : c'est la règle déjà écrite dans
   /// [RoleMembre.depuisSql], appliquée à une valeur qu'on ne peut pas
   /// confirmer plutôt qu'à une valeur qu'on ne comprend pas.
-  Appartenance get commeMembre => role == RoleMembre.membre
-      ? this
-      : Appartenance(
-          id: id,
-          stationId: stationId,
-          nomCaserne: nomCaserne,
-          role: RoleMembre.membre,
-          statut: statut,
-          nomAffiche: nomAffiche,
-        );
+  ///
+  /// Le résultat porte `roleConfirme: false`, même quand le rôle était déjà
+  /// « membre » : ce qui n'a pas été revérifié n'est pas confirmé.
+  Appartenance get commeMembre => Appartenance(
+    id: id,
+    stationId: stationId,
+    nomCaserne: nomCaserne,
+    role: RoleMembre.membre,
+    statut: statut,
+    nomAffiche: nomAffiche,
+    roleConfirme: false,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -103,9 +117,17 @@ class Appartenance {
       other.nomCaserne == nomCaserne &&
       other.role == role &&
       other.statut == statut &&
-      other.nomAffiche == nomAffiche;
+      other.nomAffiche == nomAffiche &&
+      other.roleConfirme == roleConfirme;
 
   @override
-  int get hashCode =>
-      Object.hash(id, stationId, nomCaserne, role, statut, nomAffiche);
+  int get hashCode => Object.hash(
+    id,
+    stationId,
+    nomCaserne,
+    role,
+    statut,
+    nomAffiche,
+    roleConfirme,
+  );
 }
