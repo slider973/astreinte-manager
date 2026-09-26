@@ -293,13 +293,16 @@ select tests_att.check(
 reset role;
 select set_config('request.jwt.claims', '', true);
 
--- Un JWT qui dit explicitement « adresse non vérifiée » n'ouvre pas de caserne.
+-- Depuis 0038 (ticket 058), les revendications n'ont plus voix au chapitre :
+-- c'est `auth.users.email_confirmed_at` qui tranche, et ce compte est confirmé.
+-- Le cas contraire — adresse non confirmée à la source — est couvert, sous
+-- identité, par adresse_confirmee_test.sql.
 set local role authenticated;
 select tests_att.session('cccccccc-0000-4000-8000-000000000051', 'recrue51a@caserne-a.test',
                          '{"email_verified": false}'::jsonb);
 select tests_att.check(
-  (select count(*) from my_pending_invitations()) = 0,
-  'une adresse déclarée non vérifiée ne rend rien');
+  (select count(*) from my_pending_invitations()) = 2,
+  'une revendication email_verified à faux ne décide plus rien (0038)');
 reset role;
 select set_config('request.jwt.claims', '', true);
 
@@ -308,7 +311,7 @@ select tests_att.session('cccccccc-0000-4000-8000-000000000051', 'recrue51a@case
                          '{"user_metadata": {"email_verified": true}}'::jsonb);
 select tests_att.check(
   (select count(*) from my_pending_invitations()) = 2,
-  'la claim posée par GoTrue à vrai ne change rien');
+  'user_metadata.email_verified à vrai ne change rien');
 reset role;
 select set_config('request.jwt.claims', '', true);
 
