@@ -38,8 +38,7 @@ second client du pompier.
    CI savent qu'un submodule existe (`git submodule update --init`). *`foco/` et non `ios/` :
    `ios/` est déjà le projet iOS de Flutter, qui ne bouge pas (décision du 26 septembre 2026,
    chantier 066a).* Le fork est **privé** (fork d'un dépôt privé, GitHub interdit de le rendre
-   public) : le cloner demande un accès à `slider973/Foco`, et la CI d'ici une clé de déploiement
-   en lecture seule (`docs/IOS.md § 7`).
+   public) : le cloner demande un accès à `slider973/Foco`.
 2. **Même base, même contrat.** `supabase-swift` par Swift Package Manager, clé publique seulement
    (jamais la clé service), URL et clé lues d'un `.xcconfig` non commité avec un exemple commité
    (`env/` a le même rôle côté Flutter). Mêmes tables, mêmes RLS, **mêmes fonctions RPC que
@@ -71,8 +70,12 @@ second client du pompier.
 10. **Règle des caches locaux** : tout ce que l'app écrit sur l'appareil (Keychain, UserDefaults,
     fichiers) disparaît à la déconnexion, et une appartenance restaurée revient en simple membre,
     comme `lib/core/session/deconnexion.dart`.
-11. **CI** : une tâche macOS construit et teste l'app iOS **seulement quand `foco/` change**
-    (`xcodebuild build test` sur un simulateur) ; la CI Flutter ne change pas.
+11. **CI** : une tâche macOS construit et teste l'app iOS (`xcodebuild build test` sur un
+    simulateur) ; la CI Flutter ne change pas. *Précisé le 26 septembre 2026 : cette tâche vit
+    **dans le fork seulement** ([Actions](https://github.com/slider973/Foco/actions)), qui est
+    privé ; astreinte-manager, public, ne peut pas compiler son submodule. Règle : **toute mise à
+    jour du pointeur `foco/` doit viser un commit du fork dont la course est verte**
+    (`docs/IOS.md § 7`).*
 
 ## Chantiers
 
@@ -96,7 +99,7 @@ second client du pompier.
   de la PWA.
 - La déconnexion vide tout ce que l'app a écrit sur l'appareil.
 - Les extras hors schéma sont invisibles dans le build livré.
-- La tâche iOS de la CI est verte ; `flutter analyze`, `flutter test` et le déploiement de la PWA
+- La tâche iOS de la CI du fork est verte sur le commit visé par le pointeur `foco/` ; `flutter analyze`, `flutter test` et le déploiement de la PWA
   ne changent pas.
 - Vérifié par le propriétaire sur son iPhone 17 Pro Max via un build de développement ou
   TestFlight.

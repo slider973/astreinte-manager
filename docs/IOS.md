@@ -9,7 +9,7 @@ du pompier, en SwiftUI, branché sur la même base Supabase avec le même contra
 | Cible | iOS 26.4, iPhone et iPad, Xcode 26.4 ou plus récent |
 | Base | `supabase-swift` 2.55.2 (Swift Package Manager), clé **publique** seulement |
 | Tests | cible `FocoTests` (Swift Testing), `foco/scripts/ci.sh` |
-| CI | `.github/workflows/ios.yml` ici, `.github/workflows/ios.yml` dans le fork |
+| CI | **dans le fork seulement** : [slider973/Foco → Actions](https://github.com/slider973/Foco/actions) |
 
 Pourquoi `foco/` et pas `ios/` : `ios/` est le projet iOS de Flutter (`Runner`), qui reste en
 place pour le jour où une caserne demande un build natif de l'app Flutter.
@@ -109,7 +109,7 @@ Le Mac de développement du 26 septembre 2026 a Xcode 16.2 sous macOS 14.6 : il 
 installer Xcode 26 ni compiler Foco. **La CI est le compilateur** ; la vérification se fait en
 trois niveaux.
 
-1. **Tests unitaires** (CI, à chaque changement de `foco/`) contre un faux backend : décodage des
+1. **Tests unitaires** (CI du fork, à chaque PR et poussée sur `main`) contre un faux backend : décodage des
    lignes Supabase, choix de caserne (zéro, une, plusieurs, choix gardé), repli sur le cache
    limité au réseau et rétrogradé en membre, déconnexion qui vide tout (trousseau,
    `UserDefaults`, fichiers, store), traduction des erreurs, configuration (clé de service
@@ -132,29 +132,37 @@ trois niveaux.
 
 ## 7. CI
 
-`foco/scripts/ci.sh` est la recette unique : Xcode 26.4.1 (`sudo xcode-select`), un
-`Config.xcconfig` **factice** (`https://ci.invalid`, aucune vraie clé), l'iPhone 17 Pro sous le
-runtime iOS 26.4, `xcodebuild build test`, puis deux captures (mode démo, écran de connexion)
-gardées en artefact avec le `Package.resolved` obtenu.
+**La CI iOS vit dans le fork, et seulement là** :
+[slider973/Foco → Actions](https://github.com/slider973/Foco/actions), workflow `iOS`
+(`.github/workflows/ios.yml`), sur chaque PR vers `main` et chaque poussée sur `main`.
 
-- **Dans le fork** (`slider973/Foco`, `.github/workflows/ios.yml`) : à chaque poussée sur
-  `feat/**` et à chaque PR. C'est là que tourne la vérification tant que la tâche d'ici n'a pas
-  sa clé. Le fork étant privé, ses minutes macOS comptent dans le quota du compte (×10).
-- **Ici** (`.github/workflows/ios.yml`) : seulement quand `foco` (le pointeur), `.gitmodules`
-  ou le workflow changent, ou à la main. Runner `macos-26` : c'est la seule image GitHub qui
-  porte Xcode 26.4.1 et un simulateur iOS 26.4 ; `macos-15` s'arrête à Xcode 26.3. Le
-  submodule étant privé, la tâche a besoin du secret **`FOCO_DEPLOY_KEY`** :
+Pourquoi : `slider973/Foco` est le fork privé d'un dépôt privé (`T4ruxx/Foco`), que GitHub ne
+permet pas de rendre public. Le compiler depuis astreinte-manager, qui est public, demanderait une
+clé d'accès et rendrait publics les journaux de compilation et les captures d'un code privé. Le
+propriétaire a choisi de garder tout cela privé (26 septembre 2026).
 
-  ```sh
-  ssh-keygen -t ed25519 -N '' -C 'astreinte-manager CI (lecture)' -f foco_deploy_key
-  gh repo deploy-key add foco_deploy_key.pub -R slider973/Foco --title 'astreinte-manager CI'
-  gh secret set FOCO_DEPLOY_KEY -R slider973/astreinte-manager < foco_deploy_key
-  rm foco_deploy_key foco_deploy_key.pub
-  ```
+Conséquence : **une PR d'astreinte-manager ne peut pas vérifier la compilation de l'app iOS.**
+D'où la règle :
 
-  Clé en **lecture seule** (le défaut de `deploy-key add`). **À savoir avant de la poser** :
-  astreinte-manager est public, donc les journaux de compilation et les captures de cette tâche
-  le seront aussi, alors que le code de Foco vient d'un dépôt privé.
+> **Toute mise à jour du pointeur `foco/` doit viser un commit du fork dont la course `iOS` est
+> verte** — en pratique, un commit de `main` du fork, arrivé par une PR du fork dont la course
+> était verte, et dont la course sur `main` l'est aussi.
+
+`foco/scripts/ci.sh` est la recette : Xcode 26.4.1 (`sudo xcode-select`), un `Config.xcconfig`
+**factice** (`https://ci.invalid`, aucune vraie clé), l'iPhone 17 Pro sous le runtime iOS 26.4,
+`xcodebuild build test`, puis deux captures (mode démo, écran de connexion) gardées en artefact
+avec le `Package.resolved` obtenu. Runner `macos-26` : c'est la seule image GitHub qui porte
+Xcode 26.4.1 et un simulateur iOS 26.4 ; `macos-15` s'arrête à Xcode 26.3. Le fork étant privé,
+ses minutes macOS comptent dans le quota du compte (×10).
 
 La CI Flutter (`ci.yml`) et le déploiement (`deploy.yml`) ne changent pas : leur
 `actions/checkout` ne récupère pas les submodules, et `flutter analyze` ne lit que du Dart.
+
+## 8. À reprendre (066d)
+
+- **Accueil** : sur la carte « Astreinte », le titre « D'astreinte maintenant » passe sous
+  l'illustration du casque (visible sur la capture du mode démo de la CI).
+- **« Aucune caserne »** ne regarde pas les invitations en attente, contrairement à la PWA
+  (ticket 051) : il affiche seulement le fait et le conseil de demander une invitation.
+- **Libellé « Mon rôle »** dans les réglages (Membre ou Admin de caserne) remplace « Mon grade »
+  de Foco, qu'aucune colonne du schéma ne porte : à valider avec le propriétaire.
