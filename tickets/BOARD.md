@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 056 | [L'éditeur sans caserne perd sa destination au démarrage à froid](in-progress/056-superadmin-destination-perdue-a-froid.md) | P2 | 045 053 | — |
 | 057 | [Le jeton d'appareil des notifications n'est pas branché sur l'oubli](in-progress/057-jeton-appareil-hors-oubli.md) | P2 | 024 053 | — |
 
 ## À faire
@@ -15,7 +16,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 055 | [Un refus annonce « ton chef de centre est prévenu » sans preuve](backlog/055-refus-prevenu-sans-preuve.md) | P2 | 050 | — |
-| 056 | [L'éditeur sans caserne perd sa destination au démarrage à froid](backlog/056-superadmin-destination-perdue-a-froid.md) | P2 | 045 053 | — |
 | 058 | [Lire l'adresse confirmée à la source, pas dans les métadonnées](backlog/058-invitations-en-attente-adresse-confirmee.md) | P2 | 051 | — |
 
 ## Terminés

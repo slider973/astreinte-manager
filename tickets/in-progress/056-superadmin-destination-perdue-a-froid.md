@@ -5,7 +5,7 @@
 - **Dépend de** : 045, 053
 - **Branche** : `feat/056-superadmin-destination-perdue-a-froid`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-26
 
 ## Contexte
 
