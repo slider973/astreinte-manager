@@ -10,10 +10,14 @@
 --    `authenticated` —, quand elle refuse, met en file **une** demande
 --    `assignment_declined` dans la même transaction : les deux administrateurs
 --    actifs en destinataires, le membre jamais, le nom, le motif, le créneau et
---    le mois dans la charge utile. C'est ce qui rend vraie la phrase « Ton chef
+--    le mois dans la charge utile. Un administrateur **désactivé** ne reçoit
+--    rien. C'est ce qui rend vraie la phrase « Ton chef
 --    de centre sera prévenu » dès qu'une ligne revient.
 -- 2. Un administrateur qui refuse sa propre astreinte ne se prévient pas
 --    lui-même : seuls les **autres** administrateurs sont destinataires.
+-- 2 bis. Un administrateur qui enregistre un refus **à la place** d'un membre
+--    (`assignments_update_admin` : le pompier a téléphoné) n'est pas prévenu
+--    de son propre geste — l'acteur `auth.uid()` est écarté, comme le titulaire.
 -- 3. Un administrateur seul dans sa caserne refuse : rien n'est mis en file, et
 --    le refus passe quand même. L'écran ne lui promet rien.
 -- 4. Une acceptation ne met rien en file ; un refus sans proposition partie
@@ -21,7 +25,7 @@
 -- 5. `reassign_shift` rend `notified = true` pour l'entrant, avec sa ligne de
 --    file, à côté de `previous_notified`.
 --
--- Fixtures : « CIS Refus » (deux administrateurs, deux membres) et « CIS Seul »
+-- Fixtures : « CIS Refus » (deux administrateurs actifs, un désactivé, deux membres) et « CIS Seul »
 -- (un administrateur, rien d'autre), sur mars 2029.
 
 \set ON_ERROR_STOP on
@@ -105,6 +109,7 @@ from (values
   ('55555555-0550-4000-8000-000000000101'::uuid, 'adjoint@refus.test', 'Paul',   'Adam'),
   ('55555555-0550-4000-8000-000000000102'::uuid, 'bruno@refus.test',   'Bruno',  'Bertin'),
   ('55555555-0550-4000-8000-000000000103'::uuid, 'chloe@refus.test',   'Chloé',  'Colin'),
+  ('55555555-0550-4000-8000-000000000104'::uuid, 'ines@refus.test',    'Inès',   'Ancien'),
   ('55555555-0550-4000-8000-000000000200'::uuid, 'seul@refus.test',    'Solène', 'Seul')
 ) as u(id, email, first_name, last_name);
 
@@ -113,6 +118,8 @@ insert into memberships (station_id, user_id, role, status, display_name) values
   ('55555555-0550-4000-8000-000000000001', '55555555-0550-4000-8000-000000000101', 'admin',  'active', 'Paul A.'),
   ('55555555-0550-4000-8000-000000000001', '55555555-0550-4000-8000-000000000102', 'member', 'active', 'Bruno B.'),
   ('55555555-0550-4000-8000-000000000001', '55555555-0550-4000-8000-000000000103', 'member', 'active', null),
+  -- Inès : ancienne administratrice, désactivée. Elle ne doit plus rien recevoir.
+  ('55555555-0550-4000-8000-000000000001', '55555555-0550-4000-8000-000000000104', 'admin',  'disabled', 'Inès A.'),
   ('55555555-0550-4000-8000-000000000002', '55555555-0550-4000-8000-000000000200', 'admin',  'active', 'Solène S.');
 
 insert into periods (id, station_id, year, month, status, deadline_at) values
@@ -135,7 +142,9 @@ insert into shifts (id, station_id, schedule_id, date, slot, required_count) val
   ('55555555-0550-4000-8000-000000000404', '55555555-0550-4000-8000-000000000001',
    '55555555-0550-4000-8000-000000000301', '2029-03-06', 'day',   1),
   ('55555555-0550-4000-8000-000000000405', '55555555-0550-4000-8000-000000000002',
-   '55555555-0550-4000-8000-000000000302', '2029-03-03', 'day',   1);
+   '55555555-0550-4000-8000-000000000302', '2029-03-03', 'day',   1),
+  ('55555555-0550-4000-8000-000000000406', '55555555-0550-4000-8000-000000000001',
+   '55555555-0550-4000-8000-000000000301', '2029-03-07', 'night', 1);
 
 update schedules set status = 'published'
  where id in ('55555555-0550-4000-8000-000000000301', '55555555-0550-4000-8000-000000000302');
@@ -157,6 +166,10 @@ insert into assignments (id, station_id, shift_id, user_id, status, proposed_at,
   ('55555555-0550-4000-8000-000000000504', '55555555-0550-4000-8000-000000000001',
    '55555555-0550-4000-8000-000000000404', '55555555-0550-4000-8000-000000000103',
    'proposed', null, '55555555-0550-4000-8000-000000000100'),
+  -- Bruno encore : Paul, administrateur, enregistrera son refus à sa place.
+  ('55555555-0550-4000-8000-000000000506', '55555555-0550-4000-8000-000000000001',
+   '55555555-0550-4000-8000-000000000406', '55555555-0550-4000-8000-000000000102',
+   'proposed', now() - interval '1 hour', '55555555-0550-4000-8000-000000000100'),
   -- Solène, seule administratrice de sa caserne, sur sa propre garde.
   ('55555555-0550-4000-8000-000000000505', '55555555-0550-4000-8000-000000000002',
    '55555555-0550-4000-8000-000000000405', '55555555-0550-4000-8000-000000000200',
@@ -199,7 +212,7 @@ begin
   perform tests_refus.egal(dest,
     array['55555555-0550-4000-8000-000000000100',
           '55555555-0550-4000-8000-000000000101']::uuid[],
-    'les deux administrateurs actifs sont destinataires, et eux seuls');
+    'les deux administrateurs actifs sont destinataires, et eux seuls : ni Bruno, ni Inès (désactivée)');
   perform tests_refus.egal(demande.station_id, '55555555-0550-4000-8000-000000000001'::uuid,
     'la demande porte la caserne');
   perform tests_refus.egal(demande.payload ->> 'member_name', 'Bruno B.',
@@ -253,6 +266,36 @@ begin
 end $$;
 
 -- ===========================================================================
+-- 2 bis. Un administrateur refuse à la place d'un membre
+-- ===========================================================================
+\echo ''
+\echo '--- 2 bis. Paul enregistre le refus de Bruno : seule Nadia est prévenue'
+
+set local request.jwt.claims = '{"sub":"55555555-0550-4000-8000-000000000101","role":"authenticated"}';
+
+do $$
+declare
+  touchees integer;
+  demande  notification_outbox;
+begin
+  with r as (
+    update assignments set status = 'declined', decline_reason = 'appel de Bruno'
+     where id = '55555555-0550-4000-8000-000000000506' and status = 'proposed'
+    returning id
+  ) select count(*)::integer into touchees from r;
+  perform tests_refus.egal(touchees, 1,
+    'un administrateur peut enregistrer le refus d''un membre (assignments_update_admin)');
+
+  select * into demande from tests_refus.declines()
+   where dedupe_key = 'declined:55555555-0550-4000-8000-000000000506';
+  perform tests_refus.egal(demande.recipients,
+    '[{"user_id": "55555555-0550-4000-8000-000000000100"}]'::jsonb,
+    'Nadia seule : Paul, l''acteur, n''est pas prévenu de son propre geste, Bruno non plus');
+  perform tests_refus.egal(demande.payload ->> 'member_name', 'Bruno B.',
+    'la demande nomme toujours le titulaire, pas l''acteur');
+end $$;
+
+-- ===========================================================================
 -- 3. Seule administratrice : personne à prévenir, le refus passe
 -- ===========================================================================
 \echo ''
@@ -295,8 +338,8 @@ update assignments set status = 'declined'
 
 do $$
 begin
-  perform tests_refus.egal((select count(*)::integer from tests_refus.declines()), 2,
-    'toujours deux demandes : ni l''acceptation ni le brouillon n''en ajoutent');
+  perform tests_refus.egal((select count(*)::integer from tests_refus.declines()), 3,
+    'toujours trois demandes : ni l''acceptation ni le brouillon n''en ajoutent');
 end $$;
 
 -- ===========================================================================

@@ -29,11 +29,14 @@
 -- aucune. Faire rendre un accusé par la requête aurait forcé un chantier iOS
 -- pour une information que la transaction garantit déjà.
 --
--- Destinataires : les administrateurs **actifs** de la caserne, **sauf celui qui
--- refuse** — un chef de centre qui refuse sa propre astreinte n'a pas à
--- l'apprendre par push. S'il n'en reste aucun, rien n'est mis en file (`notify`
--- refuse une liste vide) : l'écran ne promet donc rien à un administrateur
--- (`AppStrings.propositionsRefuseeParAdmin`).
+-- Destinataires : les administrateurs **actifs** de la caserne, **sauf celui dont
+-- c'est l'attribution et sauf celui qui écrit** (`auth.uid()`). Un chef de centre
+-- qui refuse sa propre astreinte n'a pas à l'apprendre par push ; un
+-- administrateur qui enregistre un refus **à la place** d'un membre
+-- (`assignments_update_admin`, un pompier qui a téléphoné) non plus : c'est son
+-- propre geste. S'il n'en reste aucun, rien n'est mis en file (`notify` refuse
+-- une liste vide) : l'écran ne promet donc rien quand le rôle d'administrateur
+-- n'est pas écarté par la base (`AppStrings.propositionsRefuseeNeutre`).
 --
 -- Seul un refus **d'une proposition partie** (`proposed_at` non nul) prévient :
 -- un brouillon n'a rien demandé à personne (docs/WORKFLOWS.md § 3), et la RLS
@@ -77,7 +80,9 @@ begin
    where m.station_id = new.station_id
      and m.role       = 'admin'
      and m.status     = 'active'
-     and m.user_id   <> new.user_id;
+     and m.user_id   <> new.user_id
+     -- L'acteur : nul pour une écriture serveur, qui n'écarte alors personne.
+     and m.user_id is distinct from auth.uid();
 
   -- Personne à prévenir : `notify` refuserait une liste vide, et faire échouer
   -- le refus pour ça reviendrait à interdire de refuser.
@@ -124,7 +129,7 @@ begin
 end $$;
 
 comment on function assignments_notifier_refus() is
-  'Met en file assignment_declined aux administrateurs actifs de la caserne (sauf celui qui refuse) quand une proposition partie passe à declined, dans la transaction de la réponse. Ticket 055.';
+  'Met en file assignment_declined aux administrateurs actifs de la caserne (sauf le titulaire de l''attribution et l''acteur auth.uid()) quand une proposition partie passe à declined, dans la transaction de la réponse. Ticket 055.';
 
 revoke execute on function assignments_notifier_refus() from public, anon, authenticated;
 

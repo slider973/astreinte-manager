@@ -1402,8 +1402,8 @@ pas dans le schéma PostgREST et ne sont pas appelables en RPC.
 - `assignments_notifier_refus` (migration `0039`, ticket 055) : `after update of status` sur
   `assignments`, `when (old.status = 'proposed' and new.status = 'declined' and
   new.proposed_at is not null)`. Met en file `assignment_declined` par `notify(...)` pour les
-  administrateurs **actifs** de la caserne, **sauf celui qui refuse** ; rien s'il n'en reste
-  aucun. Charge utile : `period`, `member_name` (nom dans la caserne, puis prénom et nom, puis
+  administrateurs **actifs** de la caserne, **sauf le titulaire de l'attribution et l'acteur
+  (`auth.uid()`)** ; rien s'il n'en reste aucun. Charge utile : `period`, `member_name` (nom dans la caserne, puis prénom et nom, puis
   adresse), `decline_reason`, `shifts[]` ; `dedupe_key = 'declined:<attribution>'`.
   `security definer` : `notify` est retirée à `authenticated`, et c'est le membre qui écrit.
   Voir « Ce que garantit la réponse d'un membre » à la fin de cette section.
@@ -1585,10 +1585,25 @@ Docker dans le coffre — laisse la demande en attente sans que la réponse le s
 
 D'où les phrases de l'écran des propositions : « <créneau> : refusée. Ton chef de centre **sera**
 prévenu. » — vraie dès que la ligne revient —, et jamais « **est** prévenu », qui affirmerait une
-livraison. Deux exceptions, qu'aucun client ne peut lire dans la réponse et qu'il déduit de son
-rôle : un administrateur qui refuse sa propre astreinte ne se prévient pas lui-même, et s'il est
-seul à administrer la caserne rien n'est mis en file. L'écran ne lui promet donc rien
-(`AppStrings.propositionsRefuseeParAdmin`).
+livraison.
+
+**Qui n'est pas destinataire.** Le déclencheur écarte trois comptes :
+
+- **les administrateurs désactivés** : seuls les `active` reçoivent ;
+- **le titulaire de l'attribution** : un administrateur qui refuse sa propre astreinte ne se
+  prévient pas lui-même ;
+- **l'acteur** (`auth.uid()`) : un administrateur peut enregistrer un refus **à la place** d'un
+  membre — le pompier a téléphoné — par `assignments_update_admin`. Il n'est pas prévenu de son
+  propre geste ; les **autres** administrateurs le sont, et la charge utile nomme toujours le
+  titulaire, jamais l'acteur. Une écriture serveur (`auth.uid()` nul) n'écarte personne de plus.
+
+S'il ne reste personne — un administrateur seul dans sa caserne qui refuse —, rien n'est mis en
+file et le refus passe quand même. Aucun client ne peut le lire dans la réponse, qui reste une
+ligne ou aucune ; l'écran le déduit du rôle, et **seulement d'un rôle lu en base** :
+« sera prévenu » n'est promis qu'à un membre dont l'appartenance vient d'une lecture de
+`memberships` (`Appartenance.roleConfirme`). Un administrateur, ou quiconque dont l'appartenance a
+été restaurée depuis l'appareil — elle revient toujours en simple membre, sans que ce soit un
+fait —, lit la phrase neutre « <créneau> : refusée. » (`AppStrings.propositionsRefuseeNeutre`).
 
 **Avant la migration `0039`, aucun refus ne prévenait personne.** Le type `assignment_declined`
 existait (§ 1), sa phrase aussi (`_shared/notification_content.ts`), le diagramme du § 5 de
