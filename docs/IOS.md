@@ -135,7 +135,7 @@ que la PWA appelle aussi sur cet écran.
 - File gardée sur l'appareil (`PendingQueueMemory`, `UserDefaults`), comme `file_locale.dart` :
   elle repart au lancement suivant et part à la déconnexion avec le domaine (§ 5).
 
-**CI** : PR [slider973/Foco#3](https://github.com/slider973/Foco/pull/3), course verte sur `main` du fork au commit `ad79bf7` (visé par le pointeur `foco/`).
+**CI** : PR [slider973/Foco#3](https://github.com/slider973/Foco/pull/3), course verte sur `main` du fork au commit `ad79bf7` ; revue : PR [slider973/Foco#4](https://github.com/slider973/Foco/pull/4), course verte sur `main` au commit `4963c4d`, visé par le pointeur `foco/`.
 
 **Vérifié contre le Supabase local** (26 septembre 2026, `membre1@caserne-a.test`, code lu dans
 Mailpit) : chaque requête ci-dessus rejouée en `curl`, l'écriture relue par la requête de la PWA
@@ -149,11 +149,14 @@ La règle de `CLAUDE.md` s'applique à l'app iOS. Un seul point : `LocalWipe`
 trousseau de l'app (la session Supabase), tout le domaine `UserDefaults`, `Caches`, `tmp`
 (l'export `.ics`), `Application Support`, le cache HTTP et les cookies.
 
+- `signOut()` fait trois choses, dans cet ordre :
+  1. **la saisie** : `AvailabilityEntry.reset()` arrête minuteurs et envois, pour qu'aucune
+     écriture en vol ne réécrive sa file sur l'appareil après l'effacement ;
+  2. **la session** : fermée côté serveur tant que le jeton est encore dans le trousseau ;
+  3. **l'effacement** (`LocalWipe`), **même si le serveur ne répond pas**.
 - L'effacement porte sur des domaines entiers, pas sur des clés : un nouveau stockage local est
-  couvert d'office, et l'ordre n'importe plus. C'est le cas de la file des disponibilités
-  (`PendingQueueMemory`, clé `foco.dispos.file.<caserne>.<membre>`, 066b) ; `signOut()` arrête
-  d'abord la saisie pour qu'aucune écriture en vol ne la réécrive après l'effacement. `signOut()` ferme d'abord la session côté serveur
-  (le jeton est encore dans le trousseau), puis efface, **même si le serveur ne répond pas**.
+  couvert d'office. C'est le cas de la file des disponibilités (`PendingQueueMemory`, clé
+  `foco.dispos.file.<caserne>.<membre>`, 066b).
 - Une appartenance relue de l'appareil revient **toujours en simple membre** (le rôle n'est même
   pas gardé) ; le repli sur ce cache ne couvre qu'une panne réseau, jamais un refus de la base.
 
@@ -224,6 +227,17 @@ La CI Flutter (`ci.yml`) et le déploiement (`deploy.yml`) ne changent pas : leu
   (ticket 051) : il affiche seulement le fait et le conseil de demander une invitation.
 - **Libellé « Mon rôle »** dans les réglages (Membre ou Admin de caserne) remplace « Mon grade »
   de Foco, qu'aucune colonne du schéma ne porte : à valider avec le propriétaire.
+- **Retour du réseau (`NWPathMonitor`)** : rejouer la file des disponibilités dès que le réseau
+  revient, comme `enLigneProvider` dans la PWA, au lieu d'attendre « Réessayer » ou le lancement
+  suivant (revue du 066b).
+- **Grille sur un écran de 375 pt** (iPhone SE, mini) : sept colonnes n'y laissent qu'environ
+  40 pt de large par case ; la hauteur fait 44 pt, la largeur pas encore (revue du 066b).
+- **Classement des erreurs inconnues** : une réponse sans corps PostgREST (`HTTPError`) ou
+  illisible est classée « inconnue » et relancée ; la PWA classe un code absent en panne réseau.
+  À aligner (revue du 066b).
+- **Deux écarts de la PWA, confirmés par la revue du 066b** (détail plus bas, `lib/` non touché) :
+  `_chargerPreferences` écrit la reprise sur une caserne suspendue ; `EtatSaisie.mois` compte la
+  file d'un autre mois.
 
 ### Écarts de 066b avec la PWA, et pourquoi
 
@@ -237,6 +251,9 @@ La CI Flutter (`ci.yml`) et le déploiement (`deploy.yml`) ne changent pas : leu
   mêmes créneaux, même compte, même confirmation.
 - **Cases de 44 pt** (règle binding de `CLAUDE.md`) : la pastille de Foco reste de 32 pt, sa cible
   en fait 44 ; la grille s'allonge d'autant.
+- **Jamais la couleur seule** (revue) : la pastille porte une coche (disponible), une croix et des
+  hachures (absent) ou un filet en tirets (non saisi), comme `StatusDescriptor` de la PWA, décrits
+  par `SlotAppearance` ; une légende les nomme sous le pinceau. La palette de Foco ne change pas.
 - **Compteurs** : la tuile « Absent » de Foco est retirée (la PWA ne compte que les disponibles) ;
   les fériés sont ceux de la PWA (français, Pâques compris) et plus la liste fixe de Foco, qui
   comptait le 1er août suisse.
@@ -245,7 +262,7 @@ La CI Flutter (`ci.yml`) et le déploiement (`deploy.yml`) ne changent pas : leu
 - **Envois en série** : l'`upsert`, le `delete` et les préférences d'un lot partent l'un après
   l'autre, là où la PWA les lance ensemble (`Future.wait`). Mêmes requêtes, même nombre.
 
-### Écarts relevés dans la PWA (signalés, non corrigés : `lib/` n'est pas touché)
+### Écarts relevés dans la PWA (signalés, non corrigés : `lib/` n'est pas touché ; confirmés par la revue)
 
 - **Reprise des préférences sur une caserne suspendue.** `_chargerPreferences` ne regarde que
   `_lectureSeuleConnue` (un refus déjà essuyé), pas `lectureSeuleCaserneProvider` : sur une caserne
