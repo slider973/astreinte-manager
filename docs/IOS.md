@@ -305,14 +305,15 @@ seulement s'il y a quelque chose à marquer. La **cloche** de l'accueil porte le
 **Contrat** (`foco/Foco/Core/Backend/NotificationsContract.swift`) — exactement les requêtes de
 `lib/features/notifications/data/`, `lib/features/profil/data/profil_repository.dart` et
 `lib/features/invitation/data/invitation_repository.dart`. Aucune colonne hors de
-`docs/SCHEMA.md`, aucune fonction en dehors de `my_pending_invitations`, aucun canal temps réel.
+`docs/SCHEMA.md`, aucune fonction en dehors de `my_pending_invitations` et, depuis le ticket 057,
+`register_push_token`, aucun canal temps réel.
 
 | Appel Swift | Requête | Côté PWA |
 |---|---|---|
 | `fetchNotifications` | `GET notifications?select=id, type, title, body, data, read_at, error, created_at&user_id=eq&channel=eq.inapp&order=created_at.desc&limit=200` | `lister` |
 | `markNotificationRead` | `PATCH notifications?id=eq.<n>&read_at=is.null&select=read_at`, `{read_at}` | `marquerLue` |
 | `markAllNotificationsRead` | `PATCH notifications?user_id=eq&channel=eq.inapp&read_at=is.null&select=id`, `{read_at}` | `toutMarquerLu` |
-| `registerPushToken` | `POST push_tokens?on_conflict=token`, `resolution=merge-duplicates,return=minimal`, `{user_id, token, platform: "ios", device_label, last_seen_at}` | `enregistrer` |
+| `registerPushToken` | `POST rpc/register_push_token`, `{p_token, p_platform: "ios", p_device_label}` *(ticket 057 ; avant : `upsert` direct sur `push_tokens`)* | `enregistrer` |
 | `deletePushToken` | `DELETE push_tokens?token=eq.<t>`, `return=minimal` | `oublier` |
 | `setPushEnabled` | `PATCH profiles?id=eq.<u>`, `{push_enabled}` ; lu par la lecture du profil du 066a | `definirPushNonCritiques` |
 | `fetchPendingInvitations` | `POST rpc/my_pending_invitations` (aucun paramètre) | `mesInvitations` |
@@ -347,9 +348,10 @@ seulement s'il y a quelque chose à marquer. La **cloche** de l'accueil porte le
   étape de l'accueil de la PWA) ou le bloc « Notifications » des réglages. Refusée : la phrase et
   « Ouvrir les réglages de l'iPhone » ; jamais redemandée.
 - **Jeton** : publié à chaque lancement quand l'autorisation est accordée (`last_seen_at` à jour,
-  comme la PWA), `platform = ios` (la valeur existe dans `push_platform` depuis la migration
-  `0001`), `device_label` « iPhone · app iOS ». Un jeton rafraîchi par FCM est écrit, puis
-  l'ancien supprimé (`JetonPushController.publier`).
+  posé par le serveur, comme la PWA), `platform = ios` (la valeur existe dans `push_platform` depuis
+  la migration `0001`), `device_label` « iPhone · app iOS ». Un jeton rafraîchi par FCM est écrit,
+  puis l'ancien supprimé (`JetonPushController.publier`). Depuis le ticket 057, par
+  `register_push_token` (voir § 4 quinquies).
 - **Déconnexion** : le jeton quitte `push_tokens` **avant** la fermeture de session (la RLS
   `push_tokens_delete_self` le permet encore) et **avant** `LocalWipe` (sa mémoire est encore
   lisible), puis FCM l'oublie (`deleteToken`) : un jeton qui n'a pas pu être supprimé meurt côté
@@ -422,7 +424,8 @@ fusionnée en squash ; course verte sur `main` du fork
 - **L'invitation à activer est une carte de l'accueil**, pas un écran de fin d'accueil : l'app iOS
   n'a pas de parcours d'accueil (profil, guide). Une seule fois, jamais avant l'entrée dans la
   caserne, rien de demandé sans le geste.
-- **La déconnexion supprime le jeton de `push_tokens`** ; la PWA ne le fait pas (voir plus bas).
+- ~~**La déconnexion supprime le jeton de `push_tokens`** ; la PWA ne le fait pas.~~ La PWA le fait
+  aussi depuis le ticket 057.
 - **Rejoindre une invitation** relit les appartenances et ouvre la caserne ; la PWA passe par son
   écran d'invitation (« Bienvenue », profil, guide).
 - **Cases du mois du planning** : la bande d'un créneau dit « J 07:00 – 19:00 » quand elle tient,
@@ -436,12 +439,44 @@ fusionnée en squash ; course verte sur `main` du fork
   Foco) : pour grandir avec Dynamic Type, elles perdent leur dessin arrondi ou à empattements par
   appel. La famille par défaut (Helvetica Neue) ne change pas.
 
-### Écarts relevés dans la PWA au 066d (signalés, non corrigés : `lib/` n'est pas touché)
+### Écarts relevés dans la PWA au 066d
 
-- **Le jeton web n'est pas supprimé à la déconnexion.** `OubliLocal.tout()` oublie les caches,
-  `JetonLocal` survit (il n'est pas même effacé), et la ligne de `push_tokens` reste : un téléphone
-  de caserne prêté continue de recevoir les push du compte sorti, jusqu'à ce que FCM rende le
-  jeton invalide. L'app iOS supprime la ligne avant la fermeture de session.
+- ~~**Le jeton web n'est pas supprimé à la déconnexion.**~~ Corrigé au ticket 057 : `OubliLocal.tout()`
+  supprime la ligne de `push_tokens` avant la fermeture de session, puis oublie la clé
+  `notifications.jeton.appareil`, même si la suppression échoue.
+
+## 4 quinquies. Ticket 057 — le jeton d'un téléphone prêté
+
+Un téléphone de caserne est prêté. À la déconnexion, la ligne `push_tokens` de l'appareil part
+avant la fermeture de session (066d pour l'app iOS, 057 pour la PWA). Mais **une déconnexion hors
+ligne ne supprime rien** : la ligne reste au nom du compte sorti. Le compte suivant se connecte,
+FCM lui rend le même jeton, et l'`upsert` direct sur la clé unique `token` était refusé par la RLS :
+les push du compte sorti continuaient d'arriver sur l'appareil, et le compte connecté n'en recevait
+aucun.
+
+Correction côté base (migration `0037`, `docs/SCHEMA.md § 3`) : `register_push_token(p_token,
+p_platform, p_device_label)`, `security definer`, ouverte à `authenticated` seulement, retire le
+jeton à tout autre compte et l'inscrit au nom de la session. Un jeton FCM identifie l'appareil : le
+présenter prouve qu'on le tient. La décision est écrite dans `docs/WORKFLOWS.md § 8`.
+
+Dans l'app iOS (`foco/`) :
+
+- `NotificationsContract.registerPushTokenFunction = "register_push_token"` et
+  `RegisterPushTokenParams` (`p_token`, `p_platform: "ios"`, `p_device_label`, `null` s'il est vide)
+  remplacent l'`upsert` et `PushTokenRow`. **Aucun `user_id` ni `last_seen_at` ne part de l'app** :
+  la base les pose.
+- `FocoBackend.registerPushToken(token:deviceLabel:)` (plus d'identifiant ni d'horloge) ;
+  `SupabaseBackend` appelle `rpc/register_push_token` ; `PushCenter` exige toujours une session
+  mais n'en envoie pas l'identifiant.
+- La suppression à la déconnexion ne change pas (`DELETE push_tokens?token=eq.<t>`, avant la
+  fermeture de session et avant `LocalWipe`).
+- Tests : contrat figé des trois paramètres, enregistrement au lancement par la fonction,
+  téléphone prêté (un jeton resté au nom d'un autre compte passe au compte connecté).
+
+**CI** : PR [slider973/Foco#8](https://github.com/slider973/Foco/pull/8), course verte du premier coup ([36226985794](https://github.com/slider973/Foco/actions/runs/36226985794) : 189 tests, 0 échec,
+0 avertissement Swift), fusionnée en squash ; course verte sur `main` du fork
+([36227804089](https://github.com/slider973/Foco/actions/runs/36227804089), 189 tests, 0 avertissement)
+au commit `ecb7955`, visé par le pointeur `foco/`.
 
 ## 5. Déconnexion et caches locaux
 
@@ -458,7 +493,8 @@ trousseau de l'app (la session Supabase), tout le domaine `UserDefaults`, `Cache
      `NotificationInbox.reset()` oublie les notifications (066d) ;
   2. **le jeton push** (066d) : `PushCenter.forget()` supprime la ligne de `push_tokens` tant que
      la session le permet et que la mémoire du jeton (`PushTokenMemory`, `UserDefaults`) est encore
-     là, puis FCM oublie le jeton de l'appareil ;
+     là, puis FCM oublie le jeton de l'appareil. Hors ligne, la ligne reste : c'est
+     `register_push_token` qui la fait passer au compte suivant (ticket 057) ;
   3. **la session** : fermée côté serveur tant que le jeton est encore dans le trousseau ;
   4. **l'effacement** (`LocalWipe`), **même si le serveur ne répond pas**.
 - L'effacement porte sur des domaines entiers, pas sur des clés : un nouveau stockage local est
@@ -559,7 +595,8 @@ ouverts, par choix et consignés :
   `supabase-dev` ou relecture de `station_access` sur zéro ligne).
 - **Deux écarts de la PWA, confirmés par la revue du 066b** (détail plus bas, `lib/` non touché) :
   `_chargerPreferences` écrit la reprise sur une caserne suspendue ; `EtatSaisie.mois` compte la
-  file d'un autre mois. Et un du 066d : le jeton web n'est pas supprimé à la déconnexion (§ 4 quater).
+  file d'un autre mois. (Celui du 066d, le jeton web non supprimé à la déconnexion, est corrigé au
+  ticket 057 : § 4 quinquies.)
 
 ### Écarts de 066b avec la PWA, et pourquoi
 
