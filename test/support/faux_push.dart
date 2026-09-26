@@ -30,6 +30,20 @@ class FauxMessageriePush implements MessageriePush {
   int demandes = 0;
   int jetonsDemandes = 0;
 
+  /// Posé : [jeton] attend que le test le complète — FCM qui tarde, pendant
+  /// qu'une déconnexion arrive.
+  Completer<String?>? jetonEnAttente;
+
+  /// Combien de fois l'appareil a oublié son jeton FCM.
+  int jetonsOublies = 0;
+
+  /// Vrai : [oublierJeton] lève, comme un SDK qui échoue hors ligne. Le
+  /// vrai ne lève jamais ; le faux le fait pour prouver que ça ne bloque rien.
+  bool oubliEchoue = false;
+
+  /// Appelé au moment de [oublierJeton] : l'ordre de la déconnexion.
+  Future<void> Function()? auMomentDeLOubliFcm;
+
   final StreamController<MessagePush> messages =
       StreamController<MessagePush>.broadcast();
 
@@ -49,7 +63,16 @@ class FauxMessageriePush implements MessageriePush {
   @override
   Future<String?> jeton() async {
     jetonsDemandes++;
+    final attente = jetonEnAttente;
+    if (attente != null) return attente.future;
     return jetonRendu;
+  }
+
+  @override
+  Future<void> oublierJeton() async {
+    jetonsOublies++;
+    await auMomentDeLOubliFcm?.call();
+    if (oubliEchoue) throw const FormatException('désabonnement refusé');
   }
 
   @override
@@ -78,6 +101,10 @@ class FauxPushTokensRepository implements PushTokensRepository {
   /// La suppression part et ne revient jamais : un réseau qui se tait.
   bool suppressionSuspendue;
 
+  /// Posé : [enregistrer] attend que le test le complète — l'appel est parti,
+  /// la réponse n'est pas revenue.
+  Completer<void>? enregistrementEnAttente;
+
   /// Appelé au moment où la suppression est demandée, **avant** qu'elle
   /// réussisse ou échoue : c'est là que les tests regardent ce qui est encore
   /// sur l'appareil et si la session est encore ouverte.
@@ -93,6 +120,8 @@ class FauxPushTokensRepository implements PushTokensRepository {
     String? libelleAppareil,
   }) async {
     if (echoue) throw const FormatException('écriture refusée');
+    final attente = enregistrementEnAttente;
+    if (attente != null) await attente.future;
     ecritures.add((
       token: token,
       plateforme: plateforme,

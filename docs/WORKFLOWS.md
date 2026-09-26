@@ -312,10 +312,11 @@ Se déconnecter
   │
   ├─ 1. push_tokens : DELETE de la ligne de ce jeton        (session encore ouverte : la RLS
   │                                                          push_tokens_delete_self le permet)
-  ├─ 2. l'appareil oublie le jeton                          (PWA : clé notifications.jeton.appareil ;
-  │                                                          iOS : PushTokenMemory, puis FCM deleteToken)
-  ├─ 3. les autres caches locaux
-  └─ 4. fermeture de session
+  ├─ 2. FCM oublie le jeton, le navigateur se désabonne     (dans tous les cas, même hors ligne)
+  ├─ 3. l'appareil oublie la mémoire du jeton               (PWA : clé notifications.jeton.appareil ;
+  │                                                          iOS : PushTokenMemory, avec LocalWipe)
+  ├─ 4. les autres caches locaux
+  └─ 5. fermeture de session
 ```
 
 - **L'ordre compte.** La ligne part **avant** la fermeture de session : après, la RLS ne laisse plus
@@ -324,6 +325,17 @@ Se déconnecter
   vit la règle des caches ; côté iOS, dans `AppStore.signOut()` avant `LocalWipe`.
 - **Une suppression qui échoue ne retient personne.** Hors ligne, ou quand le réseau se tait
   (cinq secondes au plus côté PWA), la clé locale part quand même et la session se ferme.
+- **L'appareil cesse de recevoir, même hors ligne.** Sans l'étape 2, après une déconnexion sans
+  réseau, le service worker de la PWA continuerait d'afficher les push du compte sorti tant que
+  personne ne se reconnecte. La PWA appelle le `deleteToken` du SDK Firebase **puis**, dans tous
+  les cas, désabonne elle-même le navigateur (`PushSubscription.unsubscribe()`) : le `deleteToken`
+  du SDK commence par un appel au serveur FCM et, hors ligne, s'arrête avant de désabonner ; le
+  désabonnement du navigateur, lui, est local. L'app iOS appelle `deleteToken` de FCM (066d). Un
+  échec ne bloque jamais la déconnexion.
+- **Un enregistrement lancé avant la déconnexion n'écrit rien après elle.** Le jeton est publié
+  sans attente au démarrage ; si la déconnexion arrive pendant ce temps, une garde de génération
+  (comme `generation` dans `PushCenter` d'iOS) empêche d'écrire ensuite la ligne ou la clé, et un
+  enregistrement déjà parti est attendu puis son jeton supprimé.
 
 **Le cas qui reste : la déconnexion hors ligne.** La ligne est restée au nom du compte sorti. Quand
 le compte suivant se connecte sur le même appareil, FCM lui rend le même jeton, et les clients

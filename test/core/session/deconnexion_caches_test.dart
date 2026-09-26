@@ -169,6 +169,12 @@ Future<void> _remplirLesCaches({
 /// Monte l'application sur **les vrais dépôts de stockage**, notifications
 /// accordées : tout ce qu'un parcours écrit sur l'appareil est réellement
 /// écrit.
+///
+/// **La limite du filet** : il ne découvre que les clés **écrites pendant ce
+/// test**. Un cache que ce parcours n'atteint pas — un écran qu'il n'ouvre
+/// pas, un dépôt remplacé par un faux en mémoire dans `monterApp` — n'écrit
+/// rien ici, et le filet ne le voit pas. Tout nouveau stockage local doit donc
+/// aussi être écrit par ce décor (ou par le parcours), avec son vrai dépôt.
 Future<AppMontee> _monterSurLeVraiStockage(WidgetTester tester) async {
   const cacheAstreintes = CacheAstreintesPartage();
   const appartenancesLocales = AppartenancesLocalesPartagees();

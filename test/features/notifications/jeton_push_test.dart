@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/firebase/firebase_bootstrap.dart';
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/plateforme/contexte_plateforme.dart';
@@ -173,6 +175,12 @@ void main() {
         cleAuMomentDeLOubli = await cleLocale();
         deconnexionsAuMomentDeLOubli = faux.auth.deconnexions;
       };
+      List<String>? oubliesAuMomentFcm;
+      String? cleAuMomentFcm;
+      faux.push.auMomentDeLOubliFcm = () async {
+        oubliesAuMomentFcm = List<String>.of(jetons.oublies);
+        cleAuMomentFcm = await cleLocale();
+      };
 
       await seDeconnecter(tester);
       await tester.pumpAndSettle();
@@ -187,6 +195,17 @@ void main() {
         deconnexionsAuMomentDeLOubli,
         0,
         reason: 'avant la fermeture de session : après, la RLS refuse',
+      );
+      expect(faux.push.jetonsOublies, 1, reason: 'FCM oublie le jeton');
+      expect(
+        oubliesAuMomentFcm,
+        <String>['jeton-de-test'],
+        reason: 'après la tentative de suppression côté serveur',
+      );
+      expect(
+        cleAuMomentFcm,
+        'jeton-de-test',
+        reason: 'et avant l\'effacement de la clé',
       );
       expect(await cleLocale(), isNull, reason: 'puis la clé part');
       expect(faux.auth.deconnexions, 1);
@@ -212,9 +231,100 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(jetons.oublies, isEmpty);
+      expect(
+        faux.push.jetonsOublies,
+        1,
+        reason: 'le navigateur se désabonne quand même : il marche hors ligne',
+      );
       expect(await cleLocale(), isNull);
       expect(faux.auth.deconnexions, 1, reason: 'personne n\'est retenu');
       expect(find.byType(ConnexionScreen), findsOneWidget);
+    });
+
+    testWidgets('un désabonnement FCM qui échoue ne retient rien', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final jetons = FauxPushTokensRepository();
+      final faux = await _lancer(
+        tester,
+        messagerie: FauxMessageriePush(
+          etatPermission: PermissionPush.accordee,
+        ),
+        jetonLocal: const JetonLocalPartage(),
+        jetons: jetons,
+      );
+      faux.push.oubliEchoue = true;
+
+      await seDeconnecter(tester);
+      await tester.pumpAndSettle();
+
+      expect(faux.push.jetonsOublies, 1);
+      expect(jetons.oublies, <String>['jeton-de-test']);
+      expect(await cleLocale(), isNull);
+      expect(faux.auth.deconnexions, 1);
+      expect(find.byType(ConnexionScreen), findsOneWidget);
+    });
+
+    testWidgets('un jeton rendu par FCM après la déconnexion n\'écrit ni '
+        'ligne ni clé', (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final jetons = FauxPushTokensRepository();
+      final messagerie = FauxMessageriePush(
+        etatPermission: PermissionPush.accordee,
+      )..jetonEnAttente = Completer<String?>();
+      final faux = await _lancer(
+        tester,
+        messagerie: messagerie,
+        jetonLocal: const JetonLocalPartage(),
+        jetons: jetons,
+      );
+      // `publier` est parti au lancement, sans attente, et attend FCM.
+      expect(messagerie.jetonsDemandes, 1);
+
+      await seDeconnecter(tester);
+      await tester.pumpAndSettle();
+      expect(faux.auth.deconnexions, 1);
+
+      // FCM répond enfin, sur un appareil déjà rendu.
+      messagerie.jetonEnAttente!.complete('jeton-tardif');
+      await tester.pumpAndSettle();
+
+      expect(jetons.ecritures, isEmpty, reason: 'aucune ligne');
+      expect(await cleLocale(), isNull, reason: 'aucune clé');
+    });
+
+    testWidgets('un enregistrement en vol est attendu, puis son jeton '
+        'supprimé', (tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final jetons = FauxPushTokensRepository()
+        ..enregistrementEnAttente = Completer<void>();
+      final faux = await _lancer(
+        tester,
+        messagerie: FauxMessageriePush(
+          etatPermission: PermissionPush.accordee,
+        ),
+        jetonLocal: const JetonLocalPartage(),
+        jetons: jetons,
+      );
+
+      await seDeconnecter(tester);
+      await tester.pump();
+      expect(
+        jetons.oublies,
+        isEmpty,
+        reason: 'la suppression attend l\'enregistrement parti avant elle',
+      );
+
+      // La base répond : la ligne existe, et c'est elle que la déconnexion
+      // supprime ensuite.
+      jetons.enregistrementEnAttente!.complete();
+      await tester.pumpAndSettle();
+
+      expect(jetons.ecritures.map((e) => e.token), <String>['jeton-de-test']);
+      expect(jetons.oublies, <String>['jeton-de-test']);
+      expect(await cleLocale(), isNull, reason: 'publier n\'a pas écrit la clé');
+      expect(faux.auth.deconnexions, 1);
     });
 
     testWidgets('un réseau qui se tait ne retient pas la déconnexion', (

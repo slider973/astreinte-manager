@@ -15,3 +15,7 @@ import 'pont_stub.dart' if (dart.library.js_interop) 'pont_web.dart';
 ///    destination. **C'est ce flux-ci**, et sans lui on reviendrait sur
 ///    l'écran quitté au lieu de la proposition.
 Stream<String> routesDepuisServiceWorker() => ecouterServiceWorker();
+
+/// Oublie l'abonnement push de ce navigateur, **sans réseau**
+/// (voir `desabonnerPushLocal`).
+Future<void> oublierAbonnementPush() => desabonnerPushLocal();

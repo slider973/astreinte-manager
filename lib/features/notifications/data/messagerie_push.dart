@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/env.dart';
 import '../domain/etat_notifications.dart';
 import '../domain/message_push.dart';
+import 'pont_service_worker.dart';
 
 /// Le canal de notifications, vu par l'application.
 ///
@@ -24,6 +25,12 @@ abstract interface class MessageriePush {
 
   /// Le jeton FCM de cet appareil, ou `null` si le navigateur le refuse.
   Future<String?> jeton();
+
+  /// **À la déconnexion** : cet appareil cesse de recevoir des push, même
+  /// hors ligne. Sans cela, après une déconnexion sans réseau, le service
+  /// worker continuerait d'afficher les push du compte sorti tant que
+  /// personne ne se reconnecte (ticket 057). Ne lève jamais.
+  Future<void> oublierJeton();
 
   /// Les messages reçus **pendant que l'application est au premier plan**. Le
   /// système n'affiche rien dans ce cas : c'est l'application qui montre.
@@ -108,6 +115,25 @@ class MessageriePushFirebase implements MessageriePush {
     }
   }
 
+  /// Le `deleteToken` du SDK prévient FCM **puis** désabonne le navigateur ;
+  /// hors ligne, il échoue au premier temps et ne fait pas le second. Le
+  /// désabonnement local est donc fait ensuite, dans tous les cas.
+  @override
+  Future<void> oublierJeton() async {
+    try {
+      await FirebaseMessaging.instance.deleteToken().timeout(
+        const Duration(seconds: 5),
+      );
+    } on Object catch (erreur) {
+      if (kDebugMode) debugPrint('Jeton FCM non supprimé : $erreur');
+    }
+    try {
+      await oublierAbonnementPush();
+    } on Object catch (erreur) {
+      if (kDebugMode) debugPrint('Abonnement push non oublié : $erreur');
+    }
+  }
+
   @override
   Stream<MessagePush> get messagesPremierPlan =>
       FirebaseMessaging.onMessage.map(
@@ -146,6 +172,10 @@ class MessageriePushIndisponible implements MessageriePush {
 
   @override
   Future<String?> jeton() async => null;
+
+  /// Rien n'a été abonné : rien à oublier, et surtout aucun appel à Google.
+  @override
+  Future<void> oublierJeton() async {}
 
   @override
   Stream<MessagePush> get messagesPremierPlan => const Stream<MessagePush>.empty();
