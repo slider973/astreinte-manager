@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// `push_platform` (`docs/SCHEMA.md § 1`). Le ticket 024 n'écrit que `web` ;
-/// `ios` et `android` attendent le ticket 036.
+/// `push_platform` (`docs/SCHEMA.md § 1`). La PWA n'écrit que `web` ; `ios` est
+/// écrit par l'app iOS native (`foco/`, ticket 066d).
 enum PlateformePush {
   web('web'),
   ios('ios'),
@@ -14,9 +14,12 @@ enum PlateformePush {
 
 /// Les jetons push de l'utilisateur connecté (`docs/SCHEMA.md § 2.11`).
 abstract interface class PushTokensRepository {
-  /// Enregistre ou rafraîchit le jeton de cet appareil.
+  /// Enregistre ou rafraîchit le jeton de cet appareil **au nom de la
+  /// session**, et le retire à tout autre compte qui le portait encore.
+  ///
+  /// Pas d'identifiant de membre : c'est la base qui le lit dans la session
+  /// (`register_push_token`, migration `0037`).
   Future<void> enregistrer({
-    required String userId,
     required String token,
     required PlateformePush plateforme,
     String? libelleAppareil,
@@ -28,43 +31,46 @@ abstract interface class PushTokensRepository {
 }
 
 /// Implémentation Supabase.
-///
-/// L'écriture passe par RLS : `push_tokens_insert_self` et
-/// `push_tokens_update_self` n'acceptent que `user_id = auth.uid()`
-/// (migration `0007`). Le `user_id` écrit ici est donc vérifié en base, pas
-/// ici.
 class SupabasePushTokensRepository implements PushTokensRepository {
   SupabasePushTokensRepository(this._client);
 
   final SupabaseClient _client;
 
-  /// Un `upsert` sur la contrainte d'unicité de `token`, **jamais un insert**.
+  /// Le nom de la fonction, figé ici et dans le contrat de l'app iOS.
+  static const String fonctionEnregistrement = 'register_push_token';
+
+  /// **Par `register_push_token`, jamais par un `upsert` direct.**
   ///
-  /// C'est ce qui tient la promesse « rafraîchi à chaque lancement, sans
-  /// doublon » : FCM rend le même jeton tant que l'abonnement du navigateur
-  /// tient, et la ligne existante est alors mise à jour — seul `last_seen_at`
-  /// bouge. Quand le navigateur en rend un nouveau, c'est une nouvelle ligne,
-  /// et l'ancienne est supprimée par [oublier] (voir `JetonPushLocal`).
+  /// Un téléphone de caserne est prêté. Si la personne précédente s'est
+  /// déconnectée hors ligne, la ligne de ce jeton est restée à son nom, et
+  /// l'`upsert` de la personne suivante sur la même clé unique était refusé par
+  /// la RLS : les push de l'une continuaient d'arriver sur l'appareil, l'autre
+  /// n'en recevait aucun. La fonction réattribue le jeton au compte de la
+  /// session — un jeton FCM identifie l'appareil, et le présenter prouve qu'on
+  /// le tient (`docs/WORKFLOWS.md § 8`, ticket 057).
+  ///
+  /// Même promesse qu'avant : rafraîchi à chaque lancement, sans doublon.
+  /// `last_seen_at` est posé par le serveur ; un libellé vide s'écrit `null`.
   @override
   Future<void> enregistrer({
-    required String userId,
     required String token,
     required PlateformePush plateforme,
     String? libelleAppareil,
   }) async {
     final libelle = libelleAppareil?.trim() ?? '';
 
-    await _client
-        .from('push_tokens')
-        .upsert(<String, dynamic>{
-          'user_id': userId,
-          'token': token,
-          'platform': plateforme.valeurSql,
-          'device_label': libelle.isEmpty ? null : libelle,
-          'last_seen_at': DateTime.now().toUtc().toIso8601String(),
-        }, onConflict: 'token');
+    await _client.rpc<dynamic>(
+      fonctionEnregistrement,
+      params: <String, dynamic>{
+        'p_token': token,
+        'p_platform': plateforme.valeurSql,
+        'p_device_label': libelle.isEmpty ? null : libelle,
+      },
+    );
   }
 
+  /// Sous RLS (`push_tokens_delete_self`) : seulement tant que la session est
+  /// ouverte, et seulement une ligne à soi.
   @override
   Future<void> oublier(String token) async {
     await _client.from('push_tokens').delete().eq('token', token);

@@ -104,13 +104,29 @@ class JetonPushController extends Notifier<String?> {
   @override
   String? build() => null;
 
+  /// Change à chaque désenregistrement. Un `publier` lancé avant, et qui
+  /// reprend la main après, voit qu'elle a changé et n'écrit plus rien — même
+  /// garde que `generation` dans `PushCenter` de l'app iOS.
+  int _generation = 0;
+
+  /// L'enregistrement en vol, et le jeton qu'il porte : la déconnexion
+  /// l'attend, puis supprime ce jeton-là aussi, sinon une ligne écrite juste
+  /// après la suppression resterait au nom du compte sorti.
+  ({String jeton, Future<void> envoi})? _enVol;
+
   /// Demande un jeton à FCM et l'écrit en base, en remplaçant celui que cet
   /// appareil portait avant.
   ///
   /// Appelée **à chaque lancement** quand les notifications sont actives :
   /// c'est elle qui tient `last_seen_at` à jour et qui garantit qu'un jeton
-  /// périmé est remplacé et non dupliqué.
+  /// périmé est remplacé et non dupliqué. Elle est lancée sans attente au
+  /// démarrage : une déconnexion peut donc survenir pendant qu'elle attend.
+  /// Après chaque attente, elle vérifie qu'aucun désenregistrement n'est passé
+  /// entre-temps, et sinon n'écrit ni la ligne ni la clé.
   Future<void> publier() async {
+    final generation = _generation;
+    bool depassee() => generation != _generation;
+
     final etat = ref.read(notificationsControllerProvider).value;
     if (etat == null || !etat.estActive) return;
 
@@ -118,25 +134,33 @@ class JetonPushController extends Notifier<String?> {
     if (session == null) return;
 
     final jeton = await ref.read(messageriePushProvider).jeton();
-    if (jeton == null || jeton.isEmpty) return;
+    if (jeton == null || jeton.isEmpty || depassee()) return;
 
     final local = ref.read(jetonLocalProvider);
     final depot = ref.read(pushTokensRepositoryProvider);
     final precedent = await local.lire();
+    if (depassee()) return;
 
     try {
-      await depot.enregistrer(
-        userId: session.userId,
+      final envoi = depot.enregistrer(
         token: jeton,
         plateforme: PlateformePush.web,
         libelleAppareil: ref.read(contextePlateformeProvider).libelleAppareil,
       );
+      _enVol = (jeton: jeton, envoi: envoi);
+      try {
+        await envoi;
+      } finally {
+        if (_enVol?.envoi == envoi) _enVol = null;
+      }
+      if (depassee()) return;
 
       // L'ancien ne part qu'une fois le nouveau écrit : si l'écriture échoue,
       // l'appareil garde au moins un jeton joignable.
       if (precedent != null && precedent != jeton) {
         await depot.oublier(precedent);
       }
+      if (depassee()) return;
       await local.ecrire(jeton);
       state = jeton;
     } on Object catch (erreur) {
@@ -144,6 +168,64 @@ class JetonPushController extends Notifier<String?> {
       // en faire et rien à corriger. La prochaine ouverture réessaiera.
       if (kDebugMode) debugPrint('Jeton non enregistré : $erreur');
     }
+  }
+
+  /// Le temps laissé à la base pour supprimer la ligne à la déconnexion.
+  ///
+  /// Le réseau d'une remise ou d'un véhicule ne refuse pas toujours : il se
+  /// tait. Sans limite, « Se déconnecter » attendrait une réponse qui ne
+  /// vient pas, sur le téléphone même qu'on veut rendre.
+  static const Duration delaiDesenregistrement = Duration(seconds: 5);
+
+  /// **À la déconnexion**, dans cet ordre :
+  ///
+  /// 1. la ligne de `push_tokens` part côté serveur — **avant** la fermeture
+  ///    de session : après, la RLS (`push_tokens_delete_self`) ne le permet
+  ///    plus ;
+  /// 2. le navigateur oublie le jeton FCM et se désabonne des push
+  ///    ([MessageriePush.oublierJeton]) — **dans tous les cas**, y compris
+  ///    hors ligne : c'est ce qui empêche le service worker d'afficher encore
+  ///    les push du compte sorti ;
+  /// 3. la mémoire du jeton (`notifications.jeton.appareil`) part de
+  ///    l'appareil — en dernier, parce que c'est elle qui dit quel jeton viser.
+  ///
+  /// N'est appelée que par `OubliLocal` (`core/session/oubli_local.dart`), le
+  /// seul endroit où s'écrit la règle des caches locaux. Aucun échec ne
+  /// retient la déconnexion : une ligne restée au nom du compte sorti passera
+  /// au compte suivant par `register_push_token` (`docs/WORKFLOWS.md § 8`).
+  Future<void> desenregistrer() async {
+    _generation++;
+    final local = ref.read(jetonLocalProvider);
+    final depot = ref.read(pushTokensRepositoryProvider);
+
+    // Un enregistrement parti avant la déconnexion : on l'attend (borné),
+    // pour que la suppression passe après lui et non avant.
+    final enVol = _enVol;
+    if (enVol != null) {
+      try {
+        await enVol.envoi.timeout(delaiDesenregistrement);
+      } on Object {
+        // Échoué ou muet : il ne retient personne.
+      }
+    }
+
+    final jetons = <String>{?await local.lire(), ?state, ?enVol?.jeton};
+    for (final jeton in jetons) {
+      try {
+        await depot.oublier(jeton).timeout(delaiDesenregistrement);
+      } on Object catch (erreur) {
+        if (kDebugMode) debugPrint('Jeton non désenregistré : $erreur');
+      }
+    }
+
+    try {
+      await ref.read(messageriePushProvider).oublierJeton();
+    } on Object catch (erreur) {
+      if (kDebugMode) debugPrint('Jeton FCM non oublié : $erreur');
+    }
+
+    await local.effacer();
+    state = null;
   }
 }
 

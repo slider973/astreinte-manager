@@ -1334,6 +1334,14 @@ export type Database = {
         }
         Returns: Json
       }
+      register_push_token: {
+        Args: {
+          p_device_label?: string
+          p_platform: Database["public"]["Enums"]["push_platform"]
+          p_token: string
+        }
+        Returns: undefined
+      }
       remind_schedule: {
         Args: { p_schedule: string; p_tout?: boolean }
         Returns: Json

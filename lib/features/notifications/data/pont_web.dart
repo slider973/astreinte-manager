@@ -9,6 +9,26 @@ import 'package:web/web.dart' as web;
 /// qu'au nôtre.
 const String _typeNavigation = 'astreinte-sp/navigation';
 
+/// Désabonne ce navigateur de **tous** les push de l'origine, sans réseau.
+///
+/// `PushSubscription.unsubscribe()` est local : le navigateur oublie
+/// l'abonnement, et le service worker ne reçoit plus rien, même si FCM n'a
+/// pas été prévenu. C'est ce qui tient hors ligne, là où le `deleteToken` du
+/// SDK Firebase commence par un appel au serveur et s'arrête s'il échoue.
+/// L'application n'utilise les push que pour FCM : il n'y a rien d'autre à
+/// épargner.
+Future<void> desabonnerPushLocal() async {
+  final enregistrements = await web.window.navigator.serviceWorker
+      .getRegistrations()
+      .toDart;
+  for (final enregistrement in enregistrements.toDart) {
+    final abonnement = await enregistrement.pushManager
+        .getSubscription()
+        .toDart;
+    if (abonnement != null) await abonnement.unsubscribe().toDart;
+  }
+}
+
 /// Écoute les destinations postées par le service worker.
 Stream<String> ecouterServiceWorker() {
   // Le contrôleur vit aussi longtemps que l'abonnement : il se ferme quand le

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/astreintes/data/cache_astreintes.dart';
 import '../../features/astreintes/data/cache_planning_caserne.dart';
 import '../../features/dispos/data/file_locale.dart';
+import '../../features/notifications/domain/notifications_providers.dart';
 import 'appartenances_locales.dart';
 import 'caserne_choisie.dart';
 import 'session_providers.dart';
@@ -35,6 +36,15 @@ import 'session_providers.dart';
 ///   - la file de saisie hors ligne (`dispos.file.…`, `dispos.prefs.…`), qui
 ///     porte **les disponibilités déclarées** et qui, après une suppression de
 ///     compte, tenterait d'écrire au nom de quelqu'un qui n'existe plus.
+///   - le jeton push de l'appareil (`notifications.jeton.appareil`, ticket
+///     057) : sa ligne de `push_tokens` est **d'abord** supprimée côté serveur
+///     — sinon les push du compte sorti continuent d'arriver sur un téléphone
+///     prêté —, puis la clé locale part, que la suppression ait réussi ou non.
+///
+/// Ne restent que les repères d'accueil (`accueil.…`, `dispos.peinture.faite`,
+/// `matrice.procuration.confirmee`) : des marques de passage de l'appareil,
+/// sans rien de la personne. `test/core/session/deconnexion_caches_test.dart`
+/// relit **tout** le stockage après la déconnexion, et ne tolère que ceux-là.
 ///
 /// Sur un téléphone prêté ou dans un véhicule partagé, ce sont des données de
 /// tiers qui n'ont rien à faire là pour la personne suivante — même règle que
@@ -55,6 +65,11 @@ class OubliLocal {
   final Ref _ref;
 
   Future<void> tout() async {
+    // **En premier, et hors de la garde de session** : la suppression côté
+    // serveur a besoin de la session encore ouverte, et la clé est une clé
+    // d'appareil — elle part même si l'identifiant du membre n'est plus lisible.
+    await _ref.read(jetonPushProvider.notifier).desenregistrer();
+
     final userId = _ref.read(sessionProvider).value?.userId;
     if (userId == null) return;
 

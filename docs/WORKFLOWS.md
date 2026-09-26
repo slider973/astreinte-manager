@@ -295,3 +295,56 @@ posent la même question que la ligne de proposition qui vit à côté, laquelle
 compte de non-lues de la cloche, de la pastille de la barre et du titre suit la même règle, pour
 qu'aucune non-lue ne reste invisible et incomptée. `assignment_changed` n'en fait pas partie : une
 réattribution est un fait, et c'est un rappel, bien que son lien mène aussi aux propositions.
+
+### Le jeton de l'appareil à la déconnexion *(décision du ticket 057)*
+
+Un téléphone de caserne est prêté, un véhicule est partagé. Le jeton push est une donnée
+**d'appareil**, et c'est ce qui l'avait fait échapper à la règle des caches locaux : la question
+n'était pas « que devient-il sur le téléphone ? » mais « à qui ses push arrivent-ils ensuite ? ».
+
+**Décision : à la déconnexion, le jeton est désenregistré côté serveur pour ce compte, puis oublié
+sur l'appareil.** Pas « conservé comme identité d'appareil et dissocié du compte » : le schéma n'a
+pas de ligne d'appareil sans compte, et rien n'a besoin de s'en souvenir — FCM rend le même jeton à
+la connexion suivante.
+
+```
+Se déconnecter
+  │
+  ├─ 1. push_tokens : DELETE de la ligne de ce jeton        (session encore ouverte : la RLS
+  │                                                          push_tokens_delete_self le permet)
+  ├─ 2. FCM oublie le jeton, le navigateur se désabonne     (dans tous les cas, même hors ligne)
+  ├─ 3. l'appareil oublie la mémoire du jeton               (PWA : clé notifications.jeton.appareil ;
+  │                                                          iOS : PushTokenMemory, avec LocalWipe)
+  ├─ 4. les autres caches locaux
+  └─ 5. fermeture de session
+```
+
+- **L'ordre compte.** La ligne part **avant** la fermeture de session : après, la RLS ne laisse plus
+  la supprimer. Et **avant** l'oubli local : sans la mémoire, on ne saurait plus quel jeton viser.
+  Côté PWA, tout se fait dans `OubliLocal` (`lib/core/session/oubli_local.dart`), le seul endroit où
+  vit la règle des caches ; côté iOS, dans `AppStore.signOut()` avant `LocalWipe`.
+- **Une suppression qui échoue ne retient personne.** Hors ligne, ou quand le réseau se tait
+  (cinq secondes au plus côté PWA), la clé locale part quand même et la session se ferme.
+- **L'appareil cesse de recevoir, même hors ligne.** Sans l'étape 2, après une déconnexion sans
+  réseau, le service worker de la PWA continuerait d'afficher les push du compte sorti tant que
+  personne ne se reconnecte. La PWA appelle le `deleteToken` du SDK Firebase **puis**, dans tous
+  les cas, désabonne elle-même le navigateur (`PushSubscription.unsubscribe()`) : le `deleteToken`
+  du SDK commence par un appel au serveur FCM et, hors ligne, s'arrête avant de désabonner ; le
+  désabonnement du navigateur, lui, est local. L'app iOS appelle `deleteToken` de FCM (066d). Un
+  échec ne bloque jamais la déconnexion.
+- **Un enregistrement lancé avant la déconnexion n'écrit rien après elle.** Le jeton est publié
+  sans attente au démarrage ; si la déconnexion arrive pendant ce temps, une garde de génération
+  (comme `generation` dans `PushCenter` d'iOS) empêche d'écrire ensuite la ligne ou la clé, et un
+  enregistrement déjà parti est attendu puis son jeton supprimé.
+
+**Le cas qui reste : la déconnexion hors ligne.** La ligne est restée au nom du compte sorti. Quand
+le compte suivant se connecte sur le même appareil, FCM lui rend le même jeton, et les clients
+l'enregistrent par `register_push_token` (`docs/SCHEMA.md § 3`, migration `0037`) — jamais par un
+`upsert` direct, que la RLS refusait sur la ligne d'un autre. La fonction **retire le jeton à tout
+autre compte** et l'inscrit au nom de la session.
+
+C'est légitime parce qu'**un jeton FCM identifie l'appareil** : le posséder prouve qu'on tient
+l'appareil, et un push va là où est l'appareil. Le compte sorti ne perd que la ligne d'un téléphone
+qu'il n'a plus en main ; ses autres appareils gardent les leurs. Un push qui lui est destiné
+n'atteint donc plus le téléphone prêté dès que quelqu'un d'autre s'y connecte — et, en ligne, dès sa
+déconnexion.
