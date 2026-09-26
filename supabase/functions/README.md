@@ -820,6 +820,7 @@ Réponse `200` :
   "user_id": "uuid",
   "was_available": false, // attribué contre sa déclaration : la base l'a journalisé
   "proposed_at": "2026-10-03T08:12:44.019Z",
+  "notified": true, // la demande de l'entrant est en file (0039) — pas livrée
   "previous": { // null quand rien n'était à remplacer
     "id": "uuid",
     "user_id": "uuid",
@@ -830,6 +831,11 @@ Réponse `200` :
   "period": "2026-10"
 }
 ```
+
+**`notified` et `previous.notified` disent « mis en file », pas « prévenu ».** Les deux sont vrais
+quand `notify(...)` a écrit la demande dans `notification_outbox`, dans la transaction de la
+réattribution (migration `0039` pour l'entrant, `0020` pour le sortant). La livraison est asynchrone
+: l'écran dit donc « <membre> sera prévenu », jamais « est prévenu » (ticket 055).
 
 Erreurs, forme `{"error": {"code", "message"}}` :
 
