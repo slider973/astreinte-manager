@@ -407,7 +407,7 @@ de test qui ne compilait pas, et deux avertissements de dépréciation Firebase 
 12.17.0), puis vertes ([36221277439](https://github.com/slider973/Foco/actions/runs/36221277439),
 [36222088597](https://github.com/slider973/Foco/actions/runs/36222088597),
 [36222896964](https://github.com/slider973/Foco/actions/runs/36222896964) : 190 tests,
-0 avertissement Swift de l'app, 13 captures dont le centre de notifications et six à AX3),
+0 avertissement Swift de l'app, 13 captures dont le centre de notifications et six à AX3 (la capture des disponibilités peut sortir blanche : attente fixe de 8 s dans `scripts/ci.sh`, à fiabiliser)),
 fusionnée en squash ; course verte sur `main` du fork
 ([36223546760](https://github.com/slider973/Foco/actions/runs/36223546760), 190 tests,
 0 avertissement) au commit `be48a1c`, visé par le pointeur `foco/`.
@@ -560,8 +560,6 @@ ouverts, par choix et consignés :
 - **Deux écarts de la PWA, confirmés par la revue du 066b** (détail plus bas, `lib/` non touché) :
   `_chargerPreferences` écrit la reprise sur une caserne suspendue ; `EtatSaisie.mois` compte la
   file d'un autre mois. Et un du 066d : le jeton web n'est pas supprimé à la déconnexion (§ 4 quater).
-- **Le correctif `apns` de l'Edge Function d'envoi** (§ 9) : sans lui, les push iOS arrivent sans
-  son.
 
 ### Écarts de 066b avec la PWA, et pourquoi
 
@@ -613,31 +611,11 @@ faire dans la CI.
 3. **Firebase iOS** (`docs/FIREBASE.md § 9`) : l'application iOS dans le **même** projet Firebase
    que la PWA, la clé APNs `.p8` (Key ID, Team ID) importée dans *Cloud Messaging*, et
    `GoogleService-Info.plist` déposé en `foco/Foco/GoogleService-Info.plist` (jamais commité).
-4. **Le correctif `apns` de l'Edge Function** (`supabase/functions/_shared/fcm.ts`), à confier à
-   `supabase-dev` : sans lui, iOS affiche les push **sans son**. Dans `corpsMessage`, à côté de
-   `webpush` :
-
-   ```ts
-   apns: {
-     headers: message.etiquette ? { "apns-collapse-id": message.etiquette.slice(0, 64) } : undefined,
-     payload: {
-       aps: {
-         sound: "default",
-         ...(message.etiquette ? { "thread-id": message.etiquette } : {}),
-       },
-     },
-   },
-   ```
-
-   `notification.title` et `notification.body` suffisent à l'alerte (FCM les recopie dans
-   `aps.alert`), `data.route` arrive déjà à la racine du `userInfo` : l'app n'a besoin de rien
-   d'autre. Un test dans `fcm_test.ts` : `apns.payload.aps.sound === "default"`, et le bloc
-   `webpush` inchangé. Rien ne change pour la PWA.
-5. **TestFlight** : dans App Store Connect, créer l'app avec l'identifiant du point 1 ; dans Xcode,
+4. **TestFlight** : dans App Store Connect, créer l'app avec l'identifiant du point 1 ; dans Xcode,
    *Product → Archive* avec le `Config.xcconfig` de production et `GoogleService-Info.plist` en
    place, puis *Distribute App → TestFlight*. `aps-environment` passe en `production`
    automatiquement à l'export.
-6. **Vérification sur l'iPhone 17 Pro Max** (dernier critère du ticket), build de développement ou
+5. **Vérification sur l'iPhone 17 Pro Max** (dernier critère du ticket), build de développement ou
    TestFlight : connexion par code ; mêmes disponibilités, propositions, astreintes et planning que
    la PWA, une saisie faite d'un côté visible de l'autre ; centre de notifications et cloche ;
    « Activer les notifications », ligne `platform = ios` dans `push_tokens`, envoi de test avec
@@ -645,3 +623,5 @@ faire dans la CI.
    retire la ligne et vide l'appareil ; taille de texte AX3 (Réglages → Accessibilité → Affichage et
    taille du texte) et VoiceOver sur l'accueil, les disponibilités, les propositions, mes astreintes,
    le planning et les notifications.
+
+Le bloc `apns` de l'Edge Function d'envoi est fait au chantier 066d (commit `e500717`) : les push iOS portent le son, et `deploy.yml` le met en ligne à la fusion.
