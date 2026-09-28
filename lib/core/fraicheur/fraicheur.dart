@@ -106,8 +106,8 @@ class Fraicheur {
 
   /// Les relectures retenues sous une écriture, et l'abonnement qui les
   /// relancera.
-  final Map<Donnee, ProviderSubscription<Object?>> _retenues =
-      <Donnee, ProviderSubscription<Object?>>{};
+  final Map<Donnee, List<ProviderSubscription<Object?>>> _retenues =
+      <Donnee, List<ProviderSubscription<Object?>>>{};
 
   /// Les écrans montés, et ce que chacun affiche.
   final Map<Object, Set<Donnee>> _ecrans = <Object, Set<Donnee>>{};
@@ -143,8 +143,7 @@ class Fraicheur {
   Future<void> auPremierPlan() => auRetour(<Donnee>{...globales, ...affichees});
 
   /// Relit ce qui a vieilli parmi [donnees].
-  Future<void> auRetour(Set<Donnee> donnees) =>
-      _tout(donnees, forcer: false);
+  Future<void> auRetour(Set<Donnee> donnees) => _tout(donnees, forcer: false);
 
   /// Relit [donnees] **tout de suite**, délai minimal ou pas : un événement
   /// vient d'annoncer une nouveauté.
@@ -164,9 +163,9 @@ class Fraicheur {
     // Les périodes ont leur coordinateur depuis le ticket 068, et ses tests :
     // on lui délègue, il applique la même discipline.
     if (donnee == Donnee.periodes) {
-      return _ref.read(rafraichissementPeriodesProvider).auRetour(
-        forcer: forcer,
-      );
+      return _ref
+          .read(rafraichissementPeriodesProvider)
+          .auRetour(forcer: forcer);
     }
 
     final enCours = _enCours[donnee];
@@ -248,6 +247,7 @@ class Fraicheur {
 
       case Donnee.astreintes:
         final premiere = await _premiereLecture(astreintesControllerProvider);
+        if (premiere == null) return Relecture.echouee;
         // La première lecture vient d'aboutir **au réseau** : la relire serait
         // une seconde requête pour rien. Mais si elle vient du cache — c'est
         // tout l'objet de `build` —, c'est maintenant qu'on va chercher mieux.
@@ -266,21 +266,35 @@ class Fraicheur {
       case Donnee.planningCaserne:
         // Son `build` ne lit **que** le cache (`design/027 § 3`) : la première
         // lecture réseau, c'est celle-ci.
-        await _premiereLecture(planningCaserneControllerProvider);
-        await _ref.read(planningCaserneControllerProvider.notifier).rafraichir();
+        if (await _premiereLecture(planningCaserneControllerProvider) == null) {
+          return Relecture.echouee;
+        }
+        await _ref
+            .read(planningCaserneControllerProvider.notifier)
+            .rafraichir();
         return _issue(_ref.read(planningCaserneControllerProvider));
 
       case Donnee.propositions:
-        if (await _premiereLecture(propositionsControllerProvider)) {
-          return Relecture.inchangee;
+        switch (await _premiereLecture(propositionsControllerProvider)) {
+          case null:
+            return Relecture.echouee;
+          case true:
+            return Relecture.inchangee;
+          case false:
+            break;
         }
         return _ref
             .read(propositionsControllerProvider.notifier)
             .rafraichir(publierSi: () => !_propositionsOccupees);
 
       case Donnee.centre:
-        if (await _premiereLecture(centreNotificationsProvider)) {
-          return Relecture.inchangee;
+        switch (await _premiereLecture(centreNotificationsProvider)) {
+          case null:
+            return Relecture.echouee;
+          case true:
+            return Relecture.inchangee;
+          case false:
+            break;
         }
         await _ref.read(centreNotificationsProvider.notifier).rafraichir();
         return _issue(_ref.read(centreNotificationsProvider));
@@ -323,23 +337,54 @@ class Fraicheur {
     }
   }
 
+  /// Le plus longtemps qu'on attend une première lecture encore en vol.
+  ///
+  /// Sans borne, une première lecture qui ne répond jamais — le trou noir du
+  /// réseau rural — garderait la relecture de cette donnée « en cours » pour
+  /// toujours : tous les moments suivants recevraient ce même futur, et la
+  /// donnée ne serait plus jamais relue.
+  static const Duration attenteMaximalePremiereLecture = Duration(seconds: 15);
+
+  /// L'attente effective, raccourcie par les tests qui éprouvent la borne.
+  @visibleForTesting
+  Duration attentePremiereLecture = attenteMaximalePremiereLecture;
+
+  /// Les premières lectures qui n'ont pas répondu à temps : le moment
+  /// suivant ne les attend plus, il relit par-dessus.
+  final Set<Object> _premieresAbandonnees = <Object>{};
+
   /// Si la première lecture de [provider] est encore en vol, l'attend et rend
-  /// vrai : elle vient de lire, il n'y a rien à redemander.
-  Future<bool> _premiereLecture(
+  /// vrai : elle vient de lire, il n'y a rien à redemander. Faux si elle
+  /// était déjà finie. `null` si elle n'a pas répondu dans
+  /// [attenteMaximalePremiereLecture] : la relecture n'a pas abouti, et le
+  /// prochain moment réessaiera.
+  Future<bool?> _premiereLecture(
     ProviderListenable<AsyncValue<Object?>> provider,
   ) async {
-    final etat = _ref.read(provider);
-    if (!etat.isLoading || etat.hasValue) return false;
-    final attente = Completer<void>();
+    // Une première lecture **en échec** a répondu, même si Riverpod la
+    // retente en tâche de fond (l'état reste alors « en chargement » avec son
+    // erreur) : c'est la relecture qui va réessayer, tout de suite.
+    bool enVol(AsyncValue<Object?> etat) =>
+        etat.isLoading && !etat.hasValue && !etat.hasError;
+    if (!enVol(_ref.read(provider))) return false;
+    // Déjà attendue en vain une fois : on ne l'attend plus, on relit.
+    if (_premieresAbandonnees.contains(provider)) return false;
+    final attente = Completer<bool>();
     final abonnement = _ref.listen<AsyncValue<Object?>>(provider, (_, suivant) {
-      if (!suivant.isLoading && !attente.isCompleted) attente.complete();
+      if (!enVol(suivant) && !attente.isCompleted) attente.complete(true);
     });
     try {
-      if (_ref.read(provider).isLoading) await attente.future;
+      if (!enVol(_ref.read(provider))) return true;
+      final repondu = await attente.future.timeout(
+        attentePremiereLecture,
+        onTimeout: () => false,
+      );
+      if (repondu) return true;
+      _premieresAbandonnees.add(provider);
+      return null;
     } finally {
       abonnement.close();
     }
-    return true;
   }
 
   /// Une relecture qui a laissé une erreur sans valeur, ou un message
@@ -371,15 +416,27 @@ class Fraicheur {
       _ref.read(propositionsControllerProvider.notifier).ecritureEnAttente;
 
   /// Ce qu'il faut écouter pour savoir quand [donnee] peut repartir.
-  ProviderListenable<Object?> _repos(Donnee donnee) => switch (donnee) {
-    Donnee.propositions => propositionsControllerProvider,
-    Donnee.matrice => matriceControllerProvider,
-    Donnee.planningAdmin => planningControllerProvider,
-    Donnee.suivi => suiviControllerProvider,
-    // La caserne et le rôle attendent le repos de tout ce qui écrit : on
-    // écoute la saisie, et le retour au repos des deux autres passe par
-    // l'abonnement général (`fraicheurProvider`).
-    _ => saisieControllerProvider,
+  ///
+  /// La caserne et le rôle attendent le repos de **tout** ce qui écrit — la
+  /// saisie, la matrice, les réponses aux propositions —, et seulement de ce
+  /// qui existe : écouter la saisie d'un admin qui n'a jamais ouvert son mois
+  /// la ferait naître, avec ses lectures, pour rien. Ce qui n'existe pas
+  /// n'écrit pas.
+  List<ProviderListenable<Object?>> _repos(Donnee donnee) => switch (donnee) {
+    Donnee.propositions => <ProviderListenable<Object?>>[
+      propositionsControllerProvider,
+    ],
+    Donnee.matrice => <ProviderListenable<Object?>>[matriceControllerProvider],
+    Donnee.planningAdmin => <ProviderListenable<Object?>>[
+      planningControllerProvider,
+    ],
+    Donnee.suivi => <ProviderListenable<Object?>>[suiviControllerProvider],
+    _ => <ProviderListenable<Object?>>[
+      if (_ref.exists(saisieControllerProvider)) saisieControllerProvider,
+      if (_ref.exists(matriceControllerProvider)) matriceControllerProvider,
+      if (_ref.exists(propositionsControllerProvider))
+        propositionsControllerProvider,
+    ],
   };
 
   bool _occupee(Donnee donnee) => switch (donnee) {
@@ -399,10 +456,10 @@ class Fraicheur {
   /// Retient une relecture jusqu'au retour au repos de ce qui l'a bloquée.
   void _retenir(Donnee donnee) {
     if (_retenues.containsKey(donnee)) return;
-    _retenues[donnee] = _ref.listen<Object?>(
-      _repos(donnee),
-      (_, _) => _reprendre(),
-    );
+    _retenues[donnee] = <ProviderSubscription<Object?>>[
+      for (final source in _repos(donnee))
+        _ref.listen<Object?>(source, (_, _) => _reprendre()),
+    ];
     // Rien n'a peut-être changé entre-temps, et l'écriture est déjà
     // retombée : on ne l'attend pas une seconde fois.
     scheduleMicrotask(_reprendre);
@@ -413,7 +470,11 @@ class Fraicheur {
   void _reprendre() {
     for (final donnee in _retenues.keys.toList()) {
       if (_occupee(donnee) || _enCours.containsKey(donnee)) continue;
-      _retenues.remove(donnee)?.close();
+      for (final abonnement
+          in _retenues.remove(donnee) ??
+              const <ProviderSubscription<Object?>>[]) {
+        abonnement.close();
+      }
       unawaited(_relire(donnee, forcer: true));
     }
   }
@@ -454,8 +515,10 @@ final Provider<Fraicheur> fraicheurProvider = Provider<Fraicheur>((ref) {
   );
 
   ref.onDispose(() {
-    for (final abonnement in fraicheur._retenues.values) {
-      abonnement.close();
+    for (final abonnements in fraicheur._retenues.values) {
+      for (final abonnement in abonnements) {
+        abonnement.close();
+      }
     }
     fraicheur._retenues.clear();
   });

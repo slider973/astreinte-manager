@@ -10,6 +10,7 @@ import 'package:astreinte_sp/core/session/appartenances_locales.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/session/session_utilisateur.dart';
+import 'package:astreinte_sp/features/dispos/presentation/controllers/saisie_controller.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
 import 'package:astreinte_sp/features/propositions/domain/propositions_providers.dart';
@@ -39,6 +40,24 @@ class _ReponseRetenue extends FauxPropositionsRepository {
       accepte: accepte,
       motif: motif,
     );
+  }
+}
+
+/// Une liste dont la première lecture ne répond jamais : le trou noir du
+/// réseau rural.
+class _ListeMuette extends FauxPropositionsRepository {
+  bool muette = true;
+
+  @override
+  Future<List<Proposition>> lister({
+    required String userId,
+    required String stationId,
+  }) {
+    if (muette) {
+      lectures++;
+      return Completer<List<Proposition>>().future;
+    }
+    return super.lister(userId: userId, stationId: stationId);
   }
 }
 
@@ -136,16 +155,19 @@ void main() {
       expect(conteneur.read(lectureSeuleCaserneProvider), isFalse);
     });
 
-    test('un refus ne dit « suspendue » que si station_access le dit', () async {
-      final caserne = FauxCaserneRepository();
-      final conteneur = _conteneur(caserne: caserne);
-      await _attendre(conteneur);
-      final notifier = conteneur.read(etatCaserneProvider.notifier);
+    test(
+      'un refus ne dit « suspendue » que si station_access le dit',
+      () async {
+        final caserne = FauxCaserneRepository();
+        final conteneur = _conteneur(caserne: caserne);
+        await _attendre(conteneur);
+        final notifier = conteneur.read(etatCaserneProvider.notifier);
 
-      expect(await notifier.suspendueApresRefus(), isFalse);
-      caserne.etat = caserneSuspendue;
-      expect(await notifier.suspendueApresRefus(), isTrue);
-    });
+        expect(await notifier.suspendueApresRefus(), isFalse);
+        caserne.etat = caserneSuspendue;
+        expect(await notifier.suspendueApresRefus(), isTrue);
+      },
+    );
   });
 
   group('Les appartenances relues', () {
@@ -252,6 +274,68 @@ void main() {
         conteneur.read(propositionsControllerProvider).value!.propositions,
         hasLength(1),
       );
+    });
+
+    test('la caserne retenue sous une réponse repart à son retour, sans '
+        'faire naître la saisie', () async {
+      final caserne = FauxCaserneRepository();
+      final depot = _ReponseRetenue(
+        propositions: <Proposition>[
+          proposition(id: 'a-1', jour: DateTime(2026, 9, 28)),
+        ],
+      );
+      final conteneur = _conteneur(caserne: caserne, propositions: depot);
+      await _attendre(conteneur);
+      conteneur.listen(propositionsControllerProvider, (_, _) {});
+      final premiere = await conteneur.read(
+        propositionsControllerProvider.future,
+      );
+      final fraicheur = conteneur.read(fraicheurProvider);
+
+      final reponse = conteneur
+          .read(propositionsControllerProvider.notifier)
+          .repondre(premiere.propositions.first, accepte: true);
+      caserne.etat = caserneSuspendue;
+      await fraicheur.maintenant(const <Donnee>{Donnee.caserne});
+
+      // Publier maintenant reconstruirait les propositions sous la réponse.
+      expect(fraicheur.retenue(Donnee.caserne), isTrue);
+      expect(conteneur.read(lectureSeuleCaserneProvider), isFalse);
+      // Un compte qui n'a jamais ouvert son mois n'a pas de saisie : la
+      // reprise ne l'écoute pas, donc ne la crée pas.
+      expect(conteneur.exists(saisieControllerProvider), isFalse);
+
+      depot.retour.complete();
+      await reponse;
+      await pumpEventQueue();
+
+      expect(fraicheur.retenue(Donnee.caserne), isFalse);
+      expect(conteneur.read(lectureSeuleCaserneProvider), isTrue);
+      expect(conteneur.exists(saisieControllerProvider), isFalse);
+    });
+
+    test('une première lecture qui ne répond jamais ne bloque pas la '
+        'donnée', () async {
+      final depot = _ListeMuette();
+      final conteneur = _conteneur(propositions: depot);
+      await _attendre(conteneur);
+      conteneur.listen(propositionsControllerProvider, (_, _) {});
+      final fraicheur = conteneur.read(fraicheurProvider)
+        ..attentePremiereLecture = const Duration(milliseconds: 50);
+
+      // L'attente rend la main, bornée, au lieu de garder la relecture « en
+      // cours » pour toujours.
+      await fraicheur
+          .auRetour(const <Donnee>{Donnee.propositions})
+          .timeout(const Duration(seconds: 2));
+
+      // Le moment suivant ne l'attend plus : il relit vraiment.
+      depot.muette = false;
+      final lectures = depot.lectures;
+      await fraicheur
+          .maintenant(const <Donnee>{Donnee.propositions})
+          .timeout(const Duration(seconds: 2));
+      expect(depot.lectures, lectures + 1);
     });
 
     test('pas de rafale, sauf pour un événement', () async {
