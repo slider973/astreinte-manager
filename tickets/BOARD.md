@@ -85,5 +85,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-29. Ne pas éditer à la main
 | 067 | [Distribuer l'app iOS Foco par TestFlight, depuis la CI du fork](done/067-testflight-foco.md) | P1 | 066 | https://github.com/slider973/astreinte-manager/pull/72 |
 | 068 | [La saisie iOS refusée en « lecture seule » sur un mois ouvert](done/068-saisie-ios-refusee-lecture-seule.md) | P0 | 066 067 | https://github.com/slider973/astreinte-manager/pull/74 (chantier PWA), https://github.com/slider973/astreinte-manager/pull/75 (chantier iOS) |
 | 069 | [Le paiement Stripe ne s'ouvre pas pour une caserne](done/069-checkout-stripe-client-existant.md) | P0 | 029 | https://github.com/slider973/astreinte-manager/pull/73, puis https://github.com/slider973/astreinte-manager/pull/76 (réouverture) |
-| 070 | [Les écrans de la PWA affichent des données périmées](done/070-fraicheur-ecrans-pwa.md) | P0 | 068 | — |
+| 070 | [Les écrans de la PWA affichent des données périmées](done/070-fraicheur-ecrans-pwa.md) | P0 | 068 | https://github.com/slider973/astreinte-manager/pull/77 |
 
