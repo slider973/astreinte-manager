@@ -7,7 +7,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-28. Ne pas éditer à la main
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 068 | [La saisie iOS refusée en « lecture seule » sur un mois ouvert](in-progress/068-saisie-ios-refusee-lecture-seule.md) | P0 | 066 067 |  |
-| 069 | [Le paiement Stripe ne s'ouvre pas pour une caserne](in-progress/069-checkout-stripe-client-existant.md) | P0 | 029 |  |
 
 ## À faire
 
@@ -83,4 +82,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-28. Ne pas éditer à la main
 | 065 | [Un défilement fluide sur la PWA installée](done/065-fluidite-defilement-pwa.md) | P1 | 060 | https://github.com/slider973/astreinte-manager/pull/62 |
 | 066 | [L'app iOS native Foco, branchée sur la même base que la PWA](done/066-app-ios-native.md) | P1 | 064 065 | https://github.com/slider973/astreinte-manager/pull/64 (chantier 066a), https://github.com/slider973/astreinte-manager/pull/65 (chantier 066b), https://github.com/slider973/astreinte-manager/pull/66 (chantier 066c), https://github.com/slider973/astreinte-manager/pull/67 (chantier 066d) |
 | 067 | [Distribuer l'app iOS Foco par TestFlight, depuis la CI du fork](done/067-testflight-foco.md) | P1 | 066 | https://github.com/slider973/astreinte-manager/pull/72 |
+| 069 | [Le paiement Stripe ne s'ouvre pas pour une caserne](done/069-checkout-stripe-client-existant.md) | P0 | 029 | https://github.com/slider973/astreinte-manager/pull/73 |
 

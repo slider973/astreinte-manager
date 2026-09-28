@@ -50,6 +50,7 @@ import {
   autoriser,
   portailOuvrable,
 } from "./acces.ts";
+import { parametresSession } from "./session.ts";
 
 /** Où Stripe renvoie le navigateur. Le chemin suit la stratégie d'URL de
  * l'application — sans dièse depuis le ticket 046 (même choix
@@ -219,25 +220,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const client = abonnement?.stripe_customer_id ??
       await creerClient(admin, stripe.cleSecrete, stationId, utilisateur.email);
 
-    const session = await appelStripe("/checkout/sessions", stripe.cleSecrete, {
-      mode: "subscription",
-      customer: client,
-      line_items: [{ price: prix(stripe, formule!), quantity: 1 }],
-      // **La caserne voyage avec la session.** C'est ce champ que le webhook
-      // relit dans `checkout.session.completed` : sans lui, le premier
-      // événement d'une caserne ne saurait pas à qui il appartient.
-      client_reference_id: stationId,
-      metadata: { station_id: stationId, plan: formule },
-      // Recopiées sur l'abonnement créé : les événements suivants
-      // (`customer.subscription.*`) les portent à leur tour.
-      subscription_data: { metadata: { station_id: stationId, plan: formule } },
-      success_url: lienRetour("ok"),
-      cancel_url: lienRetour("annule"),
-      locale: "fr",
-      // Le numéro de TVA d'une amicale, quand elle en a un.
-      tax_id_collection: { enabled: true },
-      allow_promotion_codes: true,
-    });
+    const session = await appelStripe(
+      "/checkout/sessions",
+      stripe.cleSecrete,
+      parametresSession({
+        client,
+        prix: prix(stripe, formule!),
+        stationId,
+        formule: formule!,
+        succes: lienRetour("ok"),
+        annulation: lienRetour("annule"),
+      }),
+    );
 
     return jsonResponse({
       ok: true,
