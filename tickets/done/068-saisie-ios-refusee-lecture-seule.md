@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 066, 067
 - **Branche** : `feat/068-saisie-ios-refusee-lecture-seule`
-- **Statut** : en cours depuis 2026-09-28
+- **Statut** : terminé le 2026-09-28 (manuel)
 
 ## Contexte
 
@@ -68,3 +68,31 @@ Dans le fork, branche `fix/068-saisie`, PR vers `main` du fork.
   fork ; `docs/IOS.md` décrit la cause et la correction.
 - Un nouveau build TestFlight est publié, et le propriétaire vérifie la saisie de novembre sur
   son iPhone.
+
+## Livraison
+
+**Fait**, en deux chantiers :
+
+- **Chantier PWA** — relecture des mois ouverts sans redémarrer la PWA (retour au premier plan,
+  ouverture du Calendrier et de l'accueil, tirer-pour-actualiser) : PR #74, fusionnée (`d957c36`).
+- **Chantier iOS** — PR [slider973/Foco#10](https://github.com/slider973/Foco/pull/10), fusionnée en
+  squash au commit `0ab920d` du fork, visé par le pointeur `foco/`. Test de reproduction rouge sur
+  l'ancien code (course [36410290026](https://github.com/slider973/Foco/actions/runs/36410290026)),
+  vert après correction ; course `iOS` verte sur `main` du fork
+  ([36412782083](https://github.com/slider973/Foco/actions/runs/36412782083)), zéro avertissement
+  Swift. Build **TestFlight 1.0 (103)** publié (course
+  [36414185633](https://github.com/slider973/Foco/actions/runs/36414185633)).
+
+**Cause** : la grille iOS gardait les cases des mois précédents (septembre, octobre) après la
+navigation vers novembre ; les coups de pinceau envoyaient donc des lots multi-mois portant des
+lignes de mois verrouillés, refusés en bloc par la RLS (`403` / `42501`), et l'app classait ce refus
+en « lecture seule / caserne suspendue ». Désormais un lot ne porte qu'un seul mois ouvert, une
+ligne inenvoyable est retirée de la file et annoncée, et un `42501` relit `station_access` puis les
+périodes avant de choisir son message. Détail dans `docs/IOS.md` § 4 sexies.
+
+**Suite possible** : la PWA classe elle aussi un refus `42501` en « lecture seule » sans lire
+`station_access` (`_traiterEchec`, noté dans `docs/IOS.md` § 4 sexies) ; à traiter dans un ticket
+dédié.
+
+**Reste à cocher par le propriétaire** (vérification sur l'appareil) :
+- [ ] la saisie de novembre sur son iPhone avec TestFlight 1.0 (103).
