@@ -13,6 +13,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-28. Ne pas éditer à la main
 |---|---|---|---|---|
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
+| 068 | [La saisie iOS refusée en « lecture seule » sur un mois ouvert](backlog/068-saisie-ios-refusee-lecture-seule.md) | P0 | 066 067 |  |
 
 ## Terminés
 
