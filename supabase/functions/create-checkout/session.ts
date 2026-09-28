@@ -37,9 +37,10 @@ export function parametresSession(
     locale: "fr",
     // Le numéro de TVA d'une amicale, quand elle en a un.
     tax_id_collection: { enabled: true },
-    // Exigé par Stripe dès qu'un client existant accompagne la collecte du
-    // numéro de TVA : sans lui, toute session est refusée (ticket 069).
-    customer_update: { name: "auto" },
+    // Stripe exige que le nom **et** l'adresse du client soient mis à jour
+    // dès qu'un client existant accompagne la collecte du numéro de TVA :
+    // sans l'un ou l'autre, toute session est refusée (ticket 069).
+    customer_update: { name: "auto", address: "auto" },
     allow_promotion_codes: true,
   };
 }

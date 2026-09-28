@@ -2,8 +2,10 @@
 // Lancement : deno test supabase/functions/tests/ --allow-env
 //
 // Ticket 069 : Stripe refusait **toute** session, parce que la collecte du
-// numéro de TVA accompagnait un client existant sans `customer_update[name]`.
-// Le refus n'apparaissait qu'en production ; ce test le rattrape en CI.
+// numéro de TVA accompagnait un client existant sans `customer_update[name]`,
+// puis sans `customer_update[address]` (réouverture, vérifiée contre l'API
+// Stripe en mode test). Le refus n'apparaissait qu'en production ; ce test le
+// rattrape en CI.
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { encoderFormulaire } from "../_shared/stripe.ts";
@@ -26,13 +28,17 @@ function champ(nom: string, valeur: string): string {
   return `${encodeURIComponent(nom)}=${encodeURIComponent(valeur)}`;
 }
 
-Deno.test("un client existant et la collecte de TVA portent customer_update[name]=auto", () => {
+Deno.test("un client existant et la collecte de TVA portent customer_update[name] et [address]=auto", () => {
   const envoye = morceaux();
   assert(envoye.includes("customer=cus_A"));
   assert(envoye.includes(champ("tax_id_collection[enabled]", "true")));
   assert(
     envoye.includes(champ("customer_update[name]", "auto")),
     "sans lui, Stripe refuse la session (400 invalid_request_error)",
+  );
+  assert(
+    envoye.includes(champ("customer_update[address]", "auto")),
+    "sans elle, Stripe refuse la session (« could not find a valid address »)",
   );
 });
 
@@ -47,7 +53,7 @@ Deno.test("la session garde la caserne, la formule et les liens de retour", () =
   assert(envoye.includes(champ("cancel_url", entree.annulation)));
   assertEquals(
     envoye.filter((morceau) => morceau.startsWith(encodeURIComponent("customer_update["))),
-    [champ("customer_update[name]", "auto")],
-    "seul le nom est mis à jour : l'adresse n'est pas collectée",
+    [champ("customer_update[name]", "auto"), champ("customer_update[address]", "auto")],
+    "exactement le nom et l'adresse, rien d'autre sur le client",
   );
 });
