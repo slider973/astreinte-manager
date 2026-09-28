@@ -1,6 +1,6 @@
 # Tableau des tickets
 
-Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main.
+Généré par `scripts/ticket.sh board` le 2026-09-28. Ne pas éditer à la main.
 
 ## En cours
 
@@ -13,6 +13,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-26. Ne pas éditer à la main
 |---|---|---|---|---|
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
+| 067 | [Distribuer l'app iOS Foco par TestFlight, depuis la CI du fork](backlog/067-testflight-foco.md) | P1 | 066 | — |
 
 ## Terminés
 
