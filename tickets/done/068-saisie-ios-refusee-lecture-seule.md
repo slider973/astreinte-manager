@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 066, 067
 - **Branche** : `feat/068-saisie-ios-refusee-lecture-seule`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/74 (chantier PWA), https://github.com/slider973/astreinte-manager/pull/75 (chantier iOS)
 - **Statut** : terminé le 2026-09-28 (manuel)
 
 ## Contexte
