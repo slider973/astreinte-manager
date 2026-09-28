@@ -2,9 +2,11 @@ import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/features/accueil/presentation/accueil_screen.dart';
+import 'package:astreinte_sp/features/dispos/domain/dispos_providers.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -116,6 +118,29 @@ void main() {
 
       expect(boutonNovembre, findsOneWidget);
       expect(depot.lectures, greaterThan(lecturesMois));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('un ?mois= explicite ne bouge pas quand un nouveau mois '
+        's\'ouvre', (tester) async {
+      final horloge = Horloge();
+      final depot = depotDeProduction();
+      await monter(tester, depot: depot, horloge: horloge);
+      await ouvrirRoute(
+        tester,
+        '${AppRoutes.calendrier}?${AppRoutes.parametreMois}=2026-09',
+      );
+      final conteneur = ProviderScope.containerOf(
+        tester.element(find.byType(MoisScreen)),
+      );
+      expect(conteneur.read(periodeCouranteProvider)!.cle, '2026-09');
+
+      depot.ajouterPeriode(novembre());
+      horloge.avancer(apresLIntervalle);
+      await rangerPuisRevenir(tester);
+
+      expect(boutonNovembre, findsOneWidget);
+      expect(conteneur.read(periodeCouranteProvider)!.cle, '2026-09');
       expect(tester.takeException(), isNull);
     });
 

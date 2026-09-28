@@ -50,14 +50,20 @@ class PeriodesCaserne extends AsyncNotifier<List<PeriodeSaisie>> {
 
   /// Relit la liste **sans passer par un état de chargement**.
   ///
-  /// Rend vrai si la liste a changé, et seulement alors la publie : un retour
-  /// au premier plan sans nouveauté ne réveille ni la saisie ni l'accueil.
-  /// Une lecture qui échoue garde la liste affichée — un réseau capricieux ne
-  /// doit pas effacer des mois déjà lus ; le prochain retour réessaiera.
-  Future<bool> relire() async {
-    if (state.isLoading) return false;
+  /// Ne publie que si la liste a changé : un retour au premier plan sans
+  /// nouveauté ne réveille ni la saisie ni l'accueil. Une lecture qui échoue
+  /// garde la liste affichée — un réseau capricieux ne doit pas effacer des
+  /// mois déjà lus ; le prochain retour réessaiera.
+  ///
+  /// [publierSi] est consulté **après** la lecture réseau, juste avant de
+  /// publier : une nouvelle liste reconstruit la saisie, et un geste de
+  /// peinture a pu commencer pendant l'attente. S'il répond faux, rien n'est
+  /// publié, la date de dernière lecture n'avance pas, et le résultat est
+  /// [Relecture.retenue] : à l'appelant de relancer plus tard.
+  Future<Relecture> relire({bool Function()? publierSi}) async {
+    if (state.isLoading) return Relecture.inchangee;
     final appartenance = ref.read(appartenanceCouranteProvider);
-    if (appartenance == null) return false;
+    if (appartenance == null) return Relecture.inchangee;
 
     final List<PeriodeSaisie> lues;
     try {
@@ -65,7 +71,7 @@ class PeriodesCaserne extends AsyncNotifier<List<PeriodeSaisie>> {
           .read(disposRepositoryProvider)
           .periodes(appartenance.stationId);
     } on Object {
-      return false;
+      return Relecture.inchangee;
     }
     // Changement de caserne pendant la lecture : la liste lue n'est plus la
     // bonne, et `build` s'occupe déjà de la nouvelle.
@@ -73,16 +79,19 @@ class PeriodesCaserne extends AsyncNotifier<List<PeriodeSaisie>> {
         ref.read(appartenanceCouranteProvider)?.stationId !=
             appartenance.stationId ||
         state.isLoading) {
-      return false;
+      return Relecture.inchangee;
     }
-    _derniereLecture = ref.read(horlogeRafraichissementProvider)();
 
     final actuelles = state.value;
     if (actuelles != null && !state.hasError && _memes(actuelles, lues)) {
-      return false;
+      _derniereLecture = ref.read(horlogeRafraichissementProvider)();
+      return Relecture.inchangee;
     }
+    if (publierSi != null && !publierSi()) return Relecture.retenue;
+
+    _derniereLecture = ref.read(horlogeRafraichissementProvider)();
     state = AsyncData<List<PeriodeSaisie>>(lues);
-    return true;
+    return Relecture.publiee;
   }
 
   static bool _memes(List<PeriodeSaisie> a, List<PeriodeSaisie> b) {
@@ -92,6 +101,19 @@ class PeriodesCaserne extends AsyncNotifier<List<PeriodeSaisie>> {
     }
     return true;
   }
+}
+
+/// L'issue d'une [PeriodesCaserne.relire].
+enum Relecture {
+  /// Rien de nouveau, ou la lecture a échoué : rien n'a été publié.
+  inchangee,
+
+  /// Une liste nouvelle a été publiée : ses lecteurs se reconstruisent.
+  publiee,
+
+  /// Une liste nouvelle a été lue mais **pas publiée**, la condition de
+  /// publication ayant refusé : elle sera relue plus tard.
+  retenue,
 }
 
 final AsyncNotifierProvider<PeriodesCaserne, List<PeriodeSaisie>>

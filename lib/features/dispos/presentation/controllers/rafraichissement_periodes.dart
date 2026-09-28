@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/theme/app_status.dart';
 import '../../domain/dispos_providers.dart';
 import 'saisie_controller.dart';
 
@@ -27,9 +26,13 @@ import 'saisie_controller.dart';
 ///    lui, est un geste délibéré : il relit toujours, mais jamais deux fois en
 ///    même temps.
 /// 2. **Rien sous une écriture** : une nouvelle liste reconstruit la saisie,
-///    et la reconstruire pendant qu'un envoi est en vol mélangerait l'état du
-///    serveur et celui de la file. La relecture est alors **différée** au
-///    retour au calme de la file, jamais perdue.
+///    et la reconstruire pendant qu'un envoi est en vol, ou sous un doigt qui
+///    peint, mélangerait l'état du serveur et celui de la file, ou remettrait
+///    le pinceau à zéro au milieu du trait. La condition est vérifiée **deux
+///    fois** : avant de partir, et après la lecture réseau, juste avant de
+///    publier — un geste a pu commencer pendant l'attente. Dans les deux cas
+///    la relecture est **différée** au retour au repos de la saisie (file
+///    vide, aucun envoi en vol, aucun doigt posé), jamais perdue.
 /// 3. **Aucune saisie perdue** : le tirer vide d'abord la file ; s'il n'y
 ///    parvient pas — hors ligne —, il ne relit pas, et la file reste gardée.
 class RafraichissementPeriodes {
@@ -42,9 +45,13 @@ class RafraichissementPeriodes {
 
   Future<void>? _enCours;
 
-  /// Une relecture a été refusée parce qu'une écriture était en file : elle
-  /// partira dès que la file sera vide.
+  /// Une relecture a été refusée ou retenue parce qu'une écriture était en
+  /// attente : elle partira dès que la saisie reviendra au repos.
   bool _differee = false;
+
+  /// La relecture différée venait d'un tirer : elle relira aussi le mois
+  /// affiché.
+  bool _differeeAvecMois = false;
 
   /// Vrai si une relecture attend la fin d'une écriture. Exposé aux tests.
   bool get differee => _differee;
@@ -59,21 +66,18 @@ class RafraichissementPeriodes {
     if (_ref.read(periodesProvider).isLoading) return Future<void>.value();
 
     if (_ecritureEnAttente) {
-      _differee = true;
+      _differer(avecMois: false);
       return Future<void>.value();
     }
 
-    final periodes = _ref.read(periodesProvider.notifier);
-    final derniere = periodes.derniereLecture;
+    final derniere = _ref.read(periodesProvider.notifier).derniereLecture;
     final maintenant = _ref.read(horlogeRafraichissementProvider)();
     if (derniere != null &&
         maintenant.difference(derniere) < intervalleMinimal) {
       return Future<void>.value();
     }
 
-    return _lancer(() async {
-      await periodes.relire();
-    });
+    return _lancer(_relirePeriodes);
   }
 
   /// Tirer pour actualiser : relit les périodes **et** le mois affiché.
@@ -85,37 +89,80 @@ class RafraichissementPeriodes {
     if (saisie.ecritureEnAttente) {
       final partie = await saisie.viderMaintenant();
       if (!partie || saisie.ecritureEnAttente) {
-        _differee = true;
+        _differer(avecMois: true);
         return;
       }
     }
 
-    return _lancer(() async {
-      final change = await _ref.read(periodesProvider.notifier).relire();
-      // Une liste nouvelle reconstruit déjà la saisie ; sinon, c'est le mois
-      // lui-même qu'on vient chercher. La file, elle, survit au rechargement :
-      // le contrôleur n'est pas recréé, seulement relu.
-      if (!change) _ref.invalidate(saisieControllerProvider);
-      try {
-        await _ref.read(saisieControllerProvider.future);
-      } on Object {
-        // L'écran dit déjà l'échec de lecture ; l'indicateur doit se retirer.
-      }
-    });
+    return _lancer(_relireTout);
   }
 
-  /// La file est revenue au calme : la relecture refusée part maintenant.
+  /// Relit la liste des périodes, et ne la publie que si la saisie est au
+  /// repos **au retour du réseau**.
+  Future<void> _relirePeriodes() async {
+    final issue = await _ref
+        .read(periodesProvider.notifier)
+        .relire(publierSi: () => !_ecritureEnAttente);
+    if (issue == Relecture.retenue) _differer(avecMois: false);
+  }
+
+  /// Relit la liste des périodes puis le mois affiché, sans jamais
+  /// reconstruire la saisie sous une écriture apparue pendant la lecture.
+  Future<void> _relireTout() async {
+    final issue = await _ref
+        .read(periodesProvider.notifier)
+        .relire(publierSi: () => !_ecritureEnAttente);
+    switch (issue) {
+      case Relecture.retenue:
+        _differer(avecMois: true);
+        return;
+      case Relecture.inchangee:
+        // Une liste inchangée ne reconstruit rien ; c'est le mois lui-même
+        // qu'on vient chercher. Mais pas sous un geste ni une écriture
+        // commencés pendant la lecture : ce rechargement-là est différé.
+        if (_ecritureEnAttente) {
+          _differer(avecMois: true);
+          return;
+        }
+        // La file survit au rechargement : le contrôleur n'est pas recréé,
+        // seulement relu.
+        _ref.invalidate(saisieControllerProvider);
+      case Relecture.publiee:
+        // Une liste nouvelle reconstruit déjà la saisie.
+        break;
+    }
+    try {
+      await _ref.read(saisieControllerProvider.future);
+    } on Object {
+      // L'écran dit déjà l'échec de lecture ; l'indicateur doit se retirer.
+    }
+  }
+
+  void _differer({required bool avecMois}) {
+    _differee = true;
+    _differeeAvecMois = _differeeAvecMois || avecMois;
+  }
+
+  /// La saisie a changé d'état : si elle est revenue au repos, la relecture
+  /// différée part maintenant, sans délai minimal — elle était déjà due.
   void _reprendre() {
-    if (!_differee || _ecritureEnAttente) return;
+    if (!_differee || _enCours != null || _ecritureEnAttente) return;
+    final avecMois = _differeeAvecMois;
     _differee = false;
-    unawaited(auRetour());
+    _differeeAvecMois = false;
+    unawaited(_lancer(avecMois ? _relireTout : _relirePeriodes));
   }
 
   bool get _ecritureEnAttente =>
       _ref.read(saisieControllerProvider.notifier).ecritureEnAttente;
 
   Future<void> _lancer(Future<void> Function() tache) {
-    final futur = tache().whenComplete(() => _enCours = null);
+    final futur = tache().whenComplete(() {
+      _enCours = null;
+      // Une relecture différée pendant celle-ci — la saisie étant revenue au
+      // repos entre-temps — ne doit pas attendre le prochain changement.
+      _reprendre();
+    });
     _enCours = futur;
     return futur;
   }
@@ -126,15 +173,14 @@ class RafraichissementPeriodes {
 final Provider<RafraichissementPeriodes> rafraichissementPeriodesProvider =
     Provider<RafraichissementPeriodes>((ref) {
       final rafraichissement = RafraichissementPeriodes(ref);
-      ref.listen<SyncEtat?>(
-        saisieControllerProvider.select(
-          (AsyncValue<EtatSaisie?> valeur) => valeur.value?.sync,
-        ),
-        (SyncEtat? _, SyncEtat? sync) {
-          if (sync == SyncEtat.repos || sync == SyncEtat.enregistre) {
-            rafraichissement._reprendre();
-          }
-        },
+      // **Tout** changement d'état de la saisie est une occasion de reprendre,
+      // pas seulement celui de la synchronisation : un geste levé sans avoir
+      // peint une seule case ne change pas `sync`, et la relecture différée
+      // resterait bloquée. `_reprendre` ne fait rien tant que la saisie n'est
+      // pas au repos.
+      ref.listen<AsyncValue<EtatSaisie?>>(
+        saisieControllerProvider,
+        (_, _) => rafraichissement._reprendre(),
       );
       return rafraichissement;
     });
