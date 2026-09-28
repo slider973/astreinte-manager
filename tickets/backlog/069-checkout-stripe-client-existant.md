@@ -5,7 +5,7 @@
 - **Dépend de** : 029
 - **Branche** : `feat/069-checkout-stripe-client-existant`
 - **PR** : https://github.com/slider973/astreinte-manager/pull/73
-- **Statut** : terminé le 2026-09-28 (PR créée)
+- **Statut** : rouvert le 2026-09-28
 
 ## Contexte
 
@@ -27,22 +27,45 @@ session : il doit pouvoir écrire sur le client le nom de l'entreprise saisi ave
 
 ## À faire
 
-1. Passer `customer_update: { name: "auto" }` à la session Checkout, avec un commentaire court.
-   `customer_update[address]` n'est pas ajouté : Stripe ne l'exige qu'avec `automatic_tax`, que la
-   session n'active pas.
+1. Passer `customer_update: { name: "auto", address: "auto" }` à la session Checkout, avec un
+   commentaire court (voir « Réouverture » : l'adresse est exigée elle aussi).
 2. Un test Deno vérifie les paramètres de la session, encodés comme les envoie `appelStripe`
-   (`customer_update[name]=auto`).
+   (`customer_update[name]=auto` et `customer_update[address]=auto`).
 
 ## Critères d'acceptation
 
 - Une session Checkout se crée pour une caserne dont le client Stripe existe déjà (en base ou créé
-  à l'instant) : la session porte `customer_update[name]=auto` avec `tax_id_collection[enabled]`.
+  à l'instant) : la session porte `customer_update[name]=auto` et `customer_update[address]=auto`
+  avec `tax_id_collection[enabled]`.
 - Le message d'erreur affiché en cas d'échec Stripe est inchangé.
 - Un test Deno couvre les paramètres de la session ; `deno fmt --check`, `deno lint`, `deno check`
   et `deno test` passent comme en CI.
-- Après fusion, le déploiement automatique publie une nouvelle version de `create-checkout`.
+- Après fusion, le déploiement automatique publie une nouvelle version de `create-checkout`, qui
+  contient `address`.
 
 ## Hors périmètre
 
-- Le calcul automatique de la TVA (`automatic_tax`) et la collecte de l'adresse de facturation.
+- Le calcul automatique de la TVA (`automatic_tax`).
 - Le portail de gestion, le webhook et l'écran Abonnement de la PWA.
+
+## Réouverture (28 septembre 2026)
+
+Le premier correctif (PR #73, `customer_update: { name: "auto" }`) n'a pas suffi. Production,
+`create-checkout` v51, 28/09 18:58 UTC :
+
+```
+We could not find a valid address on the provided customer. To enable tax ID collection, please
+set customer_update[address] to auto.
+```
+
+Vérification **directe contre l'API Stripe en mode test** :
+
+- `customer_update[name]=auto` seul → cette même erreur ;
+- `customer_update[name]=auto` **et** `customer_update[address]=auto` → session créée (`cs_test_…`).
+
+Correction : `customer_update: { name: "auto", address: "auto" }`, et le test Deno exige les deux
+champs (il imposait auparavant « seulement le nom »).
+
+Leçon : le premier correctif reposait sur une supposition non vérifiée contre l'API (« l'adresse
+n'est exigée qu'avec `automatic_tax` »). Un paramètre Stripe se vérifie par un appel réel en mode
+test avant d'être livré, pas par la lecture d'un seul message d'erreur.
