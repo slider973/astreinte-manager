@@ -5,7 +5,7 @@
 - **Dépend de** : 068
 - **Branche** : `feat/070-fraicheur-ecrans-pwa`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-29
+- **Statut** : terminé le 2026-09-29 (PR créée)
 
 ## Contexte
 
