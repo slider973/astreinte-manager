@@ -11,20 +11,115 @@ final Provider<DisposRepository> disposRepositoryProvider =
       (ref) => SupabaseDisposRepository(ref.watch(supabaseClientProvider)),
     );
 
+/// L'horloge des relectures de périodes. Surchargée par une horloge figée
+/// dans les tests : c'est elle qui décide si une relecture est « en rafale ».
+final Provider<DateTime Function()> horlogeRafraichissementProvider =
+    Provider<DateTime Function()>((ref) => DateTime.now);
+
 /// Les périodes de saisie de la caserne courante.
 ///
 /// Lues une fois et partagées : le sélecteur de mois, la grille et la
 /// bannière de date limite parlent tous de la même liste. Un rechargement
-/// passe par `ref.invalidate`.
-final FutureProvider<List<PeriodeSaisie>> periodesProvider =
-    FutureProvider<List<PeriodeSaisie>>((ref) async {
-      final appartenance = ref.watch(appartenanceCouranteProvider);
-      if (appartenance == null) return const <PeriodeSaisie>[];
+/// complet passe par `ref.invalidate` ; une relecture **discrète** — retour au
+/// premier plan, ouverture d'un écran, tirer pour actualiser — passe par
+/// [PeriodesCaserne.relire], qui ne publie rien si rien n'a changé.
+///
+/// **Pourquoi un notifier et plus un simple `FutureProvider`** (ticket 068) :
+/// le provider n'est jamais libéré, et rien d'autre que `ref.invalidate` ne le
+/// relisait. Un mois ouvert par l'admin pendant que la PWA tournait restait
+/// donc invisible jusqu'au redémarrage de l'application. Relire par
+/// `invalidate` aurait remis tous ses lecteurs en chargement, et reconstruit
+/// la saisie deux fois à chaque retour au premier plan, même sans nouveauté.
+class PeriodesCaserne extends AsyncNotifier<List<PeriodeSaisie>> {
+  /// Le moment de la dernière lecture aboutie, initiale comprise.
+  DateTime? _derniereLecture;
 
-      return ref
-          .watch(disposRepositoryProvider)
+  DateTime? get derniereLecture => _derniereLecture;
+
+  @override
+  Future<List<PeriodeSaisie>> build() async {
+    final appartenance = ref.watch(appartenanceCouranteProvider);
+    if (appartenance == null) return const <PeriodeSaisie>[];
+
+    final lues = await ref
+        .watch(disposRepositoryProvider)
+        .periodes(appartenance.stationId);
+    _derniereLecture = ref.read(horlogeRafraichissementProvider)();
+    return lues;
+  }
+
+  /// Relit la liste **sans passer par un état de chargement**.
+  ///
+  /// Ne publie que si la liste a changé : un retour au premier plan sans
+  /// nouveauté ne réveille ni la saisie ni l'accueil. Une lecture qui échoue
+  /// garde la liste affichée — un réseau capricieux ne doit pas effacer des
+  /// mois déjà lus ; le prochain retour réessaiera.
+  ///
+  /// [publierSi] est consulté **après** la lecture réseau, juste avant de
+  /// publier : une nouvelle liste reconstruit la saisie, et un geste de
+  /// peinture a pu commencer pendant l'attente. S'il répond faux, rien n'est
+  /// publié, la date de dernière lecture n'avance pas, et le résultat est
+  /// [Relecture.retenue] : à l'appelant de relancer plus tard.
+  Future<Relecture> relire({bool Function()? publierSi}) async {
+    if (state.isLoading) return Relecture.inchangee;
+    final appartenance = ref.read(appartenanceCouranteProvider);
+    if (appartenance == null) return Relecture.inchangee;
+
+    final List<PeriodeSaisie> lues;
+    try {
+      lues = await ref
+          .read(disposRepositoryProvider)
           .periodes(appartenance.stationId);
-    });
+    } on Object {
+      return Relecture.inchangee;
+    }
+    // Changement de caserne pendant la lecture : la liste lue n'est plus la
+    // bonne, et `build` s'occupe déjà de la nouvelle.
+    if (!ref.mounted ||
+        ref.read(appartenanceCouranteProvider)?.stationId !=
+            appartenance.stationId ||
+        state.isLoading) {
+      return Relecture.inchangee;
+    }
+
+    final actuelles = state.value;
+    if (actuelles != null && !state.hasError && _memes(actuelles, lues)) {
+      _derniereLecture = ref.read(horlogeRafraichissementProvider)();
+      return Relecture.inchangee;
+    }
+    if (publierSi != null && !publierSi()) return Relecture.retenue;
+
+    _derniereLecture = ref.read(horlogeRafraichissementProvider)();
+    state = AsyncData<List<PeriodeSaisie>>(lues);
+    return Relecture.publiee;
+  }
+
+  static bool _memes(List<PeriodeSaisie> a, List<PeriodeSaisie> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+}
+
+/// L'issue d'une [PeriodesCaserne.relire].
+enum Relecture {
+  /// Rien de nouveau, ou la lecture a échoué : rien n'a été publié.
+  inchangee,
+
+  /// Une liste nouvelle a été publiée : ses lecteurs se reconstruisent.
+  publiee,
+
+  /// Une liste nouvelle a été lue mais **pas publiée**, la condition de
+  /// publication ayant refusé : elle sera relue plus tard.
+  retenue,
+}
+
+final AsyncNotifierProvider<PeriodesCaserne, List<PeriodeSaisie>>
+periodesProvider = AsyncNotifierProvider<PeriodesCaserne, List<PeriodeSaisie>>(
+  PeriodesCaserne.new,
+);
 
 /// Le mois affiché, sous la forme `2026-10`.
 ///

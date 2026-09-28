@@ -15,6 +15,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../astreintes/domain/astreintes_providers.dart';
 import '../../boite/domain/onglet_boite.dart';
+import '../../dispos/presentation/controllers/rafraichissement_periodes.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../../propositions/domain/propositions_providers.dart';
@@ -38,11 +39,42 @@ import 'widgets/entete_accueil.dart';
 /// `tableauBordProvider`. Un tableau de bord qui redemanderait les mêmes
 /// lignes sous un autre angle doublerait le coût de l'écran le plus ouvert du
 /// produit.
-class AccueilScreen extends ConsumerWidget {
+class AccueilScreen extends ConsumerStatefulWidget {
   const AccueilScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AccueilScreen> createState() => _AccueilScreenState();
+}
+
+class _AccueilScreenState extends ConsumerState<AccueilScreen> {
+  /// **« Saisir mes disponibilités de novembre »** doit apparaître sans
+  /// redémarrer la PWA (ticket 068) : la liste des mois est relue à
+  /// l'ouverture de l'accueil et à chaque retour au premier plan. Sur le web,
+  /// `visibilitychange` vers `visible` arrive ici en `onResume`.
+  late final AppLifecycleListener _cycleDeVie;
+
+  @override
+  void initState() {
+    super.initState();
+    _cycleDeVie = AppLifecycleListener(onResume: _relirePeriodes);
+    // Reporté d'une image : lire un provider qui publie pendant `initState`
+    // est interdit par Riverpod.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _relirePeriodes();
+    });
+  }
+
+  @override
+  void dispose() {
+    _cycleDeVie.dispose();
+    super.dispose();
+  }
+
+  void _relirePeriodes() =>
+      unawaited(ref.read(rafraichissementPeriodesProvider).auRetour());
+
+  @override
+  Widget build(BuildContext context) {
     final destinations = ref.watch(destinationsProvider);
     final classe = AppWindowClass.of(context);
     final maintenant = ref.watch(horlogeAstreintesProvider)();
@@ -89,6 +121,7 @@ class AccueilScreen extends ConsumerWidget {
   void _relire(WidgetRef ref) {
     unawaited(ref.read(astreintesControllerProvider.notifier).rafraichir());
     unawaited(ref.read(propositionsControllerProvider.notifier).rafraichir());
+    unawaited(ref.read(rafraichissementPeriodesProvider).tirer());
   }
 }
 
@@ -115,9 +148,15 @@ class _Contenu extends ConsumerWidget {
     final dispos = tableau.dispos;
 
     return RefreshIndicator(
+      // Les trois sources de l'accueil, ensemble : le bloc « Disponibilités »
+      // dépend de la liste des mois, qu'un admin a pu compléter entre-temps
+      // (ticket 068).
       onRefresh: () async {
-        await ref.read(astreintesControllerProvider.notifier).rafraichir();
-        await ref.read(propositionsControllerProvider.notifier).rafraichir();
+        await Future.wait(<Future<void>>[
+          ref.read(astreintesControllerProvider.notifier).rafraichir(),
+          ref.read(propositionsControllerProvider.notifier).rafraichir(),
+          ref.read(rafraichissementPeriodesProvider).tirer(),
+        ]);
       },
       child: Center(
         child: ConstrainedBox(

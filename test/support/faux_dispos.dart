@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
@@ -45,12 +47,17 @@ class FauxDisposRepository implements DisposRepository {
     List<PeriodeSaisie>? periodes,
     Map<CreneauCle, DisponibiliteEtat>? disponibilites,
     Map<String, PreferencesMois>? preferences,
-  }) : _periodes =
-           periodes ?? <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 10)],
+  }) : _periodes = <PeriodeSaisie>[
+         ...periodes ?? <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 10)],
+       ],
        base = <CreneauCle, DisponibiliteEtat>{...?disponibilites},
        basePreferences = <String, PreferencesMois>{...?preferences};
 
   final List<PeriodeSaisie> _periodes;
+
+  /// Ce que l'admin fait pendant que l'application tourne : ouvrir un mois
+  /// (ticket 068). La période n'apparaît qu'à la prochaine lecture.
+  void ajouterPeriode(PeriodeSaisie periode) => _periodes.add(periode);
 
   /// L'état « en base ».
   final Map<CreneauCle, DisponibiliteEtat> base;
@@ -68,6 +75,15 @@ class FauxDisposRepository implements DisposRepository {
 
   /// Le nombre de lectures de la liste des périodes.
   int lecturesPeriodes = 0;
+
+  /// Si posé, la lecture des périodes attend qu'il soit complété avant de
+  /// répondre : c'est la fenêtre pendant laquelle un geste peut commencer
+  /// (ticket 068).
+  Completer<void>? retenueLecturePeriodes;
+
+  /// Les appels reçus, dans l'ordre : `periodes`, `lireMois`,
+  /// `enregistrerLot`, `supprimerLot`.
+  final List<String> journal = <String>[];
 
   /// Les préférences « en base », par `period_id`.
   final Map<String, PreferencesMois> basePreferences;
@@ -92,9 +108,15 @@ class FauxDisposRepository implements DisposRepository {
   @override
   Future<List<PeriodeSaisie>> periodes(String stationId) async {
     lecturesPeriodes++;
+    journal.add('periodes');
+    final retenue = retenueLecturePeriodes;
+    if (retenue != null) await retenue.future;
     final echec = erreurLecture;
     if (echec != null) throw EchecDispos(echec);
-    return _periodes;
+    // Une copie, comme une vraie réponse : rendre la liste elle-même ferait
+    // apparaître un mois ajouté **sans relecture**, et le test ne prouverait
+    // plus rien.
+    return List<PeriodeSaisie>.of(_periodes);
   }
 
   @override
@@ -105,6 +127,7 @@ class FauxDisposRepository implements DisposRepository {
     required int mois,
   }) async {
     lectures++;
+    journal.add('lireMois');
     final echec = erreurLecture;
     if (echec != null) throw EchecDispos(echec);
 
@@ -123,6 +146,7 @@ class FauxDisposRepository implements DisposRepository {
   }) async {
     if (lignes.isEmpty) return 0;
     requetes++;
+    journal.add('enregistrerLot');
     ecritures.add(lignes);
 
     final echec = erreurEcriture;
@@ -143,6 +167,7 @@ class FauxDisposRepository implements DisposRepository {
   }) async {
     if (cles.isEmpty) return 0;
     requetes++;
+    journal.add('supprimerLot');
     suppressions.add(cles);
 
     final echec = erreurEcriture;
@@ -180,10 +205,9 @@ class FauxDisposRepository implements DisposRepository {
     required PreferencesMois preferences,
   }) async {
     requetes++;
-    ecrituresPreferences.add(MapEntry<String, PreferencesMois>(
-      periodId,
-      preferences,
-    ));
+    ecrituresPreferences.add(
+      MapEntry<String, PreferencesMois>(periodId, preferences),
+    );
 
     final echec = erreurEcriture;
     if (echec != null) throw EchecDispos(echec);
