@@ -179,7 +179,8 @@ colonne hors de `docs/SCHEMA.md`, aucune fonction RPC en dehors de `my_ics_token
 
 **Temps réel : aucun**, comme la PWA côté membre (`lib/features/propositions/README.md`,
 `lib/features/boite/README.md` : seuls la matrice et le suivi de l'admin ouvrent un canal).
-L'app relit à l'ouverture de chaque écran et au retour au premier plan (`scenePhase`).
+L'app relit à l'ouverture de chaque écran et au retour au premier plan (`scenePhase`) ; depuis le
+ticket 071, aussi au retour sur l'accueil et à un push reçu au premier plan (§ 4 septies).
 
 **Règles, comme la PWA**
 
@@ -551,6 +552,57 @@ verte, 10 tests 068, 0 avertissement Swift ; fusionnée en squash ; course verte
 ([36412782083](https://github.com/slider973/Foco/actions/runs/36412782083), 0 avertissement) au
 commit `0ab920d`, visé par le pointeur `foco/`. Build TestFlight **1.0 (103)**, course
 [36414185633](https://github.com/slider973/Foco/actions/runs/36414185633).
+
+## 4 septies. Ticket 071 — la lecture seule et les données périmées
+
+**Le défaut** (audit du 28 septembre 2026, pointeur `0ab920d`). Les stores sont partagés, et le
+retour au premier plan relisait la saisie, le planning et le centre ; restait ce que personne ne
+relisait :
+
+- `PlanningJourney.readOnly` n'était posé qu'au `start` : une caserne réactivée après paiement
+  gardait « Accepter » grisé jusqu'au redémarrage (et une suspension ne grisait rien) ;
+- un push reçu au premier plan ne relisait que le centre ;
+- le `.task` de l'accueil était gardé par `isStarted` : revenir d'un écran enfant ne relisait rien ;
+- rôle et appartenances n'étaient lus qu'à l'entrée ;
+- « Planning de la caserne », « Équipe », « Aujourd'hui » et le détail d'un jour ne relisaient pas
+  ce qu'ils avaient déjà lu ;
+- le câblage `scenePhase` de l'accueil n'était pas testé.
+
+**La correction** (`foco/`) — **aucune requête, colonne ou fonction nouvelle** : les mêmes lectures,
+rejouées à d'autres moments.
+
+| Point | Fait |
+|---|---|
+| Lecture seule | `AvailabilityEntry.onStationAccess` prévient à **chaque lecture** de `station_access` (ouverture, retour au premier plan, refus d'une écriture) ; l'`AppStore` y branche `PlanningJourney.syncReadOnly`. La saisie et les réponses suivent la même lecture, sans seconde requête ; la lecture seule de la saisie suit `station_access` même si la relecture des périodes échoue ensuite |
+| Push reçu au premier plan | `handlePush(.received)` → `refreshContent()` : saisie, propositions, astreintes, mois du planning et centre |
+| Retour sur l'accueil | `AppStore.homeAppeared()` au `.task` de l'accueil (qui repart à chaque retour d'un écran poussé), à la fermeture d'une carte dépliée et des réglages ; **au plus une fois toutes les 10 s** (`homeRefreshInterval`), l'entrée et le retour au premier plan comptant comme une relecture. Les arguments de capture n'ouvrent leur écran qu'une fois |
+| Rôle et appartenances | `becameActive()` relit d'abord `memberships` (la requête du 066a) : rôle changé → adopté (« Gérer la caserne » et les liens de l'admin suivent) ; caserne ouverte plus active → saisie, planning et centre oubliés, puis l'écran de l'entrée (« Accès désactivé », une autre caserne, le choix). **Panne réseau** : le rôle lu en base à l'entrée reste ; **tout autre échec** retire le privilège (jamais de repli qui masque un refus). `LocalWipe` inchangé ; un rôle restauré du cache revient toujours simple membre |
+| Écrans | « Planning de la caserne » : la liste et les mois déjà lus (`openStationPlanning`) ; « Aujourd'hui » et le détail d'un jour : le mois relu même s'il l'est déjà (`openMonth(containing:)`) ; « Équipe » : les noms relus à chaque ouverture (`openTeam`), un échec garde ceux qu'on avait |
+| Rien sous un geste ni une écriture | la saisie ne se relit ni sous le doigt ni pendant un envoi (règle du 068) ; les propositions ne sont pas relues tant qu'une réponse est en vol (`responding`), sinon la ligne répondue reviendrait à l'écran |
+
+**Tests** (`FocoTests/FreshnessTests.swift`) : caserne réactivée puis `becameActive` → lecture seule
+levée sur la saisie et les réponses, l'inverse pour une suspension (rien ne part) ; refus d'une
+écriture → « Accepter » grisé aussi ; push reçu → nouvelle proposition à l'écran, astreintes,
+saisie et centre relus ; retour sur l'accueil → relecture, deux retours en moins de 10 s → une
+seule, 10 s après → de nouveau, le retour au premier plan compte ; rôle retiré → plus d'admin, rôle
+donné → admin, appartenance désactivée → « Accès désactivé » et mémoire vidée, panne réseau → rôle
+gardé, refus → privilège retiré ; « Équipe », « Aujourd'hui » / détail et planning relus à
+l'ouverture ; rien sous un geste, rien sous une réponse en vol. **Câblage** : `ScenePhaseWiringTests`
+monte la vraie `HomeView` dans une fenêtre de l'app hôte, passe son `scenePhase` de `.background` à
+`.inactive` (rien) puis à `.active` (relecture).
+
+**CI** : PR [slider973/Foco#11](https://github.com/slider973/Foco/pull/11). Tests seuls sur
+l'ancien code (commit `e9a374b`) : course
+[36490736169](https://github.com/slider973/Foco/actions/runs/36490736169) **rouge**, 15 échecs —
+réponses restées en lecture seule ou jamais grisées, push qui ne relit que le centre, rôle
+d'admin gardé, appartenance désactivée ignorée ; le câblage `scenePhase` passait déjà. Correction :
+(`119d372`) : course [36491914750](https://github.com/slider973/Foco/actions/runs/36491914750) verte avec un
+avertissement de test (argument par défaut isolé), puis
+[36493314724](https://github.com/slider973/Foco/actions/runs/36493314724) verte, 17 tests 071,
+0 avertissement Swift ; fusionnée en squash ; course verte sur `main` du fork
+([36494901491](https://github.com/slider973/Foco/actions/runs/36494901491), 0 avertissement) au
+commit `5062402`, visé par le pointeur `foco/`. Build TestFlight **1.0 (104)**, course
+[36496276933](https://github.com/slider973/Foco/actions/runs/36496276933).
 
 ## 5. Déconnexion et caches locaux
 
