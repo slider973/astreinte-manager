@@ -23,6 +23,7 @@ import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../domain/dispos_providers.dart';
 import '../domain/periode_saisie.dart';
+import 'controllers/rafraichissement_periodes.dart';
 import 'controllers/saisie_controller.dart';
 import 'widgets/barre_compteurs.dart';
 import 'widgets/barre_raccourcis.dart';
@@ -91,7 +92,19 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _suivreUrl();
+    // **À l'ouverture**, la liste des mois a pu vieillir depuis le démarrage
+    // de l'application : un mois ouvert entre-temps doit être là (ticket 068).
+    // Reporté d'une image pour la même raison que `_suivreUrl`.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _relireAuRetour();
+    });
   }
+
+  void _relireAuRetour() =>
+      unawaited(ref.read(rafraichissementPeriodesProvider).auRetour());
+
+  Future<void> _tirerPourActualiser() =>
+      ref.read(rafraichissementPeriodesProvider).tirer();
 
   @override
   void didUpdateWidget(MoisScreen ancien) {
@@ -118,6 +131,10 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState etat) {
+    // **Le retour au premier plan** relit la liste des mois (ticket 068) :
+    // c'est le moment où un pompier revient voir si novembre est ouvert. Sur
+    // le web, `visibilitychange` vers `visible` arrive ici en `resumed`.
+    if (etat == AppLifecycleState.resumed) _relireAuRetour();
     // L'application passe en arrière-plan : la file part sans attendre le
     // délai. Une PWA fermée ne doit rien emporter avec elle.
     if (etat == AppLifecycleState.paused || etat == AppLifecycleState.hidden) {
@@ -271,10 +288,24 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
       );
     }
     if (periodes.hasValue && periodes.requireValue.isEmpty) {
-      return const EmptyState(
-        titre: AppStrings.moisAucunePeriodeTitre,
-        texte: AppStrings.moisAucunePeriodeTexte,
-        icone: Icons.event_busy_outlined,
+      // Tirable lui aussi : c'est précisément l'écran d'un pompier qui attend
+      // que l'admin ouvre le premier mois.
+      return RefreshIndicator(
+        onRefresh: _tirerPourActualiser,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints contraintes) =>
+              SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: contraintes.maxHeight),
+                  child: const EmptyState(
+                    titre: AppStrings.moisAucunePeriodeTitre,
+                    texte: AppStrings.moisAucunePeriodeTexte,
+                    icone: Icons.event_busy_outlined,
+                  ),
+                ),
+              ),
+        ),
       );
     }
     if (saisie.hasError && !saisie.hasValue) {
@@ -344,82 +375,94 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     final astuce = _astuce(etat);
     final marge = classe.margePage;
 
-    return CustomScrollView(
-      controller: _defilement,
-      slivers: <Widget>[
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.md),
-            child: SelecteurMois(
-              periodes: periodes,
-              selectionnee: etat.periode,
-              // La forme du monde du pompier : le mois courant en pastille
-              // pleine, les autres en texte sur le papier doux.
-              pastilles: true,
-              onChoisir: _choisirMois,
-            ),
-          ),
-        ),
-        // La place que le brief du 011 avait gardée aux raccourcis : entre le
-        // sélecteur de mois et l'en-tête épinglé. En `large`, la bande n'est
-        // pas ici mais en tête du panneau de droite. Depuis le 064c, elle est
-        // dans sa carte — la deuxième de l'écran, après le sélecteur.
-        if (!classe.estLarge)
+    // **Tirer pour actualiser** (ticket 068) : relit la liste des mois et le
+    // mois affiché. Le geste ne gêne pas la peinture — elle commence par un
+    // appui long, et ses défilements automatiques ne sont pas des tirages.
+    return RefreshIndicator(
+      onRefresh: _tirerPourActualiser,
+      child: CustomScrollView(
+        controller: _defilement,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: <Widget>[
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(marge, AppSpacing.md, marge, 0),
-              child: const CarteDouce.nue(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                  child: BarreRaccourcis(dansCarte: true),
-                ),
+              padding: const EdgeInsets.only(top: AppSpacing.md),
+              child: SelecteurMois(
+                periodes: periodes,
+                selectionnee: etat.periode,
+                // La forme du monde du pompier : le mois courant en pastille
+                // pleine, les autres en texte sur le papier doux.
+                pastilles: true,
+                onChoisir: _choisirMois,
               ),
             ),
           ),
-        // La place du ticket 013 : **au-dessus de la grille**, dans le même
-        // champ de vision que les raccourcis qui viennent de tout cocher. Le
-        // brief du 011 l'avait réservée sous le dernier jour du mois ; depuis
-        // le 012, on remplit un mois en deux touches sans jamais défiler
-        // jusque-là (`design/013 § 3`). En `large`, elle est dans le panneau.
-        if (!classe.estLarge)
-          const SliverToBoxAdapter(child: SectionPreferences()),
-        if (astuce != null) SliverToBoxAdapter(child: astuce),
-        SliverToBoxAdapter(child: _Annonce(texte: etat.annonce)),
-        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
-        // **La grille dans sa carte** (`design/064 § 3.2`). L'en-tête de
-        // colonnes s'épingle à l'intérieur de la carte et s'en va avec elle :
-        // c'est ce que `SliverMainAxisGroup` fait, et c'est pourquoi la carte
-        // est un sliver et non une boîte — soixante-deux lignes ne se
-        // construisent pas d'avance.
-        SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: marge),
-          sliver: CarteDouceSliver(
-            slivers: <Widget>[
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: EnteteColonnes(
-                  calendrier: calendrier,
-                  hauteur: _hauteurEntete(context),
+          // La place que le brief du 011 avait gardée aux raccourcis : entre le
+          // sélecteur de mois et l'en-tête épinglé. En `large`, la bande n'est
+          // pas ici mais en tête du panneau de droite. Depuis le 064c, elle est
+          // dans sa carte — la deuxième de l'écran, après le sélecteur.
+          if (!classe.estLarge)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(marge, AppSpacing.md, marge, 0),
+                child: const CarteDouce.nue(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    child: BarreRaccourcis(dansCarte: true),
+                  ),
                 ),
               ),
-              if (calendrier)
-                GrilleCalendrier(periode: etat.periode, aujourdhui: aujourdhui)
-              else
-                GrilleRegistre(
-                  periode: etat.periode,
-                  aujourdhui: aujourdhui,
-                  deuxNiveaux: deuxNiveaux,
+            ),
+          // La place du ticket 013 : **au-dessus de la grille**, dans le même
+          // champ de vision que les raccourcis qui viennent de tout cocher. Le
+          // brief du 011 l'avait réservée sous le dernier jour du mois ; depuis
+          // le 012, on remplit un mois en deux touches sans jamais défiler
+          // jusque-là (`design/013 § 3`). En `large`, elle est dans le panneau.
+          if (!classe.estLarge)
+            const SliverToBoxAdapter(child: SectionPreferences()),
+          if (astuce != null) SliverToBoxAdapter(child: astuce),
+          SliverToBoxAdapter(child: _Annonce(texte: etat.annonce)),
+          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
+          // **La grille dans sa carte** (`design/064 § 3.2`). L'en-tête de
+          // colonnes s'épingle à l'intérieur de la carte et s'en va avec elle :
+          // c'est ce que `SliverMainAxisGroup` fait, et c'est pourquoi la carte
+          // est un sliver et non une boîte — soixante-deux lignes ne se
+          // construisent pas d'avance.
+          SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: marge),
+            sliver: CarteDouceSliver(
+              slivers: <Widget>[
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: EnteteColonnes(
+                    calendrier: calendrier,
+                    hauteur: _hauteurEntete(context),
+                  ),
                 ),
-              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.md)),
-            ],
+                if (calendrier)
+                  GrilleCalendrier(
+                    periode: etat.periode,
+                    aujourdhui: aujourdhui,
+                  )
+                else
+                  GrilleRegistre(
+                    periode: etat.periode,
+                    aujourdhui: aujourdhui,
+                    deuxNiveaux: deuxNiveaux,
+                  ),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.md),
+                ),
+              ],
+            ),
           ),
-        ),
-        // **Le commentaire, sous la grille** (chantier 064d) : on l'écrit une
-        // fois par mois, la grille se remplit à chaque ouverture. Sur
-        // `medium` et au-delà, il reste dans la carte des maximums.
-        const SliverToBoxAdapter(child: CarteCommentaire()),
-        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
-      ],
+          // **Le commentaire, sous la grille** (chantier 064d) : on l'écrit une
+          // fois par mois, la grille se remplit à chaque ouverture. Sur
+          // `medium` et au-delà, il reste dans la carte des maximums.
+          const SliverToBoxAdapter(child: CarteCommentaire()),
+          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
+        ],
+      ),
     );
   }
 
