@@ -7,6 +7,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-28. Ne pas éditer à la main
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 068 | [La saisie iOS refusée en « lecture seule » sur un mois ouvert](in-progress/068-saisie-ios-refusee-lecture-seule.md) | P0 | 066 067 |  |
+| 069 | [Le paiement Stripe ne s'ouvre pas pour une caserne](in-progress/069-checkout-stripe-client-existant.md) | P0 | 029 |  |
 
 ## À faire
 
@@ -14,7 +15,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-28. Ne pas éditer à la main
 |---|---|---|---|---|
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
-| 069 | [Le paiement Stripe ne s'ouvre pas pour une caserne](backlog/069-checkout-stripe-client-existant.md) | P0 | 029 |  |
 
 ## Terminés
 

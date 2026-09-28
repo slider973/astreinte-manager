@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 029
 - **Branche** : `feat/069-checkout-stripe-client-existant`
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-09-28
 
 ## Contexte
 
