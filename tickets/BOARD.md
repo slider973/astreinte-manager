@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-29. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 070 | [Les écrans de la PWA affichent des données périmées](in-progress/070-fraicheur-ecrans-pwa.md) | P0 | 068 | — |
 
 ## À faire
 
@@ -13,7 +14,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-29. Ne pas éditer à la main
 |---|---|---|---|---|
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
-| 070 | [Les écrans de la PWA affichent des données périmées](backlog/070-fraicheur-ecrans-pwa.md) | P0 | 068 | — |
 | 071 | [L'app iOS garde la lecture seule et des données périmées](backlog/071-fraicheur-ecrans-ios.md) | P0 | 068 | — |
 | 072 | [Un pompier dans plusieurs casernes, de bout en bout](backlog/072-plusieurs-casernes.md) | P1 | 070 071 | — |
 
