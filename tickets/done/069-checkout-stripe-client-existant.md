@@ -5,7 +5,7 @@
 - **Dépend de** : 029
 - **Branche** : `feat/069-checkout-stripe-client-existant`
 - **PR** : https://github.com/slider973/astreinte-manager/pull/73
-- **Statut** : rouvert le 2026-09-28
+- **Statut** : terminé le 2026-09-28 (manuel)
 
 ## Contexte
 
