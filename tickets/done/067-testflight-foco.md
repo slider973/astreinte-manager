@@ -5,7 +5,7 @@
 - **Dépend de** : 066
 - **Branche** : `feat/067-testflight-foco`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-28
+- **Statut** : terminé le 2026-09-28 (PR créée)
 
 ## Contexte
 
