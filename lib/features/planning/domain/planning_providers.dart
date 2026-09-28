@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/fraicheur/relecture.dart';
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
@@ -158,7 +161,8 @@ class EtatPlanning {
 /// deux lisent le même mois mais pas les mêmes données : saisir une case de
 /// disponibilité n'a aucune raison de relire soixante-deux créneaux, et poser
 /// une attribution n'a aucune raison de relire soixante lignes de matrice.
-class PlanningController extends AsyncNotifier<EtatPlanning?> {
+class PlanningController extends AsyncNotifier<EtatPlanning?>
+    with LectureHorodatee<EtatPlanning?> {
   /// Les retraits que ce poste vient de faire. Le canal nous renvoie nos
   /// propres suppressions : sans ce registre, l'écran s'annoncerait à lui-même
   /// « modifié par un autre administrateur ».
@@ -171,6 +175,19 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
   /// alors qu'il n'y a encore rien à mettre à jour, et l'écran afficherait
   /// « Direct interrompu » sur un canal parfaitement vivant.
   bool _canalBranche = false;
+
+  /// Le canal a déjà été branché une fois : un nouveau branchement est une
+  /// reconnexion.
+  bool _dejaBranche = false;
+
+  /// Relit après une reconnexion, sauf sous une écriture en vol : celle-ci
+  /// reviendra par le canal, désormais rebranché, et une relecture à ce
+  /// moment-là écraserait son état optimiste.
+  Future<void> _rattraper() async {
+    final courant = state.value;
+    if (courant == null || courant.sync == SyncEtat.enregistrement) return;
+    await rafraichir();
+  }
 
   /// Les événements reçus entre l'abonnement et la première image. Ils sont
   /// rejoués sur l'état dès qu'il existe : la fenêtre est étroite, mais une
@@ -190,6 +207,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
     final planning = await ref
         .read(planningRepositoryProvider)
         .lire(stationId: appartenance.stationId, periodeId: periode.id);
+    marquerLu();
 
     final etat = EtatPlanning(
       periode: periode,
@@ -221,7 +239,14 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
   }
 
   void _canal({required bool branche}) {
+    // **Une reconnexion rattrape ce que le canal a manqué** (ticket 070) :
+    // `postgres_changes` ne rejoue pas les événements survenus pendant la
+    // coupure. La toute première connexion, elle, suit la lecture de `build`
+    // et n'a rien à rattraper.
+    final reconnexion = branche && !_canalBranche && _dejaBranche;
+    _dejaBranche = _dejaBranche || branche;
     _canalBranche = branche;
+    if (reconnexion) unawaited(_rattraper());
     final courant = state.value;
     if (courant == null || courant.canalBranche == branche) return;
     state = AsyncValue<EtatPlanning?>.data(
@@ -309,11 +334,16 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
           .read(planningRepositoryProvider)
           .lire(stationId: stationId, periodeId: courant.periode.id);
       if (!ref.mounted) return;
+      marquerLu();
+      // L'état **d'après** la lecture : un événement du canal ou une mention
+      // distante arrivés pendant l'attente ne sont pas écrasés par une copie
+      // périmée (ticket 070).
+      final apres = state.value ?? courant;
       state = AsyncValue<EtatPlanning?>.data(
-        courant.copie(planning: planning, effacerMessage: true),
+        apres.copie(planning: planning, effacerMessage: true),
       );
     } on EchecPlanning catch (echec) {
-      _echouer(echec);
+      await _echouer(echec);
     }
   }
 
@@ -339,7 +369,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
         apres.copie(planning: planning, creation: false),
       );
     } on EchecPlanning catch (echec) {
-      _echouer(echec, creation: false);
+      await _echouer(echec, creation: false);
     }
   }
 
@@ -403,7 +433,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
       state = AsyncValue<EtatPlanning?>.data(
         apres.copie(planning: apres.planning.sansAttribution(locale.id)),
       );
-      _echouer(echec);
+      await _echouer(echec);
       return echec.erreur;
     }
   }
@@ -450,7 +480,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
       state = AsyncValue<EtatPlanning?>.data(
         apres.copie(planning: apres.planning.avecAttribution(retiree)),
       );
-      _echouer(echec);
+      await _echouer(echec);
       return null;
     }
   }
@@ -495,7 +525,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
           ),
         ),
       );
-      _echouer(echec);
+      await _echouer(echec);
     }
   }
 
@@ -539,7 +569,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
       );
       return (fait: resultat, erreur: null);
     } on EchecPlanning catch (echec) {
-      _echouer(echec, proposition: false);
+      await _echouer(echec, proposition: false);
       // Le planning a été publié, ou il a changé sous nos yeux : on relit
       // plutôt que de garder une image fausse.
       if (echec.erreur == ErreurPlanning.planningPublie ||
@@ -597,7 +627,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
       );
       return (fait: resultat, erreur: null);
     } on EchecPlanning catch (echec) {
-      _echouer(echec);
+      await _echouer(echec);
       // Une course perdue — l'adjoint a réattribué le premier, le créneau s'est
       // rempli entre-temps — se répare en relisant, pas en gardant une image
       // fausse à l'écran.
@@ -642,7 +672,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
       );
       return (prevenu: prevenu, erreur: null);
     } on EchecPlanning catch (echec) {
-      _echouer(echec);
+      await _echouer(echec);
       return (prevenu: null, erreur: echec.erreur);
     }
   }
@@ -679,6 +709,13 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
       state = AsyncValue<EtatPlanning?>.data(apres.copie(publication: false));
       return resultat;
     } on EchecSuivi catch (echec) {
+      if (!ref.mounted) return null;
+      // Un refus ne dit « suspendue » que si `station_access` le confirme
+      // (ticket 070).
+      final refus = echec.erreur == ErreurSuivi.lectureSeule;
+      final suspendue =
+          refus &&
+          await ref.read(etatCaserneProvider.notifier).suspendueApresRefus();
       final apres = state.value;
       if (!ref.mounted || apres == null) return null;
 
@@ -689,10 +726,13 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
         apres.copie(
           publication: false,
           sync: concurrence ? SyncEtat.repos : SyncEtat.echec,
-          messageErreur: concurrence ? null : echec.message,
+          messageErreur: concurrence
+              ? null
+              : refus && !suspendue
+              ? AppStrings.ecritureRefusee
+              : echec.message,
           effacerMessage: concurrence,
-          lectureSeule:
-              apres.lectureSeule || echec.erreur == ErreurSuivi.lectureSeule,
+          lectureSeule: apres.lectureSeule || suspendue,
         ),
       );
       if (concurrence) unawaited(rafraichir());
@@ -709,14 +749,24 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
     );
   }
 
-  void _echouer(EchecPlanning echec, {bool? creation, bool? proposition}) {
+  Future<void> _echouer(
+    EchecPlanning echec, {
+    bool? creation,
+    bool? proposition,
+  }) async {
+    if (!ref.mounted) return;
+    // Un refus ne dit « suspendue » que si `station_access`, relu à
+    // l'instant, le confirme (ticket 070) : sinon la phrase reste neutre.
+    final refus = echec.erreur == ErreurPlanning.lectureSeule;
+    final suspendue =
+        refus &&
+        await ref.read(etatCaserneProvider.notifier).suspendueApresRefus();
     final courant = state.value;
     if (!ref.mounted || courant == null) return;
 
     // Une caserne suspendue a sa propre bannière : la doubler d'une bannière
     // d'erreur dirait deux fois la même chose. Un doublon d'attribution non
     // plus : il se dit d'une phrase passagère, à l'endroit du geste.
-    final suspendue = echec.erreur == ErreurPlanning.lectureSeule;
     // Trois refus qui ne sont pas des pannes mais l'autre administrateur : ils
     // se disent d'une phrase passagère, à l'endroit du geste.
     final passagere =
@@ -729,7 +779,11 @@ class PlanningController extends AsyncNotifier<EtatPlanning?> {
         sync: SyncEtat.echec,
         creation: creation,
         proposition: proposition,
-        messageErreur: suspendue || passagere ? null : echec.message,
+        messageErreur: suspendue || passagere
+            ? null
+            : refus
+            ? AppStrings.ecritureRefusee
+            : echec.message,
         effacerMessage: suspendue || passagere,
         lectureSeule: courant.lectureSeule || suspendue,
       ),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/fraicheur/relecture.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
@@ -191,7 +192,8 @@ class EtatMatrice {
 /// **Une seule requête par mois affiché.** Les filtres, le tri, la recherche
 /// et le compte de couverture n'en déclenchent aucune : ils se dérivent des
 /// lignes déjà en mémoire.
-class MatriceController extends AsyncNotifier<EtatMatrice?> {
+class MatriceController extends AsyncNotifier<EtatMatrice?>
+    with LectureHorodatee<EtatMatrice?> {
   @override
   Future<EtatMatrice?> build() async {
     final appartenance = ref.watch(appartenanceCouranteProvider);
@@ -207,6 +209,7 @@ class MatriceController extends AsyncNotifier<EtatMatrice?> {
     final lignes = await ref
         .read(matriceRepositoryProvider)
         .matrice(stationId: stationId, periodeId: periode.id);
+    marquerLu();
 
     return EtatMatrice(
       periode: periode,
@@ -223,22 +226,34 @@ class MatriceController extends AsyncNotifier<EtatMatrice?> {
   /// Relit le mois **en le gardant à l'écran** : un rafraîchissement ne vide
   /// pas la page sous les yeux de qui l'utilise. Le mode armé survit — c'est
   /// le même mois, et l'admin n'a rien demandé d'autre.
-  Future<void> rafraichir() async {
+  ///
+  /// **Rien n'est publié sous une case en cours d'écriture** (ticket 070) :
+  /// la lecture est partie avant l'écriture, et la publier effacerait la case
+  /// optimiste. La relecture est alors [Relecture.retenue], et le
+  /// coordinateur (`core/fraicheur`) la relance au retour au repos.
+  Future<Relecture> rafraichir() async {
     final stationId = ref.read(appartenanceCouranteProvider)?.stationId;
     final courant = state.value;
-    if (stationId == null || courant == null) return;
+    if (stationId == null || courant == null) return Relecture.inchangee;
 
     try {
       final relu = await _lire(stationId, courant.periode);
-      if (!ref.mounted) return;
+      if (!ref.mounted) return Relecture.inchangee;
+      final apres = state.value ?? courant;
+      if (apres.sync == SyncEtat.enregistrement) return Relecture.retenue;
+      // Un autre mois a été choisi pendant la lecture : `build` s'en occupe.
+      if (apres.periode.id != courant.periode.id) return Relecture.inchangee;
       state = AsyncValue<EtatMatrice?>.data(
-        relu.copie(modeArme: courant.modeArme),
+        relu.copie(modeArme: apres.modeArme),
       );
+      return Relecture.publiee;
     } on EchecMatrice catch (echec) {
-      if (!ref.mounted) return;
+      if (!ref.mounted) return Relecture.echouee;
+      final apres = state.value ?? courant;
       state = AsyncValue<EtatMatrice?>.data(
-        courant.copie(messageErreur: echec.message),
+        apres.copie(messageErreur: echec.message),
       );
+      return Relecture.echouee;
     }
   }
 
@@ -315,11 +330,17 @@ class MatriceController extends AsyncNotifier<EtatMatrice?> {
         apres.copie(sync: SyncEtat.enregistre),
       );
     } on EchecMatrice catch (echec) {
+      if (!ref.mounted) return;
+      // Un refus ne dit « suspendue » que si `station_access`, relu à
+      // l'instant, le confirme (ticket 070) : sinon c'est un échec d'écriture
+      // comme un autre.
+      final suspendue =
+          echec.erreur == ErreurMatrice.lectureSeule &&
+          await ref.read(etatCaserneProvider.notifier).suspendueApresRefus();
       final apres = state.value;
       if (!ref.mounted || apres == null) return;
       // La case **garde la valeur demandée** et prend le contour d'erreur :
       // un rechargement rétablira la valeur du serveur.
-      final suspendue = echec.erreur == ErreurMatrice.lectureSeule;
       state = AsyncValue<EtatMatrice?>.data(
         apres.copie(
           sync: SyncEtat.echec,

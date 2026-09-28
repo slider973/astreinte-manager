@@ -39,9 +39,17 @@ class FauxCaserneRepository implements CaserneRepository {
   /// une requête par case peinte.
   int lectures = 0;
 
+  /// Vrai quand `station_access` ne répond plus : [essayer] rend `null`,
+  /// [lire] retombe sur [EtatCaserne.inconnue], comme le vrai dépôt.
+  bool injoignable = false;
+
   @override
-  Future<EtatCaserne> lire(String stationId) async {
+  Future<EtatCaserne> lire(String stationId) async =>
+      await essayer(stationId) ?? EtatCaserne.inconnue;
+
+  @override
+  Future<EtatCaserne?> essayer(String stationId) async {
     lectures++;
-    return etat;
+    return injoignable ? null : etat;
   }
 }

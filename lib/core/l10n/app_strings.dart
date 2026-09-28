@@ -215,6 +215,12 @@ abstract final class AppStrings {
   static const String lectureSeuleDetail =
       'Caserne suspendue : tu peux consulter, pas modifier.';
 
+  /// **Un refus de la base sur une caserne qui écrit** (ticket 070) : ni
+  /// suspension — `station_access` vient de dire le contraire —, ni panne de
+  /// réseau. La phrase dit le fait et la sortie, sans accuser l'abonnement.
+  static const String ecritureRefusee =
+      'La modification n\'a pas été enregistrée. Réessaie dans un instant.';
+
   // -------------------------------------------------------------------
   // Caserne suspendue et fin d'essai — ticket 030
   // -------------------------------------------------------------------
@@ -1653,6 +1659,13 @@ abstract final class AppStrings {
   static const String moisErreurSuspendueEnCours =
       'Ta caserne est passée en lecture seule. Tes dernières modifications '
       'n\'ont pas été enregistrées.';
+
+  /// **Un refus que ni la caserne ni le mois n'expliquent** (ticket 070) :
+  /// `station_access` dit que la caserne écrit, les périodes disent que le
+  /// mois est ouvert. La phrase reste neutre — la même que l'app iOS au
+  /// ticket 068 — et ne parle jamais de suspension.
+  static const String moisErreurRefusInexplique =
+      moisErreurEnregistrementBanniere;
   static const String actionRecharger = 'Recharger';
 
   /// **La réponse à un appui sur une case verrouillée** (ticket 014).
@@ -3184,6 +3197,12 @@ abstract final class AppStrings {
       'centre.';
   static const String propositionsErreurTexte =
       'Impossible de charger tes propositions.';
+
+  /// **Un refus de la base sur une caserne qui écrit** (ticket 070). Ce n'est
+  /// pas une suspension — `station_access` vient de le dire —, donc la phrase
+  /// n'en parle pas : elle dit ce qui s'est passé et la sortie.
+  static const String propositionsReponseRefusee =
+      'Ta réponse n\'a pas été enregistrée. Réessaie dans un instant.';
   static const String propositionsVideAction = 'Voir mon mois';
 
   // --- La feuille de refus ------------------------------------------------

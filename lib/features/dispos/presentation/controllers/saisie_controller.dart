@@ -336,6 +336,33 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
 
     final appartenance = ref.watch(appartenanceCouranteProvider);
     final session = ref.watch(sessionProvider).value;
+    // **L'état de la caserne change la grille sans la reconstruire**
+    // (ticket 070). Il est relu en cours de session désormais — retour au
+    // premier plan, retour de Stripe, refus `42501` —, et une reconstruction
+    // à ce moment-là remettrait le pinceau à zéro sous le doigt, ou effacerait
+    // la phrase du refus qui vient de le demander. Une caserne réactivée
+    // rouvre la grille : `station_access` fait foi, et la suspension apprise
+    // d'un refus ne survit pas à sa levée.
+    final lectureSeuleCaserne = ref.read(lectureSeuleCaserneProvider);
+    if (!lectureSeuleCaserne) _lectureSeuleConnue = false;
+    ref.listen<bool>(lectureSeuleCaserneProvider, (_, lectureSeule) {
+      if (!lectureSeule) _lectureSeuleConnue = false;
+      final etat = _etat;
+      if (etat == null) return;
+      final fermee = _lectureSeuleConnue || lectureSeule;
+      if (etat.lectureSeule == fermee) return;
+      _publier(
+        etat.copyWith(
+          lectureSeule: fermee,
+          // La phrase de la suspension part avec elle.
+          refusServeur: () =>
+              !fermee &&
+                  etat.refusServeur == AppStrings.moisErreurSuspendueEnCours
+              ? null
+              : etat.refusServeur,
+        ),
+      );
+    });
     final periodes =
         ref.watch(periodesProvider).value ?? const <PeriodeSaisie>[];
     final periode = ref.watch(periodeCouranteProvider);
@@ -478,8 +505,7 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       // naît inerte et la bannière dit pourquoi, au lieu d'avaler quatorze
       // cases avant de les rendre à un refus du serveur. `_lectureSeuleConnue`
       // reste le filet pour une suspension survenue écran ouvert.
-      lectureSeule:
-          _lectureSeuleConnue || ref.watch(lectureSeuleCaserneProvider),
+      lectureSeule: _lectureSeuleConnue || lectureSeuleCaserne,
     );
   }
 
@@ -1153,14 +1179,20 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     }
 
     if (erreur.estRefus) {
-      // Le serveur a refusé : reste à savoir si c'est le mois qui s'est
-      // verrouillé ou la caserne qui est passée en lecture seule. Les deux
-      // arrivent en 42501 ; seule la relecture des périodes les sépare.
-      final verrouille = await _moisVerrouilleMaintenant();
+      // Le serveur a refusé, et un `42501` ne dit pas pourquoi. **Chaque cause
+      // se vérifie**, dans l'ordre de l'app iOS (ticket 068,
+      // `docs/IOS.md § 4 sexies`) : `station_access` d'abord — seule source
+      // du « lecture seule » depuis le ticket 070 —, puis les périodes. Ce
+      // qu'aucune des deux n'explique reste neutre : un refus inexpliqué
+      // n'est jamais présenté comme une suspension.
+      final suspendue = await ref
+          .read(etatCaserneProvider.notifier)
+          .suspendueApresRefus();
+      final verrouille = !suspendue && await _moisVerrouilleMaintenant();
       final courant = _etat;
       if (courant == null) return;
 
-      _lectureSeuleConnue = _lectureSeuleConnue || !verrouille;
+      _lectureSeuleConnue = _lectureSeuleConnue || suspendue;
       _publier(
         courant.copyWith(
           sync: SyncEtat.echec,
@@ -1168,10 +1200,12 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
           preferences: courant.preferences.copyWith(
             enErreur: preferences.contains(courant.periode.id),
           ),
-          lectureSeule: !verrouille,
-          refusServeur: () => verrouille
+          lectureSeule: suspendue,
+          refusServeur: () => suspendue
+              ? AppStrings.moisErreurSuspendueEnCours
+              : verrouille
               ? AppStrings.moisErreurVerrouilleEnCours
-              : AppStrings.moisErreurSuspendueEnCours,
+              : AppStrings.moisErreurRefusInexplique,
         ),
       );
       return;
