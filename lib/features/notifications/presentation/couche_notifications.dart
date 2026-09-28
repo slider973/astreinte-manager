@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/fraicheur/fraicheur.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/session/session_providers.dart';
@@ -90,6 +91,22 @@ class _CoucheNotificationsState extends ConsumerState<CoucheNotifications> {
     unawaited(ref.read(centreNotificationsProvider.notifier).rafraichir());
   }
 
+  /// **Un push annonce une nouveauté ailleurs que dans le centre** (ticket
+  /// 070) : une proposition, un planning validé, un mois ouvert. Les écrans
+  /// qui les montrent — l'accueil d'abord, son « Propositions » et ses
+  /// astreintes — sont relus tout de suite, délai minimal ou pas : c'est un
+  /// événement, pas une grappe de retours au premier plan.
+  void _relireCeQuiAChange() {
+    if (!mounted) return;
+    unawaited(
+      ref.read(fraicheurProvider).maintenant(const <Donnee>{
+        Donnee.propositions,
+        Donnee.astreintes,
+        Donnee.periodes,
+      }),
+    );
+  }
+
   void _montrer(MessagePush message) {
     if (!message.affichable) return;
     _effacement?.cancel();
@@ -133,6 +150,7 @@ class _CoucheNotificationsState extends ConsumerState<CoucheNotifications> {
       // tenir « la notification apparaît dans la liste sans relancer l'app »
       // sans temps réel.
       _relireLeCentre();
+      _relireCeQuiAChange();
     });
 
     ref.listen(routesServiceWorkerProvider, (_, suivant) {
