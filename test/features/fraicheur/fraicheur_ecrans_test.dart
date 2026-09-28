@@ -15,8 +15,10 @@ import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/l10n/format_date.dart';
 import 'package:astreinte_sp/core/plateforme/contexte_plateforme.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
+import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/router/app_router.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/session/appartenances_locales.dart';
 import 'package:astreinte_sp/core/session/auth_erreur.dart';
 import 'package:astreinte_sp/core/session/session_providers.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
@@ -506,6 +508,31 @@ void main() {
       ];
       horloge.avancer();
       await rangerPuisRevenir(tester);
+
+      expect(find.text(AppStrings.navAdmin), findsWidgets);
+    });
+
+    testWidgets('un démarrage hors ligne rend son rôle au chef de centre au '
+        'retour du réseau', (tester) async {
+      // Sans réseau, l'appartenance vient du stockage, **toujours** en simple
+      // membre (ticket 027). Avant le ticket 070, rien ne la relisait ensuite.
+      final reseau = ConnectiviteMemoire(enLigne: false);
+      final faux = await monterApp(
+        tester,
+        session: sessionMembre,
+        appartenances: const <Appartenance>[appartenanceAdmin],
+        erreurAppartenances: AuthErreur.reseau,
+        appartenancesLocales: AppartenancesLocalesMemoire(
+          const <Appartenance>[appartenanceAdmin],
+        ),
+        reseau: reseau,
+        horlogeRafraichissement: () => maintenantTest,
+      );
+      expect(find.text(AppStrings.navAdmin), findsNothing);
+
+      faux.memberships.erreur = null;
+      reseau.definir(enLigne: true);
+      await tester.pumpAndSettle();
 
       expect(find.text(AppStrings.navAdmin), findsWidgets);
     });
