@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/caserne/caserne_providers.dart';
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
@@ -759,6 +761,71 @@ void main() {
       expect(etat.refusServeur, AppStrings.moisErreurRefusInexplique);
       expect(etat.lectureSeule, isFalse);
       expect(etat.modifiable, isTrue);
+    });
+
+    testWidgets('une suspension apprise pendant le chargement de la grille '
+        'la ferme dès sa naissance', (tester) async {
+      // Démarrage à froid : `station_access` n'a pas encore répondu quand la
+      // saisie commence à se charger, et répond pendant la lecture du mois.
+      // La garantie du ticket 030 — « su avant la première case » — tient.
+      final caserne = FauxCaserneRepository(caserneSuspendue)
+        ..retenue = Completer<void>();
+      final mois = Completer<void>();
+      final depot = FauxDisposRepository()
+        ..retenueLectureMois = mois
+        ..auDebutLireMois = () {
+          final retenue = caserne.retenue;
+          if (retenue != null && !retenue.isCompleted) retenue.complete();
+        };
+      final conteneur = await ouvrir(tester, depot: depot, caserne: caserne);
+      expect(conteneur.read(saisieControllerProvider).hasValue, isFalse);
+
+      // `station_access` a répondu, la lecture du mois est toujours en vol.
+      await tester.pump();
+      expect(conteneur.read(lectureSeuleCaserneProvider), isTrue);
+
+      mois.complete();
+      for (var essai = 0; essai < 20; essai++) {
+        await tester.pump();
+        if (conteneur.read(saisieControllerProvider).hasValue) break;
+      }
+
+      expect(etatDe(conteneur).lectureSeule, isTrue);
+      expect(etatDe(conteneur).modifiable, isFalse);
+    });
+
+    testWidgets('une suspension apprise pendant un changement de mois ferme '
+        'le nouveau mois', (tester) async {
+      final caserne = FauxCaserneRepository();
+      final depot = FauxDisposRepository(
+        periodes: <PeriodeSaisie>[
+          periodeOuverte(annee: 2026, mois: 10),
+          periodeOuverte(annee: 2026, mois: 11),
+        ],
+      );
+      final conteneur = await ouvrir(tester, depot: depot, caserne: caserne);
+      expect(etatDe(conteneur).modifiable, isTrue);
+
+      // Le mois suivant se charge ; pendant sa lecture, la caserne est
+      // suspendue et `station_access` relu le dit.
+      final mois = Completer<void>();
+      depot.retenueLectureMois = mois;
+      conteneur.read(moisSelectionneProvider.notifier).definir('2026-11');
+      await tester.pump();
+      caserne.etat = caserneSuspendue;
+      await conteneur.read(etatCaserneProvider.notifier).relire();
+      expect(conteneur.read(lectureSeuleCaserneProvider), isTrue);
+
+      mois.complete();
+      for (var essai = 0; essai < 20; essai++) {
+        await tester.pump();
+        final valeur = conteneur.read(saisieControllerProvider);
+        if (!valeur.isLoading && valeur.value?.periode.mois == 11) break;
+      }
+
+      expect(etatDe(conteneur).periode.mois, 11);
+      expect(etatDe(conteneur).lectureSeule, isTrue);
+      expect(etatDe(conteneur).modifiable, isFalse);
     });
 
     testWidgets('une caserne réactivée rouvre la grille sans redémarrage', (

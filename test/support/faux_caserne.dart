@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/caserne/caserne_repository.dart';
 import 'package:astreinte_sp/core/caserne/etat_caserne.dart';
 
@@ -43,6 +45,9 @@ class FauxCaserneRepository implements CaserneRepository {
   /// [lire] retombe sur [EtatCaserne.inconnue], comme le vrai dépôt.
   bool injoignable = false;
 
+  /// Si posé, `station_access` attend qu'il soit complété avant de répondre.
+  Completer<void>? retenue;
+
   @override
   Future<EtatCaserne> lire(String stationId) async =>
       await essayer(stationId) ?? EtatCaserne.inconnue;
@@ -50,6 +55,8 @@ class FauxCaserneRepository implements CaserneRepository {
   @override
   Future<EtatCaserne?> essayer(String stationId) async {
     lectures++;
+    final attente = retenue;
+    if (attente != null) await attente.future;
     return injoignable ? null : etat;
   }
 }

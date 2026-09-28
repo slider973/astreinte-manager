@@ -100,11 +100,8 @@ String _comptePropositions(int compte) => AppStrings.accueilSectionCompte(
   compte,
 );
 
-Proposition _proposition(String id, int jour) => proposition(
-  id: id,
-  creneauId: 'c-$id',
-  jour: DateTime(2026, 9, jour),
-);
+Proposition _proposition(String id, int jour) =>
+    proposition(id: id, creneauId: 'c-$id', jour: DateTime(2026, 9, jour));
 
 /// Les propositions d'une caserne qui **range ses astreintes** : accepter une
 /// ligne l'ajoute aux astreintes acceptées, comme la base le fait par
@@ -431,13 +428,24 @@ void main() {
       final horloge = Horloge();
       final caserne = FauxCaserneRepository();
       await _monter(tester, horloge: horloge, caserne: caserne);
-      expect(_conteneur(tester).read(lectureSeuleCaserneProvider), isFalse);
+      await ouvrirRoute(tester, AppRoutes.calendrier);
+      final conteneur = _conteneur(tester);
+      expect(conteneur.read(lectureSeuleCaserneProvider), isFalse);
+      expect(
+        conteneur.read(saisieControllerProvider).value!.modifiable,
+        isTrue,
+      );
 
       caserne.etat = caserneSuspendue;
       horloge.avancer();
       await rangerPuisRevenir(tester);
 
-      expect(_conteneur(tester).read(lectureSeuleCaserneProvider), isTrue);
+      expect(conteneur.read(lectureSeuleCaserneProvider), isTrue);
+      // Et la grille, elle, se ferme : c'est ce qui grise les cases.
+      expect(
+        conteneur.read(saisieControllerProvider).value!.modifiable,
+        isFalse,
+      );
     });
 
     testWidgets('une lecture de station_access qui échoue garde la '
@@ -522,9 +530,9 @@ void main() {
         session: sessionMembre,
         appartenances: const <Appartenance>[appartenanceAdmin],
         erreurAppartenances: AuthErreur.reseau,
-        appartenancesLocales: AppartenancesLocalesMemoire(
-          const <Appartenance>[appartenanceAdmin],
-        ),
+        appartenancesLocales: AppartenancesLocalesMemoire(const <Appartenance>[
+          appartenanceAdmin,
+        ]),
         reseau: reseau,
         horlogeRafraichissement: () => maintenantTest,
       );

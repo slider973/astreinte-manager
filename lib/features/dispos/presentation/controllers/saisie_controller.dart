@@ -343,10 +343,16 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     // la phrase du refus qui vient de le demander. Une caserne réactivée
     // rouvre la grille : `station_access` fait foi, et la suspension apprise
     // d'un refus ne survit pas à sa levée.
-    final lectureSeuleCaserne = ref.read(lectureSeuleCaserneProvider);
-    if (!lectureSeuleCaserne) _lectureSeuleConnue = false;
+    //
+    // **L'état est relu au moment de rendre la grille**, pas ici : entre ces
+    // deux instants, `build` attend la file, le mois et les préférences, et
+    // `station_access` a pu répondre entre-temps. Pendant ces attentes
+    // l'écouteur ne publie rien — il n'y a pas encore d'état à corriger, ou
+    // c'est celui d'un autre mois que `build` va remplacer — et c'est la
+    // relecture finale qui porte la réponse.
     ref.listen<bool>(lectureSeuleCaserneProvider, (_, lectureSeule) {
       if (!lectureSeule) _lectureSeuleConnue = false;
+      if (!ref.mounted || state.isLoading) return;
       final etat = _etat;
       if (etat == null) return;
       final fermee = _lectureSeuleConnue || lectureSeule;
@@ -505,8 +511,17 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
       // naît inerte et la bannière dit pourquoi, au lieu d'avaler quatorze
       // cases avant de les rendre à un refus du serveur. `_lectureSeuleConnue`
       // reste le filet pour une suspension survenue écran ouvert.
-      lectureSeule: _lectureSeuleConnue || lectureSeuleCaserne,
+      lectureSeule: _lectureSeuleSue(),
     );
+  }
+
+  /// La lecture seule **telle qu'on la sait maintenant** : `station_access`
+  /// relu à l'instant, ou une suspension apprise d'un refus que
+  /// `station_access` n'a pas levée depuis.
+  bool _lectureSeuleSue() {
+    final caserne = ref.read(lectureSeuleCaserneProvider);
+    if (!caserne) _lectureSeuleConnue = false;
+    return _lectureSeuleConnue || caserne;
   }
 
   /// Lit les préférences du mois affiché **et de son précédent**, en une
