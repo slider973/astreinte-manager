@@ -45,12 +45,17 @@ class FauxDisposRepository implements DisposRepository {
     List<PeriodeSaisie>? periodes,
     Map<CreneauCle, DisponibiliteEtat>? disponibilites,
     Map<String, PreferencesMois>? preferences,
-  }) : _periodes =
-           periodes ?? <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 10)],
+  }) : _periodes = <PeriodeSaisie>[
+         ...periodes ?? <PeriodeSaisie>[periodeOuverte(annee: 2026, mois: 10)],
+       ],
        base = <CreneauCle, DisponibiliteEtat>{...?disponibilites},
        basePreferences = <String, PreferencesMois>{...?preferences};
 
   final List<PeriodeSaisie> _periodes;
+
+  /// Ce que l'admin fait pendant que l'application tourne : ouvrir un mois
+  /// (ticket 068). La période n'apparaît qu'à la prochaine lecture.
+  void ajouterPeriode(PeriodeSaisie periode) => _periodes.add(periode);
 
   /// L'état « en base ».
   final Map<CreneauCle, DisponibiliteEtat> base;
@@ -94,7 +99,10 @@ class FauxDisposRepository implements DisposRepository {
     lecturesPeriodes++;
     final echec = erreurLecture;
     if (echec != null) throw EchecDispos(echec);
-    return _periodes;
+    // Une copie, comme une vraie réponse : rendre la liste elle-même ferait
+    // apparaître un mois ajouté **sans relecture**, et le test ne prouverait
+    // plus rien.
+    return List<PeriodeSaisie>.of(_periodes);
   }
 
   @override
@@ -180,10 +188,9 @@ class FauxDisposRepository implements DisposRepository {
     required PreferencesMois preferences,
   }) async {
     requetes++;
-    ecrituresPreferences.add(MapEntry<String, PreferencesMois>(
-      periodId,
-      preferences,
-    ));
+    ecrituresPreferences.add(
+      MapEntry<String, PreferencesMois>(periodId, preferences),
+    );
 
     final echec = erreurEcriture;
     if (echec != null) throw EchecDispos(echec);
