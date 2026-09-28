@@ -139,7 +139,8 @@ que la PWA appelle aussi sur cet écran.
   ligne »). Un échec **ne revient pas en arrière** — la PWA non plus : la case est marquée, la file
   est gardée et rejouée. Un refus de la base (mois verrouillé entre-temps, caserne suspendue)
   affiche la phrase de la PWA avec « Recharger », qui revient à ce que la base contient et abandonne
-  les écritures du mois fermé, en le disant.
+  les écritures du mois fermé, en le disant. Depuis le ticket 068, la cause est relue
+  (`station_access`, puis `periods`) et un refus inexpliqué reste neutre (§ 4 sexies).
 - File gardée sur l'appareil (`PendingQueueMemory`, `UserDefaults`), comme `file_locale.dart` :
   elle repart au lancement suivant et part à la déconnexion avec le domaine (§ 5).
 
@@ -479,6 +480,77 @@ Dans l'app iOS (`foco/`) :
 0 avertissement Swift), fusionnée en squash ; course verte sur `main` du fork
 ([36227804089](https://github.com/slider973/Foco/actions/runs/36227804089), 189 tests, 0 avertissement)
 au commit `ecb7955`, visé par le pointeur `foco/`.
+
+## 4 sexies. Ticket 068 — la saisie refusée en « lecture seule » sur un mois ouvert
+
+**Le bug** (TestFlight 1.0 (102), 28 septembre 2026, iPhone du propriétaire). Caserne en essai,
+`station_access.writable` vrai ; septembre et octobre `locked`, novembre `open`. Après une
+navigation septembre → octobre → novembre, une touche passe (`201`), un effacement aussi
+(`DELETE` du 3 novembre, nuit), puis les deux `upsert` suivants sont refusés en `403` / `42501`
+(« new row violates row-level security policy »). L'écran affiche « Ta caserne est passée en
+lecture seule… », puis « Caserne suspendue : la saisie est fermée ». Aucune ligne de novembre en
+base, alors qu'un `INSERT` du 2 novembre sous l'identité du membre passe.
+
+**La cause** : la grille de `AvailabilityView` gardait ses cibles de pinceau
+(`@State frames: [SlotKey: CGRect]`) **d'un mois à l'autre** — la vue n'était pas recréée au
+changement de mois et le dictionnaire n'était jamais vidé. Le glissement cherchait la case sous le
+doigt par `frames.first { $0.value.contains(point) }` : sur la première ligne de novembre, les
+colonnes vides (le 1er novembre 2026 est un dimanche) portaient encore les cases de septembre et
+d'octobre, et ailleurs l'ordre du dictionnaire tranchait au hasard. `AvailabilityEntry.set` ne
+vérifiait que « le mois affiché est ouvert », pas « la case est du mois affiché » : ces cases
+entraient dans la file, et l'`upsert` groupé partait avec des lignes de mois verrouillés — une
+seule suffit pour que PostgREST refuse tout le lot. Le refus relisait alors les périodes, trouvait
+novembre ouvert, et **en déduisait une suspension** (`knownReadOnly`), gardée jusqu'au redémarrage.
+Les dates, elles, étaient justes : chaque case est calculée en date civile par le même calendrier
+à l'aller et au retour (vérifié pour chaque case de septembre, octobre et novembre 2026).
+
+**La preuve** : le test `EntryRegressionTests.productionScenario` rejoue le scénario (même
+géométrie de grille, même geste, faux backend qui lève `42501` dès qu'un lot porte une ligne d'un
+mois fermé). Sur l'ancien code, course
+[36410290026](https://github.com/slider973/Foco/actions/runs/36410290026) rouge : message « Ta
+caserne est passée en lecture seule… », lots portant `2026-09`, `2026-10` et `2026-11`, base vide
+en novembre — exactement la production. Rejoué aussi en `curl` contre le Supabase local
+(octobre verrouillé, novembre ouvert, `membre1@caserne-a.test`, code lu dans Mailpit) : un lot
+29 octobre + 2 novembre → `403` `42501` ; le 2 novembre seul → accepté.
+
+**La correction** (`foco/`) :
+
+- **Un lot, un seul mois ouvert.** La grille est recréée à chaque mois (`.id(period.key)`) et
+  `GridHitMap` ne répond que pour les cases du mois affiché ; `set` et `put` écartent toute case
+  d'un autre mois. La file part **un mois à la fois**, le mois affiché d'abord ; une entrée d'un
+  mois qui n'est plus ouvert (ou avant toute lecture des périodes, rien ne part) est retirée et
+  annoncée (`staleQueueDropped`, « Des disponibilités en attente visaient un mois désormais
+  verrouillé… »).
+- **Un refus dit sa vraie cause**, dans cet ordre : `station_access` relu → `writable = false` :
+  « Ta caserne est passée en lecture seule… » et la grille se ferme ; sinon `periods` relu → le
+  mois du lot n'est plus ouvert : « Le mois vient d'être verrouillé… » avec « Recharger » ; sinon
+  erreur neutre « Impossible d'enregistrer tes disponibilités. Elles sont conservées sur ton
+  téléphone. » avec « Réessayer », **sans jamais parler de suspension**. La lecture seule ne vient
+  plus que de `station_access`.
+- **Un nouveau mois sans redémarrer.** `AvailabilityEntry.refresh()` relit `station_access`, les
+  périodes, le mois affiché et ses préférences, sans jeter la file : au retour au premier plan
+  (`AppStore.becameActive()`, depuis l'accueil et l'écran), à l'ouverture de l'accueil et des
+  Disponibilités (`prepareAvailability`), et par tirer-pour-actualiser (`.refreshable`). Si l'écran
+  montrait le mois par défaut, il suit le nouveau ; un mois choisi à la main reste affiché.
+- Tests (`FocoTests/EntryRegressionTests.swift`) : scénario de production, case d'un autre mois
+  jamais en file, un lot par mois, mois verrouillé entre-temps jamais envoyé, trois causes de refus
+  (suspendue, verrouillé, neutre), nouveau mois au retour au premier plan, à l'ouverture de l'écran
+  (mois choisi à la main gardé), date de chaque case.
+
+**Écart relevé dans la PWA** (signalé, non corrigé : `lib/` n'est pas touché) : `_traiterEchec` de
+`SaisieController` classe un `42501` comme l'ancienne app iOS — mois relu ouvert ⇒ « Ta caserne est
+passée en lecture seule », sans lire `station_access`, et `_lectureSeuleConnue` le garde jusqu'au
+rechargement de la page ou à un changement de compte. La PWA n'a pas le bug de la grille (ses lots ne portent que le mois affiché), mais
+un refus inexpliqué y serait présenté comme une suspension.
+
+**CI** : PR [slider973/Foco#10](https://github.com/slider973/Foco/pull/10). Reproduction seule
+(commits `d4e5adc`, `3599e75`) : course [36410290026](https://github.com/slider973/Foco/actions/runs/36410290026)
+**rouge** sur les tests (la première, 36409805880, échouait à la compilation : `MonthGrid` existait
+déjà, d'où `EntryMonthGrid`). Correction `5579efa` : course [36411249041](https://github.com/slider973/Foco/actions/runs/36411249041)
+verte, 10 tests 068, 0 avertissement Swift ; fusionnée en squash ; course verte sur `main` du fork
+([36412782083](https://github.com/slider973/Foco/actions/runs/36412782083), 0 avertissement) au
+commit `0ab920d`, visé par le pointeur `foco/`. Build TestFlight **1.0 (103)**, course
+[36414185633](https://github.com/slider973/Foco/actions/runs/36414185633).
 
 ## 5. Déconnexion et caches locaux
 
