@@ -1,7 +1,9 @@
-# L'app iOS native — Foco
+# L'app iOS native — Astreinte SP (projet Foco)
 
 Ticket 066. La PWA reste le produit et le seul canal de l'admin ; **Foco** est un second client
 du pompier, en SwiftUI, branché sur la même base Supabase avec le même contrat.
+Depuis le ticket 067, l'app s'affiche **« Astreinte SP »**, comme la PWA, avec son icône ;
+« Foco » ne reste que le nom interne du projet Xcode, du fork et du submodule.
 
 | | |
 |---|---|
@@ -74,9 +76,9 @@ résout `supabase-swift`.
   Run → Arguments*). Données en mémoire, aucune requête.
 - **Connexion** : l'adresse d'un compte du seed (`membre1@caserne-a.test`), puis le code à six
   chiffres, qui arrive dans Mailpit (`http://127.0.0.1:54324`) avec la pile locale.
-- **Sur l'iPhone du propriétaire** : *Signing & Capabilities* avec l'équipe Apple du
-  propriétaire (le projet porte `DEVELOPMENT_TEAM = 7LTN3MGW4H`, celle de l'auteur de Foco, et
-  l'identifiant `com.mazestudio.foco` : à remplacer par ceux du propriétaire).
+- **Sur l'iPhone du propriétaire** : identifiant `ch.staticflow.astreintesp` (ticket 067). Le
+  projet ne code plus aucune équipe : `DEVELOPMENT_TEAM = $(FOCO_TEAM_ID)` dans
+  `Config/Foco.xcconfig`, et `FOCO_TEAM_ID = <équipe>` dans son `Config/Config.xcconfig` local.
 
 ## 4. Ce que fait le chantier 066a
 
@@ -653,20 +655,16 @@ n'a pas d'écran d'administration.
 Le code est prêt ; ces étapes demandent un compte, une clé ou un téléphone, et ne peuvent pas se
 faire dans la CI.
 
-1. **Signature Apple et identifiant de bundle.** Dans `foco/Foco.xcodeproj`, cible `Foco`,
-   *Signing & Capabilities* : ton équipe Apple (le projet porte encore `DEVELOPMENT_TEAM =
-   7LTN3MGW4H`, celle de l'auteur de Foco) et ton identifiant (à la place de `com.mazestudio.foco`,
-   par exemple `ch.staticflow.foco`). Reporter l'identifiant dans `BUNDLE_ID` de
-   `foco/scripts/ci.sh` et le commiter dans le fork (PR, course verte, pointeur).
+1. ~~**Signature Apple et identifiant de bundle.**~~ Fait au ticket 067 :
+   `ch.staticflow.astreintesp`, équipe injectée (`FOCO_TEAM_ID` en local, secret `APPLE_TEAM_ID`
+   en CI), plus aucune équipe codée en dur.
 2. **`Config/Config.xcconfig` de production** : `FOCO_SUPABASE_URL` et `FOCO_SUPABASE_ANON_KEY`
    de `env/prod.json` (clé **publique** seulement), `FOCO_PWA_URL` si l'adresse de la PWA change.
    Jamais commité.
 3. **Firebase iOS** (`docs/FIREBASE.md § 9`) : l'application iOS dans le **même** projet Firebase
    que la PWA, la clé APNs `.p8` (Key ID, Team ID) importée dans *Cloud Messaging*, et
    `GoogleService-Info.plist` déposé en `foco/Foco/GoogleService-Info.plist` (jamais commité).
-4. **TestFlight** : dans App Store Connect, créer l'app avec l'identifiant du point 1 ; dans Xcode,
-   *Product → Archive* avec le `Config.xcconfig` de production et `GoogleService-Info.plist` en
-   place, puis *Distribute App → TestFlight*. `aps-environment` passe en `production`
+4. **TestFlight** : par la CI du fork, § 10. `aps-environment` passe en `production`
    automatiquement à l'export.
 5. **Vérification sur l'iPhone 17 Pro Max** (dernier critère du ticket), build de développement ou
    TestFlight : connexion par code ; mêmes disponibilités, propositions, astreintes et planning que
@@ -678,3 +676,73 @@ faire dans la CI.
    le planning et les notifications.
 
 Le bloc `apns` de l'Edge Function d'envoi est fait au chantier 066d (commit `e500717`) : les push iOS portent le son, et `deploy.yml` le met en ligne à la fusion.
+
+## 10. Publier sur TestFlight (ticket 067)
+
+Le Mac du propriétaire (Xcode 16.2) ne peut pas archiver une app iOS 26 : **l'archive, la
+signature et l'envoi se font dans la CI du fork**, workflow `TestFlight`
+(`foco/.github/workflows/testflight.yml`), lancé à la main.
+
+```sh
+gh workflow run testflight.yml -R slider973/Foco
+# avec le texte « À tester » montré aux testeurs :
+gh workflow run testflight.yml -R slider973/Foco -f changelog="Connexion par code, disponibilités d'octobre"
+gh run watch -R slider973/Foco "$(gh run list -R slider973/Foco -w TestFlight -L 1 --json databaseId -q '.[0].databaseId')"
+```
+
+Toujours depuis `main` du fork, sur un commit dont la course `iOS` est verte (§ 7).
+
+### Secrets attendus
+
+Déposés par le propriétaire, jamais par un agent : `gh secret set <NOM> -R slider973/Foco`
+(la valeur est lue sur l'entrée standard, par exemple `< AuthKey_XXXX.p8`).
+
+| Secret | Contenu | Obligatoire |
+|---|---|---|
+| `APP_STORE_CONNECT_API_KEY_ID` | identifiant de la clé API App Store Connect | oui |
+| `APP_STORE_CONNECT_API_ISSUER_ID` | identifiant de l'émetteur (*Users and Access → Integrations*) | oui |
+| `APP_STORE_CONNECT_API_KEY` | contenu du fichier `AuthKey_XXXX.p8` | oui |
+| `APPLE_TEAM_ID` | équipe Apple Developer du propriétaire (10 caractères) | oui |
+| `FOCO_CONFIG_XCCONFIG` | contenu du `Config/Config.xcconfig` de production : `FOCO_SUPABASE_URL` et `FOCO_SUPABASE_ANON_KEY` de `env/prod.json`, clé **publique** seulement | oui |
+| `GOOGLE_SERVICE_INFO_PLIST` | contenu du `GoogleService-Info.plist` Firebase | non : sans lui, l'app est construite sans push |
+
+### Ce que fait le workflow
+
+1. Écrit la clé `.p8` dans `$RUNNER_TEMP` (hors du dépôt, permissions 600), puis
+   `Config/Config.xcconfig` et `Foco/GoogleService-Info.plist` (chemins ignorés par git).
+2. Numéro de build = numéro de course + 100 : TestFlight refuse un numéro déjà utilisé ; le
+   décalage laisse la place d'un envoi manuel et d'un workflow recréé. La version affichée reste
+   `MARKETING_VERSION` du projet (1.0) : la changer dans le projet pour une nouvelle version.
+3. `xcodebuild archive` en Release, signature automatique : `-allowProvisioningUpdates` et
+   `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID`, avec
+   `DEVELOPMENT_TEAM` venu du secret.
+4. `xcodebuild -exportArchive` avec `foco/Config/ExportOptions.plist` (`method =
+   app-store-connect`, `destination = upload`, `signingStyle = automatic`, `teamID` injecté,
+   `manageAppVersionAndBuildNumber = false`) : **l'export envoie lui-même le build** à App Store
+   Connect, sans `altool` ni fastlane.
+5. Si `changelog` est donné, `foco/scripts/testflight-changelog.py` attend que le build
+   apparaisse dans l'API App Store Connect et écrit son « À tester » (`fr-FR`). Un échec ici ne
+   fait pas échouer l'envoi.
+6. Efface les fichiers secrets dans une étape `if: always()`. Aucun `set -x`, aucun `echo` de
+   valeur, aucun journal xcodebuild en artefact.
+
+`Info.plist` déclare `ITSAppUsesNonExemptEncryption = NO` (HTTPS seulement, chiffrement
+standard) : TestFlight ne redemande pas la conformité export à chaque build.
+
+### Ce qui reste manuel
+
+- **Une fois** : l'identifiant d'app `ch.staticflow.astreintesp` avec *Push Notifications*, la
+  fiche App Store Connect « Astreinte SP », les informations TestFlight (description, contact),
+  le groupe de testeurs internes avec *distribution automatique* activée (sans elle, chaque build
+  est à ajouter au groupe à la main), la clé API et les secrets ci-dessus, Firebase (§ 9).
+- **Rôle de la clé API** : la signature automatique en CI crée un certificat et des profils ; Apple
+  réserve les certificats de distribution gérés dans le cloud aux clés **Admin** (ou *App Manager*
+  avec l'accès *Certificates, Identifiers & Profiles*). Si l'export échoue sur le certificat, c'est
+  la première chose à regarder.
+- **Certificats de développement** : l'archive signée fait créer à chaque runner neuf un
+  certificat *Apple Development*. Si Apple répond que le nombre maximal de certificats est atteint,
+  révoquer les anciens certificats de développement créés par la CI dans developer.apple.com.
+- **À chaque version** : lancer le workflow, attendre le traitement d'Apple (5 à 30 minutes), puis
+  installer depuis l'app TestFlight de l'iPhone. Écrire « À tester » à la main si le `changelog`
+  n'a pas été donné ou n'a pas pu être écrit.
+- **Passer en App Store** (hors ticket 067) : fiche publique, captures, confidentialité, revue.
