@@ -277,6 +277,12 @@ Future<AppMontee> monterApp(
   PlanningCaserneRepository? planningCaserne,
   CachePlanningCaserne? cachePlanningCaserne,
   DateTime Function()? horloge,
+
+  /// L'horloge des relectures de périodes (ticket 068). Figée par défaut :
+  /// aucune relecture automatique ne part tant qu'un test n'avance pas
+  /// l'heure lui-même, et les comptes de requêtes des autres tests ne
+  /// bougent pas.
+  DateTime Function()? horlogeRafraichissement,
   DisposRepository? dispos,
   FileLocale? fileLocale,
   Connectivite? reseau,
@@ -441,6 +447,9 @@ Future<AppMontee> monterApp(
           horlogeAstreintesProvider.overrideWithValue(horloge),
         // L'onglet 0 est désormais « Mon mois » : sans faux dépôt, il
         // toucherait un client Supabase qui n'existe pas en test.
+        horlogeRafraichissementProvider.overrideWithValue(
+          horlogeRafraichissement ?? () => maintenantTest,
+        ),
         disposRepositoryProvider.overrideWithValue(
           dispos ?? FauxDisposRepository(),
         ),

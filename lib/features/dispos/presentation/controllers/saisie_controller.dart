@@ -967,6 +967,21 @@ class SaisieController extends AsyncNotifier<EtatSaisie?> {
     return _file.isEmpty && _preferencesEnAttente.isEmpty;
   }
 
+  /// Vrai tant qu'une écriture n'est pas confirmée : une case ou une
+  /// préférence en file, un envoi en vol, un doigt posé — **même avant la
+  /// première case peinte**, le geste étant ouvert dès `debutGeste`.
+  ///
+  /// C'est ce que regarde une relecture des périodes avant de partir, puis au
+  /// retour du réseau avant de publier (ticket 068) : une nouvelle liste
+  /// reconstruit la saisie, et la reconstruire sous un envoi en vol écraserait
+  /// l'état du serveur que cet envoi met à jour ; sous un doigt, elle
+  /// remettrait le pinceau à zéro au milieu du trait.
+  bool get ecritureEnAttente =>
+      _gesteActif ||
+      _envoiEnCours ||
+      _file.isNotEmpty ||
+      _preferencesEnAttente.isNotEmpty;
+
   /// « Réessayer » : rejoue toute la file en attente.
   Future<void> reessayer() async {
     _relance = 0;
