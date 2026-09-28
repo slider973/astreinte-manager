@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 066
 - **Branche** : `feat/067-testflight-foco`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/72
 - **Statut** : terminé le 2026-09-28 (PR créée)
 
 ## Contexte
