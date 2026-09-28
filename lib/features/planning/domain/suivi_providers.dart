@@ -239,6 +239,7 @@ class SuiviController extends AsyncNotifier<EtatSuivi?>
     if (courant == null) {
       if (evenement case EtatCanalSuivi(:final branche)) {
         _canalBranche = branche;
+        _dejaBranche = _dejaBranche || branche;
       } else {
         _enAttente.add(evenement);
       }

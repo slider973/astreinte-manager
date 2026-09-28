@@ -266,6 +266,7 @@ class PlanningController extends AsyncNotifier<EtatPlanning?>
       // attend.
       if (evenement case EtatCanalPlanning(:final branche)) {
         _canalBranche = branche;
+        _dejaBranche = _dejaBranche || branche;
       } else {
         _enAttente.add(evenement);
       }
