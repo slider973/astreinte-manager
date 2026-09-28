@@ -35,6 +35,11 @@
 //     trou non couvert et lui pose `replaced_by`.
 //   - `v_schedule_progress` (0018) : les six nombres du suivi, comptés ici
 //     comme la vue les compte.
+//   - « Mes astreintes » (ticket 027, rejoué au ticket 070) : les
+//     attributions **acceptées** du membre, et ses équipiers seulement quand
+//     le planning est validé ou archivé.
+//   - `station_access` (0024, rejoué au ticket 070) : le statut de la caserne
+//     et son droit d'écrire, lus par tous les écrans qui écrivent.
 //
 // Ce qui n'est **pas** rejoué est dit une fois : la RLS. Elle est éprouvée là
 // où elle vit, en SQL (`supabase/tests/`, `scripts/test_rls.sh`), et la
@@ -45,8 +50,12 @@
 
 import 'dart:async';
 
+import 'package:astreinte_sp/core/caserne/caserne_repository.dart';
+import 'package:astreinte_sp/core/caserne/etat_caserne.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
+import 'package:astreinte_sp/features/astreintes/data/astreintes_repository.dart';
+import 'package:astreinte_sp/features/astreintes/domain/astreinte.dart';
 import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/domain/disponibilite_mois.dart';
@@ -447,6 +456,20 @@ class BackendMemoire {
 
   PropositionsRepository get propositionsRepository =>
       _PropositionsMemoire(this);
+
+  /// « Mes astreintes » : c'est ce que lit l'accueil, et ce qu'une réponse
+  /// acceptée doit y faire apparaître (ticket 070).
+  AstreintesRepository get astreintesRepository => _AstreintesMemoire(this);
+
+  /// L'abonnement de la caserne, tel que `station_access` le rend : le
+  /// parcours la garde en essai, qui écrit.
+  EtatCaserne etatCaserne = EtatCaserne(
+    statut: StatutAbonnement.essai,
+    ecriture: true,
+    finEssai: DateTime.now().add(const Duration(days: 60)),
+  );
+
+  CaserneRepository get caserneRepository => _CaserneMemoire(this);
 }
 
 // ===========================================================================
@@ -1580,4 +1603,72 @@ class _PropositionsMemoire implements PropositionsRepository {
   @override
   Future<PlanningEtat?> etatPlanning(String planningId) async =>
       _base.planning == null ? null : _base.etatPlanning;
+}
+
+/// « Mes astreintes » d'un membre, lues comme `SupabaseAstreintesRepository`
+/// les lit.
+class _AstreintesMemoire implements AstreintesRepository {
+  _AstreintesMemoire(this._base);
+
+  final BackendMemoire _base;
+
+  @override
+  Future<MesAstreintes> lire({
+    required String userId,
+    required String stationId,
+    required DateTime depuis,
+  }) async {
+    final planning = _base.planning;
+    // La RLS ne montre les équipiers qu'à partir de `validated` : avant, un
+    // membre ne voit que ses propres lignes (`design/023 § 2`).
+    final equipesVisibles =
+        _base.etatPlanning == PlanningEtat.valide ||
+        _base.etatPlanning == PlanningEtat.archive;
+
+    final astreintes = <Astreinte>[
+      for (final attribution in _base.attributions)
+        if (planning != null &&
+            attribution.userId == userId &&
+            attribution.etat == AttributionEtat.accepte)
+          if (_creneau(attribution.creneauId) case final CreneauPlanning c)
+            if (!DateTime(_base.annee, _base.mois, c.jour).isBefore(depuis))
+              Astreinte(
+                id: attribution.id,
+                creneauId: c.id,
+                planningId: planning.id,
+                jour: DateTime(_base.annee, _base.mois, c.jour),
+                creneau: c.creneau,
+                planningEtat: _base.etatPlanning,
+                equipiers: equipesVisibles
+                    ? <String>[
+                        for (final autre in _base.attributionsDe(c.id))
+                          if (autre.userId != userId &&
+                              autre.etat == AttributionEtat.accepte)
+                            _base.membreParId(autre.userId)?.libelle ?? '',
+                      ]
+                    : const <String>[],
+              ),
+    ];
+    return MesAstreintes(astreintes: astreintes, luLe: _base.horloge());
+  }
+
+  CreneauPlanning? _creneau(String id) {
+    for (final creneau in _base.creneaux) {
+      if (creneau.id == id) return creneau;
+    }
+    return null;
+  }
+}
+
+/// `station_access(uuid)` : ce que la caserne a le droit d'écrire.
+class _CaserneMemoire implements CaserneRepository {
+  _CaserneMemoire(this._base);
+
+  final BackendMemoire _base;
+
+  @override
+  Future<EtatCaserne> lire(String stationId) async => _base.etatCaserne;
+
+  @override
+  Future<EtatCaserne?> essayer(String stationId) async => _base.etatCaserne;
 }

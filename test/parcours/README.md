@@ -2,8 +2,9 @@
 
 Ticket 035. Un mois d'astreintes suivi d'un bout à l'autre : l'administrateur invite,
 la recrue accepte, elle saisit son mois, l'administrateur construit le planning et le
-publie, la recrue refuse un créneau et en accepte un autre, l'administrateur réattribue,
-le second pompier accepte, le planning se valide tout seul.
+publie, la recrue refuse un créneau et en accepte un autre — et le retrouve sur son accueil
+sans passer par l'onglet Astreintes (ticket 070) —, l'administrateur réattribue, le second
+pompier accepte, le planning se valide tout seul.
 
 Le parcours existe en **deux exemplaires**, qui suivent le même fil par deux côtés :
 
@@ -79,8 +80,9 @@ c'est le fil des écrans, pas le rastériseur.
 `backend_memoire.dart` est une caserne en mémoire qui rejoue les règles de la base —
 unicité des attributions actives, `was_available` posé par la base, `proposed_at` posé
 à la publication, complétude en attributions **acceptées**, `replaced_by` sur le plus
-ancien trou non couvert. Chaque règle porte en commentaire le numéro de la migration
-dont elle vient.
+ancien trou non couvert, « Mes astreintes » (les acceptées, équipiers visibles dès
+`validated`) et `station_access` depuis le ticket 070. Chaque règle porte en commentaire
+le numéro de la migration dont elle vient.
 
 Ce qu'elle ne rejoue pas est dit une fois, en tête du fichier : la RLS. La prétendre
 en Dart donnerait une seconde vérité à tenir, et c'est le parcours SQL qui l'éprouve.
