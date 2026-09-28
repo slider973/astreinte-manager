@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../fraicheur/relecture.dart';
 import '../supabase/supabase_bootstrap.dart';
 import 'appartenance.dart';
 import 'appartenances_locales.dart';
@@ -60,6 +62,19 @@ final FutureProvider<List<Appartenance>> appartenancesProvider =
       if (session == null) return const <Appartenance>[];
 
       final local = ref.watch(appartenancesLocalesProvider);
+
+      // Une relecture vient d'aboutir (ticket 070) : sa réponse est celle de la
+      // base, confirmée à l'instant, et la redemander doublerait la requête —
+      // avec le risque qu'un second aller-retour tombe dans un tunnel et
+      // rétrograde un admin qu'on venait de confirmer.
+      final relues = ref
+          .read(appartenancesReluesProvider)
+          .prendre(session.userId);
+      if (relues != null) {
+        await local.ecrire(session.userId, relues);
+        return relues;
+      }
+
       try {
         final appartenances = await ref
             .watch(membershipRepositoryProvider)
@@ -75,6 +90,95 @@ final FutureProvider<List<Appartenance>> appartenancesProvider =
         ];
       }
     });
+
+/// La réponse d'une relecture des appartenances, en attente d'être reprise
+/// par [appartenancesProvider].
+///
+/// **Mémoire vive seulement**, et consommée à la première lecture : ce n'est
+/// pas un cache, rien n'en survit à la page, et la règle des caches de
+/// `deconnexion.dart` n'a rien à y oublier.
+class AppartenancesRelues {
+  String? _userId;
+  List<Appartenance>? _liste;
+
+  void deposer(String userId, List<Appartenance> liste) {
+    _userId = userId;
+    _liste = List<Appartenance>.unmodifiable(liste);
+  }
+
+  /// Rend la liste déposée pour [userId], une fois, puis l'oublie. Une liste
+  /// déposée pour quelqu'un d'autre est oubliée aussi.
+  List<Appartenance>? prendre(String userId) {
+    final liste = _userId == userId ? _liste : null;
+    _userId = null;
+    _liste = null;
+    return liste;
+  }
+}
+
+final Provider<AppartenancesRelues> appartenancesReluesProvider =
+    Provider<AppartenancesRelues>((ref) => AppartenancesRelues());
+
+/// **Relit les appartenances en cours de session** (ticket 070).
+///
+/// Avant ce ticket, `memberships` n'était relu qu'au changement de session : un
+/// rôle retiré ou donné n'apparaissait qu'au redémarrage, et un démarrage hors
+/// ligne laissait un chef de centre en simple membre sans nouvelle tentative.
+/// Le coordinateur `core/fraicheur` l'appelle au retour au premier plan et au
+/// retour du réseau.
+///
+/// Trois règles, les mêmes que [appartenancesProvider] :
+///
+/// - **la base est la seule autorité** : ce qui est publié vient d'une lecture
+///   réussie, jamais du stockage ;
+/// - **un échec de transport ne change rien** : l'écran garde ce qu'il sait, et
+///   surtout ne rétrograde pas un admin confirmé parce qu'un tunnel a coupé le
+///   retour au premier plan ;
+/// - **un refus n'est pas masqué** : il relance [appartenancesProvider], qui le
+///   remonte tel quel — une révocation ne se cache pas derrière l'écran d'avant.
+///
+/// Rien n'est publié si la liste n'a pas changé : tout ce que l'application
+/// affiche dépend de la caserne courante, et la republier à l'identique
+/// reconstruirait chaque écran. [publierSi] est consulté après la lecture,
+/// juste avant de publier, pour ne jamais reconstruire une saisie sous le
+/// doigt.
+Future<Relecture> relireAppartenances(
+  Ref ref, {
+  bool Function()? publierSi,
+}) async {
+  final session = ref.read(sessionProvider).value;
+  if (session == null) return Relecture.inchangee;
+  if (ref.read(appartenancesProvider).isLoading) return Relecture.inchangee;
+
+  final List<Appartenance> lues;
+  try {
+    lues = await ref
+        .read(membershipRepositoryProvider)
+        .mesAppartenances(session.userId);
+  } on AuthEchec catch (echec) {
+    if (echec.erreur == AuthErreur.reseau) return Relecture.echouee;
+    ref.invalidate(appartenancesProvider);
+    return Relecture.publiee;
+  } on Object {
+    return Relecture.echouee;
+  }
+
+  final courant = ref.read(appartenancesProvider);
+  if (ref.read(sessionProvider).value?.userId != session.userId ||
+      courant.isLoading) {
+    return Relecture.inchangee;
+  }
+  if (courant.hasValue &&
+      !courant.hasError &&
+      listEquals(courant.value, lues)) {
+    return Relecture.inchangee;
+  }
+  if (publierSi != null && !publierSi()) return Relecture.retenue;
+
+  ref.read(appartenancesReluesProvider).deposer(session.userId, lues);
+  ref.invalidate(appartenancesProvider);
+  return Relecture.publiee;
+}
 
 /// La caserne dans laquelle l'utilisateur travaille.
 ///

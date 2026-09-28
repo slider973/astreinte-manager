@@ -81,6 +81,14 @@ class FauxDisposRepository implements DisposRepository {
   /// (ticket 068).
   Completer<void>? retenueLecturePeriodes;
 
+  /// Si posé, la lecture d'un mois attend qu'il soit complété : c'est la
+  /// fenêtre pendant laquelle `station_access` peut répondre au milieu du
+  /// chargement de la saisie (ticket 070).
+  Completer<void>? retenueLectureMois;
+
+  /// Appelé au début de chaque lecture de mois, avant l'attente.
+  void Function()? auDebutLireMois;
+
   /// Les appels reçus, dans l'ordre : `periodes`, `lireMois`,
   /// `enregistrerLot`, `supprimerLot`.
   final List<String> journal = <String>[];
@@ -128,6 +136,9 @@ class FauxDisposRepository implements DisposRepository {
   }) async {
     lectures++;
     journal.add('lireMois');
+    auDebutLireMois?.call();
+    final retenueMois = retenueLectureMois;
+    if (retenueMois != null) await retenueMois.future;
     final echec = erreurLecture;
     if (echec != null) throw EchecDispos(echec);
 

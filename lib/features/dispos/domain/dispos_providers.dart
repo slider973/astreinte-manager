@@ -1,20 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/fraicheur/relecture.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../data/dispos_repository.dart';
 import 'periode_saisie.dart';
+
+// L'issue d'une relecture discrète et son horloge vivent dans `core` depuis le
+// ticket 070 : tous les écrans relus en ont besoin, et le code du 068 les lit
+// encore ici.
+export '../../../core/fraicheur/relecture.dart'
+    show Relecture, horlogeRafraichissementProvider;
 
 /// Le dépôt des disponibilités. Surchargé par un faux dans les tests.
 final Provider<DisposRepository> disposRepositoryProvider =
     Provider<DisposRepository>(
       (ref) => SupabaseDisposRepository(ref.watch(supabaseClientProvider)),
     );
-
-/// L'horloge des relectures de périodes. Surchargée par une horloge figée
-/// dans les tests : c'est elle qui décide si une relecture est « en rafale ».
-final Provider<DateTime Function()> horlogeRafraichissementProvider =
-    Provider<DateTime Function()>((ref) => DateTime.now);
 
 /// Les périodes de saisie de la caserne courante.
 ///
@@ -101,19 +103,6 @@ class PeriodesCaserne extends AsyncNotifier<List<PeriodeSaisie>> {
     }
     return true;
   }
-}
-
-/// L'issue d'une [PeriodesCaserne.relire].
-enum Relecture {
-  /// Rien de nouveau, ou la lecture a échoué : rien n'a été publié.
-  inchangee,
-
-  /// Une liste nouvelle a été publiée : ses lecteurs se reconstruisent.
-  publiee,
-
-  /// Une liste nouvelle a été lue mais **pas publiée**, la condition de
-  /// publication ayant refusé : elle sera relue plus tard.
-  retenue,
 }
 
 final AsyncNotifierProvider<PeriodesCaserne, List<PeriodeSaisie>>

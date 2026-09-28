@@ -537,7 +537,8 @@ en novembre — exactement la production. Rejoué aussi en `curl` contre le Supa
   (suspendue, verrouillé, neutre), nouveau mois au retour au premier plan, à l'ouverture de l'écran
   (mois choisi à la main gardé), date de chaque case.
 
-**Écart relevé dans la PWA** (signalé, non corrigé : `lib/` n'est pas touché) : `_traiterEchec` de
+**Écart relevé dans la PWA** (corrigé au ticket 070 : un refus relit `station_access` avant les
+périodes, et un refus inexpliqué reste neutre — `SaisieController._traiterEchec`) : `_traiterEchec` de
 `SaisieController` classe un `42501` comme l'ancienne app iOS — mois relu ouvert ⇒ « Ta caserne est
 passée en lecture seule », sans lire `station_access`, et `_lectureSeuleConnue` le garde jusqu'au
 rechargement de la page ou à un changement de compte. La PWA n'a pas le bug de la grille (ses lots ne portent que le mois affiché), mais

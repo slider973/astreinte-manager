@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/fraicheur/relecture.dart';
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
@@ -130,7 +132,8 @@ class EtatSuivi {
 }
 
 /// Le suivi d'un planning publié : lecture, temps réel, relance.
-class SuiviController extends AsyncNotifier<EtatSuivi?> {
+class SuiviController extends AsyncNotifier<EtatSuivi?>
+    with LectureHorodatee<EtatSuivi?> {
   /// Le délai d'apaisement avant de relire l'avancement.
   ///
   /// Trente réponses en dix minutes, ce sont trente événements ; relire la vue
@@ -140,6 +143,19 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
 
   Timer? _apaisement;
   bool _canalBranche = false;
+
+  /// Le canal a déjà été branché une fois : un nouveau branchement est une
+  /// reconnexion.
+  bool _dejaBranche = false;
+
+  /// Relit après une reconnexion, sauf sous une écriture en vol : celle-ci
+  /// reviendra par le canal, désormais rebranché, et une relecture à ce
+  /// moment-là écraserait son état optimiste.
+  Future<void> _rattraper() async {
+    final courant = state.value;
+    if (courant == null || courant.sync == SyncEtat.enregistrement) return;
+    await rafraichir();
+  }
 
   /// Les événements reçus entre l'abonnement et la première image. Ils sont
   /// rejoués dès que l'état existe : la fenêtre est étroite, mais une réponse
@@ -165,6 +181,7 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
           annee: periode.annee,
           mois: periode.mois,
         );
+    marquerLu();
 
     final etat = EtatSuivi(
       periode: periode,
@@ -199,7 +216,14 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
   }
 
   void _canal({required bool branche}) {
+    // **Une reconnexion rattrape ce que le canal a manqué** (ticket 070) :
+    // `postgres_changes` ne rejoue pas les événements survenus pendant la
+    // coupure. La toute première connexion, elle, suit la lecture de `build`
+    // et n'a rien à rattraper.
+    final reconnexion = branche && !_canalBranche && _dejaBranche;
+    _dejaBranche = _dejaBranche || branche;
     _canalBranche = branche;
+    if (reconnexion) unawaited(_rattraper());
     final courant = state.value;
     if (courant == null || courant.canalBranche == branche) return;
     state = AsyncValue<EtatSuivi?>.data(courant.copie(canalBranche: branche));
@@ -215,6 +239,7 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
     if (courant == null) {
       if (evenement case EtatCanalSuivi(:final branche)) {
         _canalBranche = branche;
+        _dejaBranche = _dejaBranche || branche;
       } else {
         _enAttente.add(evenement);
       }
@@ -319,11 +344,14 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
             mois: courant.periode.mois,
           );
       if (!ref.mounted) return;
+      marquerLu();
+      // L'état **d'après** la lecture, comme au planning (ticket 070).
+      final apres = state.value ?? courant;
       state = AsyncValue<EtatSuivi?>.data(
-        courant.copie(suivi: suivi, effacerMessage: true, sync: SyncEtat.repos),
+        apres.copie(suivi: suivi, effacerMessage: true, sync: SyncEtat.repos),
       );
     } on EchecSuivi catch (echec) {
-      _echouer(echec);
+      await _echouer(echec);
     }
   }
 
@@ -362,7 +390,7 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
       unawaited(rafraichir());
       return resultat;
     } on EchecSuivi catch (echec) {
-      _echouer(echec, relance: false);
+      await _echouer(echec, relance: false);
       return null;
     }
   }
@@ -371,17 +399,27 @@ class SuiviController extends AsyncNotifier<EtatSuivi?> {
   /// la base plutôt que de deviner l'état du planning.
   void invalider() => ref.invalidateSelf();
 
-  void _echouer(EchecSuivi echec, {bool? relance}) {
+  Future<void> _echouer(EchecSuivi echec, {bool? relance}) async {
+    if (!ref.mounted) return;
+    // Un refus ne dit « suspendue » que si `station_access`, relu à
+    // l'instant, le confirme (ticket 070) : sinon la phrase reste neutre.
+    final refus = echec.erreur == ErreurSuivi.lectureSeule;
+    final suspendue =
+        refus &&
+        await ref.read(etatCaserneProvider.notifier).suspendueApresRefus();
     final courant = state.value;
     if (!ref.mounted || courant == null) return;
 
-    final suspendue = echec.erreur == ErreurSuivi.lectureSeule;
     state = AsyncValue<EtatSuivi?>.data(
       courant.copie(
         sync: SyncEtat.echec,
         relance: relance,
         publication: false,
-        messageErreur: suspendue ? null : echec.message,
+        messageErreur: suspendue
+            ? null
+            : refus
+            ? AppStrings.ecritureRefusee
+            : echec.message,
         effacerMessage: suspendue,
         lectureSeule: courant.lectureSeule || suspendue,
       ),

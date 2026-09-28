@@ -58,7 +58,12 @@ class RafraichissementPeriodes {
 
   /// Retour au premier plan, ouverture d'un écran : relit si la liste a
   /// vieilli, sinon ne fait rien.
-  Future<void> auRetour() {
+  ///
+  /// [forcer] passe outre le délai minimal, et lui seul : c'est un événement
+  /// qui annonce une nouveauté — un push reçu au premier plan (ticket 070) —,
+  /// pas une grappe de retours. Le reste de la discipline tient : jamais deux
+  /// lectures en même temps, jamais sous une écriture.
+  Future<void> auRetour({bool forcer = false}) {
     final enCours = _enCours;
     if (enCours != null) return enCours;
 
@@ -72,7 +77,8 @@ class RafraichissementPeriodes {
 
     final derniere = _ref.read(periodesProvider.notifier).derniereLecture;
     final maintenant = _ref.read(horlogeRafraichissementProvider)();
-    if (derniere != null &&
+    if (!forcer &&
+        derniere != null &&
         maintenant.difference(derniere) < intervalleMinimal) {
       return Future<void>.value();
     }
@@ -117,6 +123,7 @@ class RafraichissementPeriodes {
         _differer(avecMois: true);
         return;
       case Relecture.inchangee:
+      case Relecture.echouee:
         // Une liste inchangée ne reconstruit rien ; c'est le mois lui-même
         // qu'on vient chercher. Mais pas sous un geste ni une écriture
         // commencés pendant la lecture : ce rechargement-là est différé.

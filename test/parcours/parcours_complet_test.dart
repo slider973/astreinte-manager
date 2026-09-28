@@ -4,7 +4,8 @@
 //   2. la recrue ouvre le lien et rejoint la caserne ;
 //   3. elle saisit ses disponibilités du mois ;
 //   4. l'administrateur construit le planning et le publie ;
-//   5. la recrue refuse un créneau et en accepte un autre ;
+//   5. la recrue refuse un créneau et en accepte un autre, et l'astreinte
+//      acceptée apparaît sur son accueil (ticket 070) ;
 //   6. l'administrateur réattribue le créneau refusé ;
 //   7. le second pompier accepte, et le planning se valide tout seul.
 //
@@ -50,6 +51,7 @@ import 'package:astreinte_sp/core/session/session_utilisateur.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/core/widgets/slot_chip.dart';
+import 'package:astreinte_sp/features/accueil/presentation/widgets/carte_jour.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
 import 'package:astreinte_sp/features/invitation/presentation/invitation_screen.dart';
@@ -296,7 +298,20 @@ void main() {
     testWidgets('5. la recrue refuse un créneau et accepte l\'autre', (
       tester,
     ) async {
-      await _monterMembre(tester, _marieId, _adresseRecrue);
+      await _monterMembre(
+        tester,
+        _marieId,
+        _adresseRecrue,
+        aujourdhui: DateTime(_moisAffiche.year, _moisAffiche.month, 1, 8),
+      );
+      // L'application s'ouvre sur l'accueil, qui lit « Mes astreintes » avant
+      // toute réponse : aucune.
+      expect(
+        find.text(
+          AppStrings.accueilSectionCompte(AppStrings.accueilMesAstreintes, 0),
+        ),
+        findsOneWidget,
+      );
       await ouvrirRoute(tester, '/proposals');
 
       expect(find.byType(CarteProposition), findsNWidgets(2));
@@ -328,6 +343,17 @@ void main() {
       // Un créneau sur deux est accepté : le planning n'est pas complet, il
       // reste publié.
       expect(backend.etatPlanning, PlanningEtat.publie);
+
+      // **Et l'accueil le sait** (ticket 070) : y revenir, sans passer par
+      // l'onglet Astreintes, montre le créneau accepté.
+      await ouvrirRoute(tester, AppRoutes.accueil);
+      expect(
+        find.text(
+          AppStrings.accueilSectionCompte(AppStrings.accueilMesAstreintes, 1),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byType(CarteJourVue), findsWidgets);
     });
 
     testWidgets('6. l\'administrateur réattribue le créneau refusé', (
@@ -399,6 +425,8 @@ Future<void> _monterAdmin(WidgetTester tester) async {
     planning: backend.planningDe(adminId),
     suivi: backend.suiviDe(adminId),
     propositions: backend.propositionsRepository,
+    astreintes: backend.astreintesRepository,
+    caserne: backend.caserneRepository,
     taille: _poste,
   );
 }
@@ -409,14 +437,22 @@ Future<void> _monterAdmin(WidgetTester tester) async {
 Future<void> _monterMembre(
   WidgetTester tester,
   String userId,
-  String email,
-) async {
+  String email, {
+
+  /// Le jour que vit le pompier. Par défaut, celui où le test tourne ; l'étape
+  /// 5 se place le matin du 1er, pour que la nuit acceptée soit **à venir** —
+  /// c'est ce que l'accueil compte.
+  DateTime? aujourdhui,
+}) async {
   await monterApp(
     tester,
     session: SessionUtilisateur(userId: userId, email: email),
+    horloge: aujourdhui == null ? null : () => aujourdhui,
     appartenances: <Appartenance>[backend.appartenanceDe(userId)],
     dispos: backend.disposDe(userId),
     propositions: backend.propositionsRepository,
+    astreintes: backend.astreintesRepository,
+    caserne: backend.caserneRepository,
     invitations: backend.invitationRepository,
     reperes: ReperesLocauxMemoire(<RepereAccueil>{
       RepereAccueil.peintureDispos,

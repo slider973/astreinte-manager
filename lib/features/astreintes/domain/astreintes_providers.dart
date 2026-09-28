@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/fraicheur/relecture.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../data/astreintes_repository.dart';
@@ -69,7 +70,8 @@ class EtatAstreintes {
 ///
 /// **Non auto-disposé** : passer sur « Mon mois » et revenir ne doit pas
 /// rejouer un squelette sur l'écran le plus consulté du produit.
-class AstreintesController extends AsyncNotifier<EtatAstreintes> {
+class AstreintesController extends AsyncNotifier<EtatAstreintes>
+    with LectureHorodatee<EtatAstreintes> {
   @override
   Future<EtatAstreintes> build() async {
     final session = ref.watch(sessionProvider).value;
@@ -99,15 +101,17 @@ class AstreintesController extends AsyncNotifier<EtatAstreintes> {
   Future<MesAstreintes> _lire({
     required String userId,
     required String stationId,
-  }) {
+  }) async {
     final maintenant = ref.read(horlogeAstreintesProvider)();
-    return ref
+    final lues = await ref
         .read(astreintesRepositoryProvider)
         .lire(
           userId: userId,
           stationId: stationId,
           depuis: maintenant.subtract(historiqueAstreintes),
         );
+    if (ref.mounted) marquerLu();
+    return lues;
   }
 
   Future<void> _garder(MesAstreintes donnees) async {

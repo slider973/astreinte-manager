@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/caserne/caserne_providers.dart';
+import '../../../core/fraicheur/relecture.dart';
+import '../../../core/l10n/app_strings.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
@@ -101,7 +103,8 @@ class EtatPropositions {
 /// disposé, le compte repartirait de zéro — donc disparaîtrait une fraction de
 /// seconde — à chaque changement d'onglet. Même raisonnement que le centre de
 /// notifications (ticket 026).
-class PropositionsController extends AsyncNotifier<EtatPropositions> {
+class PropositionsController extends AsyncNotifier<EtatPropositions>
+    with LectureHorodatee<EtatPropositions> {
   @override
   Future<EtatPropositions> build() async {
     final session = ref.watch(sessionProvider).value;
@@ -125,45 +128,65 @@ class PropositionsController extends AsyncNotifier<EtatPropositions> {
   Future<List<Proposition>> _lire({
     required String userId,
     required String stationId,
-  }) => ref
-      .read(propositionsRepositoryProvider)
-      .lister(userId: userId, stationId: stationId);
+  }) async {
+    final lues = await ref
+        .read(propositionsRepositoryProvider)
+        .lister(userId: userId, stationId: stationId);
+    if (ref.mounted) marquerLu();
+    return lues;
+  }
+
+  /// Les réponses parties et pas encore revenues.
+  int _reponsesEnVol = 0;
+
+  /// Vrai tant qu'une réponse est en vol (ticket 070). Une relecture publiée
+  /// à ce moment-là remettrait à l'écran la ligne que la réponse optimiste
+  /// vient de retirer — la base la tient encore pour proposée —, puis la
+  /// retirerait une seconde fois : la ligne clignoterait sous le pouce.
+  bool get ecritureEnAttente => _reponsesEnVol > 0;
 
   /// Relit la liste **en la gardant à l'écran** : un rafraîchissement ne vide
   /// pas la page sous les yeux de qui la lit.
-  Future<void> rafraichir() async {
+  ///
+  /// [publierSi] est consulté **après** la lecture, juste avant de publier :
+  /// par défaut, rien n'est publié sous une réponse en vol, et le résultat
+  /// est alors [Relecture.retenue].
+  Future<Relecture> rafraichir({bool Function()? publierSi}) async {
     final session = ref.read(sessionProvider).value;
     final appartenance = ref.read(appartenanceCouranteProvider);
-    if (session == null || appartenance == null) return;
+    if (session == null || appartenance == null) return Relecture.inchangee;
 
-    final courant = state.value ?? const EtatPropositions();
     try {
       final propositions = await _lire(
         userId: session.userId,
         stationId: appartenance.stationId,
       );
-      if (!ref.mounted) return;
+      if (!ref.mounted) return Relecture.inchangee;
+      if (ecritureEnAttente || (publierSi != null && !publierSi())) {
+        return Relecture.retenue;
+      }
+      // L'état **d'après** la lecture, pas celui d'avant : une nouvelle
+      // arrivée pendant l'attente ne doit pas être écrasée par une copie
+      // périmée.
+      final courant = state.value ?? const EtatPropositions();
       state = AsyncValue<EtatPropositions>.data(
         courant.copie(propositions: propositions, effacerNouvelle: true),
       );
+      return Relecture.publiee;
     } on EchecProposition catch (echec) {
-      if (!ref.mounted) return;
+      if (!ref.mounted) return Relecture.echouee;
+      final courant = state.value ?? const EtatPropositions();
       // Une liste déjà à l'écran ne se remplace pas par une erreur : elle
-      // reste, et la nouvelle le dit.
+      // reste. Et une lecture refusée ne dit pas « lecture seule » : seule
+      // `station_access` le dit (ticket 070), et c'est `lectureSeule` de
+      // l'état de caserne qui le porte jusqu'à l'écran.
       if (courant.propositions.isEmpty) {
         state = AsyncValue<EtatPropositions>.error(
           echec,
           StackTrace.current,
         );
-      } else {
-        state = AsyncValue<EtatPropositions>.data(
-          courant.copie(
-            lectureSeule:
-                echec.erreur == ErreurProposition.lectureSeule ||
-                courant.lectureSeule,
-          ),
-        );
       }
+      return Relecture.echouee;
     }
   }
 
@@ -193,49 +216,86 @@ class PropositionsController extends AsyncNotifier<EtatPropositions> {
       courant.copie(propositions: restantes, effacerNouvelle: true),
     );
 
+    // La réponse est en vol **jusqu'au retour de la base**, et pas au-delà :
+    // la première publication qui suit — la nouvelle, ou la ligne remise à
+    // sa place — est celle qui réveille une relecture retenue entre-temps
+    // (coordinateur `core/fraicheur`).
+    _reponsesEnVol++;
+    final ResultatReponse resultat;
     try {
-      final resultat = await ref
+      resultat = await ref
           .read(propositionsRepositoryProvider)
           .repondre(
             attributionId: proposition.id,
             accepte: accepte,
             motif: motif,
           );
-      if (!ref.mounted) return;
-
-      if (resultat == ResultatReponse.disparue) {
-        _annoncer(PropositionDisparue(proposition));
-        return;
-      }
-
-      _annoncer(
-        ReponseEnvoyee(proposition: proposition, accepte: accepte),
-      );
-
-      // La dernière acceptation d'un planning est la seule qui puisse l'avoir
-      // validé. Inutile d'aller le demander pour les autres.
-      if (accepte &&
-          !restantes.any(
-            (Proposition autre) => autre.planningId == proposition.planningId,
-          )) {
-        await _constaterValidation(proposition);
-      }
     } on EchecProposition catch (echec) {
+      _reponsesEnVol--;
       if (!ref.mounted) return;
-      _restaurer(proposition, index);
-      if (echec.erreur == ErreurProposition.lectureSeule) {
-        final apres = state.value;
-        if (apres != null) {
-          state = AsyncValue<EtatPropositions>.data(
-            apres.copie(lectureSeule: true),
-          );
-        }
-        return;
-      }
+      await _echouer(proposition, index, echec);
+      return;
+    } on Object {
+      _reponsesEnVol--;
+      rethrow;
+    }
+    _reponsesEnVol--;
+    if (!ref.mounted) return;
+
+    if (resultat == ResultatReponse.disparue) {
+      _annoncer(PropositionDisparue(proposition));
+      return;
+    }
+
+    _annoncer(ReponseEnvoyee(proposition: proposition, accepte: accepte));
+
+    // La dernière acceptation d'un planning est la seule qui puisse l'avoir
+    // validé. Inutile d'aller le demander pour les autres.
+    if (accepte &&
+        !restantes.any(
+          (Proposition autre) => autre.planningId == proposition.planningId,
+        )) {
+      await _constaterValidation(proposition);
+    }
+  }
+
+  /// La réponse n'est pas partie : la ligne revient à sa place, et l'écran
+  /// dit pourquoi.
+  Future<void> _echouer(
+    Proposition proposition,
+    int index,
+    EchecProposition echec,
+  ) async {
+    _restaurer(proposition, index);
+    if (echec.erreur != ErreurProposition.lectureSeule) {
       _annoncer(
         ReponseEchouee(proposition: proposition, message: echec.message),
       );
+      return;
     }
+
+    // **Un refus ne suffit pas à dire « suspendue »** (ticket 070) : la base
+    // peut refuser pour une autre raison. On demande à `station_access` ; si
+    // la caserne écrit, l'échec reste neutre.
+    final suspendue = await ref
+        .read(etatCaserneProvider.notifier)
+        .suspendueApresRefus();
+    if (!ref.mounted) return;
+    if (suspendue) {
+      final apres = state.value;
+      if (apres != null) {
+        state = AsyncValue<EtatPropositions>.data(
+          apres.copie(lectureSeule: true),
+        );
+      }
+      return;
+    }
+    _annoncer(
+      ReponseEchouee(
+        proposition: proposition,
+        message: AppStrings.propositionsReponseRefusee,
+      ),
+    );
   }
 
   /// Remet une ligne à **sa place exacte**. Une réponse qui échoue ne doit pas

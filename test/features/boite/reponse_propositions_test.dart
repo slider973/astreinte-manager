@@ -37,6 +37,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
+import '../../support/faux_caserne.dart';
 import '../../support/faux_invitations.dart';
 import '../../support/faux_propositions.dart';
 import '../../support/promesse_envoi.dart';
@@ -95,6 +96,7 @@ Future<FauxPropositionsRepository> _ouvrir(
   Connectivite? reseau,
   bool stabiliser = true,
   Appartenance appartenance = appartenanceMembre,
+  FauxCaserneRepository? caserne,
 }) async {
   final propositions = depot ?? _depot();
 
@@ -103,6 +105,7 @@ Future<FauxPropositionsRepository> _ouvrir(
     session: sessionMembre,
     appartenances: <Appartenance>[appartenance],
     propositions: propositions,
+    caserne: caserne,
     reseau: reseau,
     taille: taille,
     stabiliser: stabiliser,
@@ -603,12 +606,18 @@ void main() {
     testWidgets('une caserne suspendue bloque la réponse et l\'explique', (
       tester,
     ) async {
+      // La caserne écrivait à l'ouverture, puis elle est suspendue pendant
+      // que la Boîte est ouverte : le refus relit `station_access`, qui le
+      // confirme (ticket 070).
+      final caserne = FauxCaserneRepository();
       await _ouvrir(
         tester,
         depot: _depot(erreurReponse: ErreurProposition.lectureSeule),
+        caserne: caserne,
       );
       await _ouvrirReponse(tester);
 
+      caserne.etat = caserneSuspendue;
       await tester.tap(_accepter());
       await tester.pumpAndSettle();
 
@@ -621,6 +630,37 @@ void main() {
       // Et la réponse rouverte naît inerte, avec sa raison.
       await _ouvrirReponse(tester);
       expect(tester.widget<PrimaryButton>(_accepter()).onPressed, isNull);
+    });
+
+    testWidgets('un refus sur une caserne qui écrit ne dit jamais « lecture '
+        'seule »', (tester) async {
+      // Le bug de l'app iOS au ticket 068, du côté de la PWA : un `42501`
+      // n'est pas une suspension tant que `station_access` ne le dit pas.
+      final caserne = FauxCaserneRepository();
+      await _ouvrir(
+        tester,
+        depot: _depot(erreurReponse: ErreurProposition.lectureSeule),
+        caserne: caserne,
+      );
+      await _ouvrirReponse(tester);
+      final lecturesAvant = caserne.lectures;
+
+      await tester.tap(_accepter());
+      await tester.pumpAndSettle();
+
+      expect(caserne.lectures, greaterThan(lecturesAvant));
+      expect(
+        find.byWidgetPredicate(
+          (Widget w) =>
+              w is AppBanner && w.variante == AppBannerVariante.lectureSeule,
+        ),
+        findsNothing,
+      );
+      expect(find.text(AppStrings.propositionsReponseRefusee), findsOneWidget);
+      // La ligne est revenue, et elle reste répondable.
+      expect(find.text('lundi 12 octobre'), findsOneWidget);
+      await _ouvrirReponse(tester);
+      expect(tester.widget<PrimaryButton>(_accepter()).onPressed, isNotNull);
     });
   });
 

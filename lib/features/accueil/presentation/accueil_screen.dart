@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/caserne/fait_caserne_ecran.dart';
+import '../../../core/fraicheur/couche_fraicheur.dart';
+import '../../../core/fraicheur/fraicheur.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/router/destinations.dart';
@@ -46,32 +48,21 @@ class AccueilScreen extends ConsumerStatefulWidget {
   ConsumerState<AccueilScreen> createState() => _AccueilScreenState();
 }
 
-class _AccueilScreenState extends ConsumerState<AccueilScreen> {
-  /// **« Saisir mes disponibilités de novembre »** doit apparaître sans
-  /// redémarrer la PWA (ticket 068) : la liste des mois est relue à
-  /// l'ouverture de l'accueil et à chaque retour au premier plan. Sur le web,
-  /// `visibilitychange` vers `visible` arrive ici en `onResume`.
-  late final AppLifecycleListener _cycleDeVie;
-
+class _AccueilScreenState extends ConsumerState<AccueilScreen>
+    with FraicheurEcran<AccueilScreen> {
+  /// **Tout ce que le tableau de bord affiche est relu** à son ouverture et à
+  /// chaque retour au premier plan (ticket 070) : les astreintes, les
+  /// propositions et la liste des mois. Avant, seuls les mois l'étaient
+  /// (ticket 068) — une astreinte acceptée dans la Boîte n'apparaissait
+  /// qu'après un passage par l'onglet Astreintes. Le coordinateur
+  /// (`core/fraicheur`) décide du moment : au plus une fois toutes les dix
+  /// secondes, jamais sous une écriture, jamais en vidant l'écran.
   @override
-  void initState() {
-    super.initState();
-    _cycleDeVie = AppLifecycleListener(onResume: _relirePeriodes);
-    // Reporté d'une image : lire un provider qui publie pendant `initState`
-    // est interdit par Riverpod.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _relirePeriodes();
-    });
-  }
-
-  @override
-  void dispose() {
-    _cycleDeVie.dispose();
-    super.dispose();
-  }
-
-  void _relirePeriodes() =>
-      unawaited(ref.read(rafraichissementPeriodesProvider).auRetour());
+  Set<Donnee> get donneesAffichees => const <Donnee>{
+    Donnee.astreintes,
+    Donnee.propositions,
+    Donnee.periodes,
+  };
 
   @override
   Widget build(BuildContext context) {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/plateforme/ouverture_externe.dart';
 import '../../../core/session/session_providers.dart';
@@ -123,6 +124,12 @@ class AbonnementController extends AsyncNotifier<VueAbonnement?> {
       final etat = await ref.read(abonnementRepositoryProvider).lire(stationId);
       return VueAbonnement(etat: etat, retour: precedent?.retour);
     });
+    if (!ref.mounted) return;
+    // **Le reste de l'application l'apprend en même temps** (ticket 070). Le
+    // paiement ouvre Stripe dans un autre onglet : au retour, cet écran relit
+    // l'abonnement, mais la bannière de suspension et les boutons grisés des
+    // autres écrans lisent `station_access`, qui n'était relu nulle part.
+    await ref.read(etatCaserneProvider.notifier).relire();
   }
 
   /// Prend en compte le paramètre `?paiement=` de l'URL au retour du

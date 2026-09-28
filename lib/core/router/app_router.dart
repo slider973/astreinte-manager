@@ -35,6 +35,7 @@ import '../../features/profil/presentation/profil_screen.dart';
 import '../../features/superadmin/domain/superadmin_providers.dart';
 import '../../features/superadmin/presentation/superadmin_screen.dart';
 import '../env.dart';
+import '../session/appartenance.dart';
 import '../session/email.dart';
 import '../session/etat_auth.dart';
 import '../session/jeton_invitation.dart';
@@ -796,6 +797,13 @@ RetourPaiement? retourPaiement(String? valeur) => switch (valeur) {
 /// Le second abonnement n'est pas décoratif : `estSuperAdminProvider` répond
 /// après coup, et sans personne pour l'écouter la redirection resterait sur la
 /// décision prise avec un statut inconnu.
+///
+/// Le troisième non plus (ticket 070) : **le rôle** change en cours de session
+/// depuis que les appartenances sont relues au retour au premier plan. Sans
+/// lui, un admin rétrogradé garderait l'écran d'administration ouvert — la
+/// garde de `redirectionAuth` ne serait jamais recalculée, puisque l'état
+/// d'authentification, lui, reste « connecté ». Pas de boucle possible : la
+/// garde renvoie sur l'accueil, qui n'est pas sous `/admin`.
 class _RafraichissementRouteur extends ChangeNotifier {
   _RafraichissementRouteur(Ref ref) {
     _abonnement = ref.listen<EtatAuth>(
@@ -806,15 +814,31 @@ class _RafraichissementRouteur extends ChangeNotifier {
       estSuperAdminProvider,
       (_, _) => notifyListeners(),
     );
+    // **Seul un changement de rôle d'une caserne déjà connue** notifie : l'arrivée
+    // de la caserne, elle, passe déjà par l'état d'authentification, et une
+    // seconde notification dans la même image rejouerait la destination
+    // initiale d'un démarrage à froid à contretemps.
+    _role = ref.listen<bool?>(
+      appartenanceCouranteProvider.select(
+        (Appartenance? appartenance) => appartenance?.estAdmin,
+      ),
+      (avant, apres) {
+        if (avant != null && apres != null && avant != apres) {
+          notifyListeners();
+        }
+      },
+    );
   }
 
   late final ProviderSubscription<EtatAuth> _abonnement;
   late final ProviderSubscription<AsyncValue<bool>> _editeur;
+  late final ProviderSubscription<bool?> _role;
 
   @override
   void dispose() {
     _abonnement.close();
     _editeur.close();
+    _role.close();
     super.dispose();
   }
 }

@@ -11,6 +11,15 @@ abstract interface class CaserneRepository {
   /// base reste l'autorité — si elle refuse vraiment, l'écran l'apprendra du
   /// refus, comme avant ce ticket.
   Future<EtatCaserne> lire(String stationId);
+
+  /// La même lecture, mais qui **dit qu'elle n'a pas abouti** : `null` quand
+  /// la réponse n'est pas arrivée ou n'est pas lisible.
+  ///
+  /// C'est celle des relectures (ticket 070). Une caserne déjà connue comme
+  /// suspendue ne doit pas redevenir « ouverte » parce qu'un retour au premier
+  /// plan est tombé dans un tunnel : [EtatCaserne.inconnue] est le bon repli
+  /// quand on ne sait rien, pas quand on savait.
+  Future<EtatCaserne?> essayer(String stationId);
 }
 
 /// Implémentation Supabase de [CaserneRepository].
@@ -20,19 +29,23 @@ class SupabaseCaserneRepository implements CaserneRepository {
   final SupabaseClient _client;
 
   @override
-  Future<EtatCaserne> lire(String stationId) async {
+  Future<EtatCaserne> lire(String stationId) async =>
+      // Réseau, fonction absente sur un déploiement en retard, réponse
+      // illisible : trois pannes, une seule conséquence, et c'est la plus
+      // sûre des deux.
+      await essayer(stationId) ?? EtatCaserne.inconnue;
+
+  @override
+  Future<EtatCaserne?> essayer(String stationId) async {
     try {
       final reponse = await _client.rpc<dynamic>(
         'station_access',
         params: <String, dynamic>{'p_station': stationId},
       );
-      if (reponse is! Map<String, dynamic>) return EtatCaserne.inconnue;
+      if (reponse is! Map<String, dynamic>) return null;
       return EtatCaserne.depuisJson(reponse);
     } on Object {
-      // Réseau, fonction absente sur un déploiement en retard, réponse
-      // illisible : trois pannes, une seule conséquence, et c'est la plus
-      // sûre des deux.
-      return EtatCaserne.inconnue;
+      return null;
     }
   }
 }
