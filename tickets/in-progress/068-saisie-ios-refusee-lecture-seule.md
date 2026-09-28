@@ -4,6 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 066, 067
 - **Branche** : `feat/068-saisie-ios-refusee-lecture-seule`
+- **Statut** : en cours depuis 2026-09-28
 
 ## Contexte
 
