@@ -173,7 +173,12 @@ class Fraicheur {
     if (enCours != null) return enCours;
     if (!forcer && _recente(donnee)) return Future<void>.value();
 
-    final futur = _lire(donnee).whenComplete(() => _enCours.remove(donnee));
+    // Surtout pas `() => _enCours.remove(donnee)` : `remove` rend le futur
+    // retiré, et `whenComplete` attendrait alors ce futur — lui-même. Le
+    // premier test unitaire du coordinateur s'y est bloqué.
+    final futur = _lire(donnee).whenComplete(
+      () => _enCours.removeWhere((Donnee cle, _) => cle == donnee),
+    );
     _enCours[donnee] = futur;
     return futur;
   }
