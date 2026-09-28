@@ -576,8 +576,9 @@ rejouées à d'autres moments.
 | Lecture seule | `AvailabilityEntry.onStationAccess` prévient à **chaque lecture** de `station_access` (ouverture, retour au premier plan, refus d'une écriture) ; l'`AppStore` y branche `PlanningJourney.syncReadOnly`. La saisie et les réponses suivent la même lecture, sans seconde requête ; la lecture seule de la saisie suit `station_access` même si la relecture des périodes échoue ensuite |
 | Push reçu au premier plan | `handlePush(.received)` → `refreshContent()` : saisie, propositions, astreintes, mois du planning et centre |
 | Retour sur l'accueil | `AppStore.homeAppeared()` au `.task` de l'accueil (qui repart à chaque retour d'un écran poussé), à la fermeture d'une carte dépliée et des réglages ; **au plus une fois toutes les 10 s** (`homeRefreshInterval`), l'entrée et le retour au premier plan comptant comme une relecture. Les arguments de capture n'ouvrent leur écran qu'une fois |
-| Rôle et appartenances | `becameActive()` relit d'abord `memberships` (la requête du 066a) : rôle changé → adopté (« Gérer la caserne » et les liens de l'admin suivent) ; caserne ouverte plus active → saisie, planning et centre oubliés, puis l'écran de l'entrée (« Accès désactivé », une autre caserne, le choix). **Panne réseau** : le rôle lu en base à l'entrée reste ; **tout autre échec** retire le privilège (jamais de repli qui masque un refus). `LocalWipe` inchangé ; un rôle restauré du cache revient toujours simple membre |
+| Rôle et appartenances | `becameActive()` relit d'abord `memberships` (la requête du 066a) : rôle changé → adopté (« Gérer la caserne » et les liens de l'admin suivent) ; caserne ouverte plus active → saisie, planning et centre oubliés **en mémoire vive** (la file des disponibilités gardée sur l'appareil attend `LocalWipe`, à la déconnexion), puis l'écran de l'entrée (« Accès désactivé », une autre caserne, le choix). **Panne réseau** : le rôle lu en base à l'entrée reste ; **tout autre échec** retire le privilège (jamais de repli qui masque un refus). `LocalWipe` inchangé ; un rôle restauré du cache revient toujours simple membre |
 | Écrans | « Planning de la caserne » : la liste et les mois déjà lus (`openStationPlanning`) ; « Aujourd'hui » et le détail d'un jour : le mois relu même s'il l'est déjà (`openMonth(containing:)`) ; « Équipe » : les noms relus à chaque ouverture (`openTeam`), un échec garde ceux qu'on avait |
+| Lectures dépassées (revue) | la réponse des appartenances est **ignorée si la caserne ouverte ou la session a changé pendant l'attente** (caserne choisie, déconnexion), sur le chemin réussi comme sur l'échec ; une seule lecture des appartenances et une seule relecture du planning en vol (retour au premier plan et push simultanés) ; `station_access` : la lecture partie la dernière fait foi (une relecture lente ne défait pas la lecture seule posée par un refus) ; `start` pose la lecture seule comme `refresh`, même si les périodes sont illisibles |
 | Rien sous un geste ni une écriture | la saisie ne se relit ni sous le doigt ni pendant un envoi (règle du 068) ; les propositions ne sont pas relues tant qu'une réponse est en vol (`responding`), sinon la ligne répondue reviendrait à l'écran |
 
 **Tests** (`FocoTests/FreshnessTests.swift`) : caserne réactivée puis `becameActive` → lecture seule
@@ -593,7 +594,7 @@ monte la vraie `HomeView` dans une fenêtre de l'app hôte, passe son `scenePhas
 
 **CI** : PR [slider973/Foco#11](https://github.com/slider973/Foco/pull/11). Tests seuls sur
 l'ancien code (commit `e9a374b`) : course
-[36490736169](https://github.com/slider973/Foco/actions/runs/36490736169) **rouge**, 15 échecs —
+[36490736169](https://github.com/slider973/Foco/actions/runs/36490736169) **rouge**, 15 assertions en échec dans 7 tests —
 réponses restées en lecture seule ou jamais grisées, push qui ne relit que le centre, rôle
 d'admin gardé, appartenance désactivée ignorée ; le câblage `scenePhase` passait déjà. Correction :
 (`119d372`) : course [36491914750](https://github.com/slider973/Foco/actions/runs/36491914750) verte avec un
@@ -601,8 +602,19 @@ avertissement de test (argument par défaut isolé), puis
 [36493314724](https://github.com/slider973/Foco/actions/runs/36493314724) verte, 17 tests 071,
 0 avertissement Swift ; fusionnée en squash ; course verte sur `main` du fork
 ([36494901491](https://github.com/slider973/Foco/actions/runs/36494901491), 0 avertissement) au
-commit `5062402`, visé par le pointeur `foco/`. Build TestFlight **1.0 (104)**, course
+commit `5062402`. Build TestFlight **1.0 (104)**, course
 [36496276933](https://github.com/slider973/Foco/actions/runs/36496276933).
+
+**Revue** (bloquant : appartenance lue avant l'attente, utilisée après) : PR
+[slider973/Foco#12](https://github.com/slider973/Foco/pull/12), 7 tests de plus (caserne choisie
+pendant la lecture → reste B avec le rôle de B, et B n'est pas vidée ; déconnexion pendant une
+lecture réussie ou refusée → store vide ; lecture ancienne de `station_access` ignorée ; lecture
+seule posée par `start` quand les périodes échouent ; retour au premier plan et push simultanés →
+une seule lecture). Course [36497739513](https://github.com/slider973/Foco/actions/runs/36497739513)
+verte, 0 avertissement Swift ; fusionnée en squash ; course verte sur `main` du fork
+([36498778857](https://github.com/slider973/Foco/actions/runs/36498778857), 0 avertissement) au
+commit `666916c`, visé par le pointeur `foco/`. Build TestFlight **1.0 (105)**, course
+[36499812274](https://github.com/slider973/Foco/actions/runs/36499812274).
 
 ## 5. Déconnexion et caches locaux
 
