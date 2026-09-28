@@ -4,8 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 066
 - **Branche** : `feat/067-testflight-foco`
-- **PR** : —
-- **Statut** : en cours depuis 2026-09-28
+- **PR** : https://github.com/slider973/astreinte-manager/pull/72
+- **Statut** : terminé le 2026-09-28 (PR créée)
 
 ## Contexte
 
@@ -66,3 +66,36 @@ aucun mot de passe n'est saisi par l'agent) :**
 - L'app s'affiche « Astreinte SP » sous son icône, dans TestFlight et dans ses écrans ; aucun « Foco » visible par l'utilisateur.
 - L'icône de l'app est celle de la PWA.
 - `docs/IOS.md` décrit comment publier une nouvelle version.
+
+## Livraison
+
+**Fait.** Code dans la PR Foco#9, fusionnée, CI `iOS` verte (course 36402305276) ; pointeur du
+submodule `foco/` sur `abeed5b` et `docs/IOS.md` dans ce dépôt. Premier build **TestFlight 1.0 (102)**
+traité et distribué au groupe interne « Équipe » (course
+https://github.com/slider973/Foco/actions/runs/36405340664).
+
+Hors code, côté Apple, Firebase et secrets :
+- compte Apple Developer individuel, Team ID `CSQ565C7YY` ; bundle `ch.staticflow.astreintesp` avec
+  Push Notifications ; fiche App Store Connect « Astreinte SP » ;
+- clé API App Store Connect `HMQ3L32HFF` en rôle **Admin** : App Manager ne suffit pas pour la
+  signature cloud (la première course a échoué sur « Cloud signing permission error ») ; les
+  anciennes clés sont révoquées ;
+- clé APNs `Q5CN9BJUX5` ;
+- projet Firebase `astreinte-sp` : app web (PWA) et app iOS, clé VAPID, clé APNs importée ;
+- `FIREBASE_SERVICE_ACCOUNT` en secret Supabase de production, et les cinq `FIREBASE_*` en secrets
+  GitHub de ce dépôt ;
+- secrets du fork : clé API, Team ID, `FOCO_CONFIG_XCCONFIG`, `GOOGLE_SERVICE_INFO_PLIST` ;
+- toutes les clés sont archivées dans 1Password (coffre Static Flow) ; aucune n'est dans le dépôt.
+
+**Publier une nouvelle version :**
+
+```
+gh workflow run testflight.yml -R slider973/Foco
+```
+
+Le détail et la liste des secrets attendus sont dans `docs/IOS.md`.
+
+**Restent à cocher par le propriétaire** (vérifications sur l'appareil, que l'agent ne peut pas
+faire) :
+- [ ] l'installation du build TestFlight sur son iPhone 17 Pro Max ;
+- [ ] la réception d'un push de test avec le son.
