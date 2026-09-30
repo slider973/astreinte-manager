@@ -23,20 +23,20 @@
 //   4. il livre un push par le protocole de débogage de Chrome
 //      (`ServiceWorker.deliverPushMessage`) et attend que la page reçoive le
 //      relais du SDK (`isFirebaseMessaging`) ;
-//   5. il vérifie que l'ancien emplacement se désinscrit de lui-même.
+//   5. il vérifie que l'ancien emplacement se désinscrit de lui-même, sauf
+//      sur `/`, où il reste inerte et laisse la place à Flutter.
 //
 // **Sans FCM, sans clé.** La configuration est factice : elle suffit au SDK
 // pour s'initialiser dans le worker, pas pour obtenir un jeton, et aucun jeton
 // n'est demandé. Le SDK lui-même n'est pas pris chez Google : les deux
-// scripts `compat` sont extraits du paquet npm `firebase`, à la version
-// épinglée dans le worker (`VERSION_SDK`), et servis à la place de
-// `www.gstatic.com`. Toute autre requête hors de 127.0.0.1 est coupée, et le
+// scripts `compat` sont lus dans le paquet npm `firebase`, verrouillé par
+// `package-lock.json` à la version épinglée dans le worker (`VERSION_SDK`,
+// vérifié par `service_worker.test.mjs`), et servis à la place de
+// `www.gstatic.com`. Le test lui-même ne télécharge rien. Toute autre requête hors de 127.0.0.1 est coupée, et le
 // test échoue si l'une d'elles visait FCM ou Firebase.
 import {after, before, test} from 'node:test';
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
-import {existsSync, mkdtempSync, readFileSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {existsSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright-core';
@@ -58,28 +58,14 @@ let contexte;
 let page;
 const horsOrigine = [];
 
-/// Les deux scripts du SDK, pris dans le paquet npm à la version du worker.
+/// Les deux scripts du SDK, lus dans le paquet npm installé par `npm ci`.
 function sdkFirebase() {
-  const worker = readFileSync(join(RACINE, 'web/push/firebase-messaging-sw.js'), 'utf8');
-  const version = /const VERSION_SDK = '([^']+)'/.exec(worker)?.[1];
-  assert.ok(version, 'VERSION_SDK introuvable dans le worker');
-
-  const dossier = mkdtempSync(join(tmpdir(), 'sdk-firebase-'));
-  const archive = execFileSync(
-    'npm',
-    ['pack', `firebase@${version}`, '--silent', '--pack-destination', dossier],
-    {encoding: 'utf8'},
-  ).trim();
   const scripts = ['firebase-app-compat.js', 'firebase-messaging-compat.js'];
-  execFileSync('tar', [
-    '-xzf',
-    join(dossier, archive),
-    '-C',
-    dossier,
-    ...scripts.map((nom) => `package/${nom}`),
-  ]);
   return Object.fromEntries(
-    scripts.map((nom) => [nom, readFileSync(join(dossier, 'package', nom))]),
+    scripts.map((nom) => [
+      nom,
+      readFileSync(new URL(`./node_modules/firebase/${nom}`, import.meta.url)),
+    ]),
   );
 }
 
@@ -266,6 +252,59 @@ test('l\'ancien emplacement se désinscrit de lui-même', {timeout: DELAI}, asyn
   });
 
   assert.deepEqual(reste, ['/', '/push/'], 'seuls Flutter et le worker des push restent');
+});
+
+test('un worker Firebase en attente sur / ne déloge pas Flutter', {timeout: DELAI}, async () => {
+  // L'état des navigateurs passés par une version d'avant le 074 : une page
+  // contrôlée par le worker de Flutter, et l'ancien script, avec sa
+  // configuration, enregistré sans portée — donc sur `/`, derrière lui.
+  await page.reload();
+  await attendre(() => navigator.serviceWorker.controller !== null);
+  const avant = await page.evaluate(async (chemin) => {
+    const inscrit = await navigator.serviceWorker.register(chemin);
+    const worker = inscrit.installing ?? inscrit.waiting;
+    if (worker && worker.state === 'installing') {
+      await Promise.race([
+        new Promise((resolu) => worker.addEventListener('statechange', resolu)),
+        new Promise((resolu) => setTimeout(resolu, 10_000)),
+      ]);
+    }
+    // Le temps qu'un worker qui s'activerait et se désinscrirait le fasse.
+    await new Promise((resolu) => setTimeout(resolu, 1_000));
+    const racine = await navigator.serviceWorker.getRegistration('/');
+    return {
+      portee: inscrit.scope,
+      racineActive: racine?.active?.scriptURL ?? null,
+      racineEnAttente: racine?.waiting?.scriptURL ?? null,
+    };
+  }, CHEMIN_WORKER.replace('push/', ''));
+
+  assert.equal(avant.portee, `${serveur.origine}/`);
+  assert.ok(
+    avant.racineActive?.includes('flutter_service_worker.js'),
+    `Flutter doit rester actif sur / : ${avant.racineActive}`,
+  );
+  assert.ok(
+    avant.racineEnAttente?.includes('/firebase-messaging-sw.js'),
+    `l'ancien worker attend, inerte : ${avant.racineEnAttente}`,
+  );
+
+  // Au lancement suivant, le chargeur de Flutter reprend la place.
+  await page.reload();
+  await attendre(async () => {
+    const racine = await navigator.serviceWorker.getRegistration('/');
+    return (
+      (racine?.active?.scriptURL.includes('flutter_service_worker.js') ?? false) &&
+      !(racine?.waiting?.scriptURL.includes('firebase-messaging-sw.js') ?? false) &&
+      navigator.serviceWorker.controller !== null
+    );
+  });
+  const portees = await page.evaluate(async () =>
+    (await navigator.serviceWorker.getRegistrations())
+      .map((e) => new URL(e.scope).pathname)
+      .sort(),
+  );
+  assert.deepEqual(portees, ['/', '/push/']);
 });
 
 test('aucune requête vers FCM ni vers Firebase', () => {

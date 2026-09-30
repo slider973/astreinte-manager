@@ -17,8 +17,10 @@ const ANCIEN = readFileSync(`${RACINE}web/firebase-messaging-sw.js`, 'utf8');
 
 const CONFIG = '?apiKey=cle&appId=1%3A1%3Aweb%3A1&messagingSenderId=1&projectId=essai';
 
-/// Charge [source] comme un service worker servi à [adresse].
-function charger(source, adresse) {
+/// Charge [source] comme un service worker servi à [adresse], enregistré sur
+/// [portee] (par défaut, le dossier du script : ce que donne `register()`
+/// sans option).
+function charger(source, adresse, portee = new URL('./', adresse).href) {
   const ecouteurs = {};
   const scripts = [];
   const notifications = [];
@@ -34,6 +36,7 @@ function charger(source, adresse) {
     },
     skipWaiting: () => {},
     registration: {
+      scope: portee,
       showNotification: async (titre, options) => {
         notifications.push({titre, options});
       },
@@ -183,7 +186,11 @@ test('avec configuration, il charge le SDK à la version épinglée', () => {
 });
 
 test('l\'ancien emplacement se désabonne puis se désinscrit, sans rien charger', async () => {
-  const ancien = charger(ANCIEN, `https://astreinte.test/firebase-messaging-sw.js${CONFIG}`);
+  const ancien = charger(
+    ANCIEN,
+    'https://astreinte.test/firebase-messaging-sw.js',
+    'https://astreinte.test/firebase-cloud-messaging-push-scope',
+  );
   assert.deepEqual(ancien.scripts, []);
   assert.ok(ancien.ecouteurs.install, 'il s\'active sans attendre');
 
@@ -197,4 +204,27 @@ test('l\'ancien emplacement se désabonne puis se désinscrit, sans rien charger
 
   assert.equal(ancien.desabonnements.length, 1);
   assert.equal(ancien.desinscriptions.length, 1);
+});
+
+test('sur la portée de Flutter, l\'ancien emplacement ne fait rien', () => {
+  // S'activer puis se désinscrire sur `/` emporterait le worker de Flutter.
+  for (const [adresse, portee] of [
+    [`https://astreinte.test/firebase-messaging-sw.js${CONFIG}`, 'https://astreinte.test/'],
+    ['https://astreinte.test/caserne/firebase-messaging-sw.js', 'https://astreinte.test/caserne/'],
+  ]) {
+    const ancien = charger(ANCIEN, adresse, portee);
+    assert.deepEqual(Object.keys(ancien.ecouteurs), [], portee);
+    assert.deepEqual(ancien.scripts, []);
+  }
+});
+
+test('le SDK des tests est à la version épinglée dans le worker', () => {
+  const version = /const VERSION_SDK = '([^']+)'/.exec(WORKER)[1];
+  const paquet = JSON.parse(
+    readFileSync(new URL('./node_modules/firebase/package.json', import.meta.url), 'utf8'),
+  );
+  const declare = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+    .devDependencies.firebase;
+  assert.equal(declare, version, 'package.json → devDependencies.firebase');
+  assert.equal(paquet.version, version, 'node_modules/firebase installé');
 });

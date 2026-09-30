@@ -16,26 +16,35 @@
  * s'active sans attendre, oublie l'abonnement push de son enregistrement,
  * puis se désinscrit. Aucun `importScripts`, aucune requête vers Google.
  *
- * S'il remplace le worker de Flutter sur `/`, rien n'est perdu : le chargeur
- * de Flutter (`flutter_bootstrap.js`) réenregistre le sien au prochain
- * lancement, et ce worker-là n'est qu'un cache.
+ * **Sauf sur la portée `/`, où il ne fait rien du tout.** Cet enregistrement
+ * est celui de Flutter : s'y activer puis se désinscrire emporterait le worker
+ * de Flutter, donc le hors-ligne. Là, il reste en attente et le chargeur de
+ * Flutter (`flutter_bootstrap.js`) le remplace au lancement suivant ;
+ * l'abonnement push qu'il y avait laissé est oublié par l'application
+ * (`nettoyerEnregistrements`, `lib/features/notifications/data/pont_web.dart`).
  */
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
+const SUR_LA_RACINE =
+  self.registration.scope === new URL('./', self.location).href;
 
-self.addEventListener('activate', (evenement) => {
-  evenement.waitUntil(
-    (async () => {
-      try {
-        const abonnement = await self.registration.pushManager.getSubscription();
-        if (abonnement) await abonnement.unsubscribe();
-      } catch (erreur) {
-        // Sans abonnement lisible, il reste à se désinscrire : c'est ce qui
-        // coupe le chemin des push, abonnement compris.
-      }
-      await self.registration.unregister();
-    })(),
-  );
-});
+if (!SUR_LA_RACINE) {
+  self.addEventListener('install', () => {
+    self.skipWaiting();
+  });
+
+  self.addEventListener('activate', (evenement) => {
+    evenement.waitUntil(
+      (async () => {
+        try {
+          const abonnement =
+            await self.registration.pushManager.getSubscription();
+          if (abonnement) await abonnement.unsubscribe();
+        } catch (erreur) {
+          // Sans abonnement lisible, il reste à se désinscrire : c'est ce qui
+          // coupe le chemin des push, abonnement compris.
+        }
+        await self.registration.unregister();
+      })(),
+    );
+  });
+}
