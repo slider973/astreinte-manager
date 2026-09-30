@@ -1,6 +1,6 @@
 # Tableau des tickets
 
-Généré par `scripts/ticket.sh board` le 2026-09-29. Ne pas éditer à la main.
+Généré par `scripts/ticket.sh board` le 2026-09-30. Ne pas éditer à la main.
 
 ## En cours
 
@@ -15,6 +15,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-29. Ne pas éditer à la main
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 072 | [Un pompier dans plusieurs casernes, de bout en bout](backlog/072-plusieurs-casernes.md) | P1 | 070 071 | — |
+| 073 | [Échanger ou céder une astreinte entre pompiers](backlog/073-echange-astreintes.md) | P1 | 070 071 072 | — |
 
 ## Terminés
 
