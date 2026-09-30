@@ -213,8 +213,10 @@ Dans l'ordre, sur Chrome desktop, onglet de l'application ouvert, **F12** :
 Les navigateurs déjà passés par une version d'avant le ticket 074 se rangent seuls : au lancement
 suivant, l'abonnement resté sur `/` est oublié et le jeton recréé sur `/push/` ; l'ancien fichier
 `firebase-messaging-sw.js`, à la racine, n'est plus qu'un worker qui se désinscrit, à retirer à la
-version suivante. L'étape d'accueil « Reçois les propositions », sautée tant que Firebase n'était
-pas configuré, n'est plus marquée vue dans ce cas : elle revient au prochain passage par l'accueil.
+version suivante. Sur `/`, l'ancien fichier ne fait rien : il attend, inerte, que le chargeur
+de Flutter le remplace, pour ne jamais désinscrire le worker de Flutter. L'étape d'accueil
+« Reçois les propositions », sautée tant que Firebase n'était pas configuré, n'est plus marquée vue
+dans ce cas : elle revient au prochain passage par l'accueil.
 
 ## 7. Deux projets, ou un seul ?
 
@@ -325,9 +327,10 @@ Le fichier `web/push/firebase-messaging-sw.js` charge le SDK JavaScript de Fireb
 version écrite en dur (`VERSION_SDK`). Elle doit rester **identique** à celle qu'attend le paquet
 Flutter `firebase_core_web` (constante `supportedFirebaseJsSdkVersion`). Après un
 `flutter pub upgrade` qui touche `firebase_core_web`, vérifier les deux et les réaligner, sinon
-l'enregistrement du jeton échoue en arrière-plan sans message clair. Le test
-`test/push_web/portee_push.test.mjs` lit cette même constante pour extraire le SDK du paquet npm :
-une version inexistante le fait échouer en CI.
+l'enregistrement du jeton échoue en arrière-plan sans message clair. Réaligner aussi
+`devDependencies.firebase` dans `test/push_web/package.json` (puis `npm install` pour le
+`package-lock.json`) : les tests y lisent le SDK servi au worker, et
+`test/push_web/service_worker.test.mjs` échoue en CI si les deux versions divergent.
 
 ## Où vivent les choses, pour le développeur
 
@@ -339,7 +342,7 @@ une version inexistante le fait échouer en CI.
 | Le service worker, configuré par son URL, sur sa portée `push/` | `web/push/firebase-messaging-sw.js` (l'ancien `web/firebase-messaging-sw.js` ne fait que se désinscrire) |
 | Son chemin d'enregistrement, relatif au base href | `cheminServiceWorkerPush`, `lib/features/notifications/data/messagerie_push.dart` |
 | Le ménage des anciens workers (lancement, déconnexion) | `lib/features/notifications/data/pont_web.dart` |
-| Ses tests : Node, et Chrome piloté par Playwright | `test/push_web/` (tâche CI « flutter ») |
+| Ses tests : Node, et Chrome piloté par Playwright | `test/push_web/` (tâche CI « flutter ») : `npm ci && npm test` après `flutter build web`, **Node ≥ 20** |
 | Les destinations des liens | `lib/features/notifications/domain/destination_push.dart` et `docs/WORKFLOWS.md § 8` |
 | La table des jetons | `docs/SCHEMA.md § 2.11` |
 | L'envoi côté serveur | `supabase/functions/send-notification/`, contrat dans `supabase/functions/README.md` |

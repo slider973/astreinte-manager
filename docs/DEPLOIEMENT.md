@@ -274,6 +274,8 @@ curl -sI https://<domaine>/flutter_service_worker.js | grep -i cache-control
 curl -sI https://<domaine>/push/firebase-messaging-sw.js | grep -i -e content-type -e cache-control
 # attendu : content-type: application/javascript (ou text/javascript)
 #           cache-control: public, max-age=0, must-revalidate
+#           et aucun service-worker-allowed
+#    Même contrôle, automatique, dans `deploy.yml` (« Vérifier les en-têtes servis »).
 
 # 4. Une route profonde rechargée ne rend pas une page introuvable.
 #    C'est la réécriture vers index.html : sans elle, plus rien ne marche
