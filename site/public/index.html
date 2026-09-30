@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astreinte SP — le planning d'astreinte des centres de secours</title>
+<meta name="description" content="Les pompiers saisissent leurs disponibilités sur leur téléphone, le chef de centre construit le planning, chacun valide son créneau. 55 € par mois, essai gratuit.">
+<link rel="canonical" href="https://astreinte-sp.fr/">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F7F9FA">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/fonts/archivo-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/atkinson-next-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/style.v1.css">
+<link rel="stylesheet" href="/print.v1.css" media="print">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:site_name" content="Astreinte SP">
+<meta property="og:url" content="https://astreinte-sp.fr/">
+<meta property="og:title" content="Le planning d'astreinte, validé par chaque pompier">
+<meta property="og:description" content="Les pompiers saisissent leurs disponibilités sur leur téléphone, le chef de centre construit le planning, chacun valide son créneau. 55 € par mois, essai gratuit.">
+<meta property="og:image" content="https://astreinte-sp.fr/images/partage.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Astreinte SP : le planning d'astreinte, validé par chaque pompier.">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Astreinte SP",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web, iOS, Android",
+  "url": "https://astreinte-sp.fr/",
+  "inLanguage": "fr",
+  "description": "Le planning d'astreinte des centres de secours : les pompiers saisissent leurs disponibilités, le chef de centre construit le planning, chacun valide son créneau.",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "Mensuel",
+      "price": "55.00",
+      "priceCurrency": "EUR",
+      "priceSpecification": {
+        "@type": "UnitPriceSpecification",
+        "price": "55.00",
+        "priceCurrency": "EUR",
+        "referenceQuantity": { "@type": "QuantitativeValue", "value": 1, "unitCode": "MON" }
+      }
+    },
+    {
+      "@type": "Offer",
+      "name": "Annuel",
+      "price": "550.00",
+      "priceCurrency": "EUR",
+      "priceSpecification": {
+        "@type": "UnitPriceSpecification",
+        "price": "550.00",
+        "priceCurrency": "EUR",
+        "referenceQuantity": { "@type": "QuantitativeValue", "value": 1, "unitCode": "ANN" }
+      }
+    }
+  ],
+  "publisher": { "@type": "Organization", "name": "Staticflow LLC" }
+}
+</script>
+</head>
+<body>
+<!--
+  THESIS: la page est une fiche de décision pour le bureau d'amicale, pas une plaquette ; chaque
+  affirmation est adossée à une capture ou à un fait vérifiable.
+  OWN-WORLD: le papier et l'encre du registre de garde. Fond blanc et papier doux, encre #131C23,
+  filets de 1 px qui règlent la page en bandes, cases à rayon 4, boutons-blocs à rayon 8. Une seule
+  couleur saturée hors captures : l'indigo, qui veut dire « choisir, agir ».
+  STORY: comprendre (le planning validé créneau par créneau), croire (l'app, en captures), vérifier
+  (prix, essai, données, résiliation, limites), agir (demander un essai).
+  FIRST VIEWPORT: 390 px, nom, promesse, bouton, le haut du téléphone sous le pli ; 1280 px, texte à
+  gauche, matrice de l'admin à droite, le téléphone du pompier posé devant.
+  FORM: « 3 — La fiche pour le bureau », clé 45d2d0a0.
+  FINISH: un seul geste, le tampon « Accepté » ; aucune ombre sauf le téléphone ; rien ne bouge d'autre.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" hidden>
+  <symbol id="i-coche" viewBox="0 -960 960 960"><path d="m378-332 363-363q9-9 21.5-9t21.5 9q9 9 9 21.5t-9 21.5L399-267q-9 9-21 9t-21-9L175-449q-9-9-8.5-21.5T176-492q9-9 21.5-9t21.5 9l159 160Z"/></symbol>
+  <symbol id="i-sablier" viewBox="0 -960 960 960"><path d="M308-140h344v-127q0-72-50-121.5T480-438q-72 0-122 49.5T308-267v127ZM190-80q-13 0-21.5-8.5T160-110q0-13 8.5-21.5T190-140h58v-127q0-71 40-129t106-84q-66-27-106-85t-40-129v-126h-58q-13 0-21.5-8.5T160-850q0-13 8.5-21.5T190-880h580q13 0 21.5 8.5T800-850q0 13-8.5 21.5T770-820h-58v126q0 71-40 129t-106 85q66 26 106 84t40 129v127h58q13 0 21.5 8.5T800-110q0 13-8.5 21.5T770-80H190Z"/></symbol>
+  <symbol id="i-coche-cercle" viewBox="0 -960 960 960"><path d="m421-389-98-98q-9-9-22-9t-23 10q-9 9-9 22t9 22l122 123q9 9 21 9t21-9l239-239q10-10 10-23t-10-23q-10-9-23.5-8.5T635-603L421-389Zm59 309q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 31.5-156t86-127Q252-817 325-848.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 82-31.5 155T763-197.5q-54 54.5-127 86T480-80Zm0-60q142 0 241-99.5T820-480q0-142-99-241t-241-99q-141 0-240.5 99T140-480q0 141 99.5 240.5T480-140Zm0-340Z"/></symbol>
+  <symbol id="i-chevron" viewBox="0 -960 960 960"><path d="M469-358q-5-2-10-7L261-563q-9-9-8.5-21.5T262-606q9-9 21.5-9t21.5 9l175 176 176-176q9-9 21-8.5t21 9.5q9 9 9 21.5t-9 21.5L501-365q-5 5-10 7t-11 2q-6 0-11-2Z"/></symbol>
+  <symbol id="i-fleche" viewBox="0 -960 960 960"><path d="M686-450H190q-13 0-21.5-8.5T160-480q0-13 8.5-21.5T190-510h496L459-737q-9-9-9-21t9-21q9-9 21-9t21 9l278 278q5 5 7 10t2 11q0 6-2 11t-7 10L501-181q-9 9-21 9t-21-9q-9-9-9-21t9-21l227-227Z"/></symbol>
+  <symbol id="i-courriel" viewBox="0 -960 960 960"><path d="M140-160q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h680q24 0 42 18t18 42v520q0 24-18 42t-42 18H140Zm680-525L496-473q-4 2-7.5 3.5T480-468q-5 0-8.5-1.5T464-473L140-685v465h680v-465ZM480-522l336-218H145l335 218ZM140-685v7-39.32.73V-740v23-.91V-678v-7 465-465Z"/></symbol>
+</svg>
+<a class="evitement" href="#contenu">Aller au contenu</a>
+<header class="entete">
+  <div class="contenu">
+    <a class="marque" href="/"><img src="/images/icone.svg" alt="" width="32" height="32">Astreinte SP</a>
+    <nav class="navigation" aria-label="Principale">
+      <ul>
+        <li><a class="lien-prix" href="/#prix">Prix</a></li>
+        <li><a class="bouton bouton-secondaire bouton-compact" href="https://astreinte.staticflow.ch">Se connecter</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="contenu">
+  <section class="accroche" aria-labelledby="titre">
+    <div class="contenu">
+      <div class="accroche-texte">
+        <h1 id="titre">Le planning d'astreinte, validé par chaque pompier.</h1>
+        <p class="chapeau">Chacun saisit ses disponibilités sur son téléphone. Vous construisez le mois. Chaque pompier accepte ou refuse son créneau, et un refus ne défait pas le reste.</p>
+        <div class="actions">
+          <a class="bouton bouton-principal" href="#contact" data-courriel="essai">Demander un essai gratuit</a>
+          <a class="lien-action" href="#prix">Voir le prix<svg class="icone" aria-hidden="true"><use href="#i-fleche"/></svg></a>
+        </div>
+        <p class="mention">60 jours gratuits, sans carte bancaire.</p>
+      </div>
+      <figure class="accroche-visuel">
+        <div class="ecran-ordinateur">
+          <picture data-mobile="non">
+            <source type="image/avif" srcset="/images/b-matrice-720.avif 720w, /images/b-matrice-1440.avif 1440w" sizes="(min-width: 1200px) 490px, 42vw">
+            <source type="image/webp" srcset="/images/b-matrice-720.webp 720w, /images/b-matrice-1440.webp 1440w" sizes="(min-width: 1200px) 490px, 42vw">
+            <img src="/images/b-matrice-720.webp" width="720" height="450" loading="lazy" decoding="async" alt="Planning du mois sur ordinateur : une ligne par pompier, deux cases par jour, jour et nuit, avec les disponibilités, les astreintes acceptées ou en attente, et le nombre d'astreintes de chacun.">
+          </picture>
+        </div>
+        <div class="ecran-telephone">
+          <picture>
+            <source type="image/avif" srcset="/images/a-accueil-300.avif 300w, /images/a-accueil-600.avif 600w" sizes="(min-width: 840px) 190px, 280px">
+            <source type="image/webp" srcset="/images/a-accueil-300.webp 300w, /images/a-accueil-600.webp 600w" sizes="(min-width: 840px) 190px, 280px">
+            <img src="/images/a-accueil-300.webp" width="300" height="649" fetchpriority="high" decoding="async" alt="Accueil de l'application sur un téléphone : la prochaine astreinte, deux propositions à répondre et l'appel à saisir le mois.">
+          </picture>
+        </div>
+        <figcaption class="mention">Données fictives de démonstration.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section essentiel" aria-labelledby="titre-essentiel">
+    <div class="contenu">
+      <h2 id="titre-essentiel">L'essentiel</h2>
+      <dl class="fiche">
+        <div><dt>Prix</dt><dd><span class="chiffre">55&#8239;€</span> par mois, ou <span class="chiffre">550&#8239;€</span> par an, pour tout le centre</dd></div>
+        <div><dt>Essai</dt><dd><span class="chiffre">60</span> jours gratuits, sans carte bancaire</dd></div>
+        <div><dt>Données</dt><dd>Stockées en France, jamais revendues</dd></div>
+        <div><dt>Engagement</dt><dd>Aucun : l'abonnement s'arrête quand vous voulez</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="titre-probleme">
+    <div class="contenu">
+      <div class="section-entete">
+        <h2 id="titre-probleme">Papier, tableur, WhatsApp : le planning se fait à la main</h2>
+      </div>
+      <ul class="constats">
+        <li>
+          <h3>Les disponibilités arrivent par morceaux.</h3>
+          <p>Un message, une feuille, un appel. Quelqu'un recopie tout, case par case, et relance ceux qui n'ont pas répondu.</p>
+        </li>
+        <li>
+          <h3>«&#8239;Disponible&#8239;» finit en «&#8239;de garde&#8239;».</h3>
+          <p>Celui qui coche tous ses week-ends pour vous laisser le choix se retrouve de garde tous les week-ends.</p>
+        </li>
+        <li>
+          <h3>Un pompier ne peut plus, et on refait le mois.</h3>
+          <p>Le planning n'est validé par personne. On apprend le problème tard, et on reprend tout.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="titre-fonctionnement">
+    <div class="contenu">
+      <div class="section-entete">
+        <h2 id="titre-fonctionnement">Comment ça marche</h2>
+        <p class="chapeau">Trois temps, chaque mois.</p>
+      </div>
+      <ol class="etapes">
+        <li class="etape">
+          <div class="etape-texte">
+            <div class="etape-titre"><span class="numero" aria-hidden="true">1</span><h3>Chaque pompier saisit ses disponibilités</h3></div>
+            <p>Jour et nuit, pour tout le mois, en quelques touches : tous les week-ends, toutes les nuits de semaine, copier le mois précédent. La saisie se ferme à la date que vous fixez.</p>
+            <span class="case-etat case-disponible"><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Disponible</span>
+            <div class="mecanisme">
+              <h4>Disponible, ce n'est pas volontaire.</h4>
+              <p>Chacun indique aussi combien d'astreintes et de week-ends il veut vraiment faire dans le mois. Vous voyez qui est disponible, et qui a déjà son compte.</p>
+            </div>
+          </div>
+          <figure class="etape-visuel">
+            <div class="ecran-telephone">
+              <picture>
+                <source type="image/avif" srcset="/images/c-saisie-300.avif 300w, /images/c-saisie-600.avif 600w" sizes="(min-width: 840px) 300px, 280px">
+                <source type="image/webp" srcset="/images/c-saisie-300.webp 300w, /images/c-saisie-600.webp 600w" sizes="(min-width: 840px) 300px, 280px">
+                <img src="/images/c-saisie-300.webp" width="300" height="649" loading="lazy" decoding="async" alt="Saisie des disponibilités sur un téléphone : le calendrier du mois, deux cases par jour, et le compteur des jours, nuits et week-ends cochés.">
+              </picture>
+            </div>
+            <figcaption class="mention">Données fictives de démonstration.</figcaption>
+          </figure>
+        </li>
+        <li class="etape etape-large">
+          <div class="etape-texte">
+            <div class="etape-titre"><span class="numero" aria-hidden="true">2</span><h3>Vous construisez le planning</h3></div>
+            <p>Le mois entier sur un écran : qui est disponible, qui est absent, qui n'a rien saisi. Une proposition automatique remplit les créneaux en équilibrant la charge ; vous corrigez. Rien n'est visible avant que vous publiiez.</p>
+            <span class="case-etat case-propose"><svg class="icone" aria-hidden="true"><use href="#i-sablier"/></svg>Proposé</span>
+          </div>
+          <figure class="etape-visuel">
+            <div class="ecran-ordinateur">
+              <picture>
+                <source media="(min-width: 840px)" type="image/avif" srcset="/images/b-matrice-720.avif 720w, /images/b-matrice-1440.avif 1440w" sizes="(min-width: 1200px) 536px, 45vw">
+                <source media="(min-width: 840px)" type="image/webp" srcset="/images/b-matrice-720.webp 720w, /images/b-matrice-1440.webp 1440w" sizes="(min-width: 1200px) 536px, 45vw">
+                <source type="image/avif" srcset="/images/b-recadrage-360.avif 360w, /images/b-recadrage-720.avif 720w" sizes="(min-width: 600px) 640px, calc(100vw - 40px)">
+                <source type="image/webp" srcset="/images/b-recadrage-360.webp 360w, /images/b-recadrage-720.webp 720w" sizes="(min-width: 600px) 640px, calc(100vw - 40px)">
+                <img src="/images/b-recadrage-360.webp" width="360" height="293" loading="lazy" decoding="async" alt="Planning du mois sur ordinateur : une ligne par pompier, deux cases par jour, jour et nuit, avec les disponibilités, les astreintes acceptées ou en attente, et le nombre d'astreintes de chacun.">
+              </picture>
+            </div>
+            <figcaption class="mention">Données fictives de démonstration.</figcaption>
+          </figure>
+        </li>
+        <li class="etape">
+          <div class="etape-texte">
+            <div class="etape-titre"><span class="numero" aria-hidden="true">3</span><h3>Chacun accepte et reçoit ses rappels</h3></div>
+            <p>À la publication, chaque pompier reçoit ses créneaux et répond pour chacun. Sans réponse, un rappel part tout seul. Les astreintes acceptées s'ajoutent à son agenda.</p>
+            <span class="case-etat case-accepte"><svg class="icone" aria-hidden="true"><use href="#i-coche-cercle"/></svg>Accepté</span>
+            <div class="mecanisme">
+              <h4>Un refus ne défait pas le reste.</h4>
+              <p>Si quelqu'un refuse, seul ce créneau est à réattribuer, et seule la nouvelle personne est prévenue. Le reste du mois ne bouge pas.</p>
+            </div>
+          </div>
+          <figure class="etape-visuel">
+            <div class="ecran-telephone">
+              <picture>
+                <source type="image/avif" srcset="/images/d-proposition-300.avif 300w, /images/d-proposition-600.avif 600w" sizes="(min-width: 840px) 300px, 280px">
+                <source type="image/webp" srcset="/images/d-proposition-300.webp 300w, /images/d-proposition-600.webp 600w" sizes="(min-width: 840px) 300px, 280px">
+                <img src="/images/d-proposition-300.webp" width="300" height="649" loading="lazy" decoding="async" alt="Une astreinte proposée, avec ses boutons Accepter et Refuser.">
+              </picture>
+            </div>
+            <figcaption class="mention">Données fictives de démonstration.</figcaption>
+          </figure>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" id="prix" aria-labelledby="titre-prix">
+    <div class="contenu">
+      <div class="section-entete">
+        <h2 id="titre-prix">Un prix pour tout le centre</h2>
+      </div>
+      <div class="tarifs">
+        <div class="tarif">
+          <h3>Mensuel</h3>
+          <p class="montant"><span class="chiffre">55&#8239;€</span><span class="periode">par mois</span></p>
+        </div>
+        <div class="tarif">
+          <h3>Annuel</h3>
+          <p class="montant"><span class="chiffre">550&#8239;€</span><span class="periode">par an</span></p>
+          <p class="mention">110&#8239;€ offerts par rapport au mensuel</p>
+        </div>
+      </div>
+      <p class="tva"><span class="a-completer">[À COMPLÉTER : mention fiscale à côté des prix — « TTC », « HT » ou « TVA non applicable, art. 293 B du CGI » ; à reporter aussi dans « L'essentiel »]</span></p>
+      <div class="prix-corps">
+        <div class="compris">
+          <h3>Compris</h3>
+          <ul>
+            <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Tous les membres du centre, jusqu'à 60</li>
+            <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Autant d'administrateurs que nécessaire</li>
+            <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Notifications et rappels automatiques</li>
+            <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Export vers l'agenda du téléphone</li>
+            <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Les nouvelles versions, sans supplément</li>
+          </ul>
+        </div>
+        <div class="prix-notes">
+          <p>60 jours gratuits, sans carte bancaire. À la fin, vous choisissez : vous abonner, ou garder vos plannings en lecture seule. Rien n'est supprimé.</p>
+          <p><a href="#contact" data-courriel="plus60">Plus de 60 membres ? Écrivez-nous.</a></p>
+          <p class="mention">Paiement par carte bancaire, factures téléchargeables. Payé par le centre ou par l'amicale.</p>
+          <a class="bouton bouton-principal" href="#contact" data-courriel="essai">Demander un essai gratuit</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="questions" aria-labelledby="titre-questions">
+    <div class="contenu">
+      <div class="section-entete">
+        <h2 id="titre-questions">Questions fréquentes</h2>
+      </div>
+      <div class="questions">
+        <details>
+          <summary><h3>Où sont stockées les données de nos pompiers ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <p>Dans une base de données hébergée en France, à Paris. Chaque centre est cloisonné : un centre ne voit jamais les données d'un autre. Les notifications push passent par le service de Google (Firebase), aux États-Unis ; elles contiennent le texte de la notification, parfois une date de garde. Les données ne sont jamais revendues.</p>
+        </details>
+        <details>
+          <summary><h3>Qui est responsable de ces données ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <p>Votre centre, qui décide de ce qu'il y met. L'éditeur les héberge et les traite pour votre compte. Chaque pompier peut exporter ses données personnelles et supprimer son compte depuis l'application ; son historique d'astreintes reste, au nom de «&#8239;Membre supprimé&#8239;».</p>
+        </details>
+        <details>
+          <summary><h3>Ça marche sur iPhone et sur Android ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <p>Oui, dans le navigateur, sans rien télécharger sur un store. L'application s'installe sur l'écran d'accueil en deux gestes. Sur iPhone, les notifications demandent cette installation ; l'application explique comment à la première connexion.</p>
+        </details>
+        <details>
+          <summary><h3>Et sans réseau ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <p>Le dernier état connu reste lisible : vos astreintes et votre mois. Saisir ses disponibilités et répondre à une proposition demandent une connexion.</p>
+        </details>
+        <details>
+          <summary><h3>Que se passe-t-il à la fin de l'essai ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <p>Si vous ne vous abonnez pas, le centre passe en lecture seule : tout reste consultable, rien n'est supprimé. Vous pouvez vous abonner à tout moment pour reprendre.</p>
+        </details>
+        <details>
+          <summary><h3>Comment arrêter l'abonnement ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <p>Depuis l'écran Abonnement de l'application, à tout moment, sans engagement. L'arrêt prend effet à la fin de la période déjà payée ; le centre passe alors en lecture seule. Aucune donnée n'est supprimée pour un abonnement arrêté ou impayé.</p>
+        </details>
+        <details>
+          <summary><h3>Combien de temps pour démarrer ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <p>Le temps d'importer la liste de vos pompiers depuis un tableur et de leur envoyer l'invitation. Chacun se connecte avec son adresse électronique.</p>
+        </details>
+        <details>
+          <summary><h3>Faut-il un mot de passe ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <p>Non. On se connecte avec un code à 6 chiffres reçu par courriel. Rien à retenir, rien à réinitialiser.</p>
+        </details>
+        <details>
+          <summary><h3>Qu'est-ce que l'application ne fait pas ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <p>Elle gère les disponibilités et le planning d'astreinte. Elle ne gère pas les interventions, le matériel, les formations ni la paie, n'envoie pas de SMS et n'est pas reliée aux logiciels du SDIS.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="cloture" aria-labelledby="titre-cloture">
+    <div class="contenu">
+      <h2 id="titre-cloture">Essayez sur votre prochain mois</h2>
+      <p>Écrivez-nous le nom de votre centre : nous l'ouvrons, vous invitez vos pompiers, vous publiez un premier planning. 60 jours gratuits, sans carte bancaire.</p>
+      <a class="bouton" href="#contact" data-courriel="essai"><svg class="icone" aria-hidden="true"><use href="#i-courriel"/></svg>Demander un essai gratuit</a>
+      <p><a href="https://astreinte.staticflow.ch">Déjà inscrit ? Se connecter</a></p>
+    </div>
+  </section>
+</main>
+
+<footer class="pied">
+  <div class="contenu">
+    <a class="marque" href="/"><img src="/images/icone.svg" alt="" width="24" height="24">Astreinte SP</a>
+    <nav aria-label="Pied de page">
+      <ul>
+        <li><a href="/mentions-legales">Mentions légales</a></li>
+        <li><a href="/confidentialite">Confidentialité</a></li>
+        <li><a href="#contact" data-courriel="contact">Contact</a></li>
+        <li><a href="https://astreinte.staticflow.ch">Se connecter</a></li>
+      </ul>
+    </nav>
+    <p>Astreinte SP est édité par Staticflow LLC.</p>
+    <p>Ce site ne dépose aucun cookie.</p>
+    <noscript><p id="contact">Pour nous écrire, activez JavaScript ou écrivez-nous depuis l'application.</p></noscript>
+  </div>
+</footer>
+<script>
+(()=>{const a=["tcatnoc","rf.ps-etniertsa"].map(s=>[...s].reverse().join("")).join("@"),t="Centre de secours :\nDépartement :\nNombre de membres (environ) :\nAdresse électronique de l'administrateur :\nTéléphone (facultatif) :\n\nMerci.",m={essai:["Essai d'Astreinte SP","Bonjour,\n\nNous aimerions essayer Astreinte SP.\n\n"+t],plus60:["Astreinte SP — centre de plus de 60 membres","Bonjour,\n\nNotre centre compte plus de 60 membres.\n\n"+t],contact:["Astreinte SP",""]};document.addEventListener("click",e=>{const l=e.target.closest("a[data-courriel]");if(!l)return;e.preventDefault();const[s,b]=m[l.dataset.courriel]||m.contact;location.href="mailto:"+a+"?subject="+encodeURIComponent(s)+(b?"&body="+encodeURIComponent(b):"")});const c=document.querySelector(".case-accepte");if(c&&"IntersectionObserver"in window&&!matchMedia("(prefers-reduced-motion: reduce)").matches){const o=new IntersectionObserver(e=>{if(e[0].isIntersecting){c.classList.add("pose");o.disconnect()}},{threshold:.6});o.observe(c)}})();
+</script>
+</body>
+</html>

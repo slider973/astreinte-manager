@@ -1,0 +1,65 @@
+/* Feuille d'impression (brief § 5) : le bureau imprime la page pour sa réunion.
+   Pas de captures, pas de bande indigo, adresses des liens affichées. */
+@page {
+  margin: 16mm;
+}
+body {
+  font-size: 11pt;
+  line-height: 1.45;
+  color: #000;
+  background: #fff;
+}
+.evitement,
+.navigation,
+.accroche-visuel,
+.etape-visuel,
+.actions,
+.cloture .bouton,
+.prix-notes .bouton,
+.questions summary .icone {
+  display: none !important;
+}
+.accroche,
+.cloture,
+.pied,
+.entete {
+  background: #fff !important;
+  color: #000 !important;
+}
+.cloture h2,
+.cloture a {
+  color: #000 !important;
+}
+.section,
+.accroche,
+.cloture {
+  padding-block: 12pt !important;
+  break-inside: avoid-page;
+}
+h1 {
+  font-size: 24pt;
+  line-height: 1.15;
+}
+h2 {
+  font-size: 16pt;
+  line-height: 1.2;
+  break-after: avoid;
+}
+/* Les réponses de la FAQ s'impriment toutes, même repliées. */
+.questions details > p {
+  display: block !important;
+}
+.questions details::details-content {
+  content-visibility: visible;
+  display: block;
+}
+a[href^="http"]::after {
+  content: " (" attr(href) ")";
+  font-size: 9pt;
+  color: #333;
+}
+a[href^="/"]:not(.marque)::after {
+  content: " (https://astreinte-sp.fr" attr(href) ")";
+  font-size: 9pt;
+  color: #333;
+}
