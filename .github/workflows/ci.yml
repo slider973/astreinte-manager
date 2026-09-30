@@ -1,11 +1,12 @@
 # Intégration continue d'Astreinte SP.
 #
-# Quatre tâches en parallèle, chacune autosuffisante :
+# Cinq tâches en parallèle, chacune autosuffisante :
 #   - « flutter »        : analyse, tests unitaires et de widgets, build web (le canal principal),
 #                          puis le service worker des push contre ce build (ticket 074) ;
 #   - « parcours »       : le parcours complet d'un mois, dans un Chrome sans interface ;
 #   - « base-donnees »   : rejeu complet des migrations, tests RLS et lint du schéma ;
-#   - « edge-functions » : types, lint, format et tests unitaires des fonctions Deno.
+#   - « edge-functions » : types, lint, format et tests unitaires des fonctions Deno ;
+#   - « site »           : le site vitrine astreinte-sp.fr (ticket 075), HTML, liens, poids.
 #
 # Budget visé : moins de dix minutes de bout en bout. Toute étape lente ou instable doit
 # être retirée plutôt que tolérée : une CI qui échoue au hasard ne protège plus rien.
@@ -265,3 +266,40 @@ jobs:
 
       - name: Tester
         run: deno test tests/ --allow-env
+
+  # Le site vitrine (ticket 075) : `site/public/` est servi tel quel, sans construction.
+  # Ce qui est relu ici est donc exactement ce qui part en ligne.
+  #
+  # **Toujours jouée, même quand `site/` ne change pas.** Elle dure moins d'une minute et
+  # ne dépend que de Python et d'un `npx` épinglé ; un filtre de chemins aurait ajouté une
+  # action tierce, une permission et un cas de plus où la tâche peut se tromper. Le
+  # déploiement, lui, ne part que si `site/` a changé (`deploy.yml`, tâche « site »).
+  #
+  # Ce que cette tâche **ne** refuse **pas** : les marques `[À COMPLÉTER`. Le site se relit
+  # et se fusionne pendant que le propriétaire complète les mentions légales ; c'est la
+  # mise en ligne qui les refuse (`verifier.py --marqueurs`, dans `deploy.yml`). Ici,
+  # elles sont seulement listées dans le journal.
+  site:
+    name: Site vitrine — HTML, liens, poids
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      # html-validate 11 demande Node ^22.22 ou ≥ 24.8 : un « 22 » nu pourrait tomber
+      # sur une 22 plus ancienne d'un cache d'exécuteur. Épinglé.
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+
+      # Règles : `site/.htmlvalidate.json` (recommandées, plus quelques-unes de style).
+      - name: HTML valide
+        working-directory: site
+        run: npx --yes html-validate@11.16.1 public/*.html
+
+      # Liens et ancres internes, aucune ressource chargée chez un tiers, budgets de poids,
+      # pied de page identique sur les quatre pages, empreintes de la CSP à jour.
+      - name: Liens, tiers, poids, pied de page, CSP
+        run: python3 site/scripts/verifier.py --lister-marqueurs

@@ -2,7 +2,7 @@
 
 Ce que le propriétaire doit créer chez l'hébergeur pour mettre Astreinte SP en ligne, et comment
 vérifier que c'est correct. Écrit au ticket 032, étendu à la base et aux Edge Functions au
-ticket 049.
+ticket 049, au site vitrine au ticket 075 (§ 11).
 
 La PWA **est** le produit (`CLAUDE.md`). Les builds iOS et Android natifs ne sont produits qu'à la
 demande d'une caserne et ne sont pas concernés par ce document.
@@ -665,3 +665,95 @@ Ce qui part encore, et pourquoi :
 
 La compression de `main.dart.js` est faite par Vercel à la volée (3,9 Mo → environ 0,9 Mo en
 brotli). Rien à configurer. `main.dart.wasm`, lui, est compressé à la construction : voir § 6 bis.
+
+## 11. Le site vitrine astreinte-sp.fr (ticket 075)
+
+Le site qui présente Astreinte SP à un chef de centre vit dans `site/` : du HTML et du CSS écrits à
+la main, **sans construction** (`site/README.md`). `site/public/` est servi tel quel ; ce qui est
+relu en revue est ce qui part en ligne. L'application, elle, reste sur `astreinte.staticflow.ch`.
+
+### Ce qui est automatique
+
+| Quand | Quoi | Où |
+|---|---|---|
+| chaque PR, chaque poussée sur `main` | HTML valide (`html-validate`), liens et ancres, aucun tiers, poids, pied de page identique, empreintes de la CSP ; les marques `[À COMPLÉTER` sont **listées**, pas refusées | `ci.yml`, tâche « site » |
+| après une CI verte sur `main`, **si `site/` a changé** | les marques `[À COMPLÉTER` **refusées**, puis mise en ligne par l'API et vérification de la page servie (200, CSP, empreinte de `index.html`) ; les trois redirections sont contrôlées et signalées si elles manquent | `deploy.yml`, tâche « site » |
+| lancement à la main (`workflow_dispatch`) | la même mise en ligne, que `site/` ait changé ou non | idem |
+
+**Tant que le projet Vercel du site n'existe pas, la tâche s'arrête en succès** et l'écrit dans le
+résumé de l'exécution. Rien ne casse en attendant.
+
+### Une fois pour toutes — ce que le propriétaire fait
+
+1. **Créer un second projet Vercel**, vide, sans importer le dépôt (par exemple `astreinte-site`).
+   Il est séparé de celui de la PWA : ni les en-têtes, ni les réécritures, ni les jetons ne sont
+   partagés. `site/vercel.json` porte déjà `"git": { "deploymentEnabled": false }`.
+2. **Créer un jeton de projet** (`vcp_…`) sur [vercel.com/account/tokens](https://vercel.com/account/tokens),
+   portée = ce nouveau projet. Le jeton de la PWA ne suffit pas : il est limité à son projet.
+3. **Poser deux secrets de dépôt** (Settings → Secrets and variables → Actions, jamais des secrets
+   d'environnement — § 3) :
+
+   | Secret | Valeur |
+   |---|---|
+   | `VERCEL_SITE_PROJECT_ID` | `prj_…` du projet du site (Settings → General) |
+   | `VERCEL_SITE_TOKEN` | le jeton `vcp_…` du point 2 |
+
+   `VERCEL_ORG_ID` est celui de la PWA, déjà posé.
+   Si `VERCEL_SITE_PROJECT_ID` vaut par erreur l'identifiant du projet de la PWA, la tâche **refuse**
+   d'envoyer : le site remplacerait l'application en production.
+4. **Ajouter les quatre domaines au projet du site** (Settings → Domains) :
+
+   | Domaine | Réglage chez Vercel |
+   |---|---|
+   | `astreinte-sp.fr` | domaine de production |
+   | `www.astreinte-sp.fr` | « Redirect to » `astreinte-sp.fr`, **301** |
+   | `astreint-sp.fr` | « Redirect to » `astreinte-sp.fr`, **301** |
+   | `www.astreint-sp.fr` | « Redirect to » `astreinte-sp.fr`, **301** |
+
+5. **Poser les enregistrements DNS chez OVH** (Web Cloud → Noms de domaine → le domaine → Zone DNS),
+   pour **chacun des deux domaines** :
+
+   | Sous-domaine | Type | Cible | Remarque |
+   |---|---|---|---|
+   | *(vide, l'apex)* | `A` | `76.76.21.21` | l'adresse d'apex de Vercel |
+   | `www` | `CNAME` | `cname.vercel-dns.com.` | le point final compte chez OVH |
+
+   **Avant de les ajouter, supprimer** ce qu'OVH a posé à l'achat sur ces deux noms : l'`A` de
+   l'apex (souvent `213.186.33.5`, la page de parking), l'`AAAA` de l'apex s'il existe, et l'`A`
+   ou le `CNAME` de `www`. Deux `A` sur l'apex feraient répondre Vercel une fois sur deux.
+   **Ne pas toucher** aux `MX`, `SPF` et `TXT` : ce sont eux qui portent la redirection de
+   courriel ci-dessous.
+
+   Si la page Domains de Vercel affiche d'autres valeurs que celles du tableau (Vercel donne
+   parfois une cible propre au projet, du type `…vercel-dns-0xx.com`), **ce sont les siennes qui
+   comptent**. Vercel émet et renouvelle les certificats HTTPS des quatre noms dès que le DNS
+   répond ; la propagation prend de quelques minutes à quelques heures (TTL de la zone OVH).
+6. **Créer la redirection de courriel** `contact@astreinte-sp.fr` → l'adresse du propriétaire
+   (OVH, Emails → Redirection, gratuite avec le domaine). Tous les boutons « Demander un essai
+   gratuit » et « Contact » du site écrivent à cette adresse ; elle n'est jamais écrite en clair
+   dans le HTML (assemblée au clic par le script en ligne, brief 075 § 7.3).
+7. **Compléter les marques** `[À COMPLÉTER : …]` des pages (`python3 site/scripts/verifier.py
+   --lister-marqueurs` les liste), puis lancer « Déploiement » à la main ou fusionner une PR qui
+   touche `site/`.
+
+### Vérifier, à la main
+
+```sh
+curl -sI https://astreinte-sp.fr/ | grep -iE '^http|content-security-policy|strict-transport'
+# attendu : 200, la CSP de site/vercel.json, HSTS
+
+for n in www.astreinte-sp.fr astreint-sp.fr www.astreint-sp.fr; do
+  curl -s -o /dev/null -w "$n → %{http_code} %{redirect_url}\n" "https://$n/"
+done
+# attendu : 301 https://astreinte-sp.fr/, trois fois
+
+curl -s -o /dev/null -w '%{http_code}\n' https://astreinte-sp.fr/mentions-legales   # 200
+curl -s -o /dev/null -w '%{http_code}\n' https://astreinte-sp.fr/nimporte           # 404
+```
+
+### La CSP et le script en ligne
+
+Le site n'a qu'un script, en ligne, identique sur les quatre pages : il assemble l'adresse de
+contact au clic et pose le tampon « Accepté ». La CSP de `site/vercel.json` n'autorise **que son
+empreinte** (`script-src 'sha256-…'`). Modifier le script sans mettre l'empreinte à jour le ferait
+bloquer en production, en silence : `verifier.py` compare les deux et fait échouer la CI.

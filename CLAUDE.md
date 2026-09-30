@@ -13,6 +13,7 @@ Réponds en français. Tous les textes de l'app sont en français.
 | `PRODUCT.md` | Vérité produit au format Impeccable (design). |
 | `DESIGN.md` | Système de design en vigueur, créé par Impeccable au ticket 004. |
 | `docs/IOS.md` | L'app iOS native `foco/` : configuration, contrat, CI du fork, écarts avec la PWA. |
+| `site/` | Le site vitrine astreinte-sp.fr (ticket 075) : HTML et CSS statiques, `site/README.md`, mise en ligne `docs/DEPLOIEMENT.md` § 11. |
 | `design/<ticket>.md` | Brief de design d'un ticket, écrit avant le code. |
 | `tickets/` | Un ticket = une PR. `backlog/`, `in-progress/`, `done/`. Tableau dans `tickets/BOARD.md`. |
 

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confidentialité du site — Astreinte SP</title>
+<meta name="description" content="Ce site ne dépose aucun cookie et ne mesure pas votre visite. Ce que l'hébergeur enregistre, et vos droits.">
+<link rel="canonical" href="https://astreinte-sp.fr/confidentialite">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F7F9FA">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/fonts/archivo-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/atkinson-next-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/style.v1.css">
+<link rel="stylesheet" href="/print.v1.css" media="print">
+</head>
+<body>
+<a class="evitement" href="#contenu">Aller au contenu</a>
+<header class="entete">
+  <div class="contenu">
+    <a class="marque" href="/"><img src="/images/icone.svg" alt="" width="32" height="32">Astreinte SP</a>
+    <nav class="navigation" aria-label="Principale">
+      <ul>
+        <li><a class="lien-prix" href="/#prix">Prix</a></li>
+        <li><a class="bouton bouton-secondaire bouton-compact" href="https://astreinte.staticflow.ch">Se connecter</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="contenu" class="page-texte">
+  <div class="contenu lecture">
+    <h1>Confidentialité du site</h1>
+    <p class="mention">Mise à jour le 30 septembre 2026.</p>
+    <p>Cette page porte sur le site astreinte-sp.fr seulement. Les données des centres et des pompiers relèvent de la <a href="https://astreinte.staticflow.ch/legal/confidentialite">politique de confidentialité de l'application</a>.</p>
+
+    <h2>Ce que ce site ne fait pas</h2>
+    <p>Aucun cookie, aucune mesure d'audience, aucun outil de suivi, aucun formulaire, aucune fonte ni image chargée chez un tiers. Tout ce que la page affiche vient de ce domaine.</p>
+
+    <h2>Ce que l'hébergeur enregistre</h2>
+    <p>Vercel, qui héberge le site, tient des journaux techniques (adresse IP, navigateur, page demandée, date) pour la sécurité et le fonctionnement du service, <span class="a-completer">[À COMPLÉTER : durée de conservation selon Vercel]</span>. Base légale : l'intérêt légitime. Ces journaux sont traités aux États-Unis, <span class="a-completer">[À COMPLÉTER : encadrement du transfert — clauses contractuelles types ou Data Privacy Framework]</span>.</p>
+
+    <h2>Quand vous nous écrivez</h2>
+    <p>Votre courriel sert à vous répondre et à ouvrir l'essai de votre centre. Il est conservé <span class="a-completer">[À COMPLÉTER : durée — proposition : trois ans après le dernier échange, usage courant pour un contact commercial]</span>, jamais revendu ni partagé. Il transite par la messagerie de l'éditeur <span class="a-completer">[À COMPLÉTER : OVH pour la redirection de l'adresse de contact, puis le fournisseur de la boîte]</span>.</p>
+
+    <h2>Vos droits</h2>
+    <p>Vous pouvez demander l'accès à vos données, leur rectification, leur effacement, ou vous opposer à leur traitement, en nous <a href="#contact" data-courriel="contact">écrivant</a>. Vous pouvez aussi adresser une réclamation à la CNIL (<a href="https://www.cnil.fr">cnil.fr</a>).</p>
+
+    <h2>Responsable du traitement</h2>
+    <p>Staticflow LLC. <span class="a-completer">[À COMPLÉTER : représentant dans l'Union européenne (article 27 du RGPD) si l'éditeur, établi hors de l'Union, en a besoin — question juridique à trancher par le propriétaire]</span></p>
+  </div>
+</main>
+
+<footer class="pied">
+  <div class="contenu">
+    <a class="marque" href="/"><img src="/images/icone.svg" alt="" width="24" height="24">Astreinte SP</a>
+    <nav aria-label="Pied de page">
+      <ul>
+        <li><a href="/mentions-legales">Mentions légales</a></li>
+        <li><a href="/confidentialite">Confidentialité</a></li>
+        <li><a href="#contact" data-courriel="contact">Contact</a></li>
+        <li><a href="https://astreinte.staticflow.ch">Se connecter</a></li>
+      </ul>
+    </nav>
+    <p>Astreinte SP est édité par Staticflow LLC.</p>
+    <p>Ce site ne dépose aucun cookie.</p>
+    <noscript><p id="contact">Pour nous écrire, activez JavaScript ou écrivez-nous depuis l'application.</p></noscript>
+  </div>
+</footer>
+<script>
+(()=>{const a=["tcatnoc","rf.ps-etniertsa"].map(s=>[...s].reverse().join("")).join("@"),t="Centre de secours :\nDépartement :\nNombre de membres (environ) :\nAdresse électronique de l'administrateur :\nTéléphone (facultatif) :\n\nMerci.",m={essai:["Essai d'Astreinte SP","Bonjour,\n\nNous aimerions essayer Astreinte SP.\n\n"+t],plus60:["Astreinte SP — centre de plus de 60 membres","Bonjour,\n\nNotre centre compte plus de 60 membres.\n\n"+t],contact:["Astreinte SP",""]};document.addEventListener("click",e=>{const l=e.target.closest("a[data-courriel]");if(!l)return;e.preventDefault();const[s,b]=m[l.dataset.courriel]||m.contact;location.href="mailto:"+a+"?subject="+encodeURIComponent(s)+(b?"&body="+encodeURIComponent(b):"")});const c=document.querySelector(".case-accepte");if(c&&"IntersectionObserver"in window&&!matchMedia("(prefers-reduced-motion: reduce)").matches){const o=new IntersectionObserver(e=>{if(e[0].isIntersecting){c.classList.add("pose");o.disconnect()}},{threshold:.6});o.observe(c)}})();
+</script>
+</body>
+</html>

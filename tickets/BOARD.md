@@ -6,7 +6,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-30. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 075 | [Le site vitrine astreinte-sp.fr](in-progress/075-site-vitrine.md) | P1 |  | — |
 
 ## À faire
 
@@ -89,4 +88,5 @@ Généré par `scripts/ticket.sh board` le 2026-09-30. Ne pas éditer à la main
 | 070 | [Les écrans de la PWA affichent des données périmées](done/070-fraicheur-ecrans-pwa.md) | P0 | 068 | https://github.com/slider973/astreinte-manager/pull/77 |
 | 071 | [L'app iOS garde la lecture seule et des données périmées](done/071-fraicheur-ecrans-ios.md) | P0 | 068 | https://github.com/slider973/astreinte-manager/pull/79 |
 | 074 | [Aucune notification push n'arrive sur la PWA](done/074-push-web-portee-service-worker.md) | P0 | 070 | https://github.com/slider973/astreinte-manager/pull/78 |
+| 075 | [Le site vitrine astreinte-sp.fr](done/075-site-vitrine.md) | P1 |  | https://github.com/slider973/astreinte-manager/pull/80 |
 

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mentions légales — Astreinte SP</title>
+<meta name="description" content="Éditeur, hébergeur et directeur de la publication du site Astreinte SP.">
+<link rel="canonical" href="https://astreinte-sp.fr/mentions-legales">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F7F9FA">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/fonts/archivo-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/atkinson-next-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/style.v1.css">
+<link rel="stylesheet" href="/print.v1.css" media="print">
+</head>
+<body>
+<a class="evitement" href="#contenu">Aller au contenu</a>
+<header class="entete">
+  <div class="contenu">
+    <a class="marque" href="/"><img src="/images/icone.svg" alt="" width="32" height="32">Astreinte SP</a>
+    <nav class="navigation" aria-label="Principale">
+      <ul>
+        <li><a class="lien-prix" href="/#prix">Prix</a></li>
+        <li><a class="bouton bouton-secondaire bouton-compact" href="https://astreinte.staticflow.ch">Se connecter</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="contenu" class="page-texte">
+  <div class="contenu lecture">
+    <h1>Mentions légales</h1>
+    <p class="mention">Mises à jour le 30 septembre 2026.</p>
+
+    <h2>Éditeur</h2>
+    <p>Le site astreinte-sp.fr et l'application Astreinte SP sont édités par Staticflow LLC, <span class="a-completer">[À COMPLÉTER : forme, État d'immatriculation et numéro d'enregistrement]</span>, dont le siège est situé <span class="a-completer">[À COMPLÉTER : adresse du siège]</span>.</p>
+    <p>Contact : <a href="#contact" data-courriel="contact">écrivez-nous</a>.</p>
+
+    <h2>Directeur de la publication</h2>
+    <p>Jonathan Lemaine <span class="a-completer">[À COMPLÉTER : à confirmer — nom et qualité, a priori gérant de Staticflow LLC]</span>.</p>
+
+    <h2>Hébergeur</h2>
+    <p>Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis. <span class="a-completer">[À COMPLÉTER : téléphone ou moyen de contact de l'hébergeur, exigé par la LCEN — vérifier sur vercel.com/legal]</span></p>
+
+    <h2>L'application</h2>
+    <p>Astreinte SP est servie depuis <a href="https://astreinte.staticflow.ch">astreinte.staticflow.ch</a>. Ses propres mentions et sa politique de confidentialité, qui couvrent les données des centres et des pompiers, sont dans l'application : <a href="https://astreinte.staticflow.ch/legal/mentions">mentions légales de l'application</a> et <a href="https://astreinte.staticflow.ch/legal/confidentialite">politique de confidentialité de l'application</a>.</p>
+
+    <h2>Propriété intellectuelle</h2>
+    <p>Textes et captures © Staticflow LLC. Les captures montrent des données fictives de démonstration. Fontes Archivo et Atkinson Hyperlegible sous licence SIL Open Font License 1.1 ; icônes Material Symbols sous licence Apache 2.0.</p>
+  </div>
+</main>
+
+<footer class="pied">
+  <div class="contenu">
+    <a class="marque" href="/"><img src="/images/icone.svg" alt="" width="24" height="24">Astreinte SP</a>
+    <nav aria-label="Pied de page">
+      <ul>
+        <li><a href="/mentions-legales">Mentions légales</a></li>
+        <li><a href="/confidentialite">Confidentialité</a></li>
+        <li><a href="#contact" data-courriel="contact">Contact</a></li>
+        <li><a href="https://astreinte.staticflow.ch">Se connecter</a></li>
+      </ul>
+    </nav>
+    <p>Astreinte SP est édité par Staticflow LLC.</p>
+    <p>Ce site ne dépose aucun cookie.</p>
+    <noscript><p id="contact">Pour nous écrire, activez JavaScript ou écrivez-nous depuis l'application.</p></noscript>
+  </div>
+</footer>
+<script>
+(()=>{const a=["tcatnoc","rf.ps-etniertsa"].map(s=>[...s].reverse().join("")).join("@"),t="Centre de secours :\nDépartement :\nNombre de membres (environ) :\nAdresse électronique de l'administrateur :\nTéléphone (facultatif) :\n\nMerci.",m={essai:["Essai d'Astreinte SP","Bonjour,\n\nNous aimerions essayer Astreinte SP.\n\n"+t],plus60:["Astreinte SP — centre de plus de 60 membres","Bonjour,\n\nNotre centre compte plus de 60 membres.\n\n"+t],contact:["Astreinte SP",""]};document.addEventListener("click",e=>{const l=e.target.closest("a[data-courriel]");if(!l)return;e.preventDefault();const[s,b]=m[l.dataset.courriel]||m.contact;location.href="mailto:"+a+"?subject="+encodeURIComponent(s)+(b?"&body="+encodeURIComponent(b):"")});const c=document.querySelector(".case-accepte");if(c&&"IntersectionObserver"in window&&!matchMedia("(prefers-reduced-motion: reduce)").matches){const o=new IntersectionObserver(e=>{if(e[0].isIntersecting){c.classList.add("pose");o.disconnect()}},{threshold:.6});o.observe(c)}})();
+</script>
+</body>
+</html>

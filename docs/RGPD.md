@@ -218,7 +218,7 @@ d'installation émis par Firebase, sans valeur pour la personne et réutilisable
 
 | Sous-traitant | Ce qu'il traite | Où | Encadrement |
 |---|---|---|---|
-| **Supabase** | Base de données, authentification, Edge Functions : la totalité des données du § 2 | `[À COMPLÉTER : région du projet hébergé. Le PRD § 8 exige une région européenne — `eu-central-1` ou `eu-west`. À vérifier dans le tableau de bord avant toute mise en service]` | DPA de Supabase, clauses contractuelles types |
+| **Supabase** | Base de données, authentification, Edge Functions : la totalité des données du § 2 | France — région `eu-west-3` (Paris), confirmée par le propriétaire le 30 septembre 2026 | DPA de Supabase, clauses contractuelles types |
 | **Google (Firebase Cloud Messaging)** | Identifiants d'appareil et contenu des notifications push | États-Unis | Clauses contractuelles types. **Transfert hors UE** : c'est le seul du produit, et il porte le titre et le corps de la notification — donc, parfois, une date de garde |
 | **Resend** | Adresse électronique du destinataire et contenu des courriels (invitations, rappels, notifications de secours) | `[À COMPLÉTER : région retenue chez Resend]` | DPA de Resend |
 | **Stripe** | Coordonnées de facturation de la caserne, jamais celles d'un membre | Irlande / États-Unis | DPA de Stripe, clauses contractuelles types |

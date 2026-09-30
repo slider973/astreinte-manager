@@ -49,12 +49,12 @@ chez Stripe** : les 60 jours sont gérés par l'application, sans carte bancaire
    Description : `Gestion des astreintes pour un centre de secours. Un abonnement par caserne.`
 3. Section **Tarification** :
    - Modèle : **Standard**
-   - Montant : **12,00 €**
+   - Montant : **55,00 €**
    - Devise : **EUR**
    - Période de facturation : **Mensuelle**
    - **Ne coche pas** « Période d'essai » : l'essai est géré par l'application.
 4. Clique **« Ajouter un autre tarif »** et recommence :
-   - Montant : **120,00 €**
+   - Montant : **550,00 €**
    - Période de facturation : **Annuelle**
 5. **Enregistrer le produit.**
 6. Rouvre le produit : chaque tarif a un identifiant qui commence par **`price_`**. Recopie les
@@ -149,9 +149,15 @@ qu'une fonctionnalité qui échoue en silence devant un chef de centre.
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `STRIPE_AMOUNT_MONTHLY` | `1200` | Le montant **affiché** par l'écran, en centimes. À changer en même temps que `STRIPE_PRICE_MONTHLY`. |
-| `STRIPE_AMOUNT_YEARLY` | `12000` | Idem pour l'annuel. L'écran calcule tout seul l'économie annoncée (« 24 € offerts »). |
+| `STRIPE_AMOUNT_MONTHLY` | `1200` | Le montant **affiché** par l'écran, en centimes. À changer en même temps que `STRIPE_PRICE_MONTHLY`. **En production : `5500`** (55 €). |
+| `STRIPE_AMOUNT_YEARLY` | `12000` | Idem pour l'annuel. L'écran calcule tout seul l'économie annoncée. **En production : `55000`** (550 €, « 110 € offerts »). |
 | `STRIPE_CURRENCY` | `eur` | Le symbole affiché à côté des montants. |
+
+**Le défaut n'est pas le prix.** `1200` / `12000` sont les valeurs de repli du code
+(`supabase/functions/_shared/stripe.ts`), gardées pour la pile locale. Le prix de vente, décidé
+par le propriétaire le 30 septembre 2026, est **55 € par mois ou 550 € par an** : ce sont les
+tarifs Stripe de production et les deux secrets ci-dessus. Le site vitrine (`site/public/index.html`,
+ticket 075) affiche les mêmes montants ; changer l'un, c'est changer l'autre dans la même PR.
 
 Et l'adresse de retour, partagée avec les autres fonctions :
 
@@ -218,6 +224,11 @@ l'on change de carte, télécharge les factures et résilie.
 - « Les clients peuvent mettre à jour leurs moyens de paiement »
 - « Les clients peuvent consulter leur historique de facturation »
 - « Les clients peuvent annuler leur abonnement »
+
+**Résiliation : « À la fin de la période de facturation »**, pas « Immédiatement » (même page,
+section « Annulations »). C'est ce que promet le site vitrine (ticket 075, FAQ « Comment arrêter
+l'abonnement ? ») : le centre garde l'accès complet jusqu'au bout de ce qu'il a payé, puis passe en
+lecture seule. Pas de remboursement au prorata.
 
 Sans cette activation, le bouton rend une erreur et l'écran affiche « Le paiement n'a pas pu
 s'ouvrir. Réessaie dans un instant. »
