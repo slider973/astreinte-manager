@@ -578,7 +578,7 @@ rejouées à d'autres moments.
 | Retour sur l'accueil | `AppStore.homeAppeared()` au `.task` de l'accueil (qui repart à chaque retour d'un écran poussé), à la fermeture d'une carte dépliée et des réglages ; **au plus une fois toutes les 10 s** (`homeRefreshInterval`), l'entrée et le retour au premier plan comptant comme une relecture. Les arguments de capture n'ouvrent leur écran qu'une fois |
 | Rôle et appartenances | `becameActive()` relit d'abord `memberships` (la requête du 066a) : rôle changé → adopté (« Gérer la caserne » et les liens de l'admin suivent) ; caserne ouverte plus active → saisie, planning et centre oubliés **en mémoire vive** (la file des disponibilités gardée sur l'appareil attend `LocalWipe`, à la déconnexion), puis l'écran de l'entrée (« Accès désactivé », une autre caserne, le choix). **Panne réseau** : le rôle lu en base à l'entrée reste ; **tout autre échec** retire le privilège (jamais de repli qui masque un refus). `LocalWipe` inchangé ; un rôle restauré du cache revient toujours simple membre |
 | Écrans | « Planning de la caserne » : la liste et les mois déjà lus (`openStationPlanning`) ; « Aujourd'hui » et le détail d'un jour : le mois relu même s'il l'est déjà (`openMonth(containing:)`) ; « Équipe » : les noms relus à chaque ouverture (`openTeam`), un échec garde ceux qu'on avait |
-| Lectures dépassées (revue) | la réponse des appartenances est **ignorée si la caserne ouverte ou la session a changé pendant l'attente** (caserne choisie, déconnexion), sur le chemin réussi comme sur l'échec ; une seule lecture des appartenances et une seule relecture du planning en vol (retour au premier plan et push simultanés) ; `station_access` : la lecture partie la dernière fait foi (une relecture lente ne défait pas la lecture seule posée par un refus) ; `start` pose la lecture seule comme `refresh`, même si les périodes sont illisibles |
+| Lectures dépassées (revue) | la réponse des appartenances est **ignorée si la caserne ouverte ou la session a changé pendant l'attente** (caserne choisie, déconnexion), sur le chemin réussi comme sur l'échec ; une seule lecture des appartenances et une seule relecture du planning ou de la saisie en vol, **une demande arrivée pendant une relecture étant notée et rejouée une fois à sa fin** (second tour de revue ; jamais sous un geste ni pendant un envoi) ; `station_access` : la lecture partie la dernière fait foi (une relecture lente ne défait pas la lecture seule posée par un refus) ; `start` pose la lecture seule comme `refresh`, même si les périodes sont illisibles |
 | Rien sous un geste ni une écriture | la saisie ne se relit ni sous le doigt ni pendant un envoi (règle du 068) ; les propositions ne sont pas relues tant qu'une réponse est en vol (`responding`), sinon la ligne répondue reviendrait à l'écran |
 
 **Tests** (`FocoTests/FreshnessTests.swift`) : caserne réactivée puis `becameActive` → lecture seule
@@ -613,8 +613,24 @@ seule posée par `start` quand les périodes échouent ; retour au premier plan 
 une seule lecture). Course [36497739513](https://github.com/slider973/Foco/actions/runs/36497739513)
 verte, 0 avertissement Swift ; fusionnée en squash ; course verte sur `main` du fork
 ([36498778857](https://github.com/slider973/Foco/actions/runs/36498778857), 0 avertissement) au
-commit `666916c`, visé par le pointeur `foco/`. Build TestFlight **1.0 (105)**, course
+commit `666916c`. Build TestFlight **1.0 (105)**, course
 [36499812274](https://github.com/slider973/Foco/actions/runs/36499812274).
+
+**Second tour de revue** (bloquant : une relecture demandée pendant une autre était jetée — un push
+reçu pendant la relecture du retour au premier plan n'apparaissait qu'au déclencheur suivant) : PR
+[slider973/Foco#13](https://github.com/slider973/Foco/pull/13). `PlanningJourney.refresh` et
+`AvailabilityEntry.refresh` notent la demande (`refreshAgain`) et la rejouent une fois à la fin de
+la relecture en cours, sous la même garde de génération ; la saisie ne la rejoue jamais sous un
+geste ni pendant un envoi. Tests : push pendant la relecture des propositions → la proposition
+apparaît, au plus deux lectures, jamais deux en vol ; push d'ouverture de mois pendant la relecture
+des périodes → novembre finit affiché ; relance jamais sous le doigt ; `concurrentRefreshesCoalesce`
+attend désormais deux lectures successives. **Preuve rouge volontaire** (tests seuls, `2606997`) :
+course [36704881634](https://github.com/slider973/Foco/actions/runs/36704881634), 5 assertions en
+échec dans 3 tests. Correction (`69dde83`) : course
+[36705708959](https://github.com/slider973/Foco/actions/runs/36705708959) verte, 0 avertissement
+Swift ; fusionnée en squash ; course verte sur `main` du fork
+([36707326215](https://github.com/slider973/Foco/actions/runs/36707326215), 0 avertissement) au
+commit `929f313`, visé par le pointeur `foco/`. Build TestFlight **1.0 (106)**.
 
 ## 5. Déconnexion et caches locaux
 
