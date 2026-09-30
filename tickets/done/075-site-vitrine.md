@@ -5,7 +5,7 @@
 - **Dépend de** : —
 - **Branche** : `feat/075-site-vitrine`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-30
+- **Statut** : terminé le 2026-09-30 (PR créée)
 
 ## Contexte
 
