@@ -54,12 +54,33 @@ Future<void> _ouvrirEcran(
 
 void main() {
   group('Parcours d\'accueil : la place de la demande', () {
-    test('sans configuration Firebase, l\'étape est sautée', () async {
-      final suite = await _parcours(
-        etat: EtatNotifications.nonConfigure,
-      ).apresLeGuide();
+    test('sans configuration Firebase, l\'étape est sautée sans être marquée '
+        'vue', () async {
+      final reperes = ReperesLocauxMemoire(<RepereAccueil>{
+        RepereAccueil.guide,
+      });
+      var etat = EtatNotifications.nonConfigure;
+      final parcours = ParcoursAccueil(
+        reperes,
+        _androidInstalle,
+        () async => etat,
+      );
 
-      expect(suite, AppRoutes.accueilName);
+      expect(await parcours.apresLeGuide(), AppRoutes.accueilName);
+      expect(
+        await reperes.dejaVu(RepereAccueil.activationNotifications),
+        isFalse,
+        reason:
+            'ticket 074 : l\'absence tient à l\'installation, pas à '
+            'l\'appareil',
+      );
+
+      // Firebase branché : l'étape revient au passage suivant.
+      etat = EtatNotifications.aDemander;
+      expect(
+        await parcours.apresLeGuide(),
+        AppRoutes.activationNotificationsName,
+      );
     });
 
     test('un navigateur incapable ne voit pas non plus l\'étape', () async {

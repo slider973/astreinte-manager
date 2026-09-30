@@ -66,14 +66,20 @@ class ParcoursAccueil {
   /// ni promesse à faire ni geste à proposer — un écran qui annonce une
   /// impossibilité au milieu d'un accueil est du bruit. L'état reste lisible
   /// dans le profil pour qui le cherche.
+  ///
+  /// **Sans projet Firebase, l'étape n'est pas marquée vue** (ticket 074) :
+  /// l'absence tient à l'installation, pas à l'appareil ni à la personne. La
+  /// marquer, c'était la perdre pour de bon le jour où Firebase est branché ;
+  /// laissée ouverte, elle revient au prochain passage par l'accueil.
   Future<String> _etapeNotifications() async {
     if (await _reperes.dejaVu(RepereAccueil.activationNotifications)) {
       return AppRoutes.accueilName;
     }
 
     final etat = await _etat();
+    if (etat == EtatNotifications.nonConfigure) return AppRoutes.accueilName;
+
     const muets = <EtatNotifications>{
-      EtatNotifications.nonConfigure,
       EtatNotifications.horsWeb,
       EtatNotifications.nonSupporte,
     };

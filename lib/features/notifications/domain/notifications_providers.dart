@@ -114,6 +114,10 @@ class JetonPushController extends Notifier<String?> {
   /// après la suppression resterait au nom du compte sorti.
   ({String jeton, Future<void> envoi})? _enVol;
 
+  /// Vrai une fois les anciennes portées rangées dans cette page : une fois
+  /// par lancement suffit (ticket 074).
+  bool _porteesRangees = false;
+
   /// Demande un jeton à FCM et l'écrit en base, en remplaçant celui que cet
   /// appareil portait avant.
   ///
@@ -133,7 +137,19 @@ class JetonPushController extends Notifier<String?> {
     final session = ref.read(sessionProvider).value;
     if (session == null) return;
 
-    final jeton = await ref.read(messageriePushProvider).jeton();
+    final messagerie = ref.read(messageriePushProvider);
+
+    // **Avant le premier jeton du lancement** : un navigateur passé par une
+    // version d'avant le ticket 074 garde un abonnement sur la portée `/`,
+    // que le worker de Flutter reçoit et perd. Il part ici ; le `getToken`
+    // qui suit recrée l'abonnement sur la portée `push/`.
+    if (!_porteesRangees) {
+      _porteesRangees = true;
+      await messagerie.nettoyerAnciennesPortees();
+      if (depassee()) return;
+    }
+
+    final jeton = await messagerie.jeton();
     if (jeton == null || jeton.isEmpty || depassee()) return;
 
     final local = ref.read(jetonLocalProvider);
@@ -165,8 +181,14 @@ class JetonPushController extends Notifier<String?> {
       state = jeton;
     } on Object catch (erreur) {
       // Un jeton non enregistré ne se dit pas à l'utilisateur : il n'a rien à
-      // en faire et rien à corriger. La prochaine ouverture réessaiera.
-      if (kDebugMode) debugPrint('Jeton non enregistré : $erreur');
+      // en faire et rien à corriger. La prochaine ouverture réessaiera. Mais
+      // il se dit **dans la console, en production aussi** (ticket 074) :
+      // sans cela, une table `push_tokens` vide ne laisse aucune piste. Le
+      // jeton est masqué, au cas où l'erreur le citerait.
+      avertirConsole(
+        'Jeton push non enregistré : '
+        '${erreur.toString().replaceAll(jeton, '<jeton>')}',
+      );
     }
   }
 
@@ -182,11 +204,15 @@ class JetonPushController extends Notifier<String?> {
   /// 1. la ligne de `push_tokens` part côté serveur — **avant** la fermeture
   ///    de session : après, la RLS (`push_tokens_delete_self`) ne le permet
   ///    plus ;
-  /// 2. le navigateur oublie le jeton FCM et se désabonne des push
-  ///    ([MessageriePush.oublierJeton]) — **dans tous les cas**, y compris
-  ///    hors ligne : c'est ce qui empêche le service worker d'afficher encore
-  ///    les push du compte sorti ;
-  /// 3. la mémoire du jeton (`notifications.jeton.appareil`) part de
+  /// 2. le SDK supprime le jeton chez FCM ([MessageriePush.oublierJeton]) —
+  ///    **seulement** si l'autorisation est accordée et qu'un jeton est
+  ///    connu : sans jeton, le SDK n'a rien à supprimer, et il enregistrerait
+  ///    de lui-même un service worker sans configuration rien que pour le
+  ///    constater (ticket 074) ;
+  /// 3. le navigateur se désabonne des push ([MessageriePush.desabonner]) —
+  ///    **dans tous les cas**, y compris hors ligne : c'est ce qui empêche le
+  ///    service worker d'afficher encore les push du compte sorti ;
+  /// 4. la mémoire du jeton (`notifications.jeton.appareil`) part de
   ///    l'appareil — en dernier, parce que c'est elle qui dit quel jeton viser.
   ///
   /// N'est appelée que par `OubliLocal` (`core/session/oubli_local.dart`), le
@@ -218,10 +244,20 @@ class JetonPushController extends Notifier<String?> {
       }
     }
 
+    final messagerie = ref.read(messageriePushProvider);
+    final autorisee =
+        await messagerie.permission() == PermissionPush.accordee;
+    if (autorisee && jetons.isNotEmpty) {
+      try {
+        await messagerie.oublierJeton();
+      } on Object catch (erreur) {
+        if (kDebugMode) debugPrint('Jeton FCM non oublié : $erreur');
+      }
+    }
     try {
-      await ref.read(messageriePushProvider).oublierJeton();
+      await messagerie.desabonner();
     } on Object catch (erreur) {
-      if (kDebugMode) debugPrint('Jeton FCM non oublié : $erreur');
+      if (kDebugMode) debugPrint('Abonnement push non oublié : $erreur');
     }
 
     await local.effacer();
