@@ -111,3 +111,33 @@ f AtkinsonHyperlegibleMono-Bold.ttf atkinson-mono-700.woff2 "$MONO"
 Contrairement à l'app, le WOFF2 convient ici : c'est le navigateur qui décode, pas Skia. Les
 replis (`Archivo repli`, `Atkinson repli`) sont réglés sur les métriques mesurées avec fontTools
 (`size-adjust`, `ascent-override`…) pour que la page ne saute pas au chargement.
+
+## Vérification du 30 septembre 2026
+
+Lighthouse 12, profil **mobile** (émulation Moto G, 4G lente simulée), Chrome sans fenêtre, sur
+les pages servies par `site/scripts/servir.py` (en-têtes et CSP de `vercel.json` appliqués,
+sans compression : Vercel la fera en plus).
+
+| Page | Performance | Accessibilité | Bonnes pratiques | SEO | LCP | CLS | Poids transféré |
+|---|---|---|---|---|---|---|---|
+| `/` | 100 | 100 | 100 | 100 | 1,7 s | 0 | 147 Kio |
+| `/mentions-legales` | 100 | 100 | 100 | 100 | 1,5 s | 0 | 63 Kio |
+| `/confidentialite` | 100 | 100 | 100 | 100 | 1,5 s | 0 | 64 Kio |
+
+Aucun audit binaire en échec. La page 404 n'est pas notée : Lighthouse refuse d'évaluer une
+réponse 404. Rendu relu à 390 × 844 et 1280 × 800 sur les quatre pages : aucun défilement
+horizontal, fontes du site chargées, aucune requête hors du domaine. Rapports et captures d'écran
+joints à la PR, pas au dépôt.
+
+Pour reproduire (Node ≥ 22.22, Chrome installé) :
+
+```sh
+python3 site/scripts/servir.py --port 8088 &
+for page in / /mentions-legales /confidentialite; do
+  npx --yes lighthouse@12 "http://127.0.0.1:8088$page" --form-factor=mobile \
+    --only-categories=performance,accessibility,best-practices,seo \
+    --output=html --output=json --output-path="./lighthouse$(echo "$page" | tr / -)" \
+    --chrome-flags="--headless=new" --quiet
+done
+kill %1
+```

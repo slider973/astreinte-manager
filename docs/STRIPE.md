@@ -225,6 +225,11 @@ l'on change de carte, télécharge les factures et résilie.
 - « Les clients peuvent consulter leur historique de facturation »
 - « Les clients peuvent annuler leur abonnement »
 
+**Résiliation : « À la fin de la période de facturation »**, pas « Immédiatement » (même page,
+section « Annulations »). C'est ce que promet le site vitrine (ticket 075, FAQ « Comment arrêter
+l'abonnement ? ») : le centre garde l'accès complet jusqu'au bout de ce qu'il a payé, puis passe en
+lecture seule. Pas de remboursement au prorata.
+
 Sans cette activation, le bouton rend une erreur et l'écran affiche « Le paiement n'a pas pu
 s'ouvrir. Réessaie dans un instant. »
 

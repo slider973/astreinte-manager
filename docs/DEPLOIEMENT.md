@@ -699,6 +699,8 @@ résumé de l'exécution. Rien ne casse en attendant.
    | `VERCEL_SITE_TOKEN` | le jeton `vcp_…` du point 2 |
 
    `VERCEL_ORG_ID` est celui de la PWA, déjà posé.
+   Si `VERCEL_SITE_PROJECT_ID` vaut par erreur l'identifiant du projet de la PWA, la tâche **refuse**
+   d'envoyer : le site remplacerait l'application en production.
 4. **Ajouter les quatre domaines au projet du site** (Settings → Domains) :
 
    | Domaine | Réglage chez Vercel |
