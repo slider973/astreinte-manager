@@ -81,5 +81,3 @@ export async function servir(racine, vercel) {
     fermer: () => new Promise((resolu) => serveur.close(resolu)),
   };
 }
-
-export {entetesPour};
