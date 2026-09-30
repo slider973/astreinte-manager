@@ -5,7 +5,7 @@
 - **Dépend de** : 070
 - **Branche** : `feat/074-push-web-portee-service-worker`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-30
+- **Statut** : terminé le 2026-09-30 (PR créée)
 
 ## Contexte
 
