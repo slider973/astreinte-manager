@@ -85,8 +85,9 @@ jobs:
       #     sur `push/` et non derrière celui de Flutter, et un push livré par
       #     le protocole de débogage de Chrome arrive à la page.
       # Aucune clé Firebase, aucun appel à FCM : la configuration est factice
-      # et le SDK est extrait du paquet npm `firebase` (`npm pack`, ~1 s). Mesuré
-      # à ~10 s en local, installation comprise.
+      # et le SDK est lu dans le paquet npm `firebase`, verrouillé par
+      # `package-lock.json` à la version du worker (un test le vérifie). Le
+      # test lui-même ne télécharge rien. Node ≥ 20.
       - name: Installer Node
         uses: actions/setup-node@v4
         with:
