@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 070
 - **Branche** : `feat/074-push-web-portee-service-worker`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/78
 - **Statut** : terminé le 2026-09-30 (PR créée)
 
 ## Contexte
