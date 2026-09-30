@@ -55,6 +55,22 @@ ne le connaît pas : la seule adresse est l'app elle-même (`https://astreinte.s
 5. **Docs** : `docs/DEPLOIEMENT.md` (site vitrine) et une ligne dans `CLAUDE.md` (sources de
    vérité).
 
+## Décisions (propriétaire, 30 septembre 2026, points ouverts du brief)
+
+1. Pas d'inscription en libre-service : le bouton principal devient « Demander un essai gratuit »
+   (courriel prérempli vers `contact@astreinte-sp.fr`), « Se connecter » mène à l'app.
+2. Vouvoiement collectif ; le nom public est « Astreinte SP ».
+3. Résiliation effective à la fin de la période payée.
+4. Base Supabase en France (`eu-west-3`, Paris) ; les push passent par Firebase (Google,
+   États-Unis), et le site le dit.
+5. Prix : 55 €/mois, 550 €/an (valeurs Stripe de production).
+6. Restent à compléter par le propriétaire, marqués `[À COMPLÉTER …]` : mention TVA, adresse, État
+   et numéro d'enregistrement de Staticflow LLC, directeur de la publication (Jonathan Lemaine, à
+   confirmer), et les rubriques de confidentialité du brief § 8.2.
+7. Captures depuis `supabase db reset` et un planning fictif, en AVIF et WebP avec budgets.
+8. Projet Vercel séparé, déployé par l'API ; le projet et le DNS sont créés par le propriétaire
+   (`docs/DEPLOIEMENT.md` § 11).
+
 ## Critères d'acceptation
 
 - `https://astreinte-sp.fr` sert le site en HTTPS ; `www.astreinte-sp.fr`, `astreint-sp.fr` et
@@ -62,10 +78,16 @@ ne le connaît pas : la seule adresse est l'app elle-même (`https://astreinte.s
 - Lighthouse mobile ≥ 95 en performance, accessibilité, bonnes pratiques et SEO (rapport joint).
 - Aucun cookie ni requête vers un tiers de suivi au chargement.
 - Mentions légales et confidentialité présentes et liées depuis chaque page.
-- Le bouton d'essai ouvre l'app ; le prix affiché égale celui de l'écran Abonnement.
+- Le bouton principal « Demander un essai gratuit » ouvre un courriel prérempli vers
+  `contact@astreinte-sp.fr`, adresse jamais écrite en clair dans le HTML ; le lien « Se connecter »
+  ouvre l'app (`https://astreinte.staticflow.ch`). Le prix affiché (55 €/mois, 550 €/an) égale
+  celui de l'écran Abonnement en production (`STRIPE_AMOUNT_MONTHLY=5500`,
+  `STRIPE_AMOUNT_YEARLY=55000`).
 - Rendu vérifié à 390 et 1280 px, clair et sombre si le brief le prévoit.
 - La CI vérifie le site (liens internes, HTML valide, poids des images) et reste verte ; toutes les
-  commandes des jobs rejouées en local avant le push.
+  commandes des jobs rejouées en local avant le push. Les marques `[À COMPLÉTER` sont listées par
+  la CI des PR sans la faire échouer ; elles bloquent seulement la mise en ligne du site
+  (`deploy.yml`).
 
 ## Hors périmètre
 
