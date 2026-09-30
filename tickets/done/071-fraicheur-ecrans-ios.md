@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 068
 - **Branche** : `feat/071-fraicheur-ecrans-ios`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/79
 - **Statut** : terminé le 2026-09-30 (PR créée)
 
 ## Contexte
