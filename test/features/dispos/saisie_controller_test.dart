@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:astreinte_sp/core/caserne/caserne_providers.dart';
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
@@ -15,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
+import '../../support/faux_caserne.dart';
 import '../../support/faux_dispos.dart';
 
 /// Une case d'octobre 2026.
@@ -33,9 +37,14 @@ Future<ProviderContainer> ouvrir(
   required FauxDisposRepository depot,
   ConnectiviteMemoire? reseau,
   FileLocaleMemoire? fileLocale,
+  FauxCaserneRepository? caserne,
 }) async {
   final conteneur = ProviderContainer(
     overrides: [
+      // `station_access`, relu à chaque refus depuis le ticket 070.
+      caserneRepositoryProvider.overrideWithValue(
+        caserne ?? FauxCaserneRepository(),
+      ),
       appartenancesProvider.overrideWith(
         (ref) async => <Appartenance>[appartenanceMembre],
       ),
@@ -709,13 +718,15 @@ void main() {
       expect(etatDe(conteneur).lectureSeule, isFalse);
     });
 
-    testWidgets('le refus nomme la lecture seule quand le mois reste ouvert', (
-      tester,
-    ) async {
+    testWidgets('le refus nomme la lecture seule quand station_access la '
+        'confirme', (tester) async {
       final depot = FauxDisposRepository()
         ..erreurEcriture = ErreurDispos.verrouille;
-      final conteneur = await ouvrir(tester, depot: depot);
+      final caserne = FauxCaserneRepository();
+      final conteneur = await ouvrir(tester, depot: depot, caserne: caserne);
 
+      // Suspendue pendant la session : la saisie ne le sait pas encore.
+      caserne.etat = caserneSuspendue;
       pilote(conteneur).basculer(jour(4));
       await tester.pump(apresLeDelai);
       await tester.pump();
@@ -728,6 +739,121 @@ void main() {
         isFalse,
         reason: 'la grille passe en lecture seule',
       );
+    });
+
+    testWidgets('un refus sur une caserne qui écrit et un mois ouvert reste '
+        'neutre', (tester) async {
+      // L'écart relevé par l'app iOS au ticket 068 (`docs/IOS.md § 4 sexies`) :
+      // un `42501` inexpliqué était présenté comme une suspension, gardée
+      // jusqu'au rechargement de la page.
+      final depot = FauxDisposRepository()
+        ..erreurEcriture = ErreurDispos.verrouille;
+      final caserne = FauxCaserneRepository();
+      final conteneur = await ouvrir(tester, depot: depot, caserne: caserne);
+      final lecturesAvant = caserne.lectures;
+
+      pilote(conteneur).basculer(jour(4));
+      await tester.pump(apresLeDelai);
+      await tester.pump();
+
+      final etat = etatDe(conteneur);
+      expect(caserne.lectures, greaterThan(lecturesAvant));
+      expect(etat.refusServeur, AppStrings.moisErreurRefusInexplique);
+      expect(etat.lectureSeule, isFalse);
+      expect(etat.modifiable, isTrue);
+    });
+
+    testWidgets('une suspension apprise pendant le chargement de la grille '
+        'la ferme dès sa naissance', (tester) async {
+      // Démarrage à froid : `station_access` n'a pas encore répondu quand la
+      // saisie commence à se charger, et répond pendant la lecture du mois.
+      // La garantie du ticket 030 — « su avant la première case » — tient.
+      final caserne = FauxCaserneRepository(caserneSuspendue)
+        ..retenue = Completer<void>();
+      final mois = Completer<void>();
+      final depot = FauxDisposRepository()
+        ..retenueLectureMois = mois
+        ..auDebutLireMois = () {
+          final retenue = caserne.retenue;
+          if (retenue != null && !retenue.isCompleted) retenue.complete();
+        };
+      final conteneur = await ouvrir(tester, depot: depot, caserne: caserne);
+      expect(conteneur.read(saisieControllerProvider).hasValue, isFalse);
+
+      // `station_access` a répondu, la lecture du mois est toujours en vol.
+      await tester.pump();
+      expect(conteneur.read(lectureSeuleCaserneProvider), isTrue);
+
+      mois.complete();
+      for (var essai = 0; essai < 20; essai++) {
+        await tester.pump();
+        if (conteneur.read(saisieControllerProvider).hasValue) break;
+      }
+
+      expect(etatDe(conteneur).lectureSeule, isTrue);
+      expect(etatDe(conteneur).modifiable, isFalse);
+    });
+
+    testWidgets('une suspension apprise pendant un changement de mois ferme '
+        'le nouveau mois', (tester) async {
+      final caserne = FauxCaserneRepository();
+      final depot = FauxDisposRepository(
+        periodes: <PeriodeSaisie>[
+          periodeOuverte(annee: 2026, mois: 10),
+          periodeOuverte(annee: 2026, mois: 11),
+        ],
+      );
+      final conteneur = await ouvrir(tester, depot: depot, caserne: caserne);
+      expect(etatDe(conteneur).modifiable, isTrue);
+
+      // Le mois suivant se charge ; pendant sa lecture, la caserne est
+      // suspendue et `station_access` relu le dit.
+      final mois = Completer<void>();
+      depot.retenueLectureMois = mois;
+      conteneur.read(moisSelectionneProvider.notifier).definir('2026-11');
+      await tester.pump();
+      caserne.etat = caserneSuspendue;
+      await conteneur.read(etatCaserneProvider.notifier).relire();
+      expect(conteneur.read(lectureSeuleCaserneProvider), isTrue);
+
+      mois.complete();
+      for (var essai = 0; essai < 20; essai++) {
+        await tester.pump();
+        final valeur = conteneur.read(saisieControllerProvider);
+        if (!valeur.isLoading && valeur.value?.periode.mois == 11) break;
+      }
+
+      expect(etatDe(conteneur).periode.mois, 11);
+      expect(etatDe(conteneur).lectureSeule, isTrue);
+      expect(etatDe(conteneur).modifiable, isFalse);
+    });
+
+    testWidgets('une caserne réactivée rouvre la grille sans redémarrage', (
+      tester,
+    ) async {
+      final depot = FauxDisposRepository()
+        ..erreurEcriture = ErreurDispos.verrouille;
+      final caserne = FauxCaserneRepository();
+      final conteneur = await ouvrir(tester, depot: depot, caserne: caserne);
+
+      caserne.etat = caserneSuspendue;
+      pilote(conteneur).basculer(jour(4));
+      await tester.pump(apresLeDelai);
+      await tester.pump();
+      expect(etatDe(conteneur).modifiable, isFalse);
+
+      // Le chef de centre a payé : la relecture de `station_access` (retour
+      // au premier plan, retour de Stripe) le dit.
+      caserne.etat = caserneEnEssai;
+      depot.erreurEcriture = null;
+      await conteneur.read(etatCaserneProvider.notifier).relire();
+      for (var essai = 0; essai < 10; essai++) {
+        await tester.pump();
+      }
+
+      expect(etatDe(conteneur).lectureSeule, isFalse);
+      expect(etatDe(conteneur).modifiable, isTrue);
+      await tester.pump(apresLeDelai);
     });
   });
 

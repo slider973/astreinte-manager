@@ -1,0 +1,16 @@
+{
+  "name": "astreinte-sp-tests-web",
+  "private": true,
+  "description": "Tests du service worker des push (ticket 074) : unitaires sous Node, bout en bout dans Chrome par Playwright.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test --test-reporter=spec"
+  },
+  "devDependencies": {
+    "firebase": "12.19.0",
+    "playwright-core": "1.63.0"
+  }
+}

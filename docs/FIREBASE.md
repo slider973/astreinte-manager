@@ -178,17 +178,45 @@ Une seconde ligne apparaît dans `push_tokens`, avec le modèle du téléphone.
 ### c. Sur iPhone — la vérification qui compte
 
 **Sur iPhone, une page ouverte dans Safari ne reçoit jamais de notification.** Il faut que
-l'application soit sur l'écran d'accueil, et iOS 16.4 au minimum.
+l'application soit sur l'écran d'accueil, et iOS 16.4 au minimum. C'est le mode d'emploi à donner
+à chaque pompier équipé d'un iPhone :
 
 1. Ouvre le site dans **Safari** (pas Chrome : sur iPhone, seul Safari sait installer).
 2. Bouton **Partager** → **« Sur l'écran d'accueil »** → **« Ajouter »**.
-3. **Ferme Safari** et lance l'application depuis l'icône de l'écran d'accueil.
+3. **Ferme Safari** et lance l'application **depuis l'icône** de l'écran d'accueil — pas depuis
+   un onglet de Safari, même ouvert sur la même adresse.
 4. Onglet **Profil** → « Notifications » → **« Activer les notifications »** → accepte.
 5. Refais l'envoi de test du § 6.a.
 
 Si tu tentes l'étape 4 **sans** avoir installé l'application, l'écran affiche « Ajoute
 l'application à ton écran d'accueil pour les recevoir » et ne propose aucun bouton. C'est voulu :
-une autorisation refusée sur iPhone ne se redemande pas.
+une autorisation refusée sur iPhone ne se redemande pas. **C'est la première chose à vérifier
+quand un iPhone n'a aucune ligne dans `push_tokens`** : le 29 septembre 2026, c'était le cas du
+propriétaire, qui ouvrait le site dans Safari (ticket 074).
+
+### d. Quand rien n'arrive — le diagnostic
+
+Dans l'ordre, sur Chrome desktop, onglet de l'application ouvert, **F12** :
+
+1. **Application → Service workers.** Deux lignes, toutes deux « activated and is running » :
+   `/` avec `flutter_service_worker.js` (le cache de l'application) et **`/push/`** avec
+   `push/firebase-messaging-sw.js?apiKey=…` (les notifications). Une ligne Firebase sur `/`
+   marquée « waiting to activate », c'est le défaut corrigé au ticket 074 : le push arrive au
+   worker de Flutter et se perd. Il ne doit plus se produire ; s'il revient, cliquer
+   **Unregister** sur la ligne `/` (Flutter réenregistre son worker au rechargement), recharger,
+   puis réactiver depuis le Profil.
+2. **Console.** Un jeton refusé ou une ligne `push_tokens` non écrite laisse un avertissement,
+   **en production aussi** : `Astreinte SP — Jeton push indisponible : …` ou
+   `Astreinte SP — Jeton push non enregistré : …`. Le message du SDK ou de la base dit pourquoi
+   (clé VAPID, autorisation, réseau) ; le jeton n'y figure jamais.
+
+Les navigateurs déjà passés par une version d'avant le ticket 074 se rangent seuls : au lancement
+suivant, l'abonnement resté sur `/` est oublié et le jeton recréé sur `/push/` ; l'ancien fichier
+`firebase-messaging-sw.js`, à la racine, n'est plus qu'un worker qui se désinscrit, à retirer à la
+version suivante. Sur `/`, l'ancien fichier ne fait rien : il attend, inerte, que le chargeur
+de Flutter le remplace, pour ne jamais désinscrire le worker de Flutter. L'étape d'accueil
+« Reçois les propositions », sautée tant que Firebase n'était pas configuré, n'est plus marquée vue
+dans ce cas : elle revient au prochain passage par l'accueil.
 
 ## 7. Deux projets, ou un seul ?
 
@@ -295,11 +323,14 @@ la PWA.
 
 ## Mettre à jour le SDK
 
-Le fichier `web/firebase-messaging-sw.js` charge le SDK JavaScript de Firebase depuis Google, à une
+Le fichier `web/push/firebase-messaging-sw.js` charge le SDK JavaScript de Firebase depuis Google, à une
 version écrite en dur (`VERSION_SDK`). Elle doit rester **identique** à celle qu'attend le paquet
 Flutter `firebase_core_web` (constante `supportedFirebaseJsSdkVersion`). Après un
 `flutter pub upgrade` qui touche `firebase_core_web`, vérifier les deux et les réaligner, sinon
-l'enregistrement du jeton échoue en arrière-plan sans message clair.
+l'enregistrement du jeton échoue en arrière-plan sans message clair. Réaligner aussi
+`devDependencies.firebase` dans `test/push_web/package.json` (puis `npm install` pour le
+`package-lock.json`) : les tests y lisent le SDK servi au worker, et
+`test/push_web/service_worker.test.mjs` échoue en CI si les deux versions divergent.
 
 ## Où vivent les choses, pour le développeur
 
@@ -308,7 +339,10 @@ l'enregistrement du jeton échoue en arrière-plan sans message clair.
 | Les cinq variables | `env/prod.json`, lues par `lib/core/env.dart` |
 | L'initialisation, qui ne lève jamais | `lib/core/firebase/firebase_bootstrap.dart` |
 | L'état des notifications, fonction pure | `lib/features/notifications/domain/etat_notifications.dart` |
-| Le service worker, configuré par son URL | `web/firebase-messaging-sw.js` |
+| Le service worker, configuré par son URL, sur sa portée `push/` | `web/push/firebase-messaging-sw.js` (l'ancien `web/firebase-messaging-sw.js` ne fait que se désinscrire) |
+| Son chemin d'enregistrement, relatif au base href | `cheminServiceWorkerPush`, `lib/features/notifications/data/messagerie_push.dart` |
+| Le ménage des anciens workers (lancement, déconnexion) | `lib/features/notifications/data/pont_web.dart` |
+| Ses tests : Node, et Chrome piloté par Playwright | `test/push_web/` (tâche CI « flutter ») : `npm ci && npm test` après `flutter build web`, **Node ≥ 20** |
 | Les destinations des liens | `lib/features/notifications/domain/destination_push.dart` et `docs/WORKFLOWS.md § 8` |
 | La table des jetons | `docs/SCHEMA.md § 2.11` |
 | L'envoi côté serveur | `supabase/functions/send-notification/`, contrat dans `supabase/functions/README.md` |

@@ -1044,9 +1044,11 @@ pas un pompier sur le terrain.
 
 Le message FCM porte **`notification` et `data`**, et ce n'est pas de la ceinture-bretelles : au
 premier plan `messagerie_push.dart` lit `notification.title` ; en arrière-plan le SDK affiche tout
-seul et `web/firebase-messaging-sw.js` retrouve la destination dans `FCM_MSG.data.route` ; en repli
-« data only », le même service worker lit `data.title`, `data.body` et `data.route`. Retirer l'un
-des deux blocs casse l'un des trois chemins.
+seul et `web/push/firebase-messaging-sw.js` retrouve la destination dans `FCM_MSG.data.route` ; en
+repli « data only », le même service worker lit `data.title`, `data.body` et `data.route`. Retirer
+l'un des deux blocs casse l'un des trois chemins. Ce worker vit dans `web/push/`, sur sa propre
+portée, depuis le ticket 074 : à la racine, il restait en attente derrière
+`flutter_service_worker.js` et les trois chemins étaient coupés à la fois.
 
 **`webpush.fcm_options.link` est une adresse complète, pas la route.** L'API v1 valide ce champ
 comme une URL et impose `https` : un chemin relatif fait échouer le message entier par un

@@ -34,8 +34,14 @@ class FauxMessageriePush implements MessageriePush {
   /// qu'une déconnexion arrive.
   Completer<String?>? jetonEnAttente;
 
-  /// Combien de fois l'appareil a oublié son jeton FCM.
+  /// Combien de fois le SDK a été appelé pour supprimer le jeton chez FCM.
   int jetonsOublies = 0;
+
+  /// Combien de fois le navigateur s'est désabonné localement.
+  int desabonnements = 0;
+
+  /// Combien de fois les anciennes portées ont été rangées (ticket 074).
+  int nettoyages = 0;
 
   /// Vrai : [oublierJeton] lève, comme un SDK qui échoue hors ligne. Le
   /// vrai ne lève jamais ; le faux le fait pour prouver que ça ne bloque rien.
@@ -74,6 +80,12 @@ class FauxMessageriePush implements MessageriePush {
     await auMomentDeLOubliFcm?.call();
     if (oubliEchoue) throw const FormatException('désabonnement refusé');
   }
+
+  @override
+  Future<void> desabonner() async => desabonnements++;
+
+  @override
+  Future<void> nettoyerAnciennesPortees() async => nettoyages++;
 
   @override
   Stream<MessagePush> get messagesPremierPlan => messages.stream;

@@ -250,10 +250,14 @@ export function classerErreurFcm(statut: number, corps: string): VerdictJeton {
  * pas de la ceinture-bretelles : le client du ticket 024 lit les deux selon la
  * situation. Au premier plan, `messagerie_push.dart` lit `notification.title` et
  * `notification.body` ; en arrière-plan, le SDK affiche la notification tout seul
- * et `web/firebase-messaging-sw.js` retrouve la destination dans
+ * et `web/push/firebase-messaging-sw.js` retrouve la destination dans
  * `FCM_MSG.data.route` ; en repli « data only », le même service worker lit
  * `data.title`, `data.body` et `data.route`. Retirer l'un des deux blocs casse
  * l'un des trois chemins.
+ *
+ * Ce worker a sa propre portée, `push/`, depuis le ticket 074 : à la racine, il
+ * restait en attente derrière `flutter_service_worker.js`, et les trois chemins
+ * étaient coupés à la fois — le push arrivait au worker de Flutter, qui le perdait.
  */
 /**
  * Ce champ accepte-t-il cette valeur ?
@@ -266,7 +270,7 @@ export function classerErreurFcm(statut: number, corps: string): VerdictJeton {
  * tout basculant en courriel de secours. Le silence parfait.
  *
  * L'omettre est sans conséquence : le service worker lit `data.route`, pas ce
- * champ (`web/firebase-messaging-sw.js`). En développement, où `APP_BASE_URL` est
+ * champ (`web/push/firebase-messaging-sw.js`). En développement, où `APP_BASE_URL` est
  * en `http://127.0.0.1:3000`, le push part donc simplement sans lui.
  */
 export function lienPubliable(lien: string | undefined): boolean {

@@ -545,6 +545,21 @@ void main() {
 
       expect(find.text(AppStrings.planningDirectInterrompu), findsOneWidget);
     });
+
+    testWidgets('une reconnexion du canal relit le planning', (tester) async {
+      // Ce que l'autre poste a fait pendant la coupure n'arrive jamais par le
+      // canal : son retour relit (ticket 070).
+      final depot = await _ouvrir(tester);
+      final lectures = depot.lectures;
+
+      depot.diffuser(const EtatCanalPlanning(branche: false));
+      await tester.pumpAndSettle();
+      depot.diffuser(const EtatCanalPlanning(branche: true));
+      await tester.pumpAndSettle();
+
+      expect(depot.lectures, lectures + 1);
+      expect(find.text(AppStrings.planningDirect), findsOneWidget);
+    });
   });
 
   group('Le téléphone', () {

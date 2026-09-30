@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/caserne/fait_caserne_ecran.dart';
+import '../../../core/fraicheur/couche_fraicheur.dart';
+import '../../../core/fraicheur/fraicheur.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/reseau/connectivite.dart';
@@ -63,7 +65,7 @@ class BoiteScreen extends ConsumerStatefulWidget {
 }
 
 class _BoiteScreenState extends ConsumerState<BoiteScreen>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, FraicheurEcran<BoiteScreen> {
   late TabController _onglets;
 
   /// La durée avec laquelle [_onglets] a été construit. Le contrôleur la porte
@@ -79,19 +81,18 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
   /// et ne s'efface que sur un geste ou sur un rafraîchissement.
   NouvellePropositions? _bandeau;
 
+  /// **Relire à l'ouverture, et au retour au premier plan.** Les deux
+  /// contrôleurs sont gardés en vie pour la pastille : arriver ici ne les
+  /// relit pas tout seul, et un onglet laissé ouvert une heure rouvrirait la
+  /// Boîte sur la liste d'il y a une heure. Le retour au premier plan est le
+  /// cas exact du pompier qui revient de sa notification : la Boîte n'écoute
+  /// aucun canal temps réel (`design/021 § 7.3`, `design/026 § 6`). Le moment
+  /// est décidé par le coordinateur (`core/fraicheur`, ticket 070).
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    // **Relire à l'ouverture.** Les deux contrôleurs sont gardés en vie pour
-    // la pastille : arriver ici ne les relit pas tout seul, et un onglet
-    // laissé ouvert une heure rouvrirait la Boîte sur la liste d'il y a une
-    // heure. Reporté d'une image, modifier un provider pendant `initState`
-    // étant interdit par Riverpod.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _relire();
-    });
-  }
+  Set<Donnee> get donneesAffichees => const <Donnee>{
+    Donnee.propositions,
+    Donnee.centre,
+  };
 
   @override
   void didChangeDependencies() {
@@ -131,19 +132,10 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _onglets
       ..removeListener(_suivreOnglet)
       ..dispose();
     super.dispose();
-  }
-
-  /// **Le cas exact du pompier qui revient de sa notification.** La Boîte
-  /// n'écoute aucun canal temps réel (`design/021 § 7.3`, `design/026 § 6`) :
-  /// le retour au premier plan est le seul moment qui mérite une requête.
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState etat) {
-    if (etat == AppLifecycleState.resumed) _relire();
   }
 
   /// L'onglet suit le doigt, et l'URL suit l'onglet.

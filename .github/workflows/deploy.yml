@@ -581,6 +581,30 @@ jobs:
               echec="Service-Worker-Allowed absent : vercel.json n'a pas été appliqué par le déploiement (voir scripts/deployer_pwa.py)."
               return 1
             fi
+
+            # Le service worker des push (ticket 074). Absent, la réécriture
+            # vers index.html rendrait une page HTML sous ce nom : le
+            # navigateur refuserait de l'enregistrer et aucun jeton web
+            # n'arriverait jamais. Il doit rester sans cache, et **sans**
+            # Service-Worker-Allowed : sa portée est son dossier, `push/`,
+            # et rien ne doit lui permettre de revenir sur celle de Flutter.
+            if ! push="$(entetes_de "$URL/push/firebase-messaging-sw.js")"; then
+              echec="aucune réponse de $URL/push/firebase-messaging-sw.js"
+              return 1
+            fi
+            echo "$push"
+            if ! echo "$push" | grep -q '^content-type:.*javascript'; then
+              echec="push/firebase-messaging-sw.js n'est pas servi en JavaScript : absent du déploiement, réécrit vers index.html ? Aucune notification web ne peut s'enregistrer."
+              return 1
+            fi
+            if ! echo "$push" | grep -q 'must-revalidate'; then
+              echec="push/firebase-messaging-sw.js est mis en cache : une correction du worker n'atteindrait pas les téléphones déjà installés."
+              return 1
+            fi
+            if echo "$push" | grep -q '^service-worker-allowed:'; then
+              echec="push/firebase-messaging-sw.js porte Service-Worker-Allowed : sa portée doit rester push/ (ticket 074)."
+              return 1
+            fi
             return 0
           }
 

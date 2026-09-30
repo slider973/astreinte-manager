@@ -9,6 +9,8 @@ import 'package:astreinte_sp/features/notifications/data/jeton_local.dart';
 import 'package:astreinte_sp/features/notifications/data/push_tokens_repository.dart';
 import 'package:astreinte_sp/features/notifications/domain/etat_notifications.dart';
 import 'package:astreinte_sp/features/notifications/domain/notifications_providers.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -56,6 +58,34 @@ void main() {
       expect(ecriture.token, 'jeton-de-test');
       expect(ecriture.plateforme, PlateformePush.web);
       expect(ecriture.libelleAppareil, 'Pixel 7 · Chrome');
+    });
+
+    testWidgets('les anciennes portées sont rangées une fois, avant le jeton', (
+      tester,
+    ) async {
+      final messagerie = FauxMessageriePush(
+        etatPermission: PermissionPush.accordee,
+      );
+      messagerie.jetonEnAttente = Completer<String?>();
+      await _lancer(tester, messagerie: messagerie);
+      // `publier` attend FCM : ce qui est fait l'a été avant le jeton.
+      final nettoyagesAvantJeton = messagerie.nettoyages;
+      messagerie.jetonEnAttente!.complete('jeton-de-test');
+      await tester.pumpAndSettle();
+
+      // Ticket 074 : un abonnement laissé sur `/` par une version d'avant
+      // part **avant** le `getToken`, qui le recrée sur `push/`.
+      expect(nettoyagesAvantJeton, 1);
+      expect(messagerie.jetonsDemandes, 1);
+
+      // Un second `publier` dans la même page ne range plus rien.
+      messagerie.jetonEnAttente = null;
+      final conteneur = ProviderScope.containerOf(
+        tester.element(find.byType(MaterialApp)),
+      );
+      await conteneur.read(jetonPushProvider.notifier).publier();
+      expect(messagerie.nettoyages, 1);
+      expect(messagerie.jetonsDemandes, 2);
     });
 
     testWidgets('un jeton périmé est remplacé, pas dupliqué', (tester) async {
@@ -197,6 +227,7 @@ void main() {
         reason: 'avant la fermeture de session : après, la RLS refuse',
       );
       expect(faux.push.jetonsOublies, 1, reason: 'FCM oublie le jeton');
+      expect(faux.push.desabonnements, 1, reason: 'le navigateur aussi');
       expect(
         oubliesAuMomentFcm,
         <String>['jeton-de-test'],

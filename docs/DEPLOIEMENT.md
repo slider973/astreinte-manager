@@ -267,6 +267,16 @@ curl -sI -H 'Accept-Encoding: br' https://<domaine>/canvaskit/chromium/canvaskit
 curl -sI https://<domaine>/flutter_service_worker.js | grep -i cache-control
 # attendu : public, max-age=0, must-revalidate
 
+# 3 bis. Le service worker des push est servi, **et pas réécrit vers index.html**
+#    (ticket 074). S'il manquait, la réécriture rendrait la page HTML sous ce
+#    nom, le navigateur refuserait de l'enregistrer, et aucun jeton web
+#    n'arriverait dans `push_tokens`.
+curl -sI https://<domaine>/push/firebase-messaging-sw.js | grep -i -e content-type -e cache-control
+# attendu : content-type: application/javascript (ou text/javascript)
+#           cache-control: public, max-age=0, must-revalidate
+#           et aucun service-worker-allowed
+#    Même contrôle, automatique, dans `deploy.yml` (« Vérifier les en-têtes servis »).
+
 # 4. Une route profonde rechargée ne rend pas une page introuvable.
 #    C'est la réécriture vers index.html : sans elle, plus rien ne marche
 #    depuis que les routes vivent dans le chemin (ticket 046).
@@ -447,6 +457,7 @@ comprime `application/wasm` à la volée comme il comprime le JavaScript.
 | `Content-Encoding: br` sur `main.dart.wasm` | 3,6 Mo → 1,0 Mo. Rien ne garantit qu'un CDN comprime `application/wasm` à la volée comme il comprime le JavaScript : la compression est faite à la construction et l'en-tête l'annonce. Pas de cache long, même raison que `canvaskit/**` (ticket 065) |
 | `Cross-Origin-Opener-Policy: same-origin` et `Cross-Origin-Embedder-Policy: require-corp` sur **toutes** les routes | c'est la condition pour que la page ait `SharedArrayBuffer`, donc pour que Skwasm rastérise sur un fil séparé. Sans eux, la construction Wasm se charge quand même et retombe sur sa variante à un seul fil : rien ne casse, tout ralentit. Le détail et la porte de secours `credentialless` sont au § 6 bis (ticket 065) |
 | `canvaskit/**` **sans** cache long | auto-hébergé, le chemin n'a plus la révision du moteur dedans. Un `immutable` d'un an figerait la version d'aujourd'hui et la prochaine montée de Flutter servirait un moteur périmé aux téléphones déjà venus. C'est le service worker qui gère les versions, par empreinte |
+| `push/firebase-messaging-sw.js` sans cache, **sans** `Service-Worker-Allowed` | le service worker des push vit dans son propre dossier depuis le ticket 074 : il prend la portée `push/` par défaut, sans en-tête pour l'élargir. À la racine, il partageait la portée `/` avec `flutter_service_worker.js`, restait en attente derrière lui et les push se perdaient. L'ancien `firebase-messaging-sw.js`, à la racine, n'est plus qu'un worker qui se désinscrit : à retirer à la version suivante (`docs/FIREBASE.md § 6.d`) |
 | `nosniff`, `Referrer-Policy`, `X-Frame-Options` | le minimum, sans politique de sécurité de contenu : le moteur a besoin de `wasm-unsafe-eval` et une CSP mal posée casse l'application en silence. `nosniff` a une conséquence de plus depuis le ticket 065 : `WebAssembly.compileStreaming` refuse alors tout ce qui n'est pas servi en `application/wasm`, et la page reste blanche sans message |
 
 ## 8. Les trois états de la base, et ce que chacun donne
@@ -647,7 +658,7 @@ Ce qui part encore, et pourquoi :
 - **Supabase** (`<ref>.supabase.co`) : c'est la base du produit, hébergée en Europe. Ce n'est pas un
   tiers au sens du registre des données personnelles, c'est le sous-traitant déclaré.
 - **Firebase**, le jour où les cinq secrets `FIREBASE_*` seront posés : `firebase_core_web` injecte
-  le SDK depuis `www.gstatic.com`, et `web/firebase-messaging-sw.js` fait un `importScripts` vers la
+  le SDK depuis `www.gstatic.com`, et `web/push/firebase-messaging-sw.js` fait un `importScripts` vers la
   même adresse. Tant que la configuration est absente — c'est le cas aujourd'hui —, **aucune de ces
   requêtes ne part**. Le jour où elle sera posée, ce sera une dépendance tierce assumée, à déclarer
   dans la politique de confidentialité ; elle sort du périmètre du ticket 037.

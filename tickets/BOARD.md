@@ -1,12 +1,11 @@
 # Tableau des tickets
 
-Généré par `scripts/ticket.sh board` le 2026-09-29. Ne pas éditer à la main.
+Généré par `scripts/ticket.sh board` le 2026-09-30. Ne pas éditer à la main.
 
 ## En cours
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
-| 070 | [Les écrans de la PWA affichent des données périmées](in-progress/070-fraicheur-ecrans-pwa.md) | P0 | 068 | — |
 | 071 | [L'app iOS garde la lecture seule et des données périmées](in-progress/071-fraicheur-ecrans-ios.md) | P0 | 068 | — |
 
 ## À faire
@@ -16,6 +15,7 @@ Généré par `scripts/ticket.sh board` le 2026-09-29. Ne pas éditer à la main
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 072 | [Un pompier dans plusieurs casernes, de bout en bout](backlog/072-plusieurs-casernes.md) | P1 | 070 071 | — |
+| 073 | [Échanger ou céder une astreinte entre pompiers](backlog/073-echange-astreintes.md) | P1 | 070 071 072 | — |
 
 ## Terminés
 
@@ -86,4 +86,6 @@ Généré par `scripts/ticket.sh board` le 2026-09-29. Ne pas éditer à la main
 | 067 | [Distribuer l'app iOS Foco par TestFlight, depuis la CI du fork](done/067-testflight-foco.md) | P1 | 066 | https://github.com/slider973/astreinte-manager/pull/72 |
 | 068 | [La saisie iOS refusée en « lecture seule » sur un mois ouvert](done/068-saisie-ios-refusee-lecture-seule.md) | P0 | 066 067 | https://github.com/slider973/astreinte-manager/pull/74 (chantier PWA), https://github.com/slider973/astreinte-manager/pull/75 (chantier iOS) |
 | 069 | [Le paiement Stripe ne s'ouvre pas pour une caserne](done/069-checkout-stripe-client-existant.md) | P0 | 029 | https://github.com/slider973/astreinte-manager/pull/73, puis https://github.com/slider973/astreinte-manager/pull/76 (réouverture) |
+| 070 | [Les écrans de la PWA affichent des données périmées](done/070-fraicheur-ecrans-pwa.md) | P0 | 068 | https://github.com/slider973/astreinte-manager/pull/77 |
+| 074 | [Aucune notification push n'arrive sur la PWA](done/074-push-web-portee-service-worker.md) | P0 | 070 | https://github.com/slider973/astreinte-manager/pull/78 |
 

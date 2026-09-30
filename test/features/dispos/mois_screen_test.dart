@@ -33,6 +33,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
+import '../../support/faux_caserne.dart';
 import '../../support/faux_dispos.dart';
 import '../../support/polices.dart';
 
@@ -55,12 +56,14 @@ Future<void> ouvrirMois(
   FileLocale? fileLocale,
   ConnectiviteMemoire? reseau,
   Size taille = const Size(390, 844),
+  FauxCaserneRepository? caserne,
 }) async {
   await monterApp(
     tester,
     session: sessionMembre,
     appartenances: const <Appartenance>[appartenanceMembre],
     dispos: depot ?? FauxDisposRepository(),
+    caserne: caserne,
     fileLocale: fileLocale,
     reseau: reseau,
     reperes:
@@ -447,10 +450,13 @@ void main() {
     ) async {
       final depot = FauxDisposRepository()
         ..erreurEcriture = ErreurDispos.verrouille;
-      await ouvrirMois(tester, depot: depot);
+      final caserne = FauxCaserneRepository();
+      await ouvrirMois(tester, depot: depot, caserne: caserne);
 
       // Le mois reste ouvert, mais le serveur refuse : la caserne est passée
-      // en lecture seule pendant la session.
+      // en lecture seule pendant la session, et `station_access` relu au
+      // refus le confirme (ticket 070).
+      caserne.etat = caserneSuspendue;
       await tester.tap(caseDe(0, CreneauType.jour));
       await tester.pump(const Duration(seconds: 2));
 
@@ -459,6 +465,30 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text(AppStrings.moisRefusLectureSeule), findsOneWidget);
+    });
+
+    testWidgets('un refus que ni la caserne ni le mois n\'expliquent reste '
+        'neutre', (tester) async {
+      // `station_access` dit que la caserne écrit, le mois est ouvert : le
+      // refus n'est pas une suspension, et l'écran ne le dit jamais
+      // (`docs/IOS.md § 4 sexies`, ticket 070).
+      final depot = FauxDisposRepository()
+        ..erreurEcriture = ErreurDispos.verrouille;
+      await ouvrirMois(tester, depot: depot);
+
+      await tester.tap(caseDe(0, CreneauType.jour));
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.moisErreurRefusInexplique), findsOneWidget);
+      expect(find.text(AppStrings.moisErreurSuspendueEnCours), findsNothing);
+      expect(find.text(AppStrings.moisRefusLectureSeule), findsNothing);
+      // La grille reste modifiable : une autre case répond, sans phrase de
+      // suspension.
+      await tester.tap(caseDe(1, CreneauType.jour));
+      await tester.pump();
+      expect(find.text(AppStrings.moisRefusLectureSeule), findsNothing);
+      await tester.pumpAndSettle();
     });
 
     testWidgets('aucune période : un état vide sans bouton mort', (

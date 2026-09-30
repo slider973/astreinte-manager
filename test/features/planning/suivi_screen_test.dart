@@ -364,6 +364,27 @@ void main() {
 
       expect(find.text(AppStrings.planningDirectInterrompu), findsOneWidget);
     });
+
+    testWidgets('une reconnexion du canal rattrape ce qu\'il a manqué', (
+      tester,
+    ) async {
+      // `postgres_changes` ne rejoue pas les événements de la coupure : le
+      // retour du canal relit le suivi (ticket 070). Sa première connexion,
+      // elle, suit la lecture d'ouverture et ne relit rien.
+      final depot = _depot();
+      await _ouvrir(tester, depot: depot);
+      final lectures = depot.lectures;
+
+      depot.diffuser(const EtatCanalSuivi(branche: false));
+      await tester.pumpAndSettle();
+      expect(depot.lectures, lectures);
+
+      depot.diffuser(const EtatCanalSuivi(branche: true));
+      await tester.pumpAndSettle();
+
+      expect(depot.lectures, lectures + 1);
+      expect(find.text(AppStrings.planningDirect), findsOneWidget);
+    });
   });
 
   group('Le suivi du planning — les filtres', () {

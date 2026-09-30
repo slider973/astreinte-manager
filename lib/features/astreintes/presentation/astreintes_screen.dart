@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/fraicheur/couche_fraicheur.dart';
+import '../../../core/fraicheur/fraicheur.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/reseau/connectivite.dart';
@@ -61,49 +63,34 @@ class AstreintesScreen extends ConsumerStatefulWidget {
 }
 
 class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
-    with WidgetsBindingObserver {
+    with FraicheurEcran<AstreintesScreen> {
   VueAstreintes _vue = VueAstreintes.liste;
 
   /// Le mois affiché par le calendrier. `null` tant qu'il n'a pas été ouvert :
   /// il s'ouvre alors sur le mois courant.
   DateTime? _mois;
 
+  /// **La portée affichée**, et elle seule, est relue — à l'ouverture de
+  /// l'écran, au changement de portée et au retour au premier plan : lire le
+  /// planning entier de la caserne pour quelqu'un qui regarde ses propres
+  /// dates serait trois requêtes pour rien, sur un réseau qu'on sait
+  /// mauvais.
+  ///
+  /// Le cache d'abord, la requête ensuite : `build()` du contrôleur rend
+  /// l'instantané local sans attendre le réseau, et c'est le coordinateur
+  /// (`core/fraicheur`, ticket 070) qui va chercher mieux. Le contrôleur n'est
+  /// pas auto-disposé : une proposition acceptée sur l'onglet voisin ne le
+  /// réveillerait jamais — c'est désormais la réponse elle-même qui le relit.
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    // **Le cache d'abord, la requête ensuite.** `build()` du contrôleur rend
-    // l'instantané local sans attendre le réseau ; c'est ici, à la première
-    // image, qu'on va chercher mieux.
-    //
-    // Et à **chaque** ouverture de l'écran, pas seulement quand l'instantané
-    // vient du cache : le contrôleur n'est pas auto-disposé, donc une
-    // proposition acceptée sur l'onglet voisin ne le réveillerait jamais.
-    // Trouvé dans Chrome — accepter puis passer ici ne montrait rien
-    // (`design/027 § 11`). Le rafraîchissement ne vide pas l'écran : il
-    // remplace ce qui est déjà lisible.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _rafraichir();
-    });
-  }
+  Set<Donnee> get donneesAffichees => <Donnee>{
+    if (ref.read(porteeAstreintesProvider) == PorteeAstreintes.caserne)
+      Donnee.planningCaserne
+    else
+      Donnee.astreintes,
+  };
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  /// Le retour au premier plan est le seul moment où la liste peut avoir
-  /// vieilli sans qu'on l'ait demandé. Posé dans l'écran et non dans le
-  /// contrôleur, qui vit sur tous les onglets (même raison qu'au ticket 021).
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState etat) {
-    if (etat == AppLifecycleState.resumed) _rafraichir();
-  }
-
-  /// Rafraîchit **la portée affichée**, pas les deux : lire le planning entier
-  /// de la caserne pour quelqu'un qui regarde ses propres dates serait trois
-  /// requêtes pour rien, sur un réseau qu'on sait mauvais.
+  /// « Réessayer » : un geste délibéré, qui relit la portée affichée tout de
+  /// suite, sans délai minimal.
   void _rafraichir() {
     unawaited(
       ref.read(porteeAstreintesProvider) == PorteeAstreintes.caserne
@@ -114,10 +101,10 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
 
   void _choisirPortee(PorteeAstreintes portee) {
     ref.read(porteeAstreintesProvider.notifier).choisir(portee);
-    // La portée qu'on vient d'ouvrir va chercher mieux que son cache, tout de
-    // suite : elle a pu vieillir pendant qu'on regardait l'autre.
+    // La portée qu'on vient d'ouvrir va chercher mieux que son cache si elle
+    // a vieilli pendant qu'on regardait l'autre.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _rafraichir();
+      if (mounted) declarerDonnees();
     });
   }
 

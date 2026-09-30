@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/fraicheur/couche_fraicheur.dart';
 import 'core/l10n/app_strings.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -29,8 +30,12 @@ class AstreinteApp extends ConsumerWidget {
       // Les notifications se branchent **au-dessus des routes** : un push ne
       // choisit pas l'écran sur lequel il tombe, et sa bannière ne peut donc
       // pas vivre dans un écran (ticket 024).
-      builder: (context, child) =>
-          CoucheNotifications(child: child ?? const SizedBox.shrink()),
+      //
+      // La couche de fraîcheur aussi (ticket 070) : le retour au premier plan
+      // relit ce que les écrans montés affichent, quel que soit l'écran.
+      builder: (context, child) => CoucheFraicheur(
+        child: CoucheNotifications(child: child ?? const SizedBox.shrink()),
+      ),
     );
   }
 }

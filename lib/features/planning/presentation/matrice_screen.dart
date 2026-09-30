@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/caserne/fait_caserne_ecran.dart';
+import '../../../core/fraicheur/couche_fraicheur.dart';
+import '../../../core/fraicheur/fraicheur.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/l10n/format_date.dart';
 import '../../../core/preferences/reperes_locaux.dart';
@@ -119,7 +121,18 @@ class MatriceScreen extends ConsumerStatefulWidget {
   ConsumerState<MatriceScreen> createState() => _MatriceScreenState();
 }
 
-class _MatriceScreenState extends ConsumerState<MatriceScreen> {
+class _MatriceScreenState extends ConsumerState<MatriceScreen>
+    with FraicheurEcran<MatriceScreen> {
+  /// **La matrice et le planning sont relus** à l'ouverture de l'écran et à
+  /// chaque retour au premier plan (ticket 070) — un pompier a pu saisir son
+  /// mois pendant que le poste de l'admin dormait. Le coordinateur
+  /// (`core/fraicheur`) ne relit jamais sous une case en cours d'écriture.
+  @override
+  Set<Donnee> get donneesAffichees => const <Donnee>{
+    Donnee.matrice,
+    Donnee.planningAdmin,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -448,6 +461,14 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen> {
 
     // Le planning vient de quitter le bureau : c'est ici qu'on va le suivre.
     ref.invalidate(suiviControllerProvider);
+    // **Un admin est souvent aussi pompier** (ticket 070) : ses propres
+    // propositions viennent de partir, et l'accueil comme la Boîte doivent
+    // les montrer sans qu'il passe par la Boîte pour les réveiller.
+    unawaited(
+      ref.read(fraicheurProvider).maintenant(const <Donnee>{
+        Donnee.propositions,
+      }),
+    );
     context.goNamed(
       AppRoutes.suiviName,
       queryParameters: <String, String>{
