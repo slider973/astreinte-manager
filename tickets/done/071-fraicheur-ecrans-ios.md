@@ -4,8 +4,8 @@
 - **Priorité** : P0
 - **Dépend de** : 068
 - **Branche** : `feat/071-fraicheur-ecrans-ios`
-- **PR** : —
-- **Statut** : en cours depuis 2026-09-29
+- **PR** : https://github.com/slider973/astreinte-manager/pull/79
+- **Statut** : terminé le 2026-09-30 (PR créée)
 
 ## Contexte
 
@@ -58,3 +58,36 @@ Dans le fork, branche `fix/071-fraicheur`, PR vers `main` du fork.
 
 - La PWA (ticket 070).
 - Plusieurs casernes (ticket 072).
+
+## Livraison
+
+**Fait**, en un seul chantier (volet iOS ; la PWA relève du ticket 070) :
+
+- **PR du fork**, fusionnées en squash sur `main` de `slider973/Foco` :
+  [Foco#11](https://github.com/slider973/Foco/pull/11) (`5062402`),
+  [Foco#12](https://github.com/slider973/Foco/pull/12) (`666916c`),
+  [Foco#13](https://github.com/slider973/Foco/pull/13) (`929f313`, visé par le pointeur `foco/`).
+- **Preuves rouges volontaires** sur l'ancien code : course
+  [36490736169](https://github.com/slider973/Foco/actions/runs/36490736169) (7 tests, 15 assertions
+  en échec) et course [36704881634](https://github.com/slider973/Foco/actions/runs/36704881634)
+  (3 tests en échec), verts après correction.
+- **Courses `iOS` vertes sur `main` du fork** :
+  [36494901491](https://github.com/slider973/Foco/actions/runs/36494901491),
+  [36498778857](https://github.com/slider973/Foco/actions/runs/36498778857),
+  [36707326215](https://github.com/slider973/Foco/actions/runs/36707326215) ; zéro avertissement
+  Swift.
+- **TestFlight** : builds 1.0 (104), 1.0 (105) puis **1.0 (106)**, le build à retenir (course
+  [36708847229](https://github.com/slider973/Foco/actions/runs/36708847229)).
+- **Revue** : trois tours (le troisième autorisé par le propriétaire). Bloquants levés :
+  - l'appartenance était lue avant l'attente et utilisée après : un changement de caserne ou une
+    déconnexion pendant la lecture appliquait un résultat dépassé ; il est désormais ignoré ;
+  - une relecture demandée pendant une autre était jetée au lieu d'être rejouée ; elle est
+    désormais rejouée à la fin de la lecture en cours.
+- Détail dans `docs/IOS.md` § 4 septies.
+
+**Reste à cocher par le propriétaire** (vérification sur l'iPhone avec TestFlight 1.0 (106)) :
+- [ ] caserne suspendue puis réactivée : la lecture seule suit sans redémarrer l'app ;
+- [ ] rôle retiré puis redonné : les écrans admin disparaissent puis reviennent au retour au premier plan ;
+- [ ] push reçu app ouverte : planning et propositions à jour ;
+- [ ] retour sur l'accueil depuis un écran enfant : données relues ;
+- [ ] écrans Équipe, Aujourd'hui et Planning de la caserne : à jour à l'ouverture.
