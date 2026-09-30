@@ -5,7 +5,7 @@
 - **Dépend de** : 068
 - **Branche** : `feat/071-fraicheur-ecrans-ios`
 - **PR** : —
-- **Statut** : en cours depuis 2026-09-29
+- **Statut** : terminé le 2026-09-30 (PR créée)
 
 ## Contexte
 
