@@ -11,6 +11,9 @@
 #   base → fonctions → configuration ─┐
 #                   ↘ PWA (Vercel) ───┴→ vérification d'écart
 #
+#   site vitrine (Vercel, projet à part) — indépendant du reste, et seulement
+#   quand `site/` a changé (ticket 075, voir la tâche « site » en bas du fichier)
+#
 # Une Edge Function qui appelle une procédure que la base n'a pas encore ne rend
 # pas un message clair, elle rend une erreur de serveur ; et une PWA qui appelle
 # une fonction pas encore déployée rend un 404 que l'utilisateur lit « Impossible
@@ -722,3 +725,164 @@ jobs:
     with:
       ref: ${{ github.event.workflow_run.head_sha || github.ref }}
     secrets: inherit
+
+  # ## Le site vitrine astreinte-sp.fr (ticket 075)
+  #
+  # **Indépendant de tout le reste** : il ne lit ni la base ni les fonctions, il ne
+  # dépend de rien et rien n'en dépend. Un échec ici ne retient pas la PWA, et
+  # inversement. Projet Vercel **à part** (docs/DEPLOIEMENT.md § 11), mis en ligne
+  # par le même `scripts/deployer_pwa.py`, qui sait envoyer n'importe quel
+  # répertoire avec sa configuration : `site/public/` rangé sous le
+  # `outputDirectory` que déclare `site/vercel.json`, et ce fichier à la racine.
+  #
+  # Trois portes, dans cet ordre, et **aucune n'échoue pour une raison de
+  # calendrier** — c'est la règle du propriétaire : une tâche ne casse que si le
+  # site est faux.
+  #
+  #   1. `site/` a-t-il changé dans ce commit ? Sinon, rien. Les fusions se font en
+  #      squash : un commit sur `main` est une PR entière, et son parent est
+  #      l'état d'avant. Un lancement à la main (`workflow_dispatch`) met toujours
+  #      en ligne, c'est le rattrapage.
+  #   2. Les secrets du projet existent-ils ? Tant que `VERCEL_SITE_PROJECT_ID` et
+  #      `VERCEL_SITE_TOKEN` manquent, la tâche le dit dans le résumé et s'arrête
+  #      en succès : le projet Vercel du site n'est pas encore créé.
+  #   3. Plus aucune marque `[À COMPLÉTER` dans les pages ? Celle-là **échoue**
+  #      exprès : des mentions légales trouées ne se publient pas. La CI des PR ne
+  #      fait que les lister, pour que le site se relise en attendant.
+  site:
+    name: Site vitrine — mise en ligne
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 2
+
+      - name: Le site a-t-il changé ?
+        id: changement
+        env:
+          EVENEMENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENEMENT" = "workflow_dispatch" ]; then
+            echo "Lancement à la main : le site est mis en ligne quoi qu'il arrive."
+            echo "site=true" >> "$GITHUB_OUTPUT"
+          elif ! git rev-parse -q --verify HEAD^ >/dev/null; then
+            echo "Pas de commit parent : le site est mis en ligne par précaution."
+            echo "site=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet HEAD^ HEAD -- site/; then
+            echo "site/ n'a pas changé dans ce commit : rien à mettre en ligne."
+            echo "site=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --stat HEAD^ HEAD -- site/
+            echo "site=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Le projet Vercel du site existe-t-il ?
+        id: projet
+        if: steps.changement.outputs.site == 'true'
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_SITE_PROJECT_ID: ${{ secrets.VERCEL_SITE_PROJECT_ID }}
+          VERCEL_SITE_TOKEN: ${{ secrets.VERCEL_SITE_TOKEN }}
+        run: |
+          manquants=""
+          [ -n "$VERCEL_ORG_ID" ]          || manquants="$manquants VERCEL_ORG_ID"
+          [ -n "$VERCEL_SITE_PROJECT_ID" ] || manquants="$manquants VERCEL_SITE_PROJECT_ID"
+          [ -n "$VERCEL_SITE_TOKEN" ]      || manquants="$manquants VERCEL_SITE_TOKEN"
+          if [ -n "$manquants" ]; then
+            echo "::notice::Site vitrine non mis en ligne : secrets absents :$manquants. Le projet Vercel du site n'est pas encore créé (docs/DEPLOIEMENT.md § 11). Rien n'échoue pour autant."
+            {
+              echo "### Site vitrine — pas mis en ligne"
+              echo ""
+              echo "Secrets absents :$manquants (docs/DEPLOIEMENT.md § 11)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "pret=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "pret=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Tout `verifier.py` est rejoué, pas seulement les marques : il dure une
+      # seconde, et c'est la dernière lecture avant la production.
+      - name: Aucune mention à compléter
+        if: steps.projet.outputs.pret == 'true'
+        run: python3 site/scripts/verifier.py --marqueurs
+
+      - name: Mettre en ligne sur Vercel
+        id: mise_en_ligne
+        if: steps.projet.outputs.pret == 'true'
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_SITE_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_SITE_TOKEN }}
+        run: |
+          set -o pipefail
+          python3 scripts/deployer_pwa.py \
+            --racine site/public \
+            --config site/vercel.json \
+            --domaine astreinte-sp.fr \
+            --attente 300 2>&1 | tee /tmp/site.txt
+          {
+            echo "### Site vitrine — mise en ligne"
+            echo ""
+            echo '```'
+            cat /tmp/site.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # La page servie est celle du commit, avec sa CSP. Les trois redirections
+      # (www, astreint-sp.fr) dépendent du DNS chez OVH et de sa propagation :
+      # elles sont signalées, pas bloquantes.
+      - name: Vérifier le site servi
+        if: steps.projet.outputs.pret == 'true'
+        env:
+          URL: ${{ steps.mise_en_ligne.outputs.url }}
+        run: |
+          set -o pipefail
+          [ -n "$URL" ] || {
+            echo "::error::Aucune adresse à vérifier : scripts/deployer_pwa.py n'a rendu aucune sortie « url »."
+            exit 1
+          }
+          attendu="$(sha1sum site/public/index.html | cut -d' ' -f1)"
+          echec=""
+          for tentative in 1 2 3; do
+            echec=""
+            entetes="$(curl -sSIL "$URL/" | tr '[:upper:]' '[:lower:]')" || echec="aucune réponse de $URL/"
+            if [ -z "$echec" ]; then
+              echo "$entetes"
+              echo "$entetes" | grep -qE '^http/[0-9.]+ 200' || echec="$URL ne rend pas 200."
+            fi
+            if [ -z "$echec" ]; then
+              echo "$entetes" | grep -q "content-security-policy: default-src 'none'" \
+                || echec="CSP absente : site/vercel.json n'a pas été appliqué."
+            fi
+            if [ -z "$echec" ]; then
+              servi="$(curl -sS --compressed "$URL/" | sha1sum | cut -d' ' -f1)"
+              echo "index.html du dépôt : $attendu — servi : $servi"
+              [ "$servi" = "$attendu" ] || echec="La page servie n'est pas celle de ce commit."
+            fi
+            [ -z "$echec" ] && break
+            echo "tentative $tentative : $echec"
+            [ "$tentative" -eq 3 ] || sleep 5
+          done
+          if [ -n "$echec" ]; then
+            echo "::error::$echec (adresse vérifiée : $URL)"
+            exit 1
+          fi
+          for alias in https://www.astreinte-sp.fr https://astreint-sp.fr https://www.astreint-sp.fr; do
+            code="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$alias/" || echo "000")"
+            echo "$alias → $code"
+            case "$code" in
+              301\ https://astreinte-sp.fr/*|308\ https://astreinte-sp.fr/*) ;;
+              *) echo "::warning::$alias ne redirige pas en 301 vers https://astreinte-sp.fr ($code) — DNS ou domaine du projet à revoir (docs/DEPLOIEMENT.md § 11)." ;;
+            esac
+          done
+          {
+            echo "### Site vitrine — vérifié en ligne"
+            echo ""
+            echo "- $URL rend 200, CSP servie, \`index.html\` identique au dépôt ($attendu)"
+          } >> "$GITHUB_STEP_SUMMARY"
