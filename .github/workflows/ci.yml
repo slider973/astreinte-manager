@@ -287,11 +287,12 @@ jobs:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
 
-      # html-validate 11 demande Node ^22.22 ou ≥ 24.8.
+      # html-validate 11 demande Node ^22.22 ou ≥ 24.8 : un « 22 » nu pourrait tomber
+      # sur une 22 plus ancienne d'un cache d'exécuteur. Épinglé.
       - name: Installer Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.22.0
 
       # Règles : `site/.htmlvalidate.json` (recommandées, plus quelques-unes de style).
       - name: HTML valide

@@ -787,9 +787,16 @@ jobs:
         if: steps.changement.outputs.site == 'true'
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_SITE_PROJECT_ID: ${{ secrets.VERCEL_SITE_PROJECT_ID }}
           VERCEL_SITE_TOKEN: ${{ secrets.VERCEL_SITE_TOKEN }}
         run: |
+          # Le site ne doit jamais partir dans le projet de la PWA : il y remplacerait
+          # l'application en production. Refus net, avant tout envoi.
+          if [ -n "$VERCEL_SITE_PROJECT_ID" ] && [ "$VERCEL_SITE_PROJECT_ID" = "$VERCEL_PROJECT_ID" ]; then
+            echo "::error::VERCEL_SITE_PROJECT_ID est égal à VERCEL_PROJECT_ID, le projet de la PWA : la mise en ligne du site écraserait l'application. Créer un projet à part (docs/DEPLOIEMENT.md § 11)."
+            exit 1
+          fi
           manquants=""
           [ -n "$VERCEL_ORG_ID" ]          || manquants="$manquants VERCEL_ORG_ID"
           [ -n "$VERCEL_SITE_PROJECT_ID" ] || manquants="$manquants VERCEL_SITE_PROJECT_ID"
