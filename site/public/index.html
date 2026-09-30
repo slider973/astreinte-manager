@@ -118,7 +118,7 @@
           <picture data-mobile="non">
             <source type="image/avif" srcset="/images/b-matrice-720.avif 720w, /images/b-matrice-1440.avif 1440w" sizes="(min-width: 1200px) 490px, 42vw">
             <source type="image/webp" srcset="/images/b-matrice-720.webp 720w, /images/b-matrice-1440.webp 1440w" sizes="(min-width: 1200px) 490px, 42vw">
-            <img src="/images/b-matrice-720.webp" width="720" height="450" loading="lazy" decoding="async" alt="Planning du mois sur ordinateur : une ligne par pompier, deux cases par jour, jour et nuit, avec les disponibilités, les astreintes acceptées ou en attente, et le nombre d'astreintes de chacun.">
+            <img src="/images/b-matrice-720.webp" width="720" height="450" loading="lazy" decoding="async" alt="Planning du mois sur ordinateur : une ligne par pompier, deux cases par jour, jour et nuit, avec les disponibilités, les astreintes acceptées ou en attente et, dans la colonne « Astr. », les astreintes restantes sur le plafond de chacun.">
           </picture>
         </div>
         <div class="ecran-telephone">
@@ -139,7 +139,7 @@
       <dl class="fiche">
         <div><dt>Prix</dt><dd><span class="chiffre">55&#8239;€</span> par mois, ou <span class="chiffre">550&#8239;€</span> par an, pour tout le centre</dd></div>
         <div><dt>Essai</dt><dd><span class="chiffre">60</span> jours gratuits, sans carte bancaire</dd></div>
-        <div><dt>Données</dt><dd>Stockées en France, jamais revendues</dd></div>
+        <div><dt>Données</dt><dd>Base de données en France, jamais revendues</dd></div>
         <div><dt>Engagement</dt><dd>Aucun : l'abonnement s'arrête quand vous voulez</dd></div>
       </dl>
     </div>
@@ -208,7 +208,7 @@
                 <source media="(min-width: 840px)" type="image/webp" srcset="/images/b-matrice-720.webp 720w, /images/b-matrice-1440.webp 1440w" sizes="(min-width: 1200px) 536px, 45vw">
                 <source type="image/avif" srcset="/images/b-recadrage-360.avif 360w, /images/b-recadrage-720.avif 720w" sizes="(min-width: 600px) 640px, calc(100vw - 40px)">
                 <source type="image/webp" srcset="/images/b-recadrage-360.webp 360w, /images/b-recadrage-720.webp 720w" sizes="(min-width: 600px) 640px, calc(100vw - 40px)">
-                <img src="/images/b-recadrage-360.webp" width="360" height="293" loading="lazy" decoding="async" alt="Planning du mois sur ordinateur : une ligne par pompier, deux cases par jour, jour et nuit, avec les disponibilités, les astreintes acceptées ou en attente, et le nombre d'astreintes de chacun.">
+                <img src="/images/b-recadrage-360.webp" width="360" height="293" loading="lazy" decoding="async" alt="Planning du mois sur ordinateur : une ligne par pompier, deux cases par jour, jour et nuit, avec les disponibilités, les astreintes acceptées ou en attente et, dans la colonne « Astr. », les astreintes restantes sur le plafond de chacun.">
               </picture>
             </div>
             <figcaption class="mention">Données fictives de démonstration.</figcaption>
@@ -217,7 +217,7 @@
         <li class="etape">
           <div class="etape-texte">
             <div class="etape-titre"><span class="numero" aria-hidden="true">3</span><h3>Chacun accepte et reçoit ses rappels</h3></div>
-            <p>À la publication, chaque pompier reçoit ses créneaux et répond pour chacun. Sans réponse, un rappel part tout seul. Les astreintes acceptées s'ajoutent à son agenda.</p>
+            <p>À la publication, chaque pompier reçoit ses créneaux et répond pour chacun. Sans réponse, un rappel part tout seul. Les astreintes acceptées peuvent s'ajouter à son agenda, par un lien d'abonnement au calendrier.</p>
             <span class="case-etat case-accepte"><svg class="icone" aria-hidden="true"><use href="#i-coche-cercle"/></svg>Accepté</span>
             <div class="mecanisme">
               <h4>Un refus ne défait pas le reste.</h4>
@@ -260,7 +260,7 @@
         <div class="compris">
           <h3>Compris</h3>
           <ul>
-            <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Tous les membres du centre, jusqu'à 60</li>
+            <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Prévu pour les centres jusqu'à 60 membres</li>
             <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Autant d'administrateurs que nécessaire</li>
             <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Notifications et rappels automatiques</li>
             <li><svg class="icone" aria-hidden="true"><use href="#i-coche"/></svg>Export vers l'agenda du téléphone</li>
@@ -285,7 +285,7 @@
       <div class="questions">
         <details>
           <summary><h3>Où sont stockées les données de nos pompiers ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
-          <p>Dans une base de données hébergée en France, à Paris. Chaque centre est cloisonné : un centre ne voit jamais les données d'un autre. Les notifications push passent par le service de Google (Firebase), aux États-Unis ; elles contiennent le texte de la notification, parfois une date de garde. Les données ne sont jamais revendues.</p>
+          <p>La base de données est hébergée en France, à Paris. Chaque centre est cloisonné : un centre ne voit jamais les données d'un autre. Deux services passent ailleurs, et nous préférons le dire : les notifications push passent par le service de Google (Firebase), aux États-Unis, et contiennent le texte de la notification, parfois une date de garde ; les courriels de l'application (code de connexion, invitations, rappels) sont envoyés par un prestataire d'envoi, Resend, qui traite l'adresse du destinataire et le contenu du message. Les données ne sont jamais revendues.</p>
         </details>
         <details>
           <summary><h3>Qui est responsable de ces données ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
@@ -293,7 +293,7 @@
         </details>
         <details>
           <summary><h3>Ça marche sur iPhone et sur Android ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
-          <p>Oui, dans le navigateur, sans rien télécharger sur un store. L'application s'installe sur l'écran d'accueil en deux gestes. Sur iPhone, les notifications demandent cette installation ; l'application explique comment à la première connexion.</p>
+          <p>Oui, dans le navigateur, sans rien télécharger sur un store. L'application s'installe sur l'écran d'accueil en trois gestes. Sur iPhone, les notifications demandent cette installation ; l'application explique comment à la première connexion.</p>
         </details>
         <details>
           <summary><h3>Et sans réseau ?</h3><svg class="icone" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
