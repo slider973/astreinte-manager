@@ -16,6 +16,17 @@ import 'pont_stub.dart' if (dart.library.js_interop) 'pont_web.dart';
 ///    l'écran quitté au lieu de la proposition.
 Stream<String> routesDepuisServiceWorker() => ecouterServiceWorker();
 
-/// Oublie l'abonnement push de ce navigateur, **sans réseau**
-/// (voir `desabonnerPushLocal`).
-Future<void> oublierAbonnementPush() => desabonnerPushLocal();
+/// Range les service workers de l'origine, **sans réseau** (voir
+/// `nettoyerEnregistrements`).
+///
+/// [garderPush] : vrai au lancement, où l'abonnement de la portée `push/` est
+/// celui qu'on veut garder ; faux à la déconnexion, où tout part.
+Future<void> nettoyerServiceWorkers({required bool garderPush}) =>
+    nettoyerEnregistrements(garderPush: garderPush);
+
+/// Un avertissement dans la console du navigateur, **en production aussi**.
+///
+/// Réservé aux échecs qui, sinon, ne laissent aucune trace : un jeton push
+/// refusé, une ligne `push_tokens` non écrite (ticket 074). Jamais de jeton
+/// dans le message.
+void avertirConsole(String message) => avertir(message);
