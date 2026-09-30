@@ -1,7 +1,8 @@
 # Intégration continue d'Astreinte SP.
 #
 # Quatre tâches en parallèle, chacune autosuffisante :
-#   - « flutter »        : analyse, tests unitaires et de widgets, build web (le canal principal) ;
+#   - « flutter »        : analyse, tests unitaires et de widgets, build web (le canal principal),
+#                          puis le service worker des push contre ce build (ticket 074) ;
 #   - « parcours »       : le parcours complet d'un mois, dans un Chrome sans interface ;
 #   - « base-donnees »   : rejeu complet des migrations, tests RLS et lint du schéma ;
 #   - « edge-functions » : types, lint, format et tests unitaires des fonctions Deno.
@@ -73,6 +74,35 @@ jobs:
       # Mesuré à ~85 s en local.
       - name: Construire la PWA
         run: flutter build web --wasm --dart-define-from-file=env/dev.json
+
+      # Le service worker des push (ticket 074), **contre le build ci-dessus** :
+      # c'est pour le réutiliser que ces étapes sont ici et pas dans une tâche à
+      # part, qui devrait tout reconstruire. Deux fichiers, `npm test` les joue
+      # tous les deux :
+      #   - `service_worker.test.mjs` : le worker hors navigateur, sous Node ;
+      #   - `portee_push.test.mjs` : dans le Chrome de l'exécuteur, piloté par
+      #     `playwright-core` (aucun navigateur téléchargé). Le worker s'active
+      #     sur `push/` et non derrière celui de Flutter, et un push livré par
+      #     le protocole de débogage de Chrome arrive à la page.
+      # Aucune clé Firebase, aucun appel à FCM : la configuration est factice
+      # et le SDK est extrait du paquet npm `firebase` (`npm pack`, ~1 s). Mesuré
+      # à ~10 s en local, installation comprise.
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: test/push_web/package-lock.json
+
+      - name: Installer les dépendances des tests du worker
+        working-directory: test/push_web
+        run: npm ci
+
+      - name: Tester le service worker des push
+        working-directory: test/push_web
+        run: npm test
+        env:
+          CHROME_EXECUTABLE: /usr/bin/google-chrome
 
   # Le parcours complet d'un mois (ticket 035) : l'admin invite, la recrue accepte,
   # saisit son mois, l'admin construit et publie, la recrue refuse, l'admin réattribue,
