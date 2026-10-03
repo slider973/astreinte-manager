@@ -8,6 +8,12 @@
 //      L'invitation reste créée et renvoyable. Un courriel qui ne part pas est un
 //      incident d'envoi, pas une raison de perdre l'invitation.
 //
+// Avant tout fournisseur : une adresse dont le domaine finit par `.invalid`
+// (RFC 2606, RFC 6761 § 6.4) n'est jamais distribuable. Elle ne part pas, sans
+// appel au fournisseur — un rebond par adresse fictive abîme la réputation du
+// compte Resend, qui porte aussi les invitations (ticket 076 : les membres
+// fictifs de la caserne de démonstration ont de telles adresses).
+//
 // Aucune clé n'est journalisée ni renvoyée.
 
 export type Mail = {
@@ -94,7 +100,17 @@ async function sendWithMailpit(
   return { sent: true, provider: "mailpit" };
 }
 
+/** Vrai si le domaine du destinataire est `invalid` ou finit par `.invalid`. */
+export function adresseNonDistribuable(adresse: string): boolean {
+  const arobase = adresse.lastIndexOf("@");
+  const domaine = adresse.slice(arobase + 1).trim().toLowerCase().replace(/\.+$/, "");
+  return domaine === "invalid" || domaine.endsWith(".invalid");
+}
+
 export async function sendMail(mail: Mail): Promise<MailResult> {
+  if (adresseNonDistribuable(mail.to)) {
+    return { sent: false, provider: "none", error: "adresse non distribuable (.invalid)" };
+  }
   const from = Deno.env.get("MAIL_FROM") ?? DEFAULT_FROM;
   const resendKey = Deno.env.get("RESEND_API_KEY");
   const mailpitUrl = Deno.env.get("MAILPIT_URL") ?? DEFAULT_MAILPIT;
