@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 067, 071
 - **Branche** : `feat/076-testflight-testeurs-externes`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/81
 - **Statut** : terminé le 2026-10-03 (PR créée)
 
 ## Contexte
