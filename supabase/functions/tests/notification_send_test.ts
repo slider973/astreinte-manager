@@ -258,6 +258,25 @@ Deno.test("un push qui n'atteint aucun appareil bascule aussi sur le courriel", 
   assertEquals(journal.courriels.length, 1);
 });
 
+Deno.test("une adresse .invalid : courriel non parti, mais la ligne interne suffit (ticket 076)", async () => {
+  const { deps, journal } = faussesDeps({
+    jetons: {},
+    mail: { sent: false, provider: "none", error: "adresse non distribuable (.invalid)" },
+  });
+
+  const resultat = await traiterEnvoi(deps, demande());
+
+  assertEquals(journal.courriels.length, 1);
+  const trace = journal.notifications.find((n) => n.channel === "email");
+  assertEquals(trace?.delivered, false);
+  assertEquals(trace?.error, "adresse non distribuable (.invalid)");
+  // Servi par la ligne `inapp` : la demande se clôt, sans reprise en boucle.
+  assertEquals(resultat.results[0].inapp, true);
+  assertEquals(resultat.results[0].ok, true);
+  assertEquals(resultat.results[0].code, undefined);
+  assertEquals(resultat.ok, true);
+});
+
 // ---------------------------------------------------------------------------
 // 3 et 4. Le réglage du membre
 // ---------------------------------------------------------------------------

@@ -46,6 +46,7 @@ cp Config/Config.example.xcconfig Config/Config.xcconfig
 | `FOCO_SUPABASE_ANON_KEY` | la clé **publique** (anon / publishable) |
 | `FOCO_PWA_URL` | facultatif, défaut `https://astreinte.staticflow.ch` (« Gérer la caserne ») |
 | `FOCO_EXTRAS_FLAG` | facultatif ; `FOCO_EXTRAS` pour voir les extras hors schéma en local |
+| `FOCO_REVIEW_EMAIL` | facultatif, défaut `revue-apple@astreinte-sp.fr` (`Config/Foco.xcconfig`, versionné : ce n'est pas un secret) ; la seule adresse connectée par mot de passe (§ 10, ticket 076). Vide : personne |
 
 - Les valeurs de dev sont celles de `env/dev.json` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`), ou la
   sortie de `supabase status`. Celles de production, celles de `env/prod.json`.
@@ -899,3 +900,139 @@ standard) : TestFlight ne redemande pas la conformité export à chaque build.
   installer depuis l'app TestFlight de l'iPhone. Écrire « À tester » à la main si le `changelog`
   n'a pas été donné ou n'a pas pu être écrit.
 - **Passer en App Store** (hors ticket 067) : fiche publique, captures, confidentialité, revue.
+
+### Testeurs externes (ticket 076)
+
+Un testeur **externe** (hors du compte Apple du propriétaire) reçoit l'app par le groupe
+« Testeurs externes », par **lien public** (plafond 100) ou par invitation. Chaque première build
+d'une version passe la **revue bêta d'Apple**, qui exige un accès de démonstration : d'où la
+caserne de démonstration et la connexion de revue.
+
+**La caserne de démonstration** — `supabase/scripts/caserne_demo.sql`, rejouable, **pas une
+migration** (ce sont des données). Elle crée ou remet à zéro « CIS Démonstration » (identifiant
+fixe `de300000-0000-4000-8000-000000000001`, slug `demonstration`) et rien d'autre :
+
+- dix membres : le compte de revue `revue-apple@astreinte-sp.fr` (**simple membre**, adresse
+  confirmée), une cheffe fictive (admin) et huit membres fictifs. Les fictifs n'ont **qu'un
+  profil, sans compte d'authentification**, et une adresse en `.invalid` (RFC 2606, RFC 6761) :
+  personne ne peut s'y connecter, et `sendMail` (`supabase/functions/_shared/mailer.ts`) ne leur
+  écrit jamais (voir « Courriels » plus bas) ;
+- mois courant : planning validé, tout accepté ; M+1 : saisie verrouillée, planning publié,
+  **propositions en attente** pour le compte de revue, marquées comme déjà relancées
+  (`reminder_count = 2`, `last_reminder_at` à l'instant du passage : aucun palier de
+  `cron_assignment_reminders` n'est dû, un rejeu ne relance personne) ; M+2 : saisie ouverte ;
+  deux notifications dans son centre ;
+- abonnement `active` sans date de fin : jamais de lecture seule.
+
+Le script refuse de tourner si le slug appartient à une autre caserne. Pour supprimer un planning
+publié, il lève deux gardes (`schedules_guard_suppression`, `shifts_guard_suppression`) et
+l'audit de suppression des mois **dans sa transaction** : le DDL est transactionnel, aucune autre
+session ne les voit levées, la RLS ne change pas. En revanche `alter table … disable trigger`
+prend un **verrou exclusif** sur `schedules`, `shifts` et `periods` jusqu'au commit (une ou deux
+secondes) : toute lecture de ces tables attend. **Lancer le script hors des heures d'usage.** Vérifié en local (`supabase db reset`, deux
+passages, empreinte des autres casernes identique) puis en production le 3 octobre 2026.
+
+```sh
+# Avant chaque revue bêta, pour rafraîchir les dates (M, M+1, M+2) :
+supabase db query --linked --project-ref axvflcgwsmrjrnjheoly -f supabase/scripts/caserne_demo.sql
+# En local (la CLI refuse plusieurs commandes en --local) :
+psql "$(supabase status -o json | jq -r .DB_URL)" -v ON_ERROR_STOP=1 -f supabase/scripts/caserne_demo.sql
+```
+
+Le compte de revue survit à la remise à zéro, mot de passe compris. Ce mot de passe est dans
+**1Password** (coffre Static Flow, « Astreinte SP — compte de revue Apple », champs `username` et
+`password`, ID `pw4q4mo6ol6anbl6kwlnamtvby`) et **nulle part ailleurs** : jamais dans le dépôt,
+jamais transmis à Apple par un agent. Pour le poser ou le changer, l'API d'administration Auth,
+la clé de service lue dans une variable et jamais affichée :
+
+```sh
+REF=axvflcgwsmrjrnjheoly
+SRK=$(supabase projects api-keys --project-ref $REF -o json | jq -r '.[] | select(.name=="service_role") | .api_key')
+UID_=$(supabase db query --linked --project-ref $REF "select id from auth.users where email='revue-apple@astreinte-sp.fr'" | jq -r '.rows[0].id')
+op read "op://Static Flow/pw4q4mo6ol6anbl6kwlnamtvby/password" | jq -Rc '{password: .}' \
+  | curl -s -o /dev/null -w '%{http_code}\n' -X PUT "https://$REF.supabase.co/auth/v1/admin/users/$UID_" \
+      -H "apikey: $SRK" -H "Authorization: Bearer $SRK" -H 'Content-Type: application/json' --data-binary @-
+unset SRK
+```
+
+**La connexion de revue, dans l'app** — `FOCO_REVIEW_EMAIL` (§ 2) : quand l'adresse saisie lui
+est égale (casse et espaces ignorés), l'écran de connexion affiche un champ mot de passe et appelle
+`signInWithPassword` au lieu d'envoyer un code. Toute autre adresse garde le code, inchangé ; sans
+adresse configurée, personne n'a de mot de passe, et `AppStore.signIn(email:password:)` refuse le
+mot de passe à toute autre adresse avant le réseau. La session, le trousseau et la déconnexion
+(`LocalWipe`) sont ceux du code.
+
+> **Écart au contrat de la PWA** (le seul de l'app iOS sur l'authentification) : un appel Auth
+> `POST /auth/v1/token?grant_type=password`, que la PWA ne fait jamais. Raison : le relecteur
+> d'Apple ne peut pas lire un code envoyé par courriel, et la revue bêta exige un accès de
+> démonstration. Aucune table, colonne ni fonction nouvelle ; la base accepte déjà le mot de passe
+> (fournisseur e-mail de GoTrue) pour tout compte qui en a un ; l'app ne le propose qu'à
+> l'adresse de revue. La PWA n'est pas touchée.
+
+**App Store Connect** — `foco/scripts/testflight-externe.py` (clé API **Admin**, 1Password),
+idempotent :
+
+1. informations de test `fr-FR` : description, retours à `jonathan.lemaine78@gmail.com`,
+   confidentialité `https://astreinte.staticflow.ch/legal/confidentialite` ;
+2. détails de la revue bêta : contact Jonathan Lemaine, « connexion requise » cochée, notes en
+   anglais pour le relecteur. **Le script n'écrit jamais le nom d'utilisateur ni le mot de
+   passe.** Apple refuse toute écriture de ces détails sans **téléphone de contact** (HTTP 409,
+   relevé au build 107) : sans `CONTACT_PHONE` ni téléphone déjà saisi dans App Store Connect, le
+   script ne les écrit pas, le dit et poursuit ; un téléphone saisi à la main est repris tel quel ;
+3. groupe externe « Testeurs externes » : retours activés, lien public avec plafond 100 (si Apple
+   le refuse avant la première revue acceptée, le script le dit et le prochain passage l'active) ;
+4. le dernier build traité (ou `--build N`) ajouté au groupe ;
+5. `--soumettre` : soumission à la revue bêta, **refusée par le script** tant que le téléphone et
+   les identifiants de démonstration ne sont pas saisis dans App Store Connect.
+
+```sh
+cd foco
+I=gjbku4bzm4xghk4ap5xbaz4qce   # « Astreinte SP — App Store Connect API Admin (CI) »
+ASC_KEY_ID=$(op read "op://Static Flow/$I/Key ID") ASC_ISSUER_ID=$(op read "op://Static Flow/$I/Issuer ID") \
+ASC_KEY="$(op read "op://Static Flow/$I/p8")" python3 scripts/testflight-externe.py [--build N] [--soumettre]
+```
+
+Le workflow le fait aussi : `-f externe=true` attend le traitement du build et l'ajoute au groupe ;
+`-f soumettre=true` le soumet en plus (même garde). L'étape est en `continue-on-error` (un échec
+ne défait pas l'envoi) : son issue réelle (`steps.externe.outcome`) est écrite dans le résumé de
+la course, où un échec se lit en clair. Premier build externe : **1.0 (107)**, course
+[TestFlight n° 7](https://github.com/slider973/Foco/actions/runs/37119547344), ajouté au groupe le
+3 octobre 2026, état `READY_FOR_BETA_SUBMISSION` (non soumis : identifiants à saisir).
+
+```sh
+gh workflow run testflight.yml -R slider973/Foco -f changelog="…" -f externe=true [-f soumettre=true]
+```
+
+**Ce qui reste manuel** :
+
+- **Une fois, par le propriétaire** : dans App Store Connect → app Astreinte SP → TestFlight →
+  *Informations de test* (*Test Information*), section *Informations sur la revue bêta de l'app* :
+  le **téléphone** de contact, puis « Connexion requise » cochée avec le **nom d'utilisateur** et
+  le **mot de passe** de l'item 1Password « Astreinte SP — compte de revue Apple ». Enregistrer.
+  Ensuite `python3 scripts/testflight-externe.py --build 107 --soumettre` : il écrit le contact,
+  les notes et la case, garde téléphone et identifiants, puis soumet.
+- **Le lien public** (`https://testflight.apple.com/join/1srwe1VG`, plafond 100) existe depuis le
+  3 octobre 2026 ; il n'admet des testeurs qu'une fois la revue bêta acceptée. Le script le
+  réimprime à chaque passage.
+- **Avant chaque revue** (nouvelle version) : rejouer `caserne_demo.sql` pour des dates fraîches.
+- **Redirection OVH à créer par le propriétaire** : `revue-apple@astreinte-sp.fr` n'a pas de
+  boîte. Créer chez OVH (domaine `astreinte-sp.fr` → *E-mails* → *Redirections*) une redirection
+  vers sa boîte personnelle. Sans elle, les courriels envoyés au compte de revue (rappel de saisie
+  à J-1, repli courriel faute d'appareil) **rebondissent**. L'adresse ne change pas : c'est celle
+  donnée à Apple.
+
+**Courriels** — Le 3 octobre 2026, la caserne de démonstration a fait partir **11 courriels par
+Resend**, 10 vers `*@demo.astreinte-sp.invalid` et 1 vers le compte de revue, soit la moitié du
+volume de la production ce jour-là, tous en rebond : un risque de suspension du compte Resend, qui
+porte aussi les invitations. Causes : les profils fictifs n'ont aucun appareil, donc le push se
+replie sur le courriel (`_shared/notification_send.ts`) ; les paliers `email` des relances et du
+rappel J-1 (`0033`) ; `late_responders` vers la cheffe fictive ; un refus prévient les admins
+(`0039`) ; et chaque rejeu du script remettait les propositions à zéro relance. Corrections :
+
+- `sendMail` refuse toute adresse dont le domaine est `invalid` ou finit par `.invalid`, **avant**
+  d'appeler un fournisseur : `{ sent: false, provider: "none", error: "adresse non distribuable
+  (.invalid)" }`, tracé dans la ligne `email` de `notifications`. La ligne `inapp`, écrite pour
+  tous ces types, suffit à servir la demande (`resultat.ok`) : pas de reprise en boucle
+  (`tests/mailer_test.ts`, `tests/notification_send_test.ts`) ;
+- le script marque M+1 comme déjà relancé (plus haut) ;
+- le compte de revue reçoit encore ce qui lui est destiné : c'est la redirection OVH qui l'absorbe.
