@@ -914,17 +914,22 @@ fixe `de300000-0000-4000-8000-000000000001`, slug `demonstration`) et rien d'aut
 
 - dix membres : le compte de revue `revue-apple@astreinte-sp.fr` (**simple membre**, adresse
   confirmée), une cheffe fictive (admin) et huit membres fictifs. Les fictifs n'ont **qu'un
-  profil, sans compte d'authentification**, et une adresse en `.invalid` : personne ne peut s'y
-  connecter et aucun courriel n'y arrive ;
+  profil, sans compte d'authentification**, et une adresse en `.invalid` (RFC 2606, RFC 6761) :
+  personne ne peut s'y connecter, et `sendMail` (`supabase/functions/_shared/mailer.ts`) ne leur
+  écrit jamais (voir « Courriels » plus bas) ;
 - mois courant : planning validé, tout accepté ; M+1 : saisie verrouillée, planning publié,
-  **propositions en attente** pour le compte de revue ; M+2 : saisie ouverte ; deux notifications
-  dans son centre ;
+  **propositions en attente** pour le compte de revue, marquées comme déjà relancées
+  (`reminder_count = 2`, `last_reminder_at` à l'instant du passage : aucun palier de
+  `cron_assignment_reminders` n'est dû, un rejeu ne relance personne) ; M+2 : saisie ouverte ;
+  deux notifications dans son centre ;
 - abonnement `active` sans date de fin : jamais de lecture seule.
 
 Le script refuse de tourner si le slug appartient à une autre caserne. Pour supprimer un planning
 publié, il lève deux gardes (`schedules_guard_suppression`, `shifts_guard_suppression`) et
 l'audit de suppression des mois **dans sa transaction** : le DDL est transactionnel, aucune autre
-session ne les voit levées, la RLS ne change pas. Vérifié en local (`supabase db reset`, deux
+session ne les voit levées, la RLS ne change pas. En revanche `alter table … disable trigger`
+prend un **verrou exclusif** sur `schedules`, `shifts` et `periods` jusqu'au commit (une ou deux
+secondes) : toute lecture de ces tables attend. **Lancer le script hors des heures d'usage.** Vérifié en local (`supabase db reset`, deux
 passages, empreinte des autres casernes identique) puis en production le 3 octobre 2026.
 
 ```sh
@@ -988,7 +993,9 @@ ASC_KEY="$(op read "op://Static Flow/$I/p8")" python3 scripts/testflight-externe
 ```
 
 Le workflow le fait aussi : `-f externe=true` attend le traitement du build et l'ajoute au groupe ;
-`-f soumettre=true` le soumet en plus (même garde). Premier build externe : **1.0 (107)**, course
+`-f soumettre=true` le soumet en plus (même garde). L'étape est en `continue-on-error` (un échec
+ne défait pas l'envoi) : son issue réelle (`steps.externe.outcome`) est écrite dans le résumé de
+la course, où un échec se lit en clair. Premier build externe : **1.0 (107)**, course
 [TestFlight n° 7](https://github.com/slider973/Foco/actions/runs/37119547344), ajouté au groupe le
 3 octobre 2026, état `READY_FOR_BETA_SUBMISSION` (non soumis : identifiants à saisir).
 
@@ -1008,5 +1015,24 @@ gh workflow run testflight.yml -R slider973/Foco -f changelog="…" -f externe=t
   3 octobre 2026 ; il n'admet des testeurs qu'une fois la revue bêta acceptée. Le script le
   réimprime à chaque passage.
 - **Avant chaque revue** (nouvelle version) : rejouer `caserne_demo.sql` pour des dates fraîches.
-- Les courriels automatiques de la caserne de démonstration (rappels, relances) partent vers le
-  compte de revue et des adresses `.invalid` : sans effet, aucune vraie personne n'est concernée.
+- **Redirection OVH à créer par le propriétaire** : `revue-apple@astreinte-sp.fr` n'a pas de
+  boîte. Créer chez OVH (domaine `astreinte-sp.fr` → *E-mails* → *Redirections*) une redirection
+  vers sa boîte personnelle. Sans elle, les courriels envoyés au compte de revue (rappel de saisie
+  à J-1, repli courriel faute d'appareil) **rebondissent**. L'adresse ne change pas : c'est celle
+  donnée à Apple.
+
+**Courriels** — Le 3 octobre 2026, la caserne de démonstration a fait partir **11 courriels par
+Resend**, 10 vers `*@demo.astreinte-sp.invalid` et 1 vers le compte de revue, soit la moitié du
+volume de la production ce jour-là, tous en rebond : un risque de suspension du compte Resend, qui
+porte aussi les invitations. Causes : les profils fictifs n'ont aucun appareil, donc le push se
+replie sur le courriel (`_shared/notification_send.ts`) ; les paliers `email` des relances et du
+rappel J-1 (`0033`) ; `late_responders` vers la cheffe fictive ; un refus prévient les admins
+(`0039`) ; et chaque rejeu du script remettait les propositions à zéro relance. Corrections :
+
+- `sendMail` refuse toute adresse dont le domaine est `invalid` ou finit par `.invalid`, **avant**
+  d'appeler un fournisseur : `{ sent: false, provider: "none", error: "adresse non distribuable
+  (.invalid)" }`, tracé dans la ligne `email` de `notifications`. La ligne `inapp`, écrite pour
+  tous ces types, suffit à servir la demande (`resultat.ok`) : pas de reprise en boucle
+  (`tests/mailer_test.ts`, `tests/notification_send_test.ts`) ;
+- le script marque M+1 comme déjà relancé (plus haut) ;
+- le compte de revue reçoit encore ce qui lui est destiné : c'est la redirection OVH qui l'absorbe.
