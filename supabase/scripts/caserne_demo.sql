@@ -27,6 +27,11 @@
 --     levées le temps de la transaction (DDL transactionnel, personne d'autre
 --     ne les voit levées), parce qu'un planning publié ne se supprime pas
 --     autrement — c'est voulu pour une vraie caserne, pas pour celle-ci.
+--     `alter table … disable trigger` prend un verrou exclusif sur schedules,
+--     shifts et periods jusqu'au commit (une ou deux secondes) : lancer le
+--     script hors des heures d'usage ;
+--   - courriels : les adresses `.invalid` ne partent jamais (filtre de
+--     `_shared/mailer.ts`) ; la ligne interne suffit à servir la demande.
 --
 -- Contenu, recalculé depuis now() à chaque passage :
 --   - mois courant : planning validé, toutes les astreintes acceptées ;
@@ -284,8 +289,14 @@ on conflict (station_id, user_id, date, slot) do nothing;
 
 -- M : tout accepté. M+1 : le compte de revue a tout « proposé » ; les autres
 -- ont répondu pour les deux tiers.
+--
+-- Relances (cron_assignment_reminders, 0021/0033) : M+1 est marqué comme déjà
+-- relancé deux fois, à l'instant du passage. Avec 0, le palier push serait dû
+-- (proposed_at a dix jours) ; avec 1, le palier courriel (sa condition
+-- nominale est reminder_count = 1). Avec 2 et last_reminder_at = now(),
+-- aucun palier n'est dû : un rejeu du script ne relance personne.
 insert into assignments (station_id, shift_id, user_id, status, was_available,
-                         proposed_at, responded_at, created_by)
+                         proposed_at, responded_at, reminder_count, last_reminder_at, created_by)
 select c.station_id, a.shift_id, a.user_id,
        case
          when a.offset_m = 0 then 'accepted'
@@ -300,6 +311,8 @@ select c.station_id, a.shift_id, a.user_id,
          when a.ordinal = 0 or a.n % 3 = 0 then null
          else now() - interval '2 days'
        end,
+       case when a.offset_m = 1 then 2 else 0 end,
+       case when a.offset_m = 1 then now() end,
        c.chef_id
 from demo_assign a, demo_const c;
 
