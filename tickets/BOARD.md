@@ -6,6 +6,7 @@ Généré par `scripts/ticket.sh board` le 2026-10-03. Ne pas éditer à la main
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
+| 076 | [Ouvrir l'app iOS à des testeurs externes par TestFlight](in-progress/076-testflight-testeurs-externes.md) | P1 | 067 071 | — |
 
 ## À faire
 
@@ -15,7 +16,6 @@ Généré par `scripts/ticket.sh board` le 2026-10-03. Ne pas éditer à la main
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 072 | [Un pompier dans plusieurs casernes, de bout en bout](backlog/072-plusieurs-casernes.md) | P1 | 070 071 | — |
 | 073 | [Échanger ou céder une astreinte entre pompiers](backlog/073-echange-astreintes.md) | P1 | 070 071 072 | — |
-| 076 | [Ouvrir l'app iOS à des testeurs externes par TestFlight](backlog/076-testflight-testeurs-externes.md) | P1 | 067 071 | — |
 
 ## Terminés
 

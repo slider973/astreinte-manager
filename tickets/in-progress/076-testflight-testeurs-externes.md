@@ -5,7 +5,7 @@
 - **Dépend de** : 067, 071
 - **Branche** : `feat/076-testflight-testeurs-externes`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-10-03
 
 ## Contexte
 
