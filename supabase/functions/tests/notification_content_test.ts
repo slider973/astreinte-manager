@@ -670,3 +670,19 @@ Deno.test("échange : aucun type d'échange n'est regroupé ni critique", () => 
     assertEquals(CANAUX_PAR_DEFAUT[type], ["push", "inapp"]);
   }
 });
+
+Deno.test("échange : deux demandes du même mois ne se remplacent pas sur l'écran verrouillé", () => {
+  const a = etiquette(
+    "exchange_requested",
+    { ...ECHANGE, exchange_id: "aaaaaaaa-1111" },
+    "c1c1c1c1-x",
+  );
+  const b = etiquette(
+    "exchange_requested",
+    { ...ECHANGE, exchange_id: "bbbbbbbb-2222" },
+    "c1c1c1c1-x",
+  );
+  assert(a !== b, "deux demandes, deux étiquettes");
+  assertEquals(a, "exchange_requested:aaaaaaaa:c1c1c1c1");
+  assert(new TextEncoder().encode(a).length <= 64, "sous la limite d'apns-collapse-id");
+});

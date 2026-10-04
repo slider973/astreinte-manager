@@ -1049,7 +1049,9 @@ utile commune des cinq types d'échange est composée en base par `exchange_payl
 échec (`reason_code` d'une demande `failed`) est traduit par `MOTIFS_ECHEC_ECHANGE`, dont la liste
 est exactement celle de la contrainte `shift_exchanges_reason_code` — un test Deno le vérifie. Tant
 que les clients ne connaissent pas ces deux liens, ils retombent sur l'accueil sans message (règle
-du § 8 de `docs/WORKFLOWS.md`).
+du § 8 de `docs/WORKFLOWS.md`). Leur étiquette de regroupement porte **l'identifiant de la demande**
+au lieu du mois (`exchange_requested:<8>:<caserne 8>`) : deux demandes du même mois sont deux faits,
+elles ne se remplacent pas sur l'écran verrouillé.
 
 `/connexion` est une cinquième forme, que `destination_push.dart` ne connaît pas et rejette : un
 push la portant n'ouvrirait rien. C'est sans conséquence parce que `invitation` ne part que par

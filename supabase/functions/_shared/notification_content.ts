@@ -989,8 +989,16 @@ export function etiquette(
   payload: ChargeUtile,
   stationId?: string | null,
 ): string {
+  // Une demande d'échange est un fait à elle seule (ticket 073) : deux demandes
+  // du même mois ne se remplacent pas, elles appellent deux réponses. Son
+  // identifiant tient lieu de mois. « exchange_requested:<8>:<8> » : 36 octets.
+  const echange = type.startsWith("exchange_") ? texte(payload, "exchange_id") : null;
   const periode = lirePeriode(payload);
-  const base = periode ? `${type}:${periode}` : type;
+  const base = echange
+    ? `${type}:${echange.toLowerCase().slice(0, 8)}`
+    : periode
+    ? `${type}:${periode}`
+    : type;
   const caserne = stationId?.trim().toLowerCase().slice(0, 8);
   return caserne ? `${base}:${caserne}` : base;
 }
