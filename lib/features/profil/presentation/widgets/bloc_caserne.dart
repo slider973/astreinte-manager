@@ -1,14 +1,18 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../../../core/l10n/app_strings.dart';
-import '../../../../core/session/appartenance.dart';
+import '../../../../core/l10n/format_date.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/session/caserne_choisie.dart';
 import '../../../../core/session/session_providers.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_divider.dart';
+import '../../../../core/widgets/liste_casernes.dart';
+import '../../../invitation/domain/invitation_providers.dart';
+import '../../../invitation/domain/invitation_recue.dart';
 import 'bloc_regle.dart';
 
 /// La caserne où l'on travaille, et le moyen d'en changer quand il y en a
@@ -23,7 +27,6 @@ class BlocCaserne extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final courante = ref.watch(appartenanceCouranteProvider);
-    final actives = ref.watch(appartenancesActivesProvider);
     final plusieurs = ref.watch(plusieursCasernesProvider);
 
     return BlocRegle(
@@ -47,23 +50,23 @@ class BlocCaserne extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           const AppDivider(),
           const SizedBox(height: AppSpacing.lg),
-          _Selecteur(appartenances: actives, courante: courante),
+          const _Selecteur(),
         ],
+        const SizedBox(height: AppSpacing.sm),
+        const _Invitations(),
       ],
     );
   }
 }
 
-/// Un groupe de boutons radio, **jamais un menu déroulant** : deux ou trois
-/// entrées tiennent à l'écran, et un menu cache jusqu'à l'existence du choix.
-class _Selecteur extends ConsumerWidget {
-  const _Selecteur({required this.appartenances, required this.courante});
-
-  final List<Appartenance> appartenances;
-  final Appartenance? courante;
+/// Le choix, partagé avec la feuille de l'accueil et le menu du grand écran
+/// (`ListeCasernes`, ticket 072). Un groupe de boutons radio, **jamais un menu
+/// déroulant** : deux ou trois entrées tiennent à l'écran.
+class _Selecteur extends StatelessWidget {
+  const _Selecteur();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Column(
@@ -84,51 +87,93 @@ class _Selecteur extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        // `RadioGroup` porte la valeur et le geste pour tout le groupe : les
-        // tuiles n'ont plus qu'à se nommer.
-        RadioGroup<String>(
-          groupValue: courante?.stationId,
-          onChanged: (String? stationId) {
-            if (stationId == null) return;
-            unawaited(
-              ref.read(caserneChoisieProvider.notifier).choisir(stationId),
-            );
-          },
-          child: Column(
-            children: <Widget>[
-              for (final appartenance in appartenances)
-                _Choix(
-                  appartenance: appartenance,
-                  choisie: appartenance.stationId == courante?.stationId,
-                ),
-            ],
-          ),
-        ),
+        const ListeCasernes(avecInvitations: false),
       ],
     );
   }
 }
 
-class _Choix extends StatelessWidget {
-  const _Choix({required this.appartenance, required this.choisie});
-
-  final Appartenance appartenance;
-  final bool choisie;
+/// **Les invitations d'un membre déjà rattaché** (ticket 072,
+/// `design/072 § 6.5`) : une ligne par invitation, l'expirée dite avec sa
+/// sortie, l'échec de lecture dit avec « Réessayer ». Rien n'est gardé sur
+/// l'appareil (`invitationsRecuesProvider`).
+class _Invitations extends ConsumerWidget {
+  const _Invitations();
 
   @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      // La caserne active porte `selected`, pas seulement une couleur : l'état
-      // n'est jamais porté par la seule teinte (`DESIGN.md § Do's`).
-      selected: choisie,
-      child: RadioListTile<String>(
-        value: appartenance.stationId,
-        title: Text(appartenance.nomCaserne),
-        subtitle: Text(AppStrings.profilCaserneRole(appartenance.role.libelle)),
-        contentPadding: EdgeInsets.zero,
-        // 48 dp au minimum, comme toute cible de cet écran.
-        visualDensity: VisualDensity.standard,
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final lecture = ref.watch(invitationsRecuesProvider);
+    final style = theme.textTheme.bodyMedium;
+
+    if (lecture.hasError && !lecture.isLoading) {
+      return Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(AppStrings.profilInvitationsEchec, style: style),
+          ),
+          TextButton(
+            onPressed: () => ref.invalidate(invitationsRecuesProvider),
+            child: const Text(AppStrings.actionReessayer),
+          ),
+        ],
+      );
+    }
+
+    final invitations = lecture.value ?? const <InvitationRecue>[];
+    if (invitations.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (final invitation in invitations)
+          if (invitation.expiree)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Text(
+                AppStrings.profilInvitationExpiree(invitation.caserne),
+                style: style?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: AppTouch.cible),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      AppStrings.profilInvitationLigne(
+                        invitation.caserne,
+                        formaterDateLongueSansAnnee(invitation.echeance),
+                      ),
+                      style: style,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  TextButton(
+                    onPressed: () => context.goNamed(
+                      AppRoutes.rejoindreName,
+                      pathParameters: <String, String>{
+                        AppRoutes.parametreInvitation: invitation.id,
+                      },
+                    ),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(AppTouch.cible, AppTouch.cible),
+                    ),
+                    child: Text(
+                      AppStrings.caserneChoixInvitationAction,
+                      semanticsLabel:
+                          AppStrings.caserneChoixInvitationSemantique(
+                            invitation.caserne,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      ],
     );
   }
 }

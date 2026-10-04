@@ -111,7 +111,7 @@ class _AbonnementScreenState extends ConsumerState<AbonnementScreen> {
   @override
   Widget build(BuildContext context) {
     final admin = ref.watch(estAdminCaserneProvider);
-    final asynchrone = ref.watch(abonnementControllerProvider);
+    final asynchrone = ref.watch(abonnementOuvertProvider);
     final destinations = ref.watch(destinationsProvider);
 
     final vue = asynchrone.value;

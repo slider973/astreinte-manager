@@ -6,6 +6,7 @@ import '../theme/app_breakpoints.dart';
 import '../theme/app_spacing.dart';
 import 'app_banner.dart';
 import 'app_divider.dart';
+import 'bouton_caserne.dart';
 import 'colonne_navigation.dart';
 import 'entete_travail.dart';
 
@@ -145,6 +146,7 @@ class AppScaffold extends StatelessWidget {
     this.actionsEnTete = const <Widget>[],
     this.sansBarreApplication = false,
     this.fondDoux = false,
+    this.selecteurCaserne = false,
   });
 
   final String titre;
@@ -201,6 +203,12 @@ class AppScaffold extends StatelessWidget {
   /// se pose plus : c'est [EnTeteTravail] qui titre, et l'accueil n'affiche
   /// alors que la salutation.
   final bool sansBarreApplication;
+
+  /// **Une destination de premier niveau** (ticket 072) : dès `expanded`, le
+  /// titre de l'en-tête de travail devient le sélecteur de caserne quand la
+  /// personne en a plusieurs (`BoutonCaserne.titre`). Avec une seule caserne,
+  /// rien ne change : le titre reste un titre.
+  final bool selecteurCaserne;
 
   @override
   Widget build(BuildContext context) {
@@ -311,6 +319,12 @@ class AppScaffold extends StatelessWidget {
                 children: <Widget>[
                   EnTeteTravail(
                     titre: caserne ?? titre,
+                    titreActionnable: selecteurCaserne
+                        ? Align(
+                            alignment: Alignment.centerLeft,
+                            child: BoutonCaserne.titre(repli: caserne ?? titre),
+                          )
+                        : null,
                     actions: <Widget>[...?actions, ...actionsEnTete],
                   ),
                   const AppDivider(),

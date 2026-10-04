@@ -18,6 +18,7 @@ class Candidat {
     required this.membre,
     required this.disponibilite,
     this.attribution,
+    this.ailleurs = false,
   });
 
   final LigneMatrice membre;
@@ -27,6 +28,12 @@ class Candidat {
 
   /// Non nul quand le membre est déjà attribué à ce créneau.
   final Attribution? attribution;
+
+  /// **Astreinte ailleurs sur ce créneau** (ticket 072) : proposé ou accepté
+  /// dans une autre caserne sur un créneau qui chevauche. La proposition
+  /// automatique ne le choisit pas ; l'admin peut l'attribuer quand même, la
+  /// mention sous les yeux. Rien d'autre de l'autre caserne n'est connu.
+  final bool ailleurs;
 
   String get userId => membre.userId;
 
@@ -148,6 +155,7 @@ class PanneauCandidats {
           creneauId: creneau.id,
           userId: membre.userId,
         ),
+        ailleurs: membre.ailleurs(creneau.jour, creneau.creneau),
       );
 
       if (candidat.estAttribue) {
@@ -159,7 +167,13 @@ class PanneauCandidats {
       }
     }
 
-    disponibles.sort(comparerCandidats);
+    // Pris ailleurs : **en fin de section**, après tous les autres disponibles
+    // — le dernier qu'on dérange, et la machine ne le choisira pas (ticket
+    // 072, même logique que le quota négatif).
+    disponibles.sort((Candidat a, Candidat b) {
+      if (a.ailleurs != b.ailleurs) return a.ailleurs ? 1 : -1;
+      return comparerCandidats(a, b);
+    });
     nonDisponibles.sort(comparerCandidats);
     attribues.sort(comparerCandidats);
 

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/session/caserne_ouverte.dart';
 import '../../echanges/domain/echange.dart';
 import '../../echanges/domain/echanges_providers.dart';
 import '../../notifications/domain/centre_providers.dart';
@@ -190,8 +191,10 @@ EtatBoite etatBoiteDe({
 /// sources.
 final Provider<EtatBoite> etatBoiteProvider = Provider<EtatBoite>(
   (ref) => etatBoiteDe(
-    propositions: ref.watch(propositionsControllerProvider),
-    centre: ref.watch(centreNotificationsProvider),
+    propositions: caserneOuverteSeulement(ref, propositionsControllerProvider),
+    // Filtré par la caserne ouverte (ticket 072) : la Boîte est le journal
+    // d'un cadre, pas une vue consolidée.
+    centre: ref.watch(centreCaserneOuverteProvider),
     demandes: ref.watch(echangesRecusProvider),
   ),
 );

@@ -225,8 +225,10 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
       },
     );
 
-    final periodes = ref.watch(periodesProvider);
-    final saisie = ref.watch(saisieControllerProvider);
+    // La caserne ouverte seulement (ticket 072) : après une bascule, le
+    // squelette, jamais le mois de l'ancienne caserne.
+    final periodes = ref.watch(periodesOuvertesProvider);
+    final saisie = ref.watch(saisieOuverteProvider);
     final etat = saisie.value;
     _saisie = ref.read(saisieControllerProvider.notifier);
 
@@ -238,6 +240,8 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     final destinations = ref.watch(destinationsProvider);
 
     return AppScaffold(
+      // Sur grand écran, le nom de la caserne devient le sélecteur (072).
+      selecteurCaserne: true,
       titre: AppStrings.navCalendrier,
       destinations: destinations,
       indexSelectionne: indexDestination(

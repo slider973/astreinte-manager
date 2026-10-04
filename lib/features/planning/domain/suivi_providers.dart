@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/fraicheur/relecture.dart';
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
@@ -433,13 +434,21 @@ final AsyncNotifierProvider<SuiviController, EtatSuivi?> suiviControllerProvider
       isAutoDispose: true,
     );
 
+/// La même source, sans rien de ce qui a été lu dans une autre caserne
+/// (ticket 072, `core/session/caserne_ouverte.dart`) : après une bascule entre
+/// deux casernes administrées, l'écran montre son squelette, jamais les lignes
+/// de l'ancienne.
+final Provider<AsyncValue<EtatSuivi?>> suiviOuvertProvider =
+    dansLaCaserneOuverte(suiviControllerProvider, autoDispose: true);
+
+
 /// Les journées du mois, construites **une fois par état** et mémorisées.
 ///
 /// La liste est virtualisée ; le tri de soixante-deux créneaux n'a aucune
 /// raison de se refaire à chaque image de défilement.
 final Provider<List<JourneeSuivi>> journeesSuiviProvider =
     Provider<List<JourneeSuivi>>((ref) {
-      final etat = ref.watch(suiviControllerProvider).value;
+      final etat = caserneOuverteSeulement(ref, suiviControllerProvider).value;
       if (etat == null || !etat.suivi.existe) return const <JourneeSuivi>[];
       return etat.suivi.journees();
     });
@@ -469,7 +478,7 @@ final Provider<List<JourneeSuivi>> journeesVisiblesProvider =
 /// Le compte affiché dans chaque puce de filtre.
 final Provider<Map<FiltreSuivi, int>> comptesSuiviProvider =
     Provider<Map<FiltreSuivi, int>>((ref) {
-      final etat = ref.watch(suiviControllerProvider).value;
+      final etat = caserneOuverteSeulement(ref, suiviControllerProvider).value;
       final journees = ref.watch(journeesSuiviProvider);
       if (etat == null) return const <FiltreSuivi, int>{};
       return <FiltreSuivi, int>{
@@ -481,7 +490,7 @@ final Provider<Map<FiltreSuivi, int>> comptesSuiviProvider =
 /// Les retardataires, recalculés à chaque changement d'état.
 final Provider<List<Retardataire>> retardatairesProvider =
     Provider<List<Retardataire>>((ref) {
-      final etat = ref.watch(suiviControllerProvider).value;
+      final etat = caserneOuverteSeulement(ref, suiviControllerProvider).value;
       if (etat == null || !etat.suivi.existe) return const <Retardataire>[];
       return etat.suivi.retardataires();
     });

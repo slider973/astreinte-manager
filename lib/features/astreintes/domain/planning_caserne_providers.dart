@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../data/cache_planning_caserne.dart';
@@ -334,3 +335,8 @@ planningCaserneControllerProvider =
     AsyncNotifierProvider<PlanningCaserneController, EtatPlanningCaserne>(
       PlanningCaserneController.new,
     );
+
+/// La même source, sans rien de ce qui a été lu dans une autre caserne
+/// (ticket 072, `core/session/caserne_ouverte.dart`).
+final Provider<AsyncValue<EtatPlanningCaserne>> planningCaserneOuvertProvider =
+    dansLaCaserneOuverte(planningCaserneControllerProvider);

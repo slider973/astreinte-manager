@@ -39,6 +39,7 @@ import '../../propositions/domain/propositions_providers.dart';
 import '../../propositions/presentation/widgets/feuille_refus.dart';
 import '../domain/composition_boite.dart';
 import '../domain/onglet_boite.dart';
+import 'widgets/carte_passerelle.dart';
 import 'widgets/liste_boite.dart';
 import 'widgets/panneau_reponse.dart';
 import 'widgets/squelette_boite.dart';
@@ -402,7 +403,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
     // déduit d'un refus du serveur. La seconde reste le filet — une Boîte
     // ouverte depuis dix minutes peut avoir manqué une suspension.
     final lectureSeule =
-        (ref.watch(propositionsControllerProvider).value?.lectureSeule ??
+        (ref.watch(propositionsOuvertesProvider).value?.lectureSeule ??
             false) ||
         ref.watch(lectureSeuleCaserneProvider);
     final raisonBlocage = _raisonBlocage(
@@ -413,6 +414,8 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
     final grand = AppWindowClass.of(context).estLarge;
 
     return AppScaffold(
+      // Sur grand écran, le nom de la caserne devient le sélecteur (072).
+      selecteurCaserne: true,
       titre: AppStrings.boiteTitre(etat.nonLus),
       destinations: destinations,
       indexSelectionne: indexDestination(destinations, AppRoutes.boiteName),
@@ -442,6 +445,10 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
       child: Column(
         children: <Widget>[
           _BarreOnglets(controleur: _onglets),
+          // **Les autres casernes qui attendent** (ticket 072) : la Boîte ne
+          // montre que la caserne ouverte, la passerelle empêche l'oubli. Pas
+          // sur « Propositions » : elle ne parle que de rappels non lus.
+          if (widget.onglet != OngletBoite.propositions) const Passerelles(),
           Expanded(
             child: _corps(etat: etat, raisonBlocage: raisonBlocage),
           ),
@@ -503,7 +510,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
         raisonBlocage: _raisonBlocage(
           enLigne: ref.watch(enLigneProvider).value ?? true,
           lectureSeule:
-              (ref.watch(propositionsControllerProvider).value?.lectureSeule ??
+              (ref.watch(propositionsOuvertesProvider).value?.lectureSeule ??
                   false) ||
               ref.watch(lectureSeuleCaserneProvider),
         ),
@@ -522,7 +529,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
   /// `settings` — exactement ce que `lireHeuresAffichage` rend elle-même quand
   /// la caserne est illisible.
   HeuresAffichage _heures() =>
-      ref.watch(astreintesControllerProvider).value?.donnees.heures ??
+      ref.watch(astreintesOuvertesProvider).value?.donnees.heures ??
       HeuresAffichage.defaut;
 
   String? _raisonBlocage({required bool enLigne, required bool lectureSeule}) {

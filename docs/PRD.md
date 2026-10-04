@@ -158,7 +158,15 @@ Une caserne peut avoir plusieurs admins. Un admin est aussi membre et peut être
 - Pas de mot de passe. Pas d'OAuth au MVP.
 - Session longue durée sur mobile (refresh token), déconnexion explicite.
 - Un utilisateur peut appartenir à plusieurs casernes (rare, mais possible dans les
-  regroupements). Un sélecteur de caserne apparaît dans ce cas.
+  regroupements). Un sélecteur de caserne apparaît dans ce cas, sous la salutation de l'accueil
+  (le titre de l'en-tête sur grand écran) et au Profil ; une invitation d'une autre caserne se
+  voit sur l'accueil. Décisions du propriétaire du 28 septembre 2026 (ticket 072) :
+  1. le planning automatique ne propose pas quelqu'un déjà proposé ou d'astreinte dans une autre
+     caserne sur un créneau qui chevauche ; l'admin voit « Astreinte ailleurs » sans rien apprendre
+     d'autre de l'autre caserne, et peut l'attribuer à la main quand même ;
+  2. une notification ou un lien d'une autre caserne fait basculer l'application vers elle, et un
+     bandeau dit quelle caserne est ouverte (`docs/WORKFLOWS.md § 8`). La Boîte ne montre que la
+     caserne ouverte, et dit combien de non-lues attendent dans l'autre.
 
 ### 6.2 Caserne et membres
 - Une caserne a un nom, un fuseau horaire, des paramètres et un abonnement.

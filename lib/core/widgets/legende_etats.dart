@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
+
 import '../theme/app_spacing.dart';
 import '../theme/app_status.dart';
 import '../theme/app_typography.dart';
@@ -139,4 +141,26 @@ class _Entree extends StatelessWidget {
       ],
     );
   }
+}
+
+/// **L'entrée « Astreinte ailleurs »** de la légende (ticket 072) : une case
+/// à coin rabattu et son mot. Elle n'apparaît que si le mois en contient au
+/// moins une — c'est à l'appelant d'en décider.
+class LegendeAilleurs extends StatelessWidget {
+  const LegendeAilleurs({super.key});
+
+  @override
+  Widget build(BuildContext context) => const Tooltip(
+    message: AppStrings.matriceCaseAilleursInfobulle,
+    child: _Entree(
+      libelle: AppStrings.matriceLegendeAilleurs,
+      marque: SlotChip(
+        etat: DisponibiliteEtat.disponible,
+        creneau: CreneauType.jour,
+        densite: SlotChipDensite.dense,
+        ailleurs: true,
+        libelleSemantique: AppStrings.matriceLegendeAilleurs,
+      ),
+    ),
+  );
 }

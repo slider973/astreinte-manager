@@ -21,7 +21,11 @@ abstract interface class NotificationsRepository {
   Future<DateTime?> marquerLue(String id);
 
   /// Marque lues toutes les non-lues du membre. Rend leur nombre.
-  Future<int> toutMarquerLu(String userId);
+  ///
+  /// Avec [stationId] (ticket 072), seulement celles de cette caserne et
+  /// celles sans caserne : ce que la Boîte montre. Jamais l'autre caserne en
+  /// silence.
+  Future<int> toutMarquerLu(String userId, {String? stationId});
 }
 
 /// Implémentation Supabase.
@@ -42,7 +46,7 @@ class SupabaseNotificationsRepository implements NotificationsRepository {
   /// elle n'est pas demandée. `sent_at` et `delivered` tracent l'envoi et
   /// n'ont aucun lecteur ici.
   static const String _colonnes =
-      'id, type, title, body, data, read_at, error, created_at';
+      'id, station_id, type, title, body, data, read_at, error, created_at';
 
   /// Le plafond de lecture.
   ///
@@ -84,18 +88,23 @@ class SupabaseNotificationsRepository implements NotificationsRepository {
         .select('read_at');
 
     if (lignes.isEmpty) return null;
-    return DateTime.tryParse(lignes.first['read_at'] as String? ?? '')
-        ?.toLocal();
+    return DateTime.tryParse(
+      lignes.first['read_at'] as String? ?? '',
+    )?.toLocal();
   }
 
   @override
-  Future<int> toutMarquerLu(String userId) async {
-    final lignes = await _client
+  Future<int> toutMarquerLu(String userId, {String? stationId}) async {
+    var requete = _client
         .from('notifications')
         .update(<String, dynamic>{'read_at': _maintenant()})
         .eq('user_id', userId)
         .eq('channel', 'inapp')
-        .isFilter('read_at', null)
+        .isFilter('read_at', null);
+    if (stationId != null) {
+      requete = requete.or('station_id.eq.$stationId,station_id.is.null');
+    }
+    final lignes = await requete
         // La relecture n'est pas décorative : une politique `using` qui ne
         // matche pas **ne lève rien**, elle filtre. Sans elle, l'écran dirait
         // « c'est fait » sans que rien ne le soit.

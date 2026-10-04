@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/fraicheur/relecture.dart';
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
@@ -349,12 +350,25 @@ propositionsControllerProvider =
       PropositionsController.new,
     );
 
+/// La même source, **sans rien de ce qui a été lu dans une autre caserne**
+/// (ticket 072, `core/session/caserne_ouverte.dart`). C'est elle que les écrans
+/// lisent : après une bascule, ils montrent leur squelette jusqu'à la première
+/// réponse de la nouvelle caserne, jamais les lignes de l'ancienne.
+final Provider<AsyncValue<EtatPropositions>> propositionsOuvertesProvider =
+    dansLaCaserneOuverte(propositionsControllerProvider);
+
+
 /// Le nombre affiché par la pastille de l'onglet « Propositions ».
 ///
 /// Zéro tant que la liste n'est pas arrivée : une pastille qui apparaît vaut
 /// mieux qu'une pastille qui ment.
 final Provider<int> propositionsEnAttenteProvider = Provider<int>(
-  (ref) => ref.watch(propositionsControllerProvider).value?.enAttente ?? 0,
+  (ref) =>
+      caserneOuverteSeulement(
+        ref,
+        propositionsControllerProvider,
+      ).value?.enAttente ??
+      0,
 );
 
 /// Les éléments réellement affichés — en-têtes de mois compris — construits
@@ -362,7 +376,10 @@ final Provider<int> propositionsEnAttenteProvider = Provider<int>(
 /// n'a aucune raison de se refaire à chaque image de défilement.
 final Provider<List<ElementListe>> elementsPropositionsProvider =
     Provider<List<ElementListe>>((ref) {
-      final etat = ref.watch(propositionsControllerProvider).value;
+      final etat = caserneOuverteSeulement(
+        ref,
+        propositionsControllerProvider,
+      ).value;
       if (etat == null) return const <ElementListe>[];
       return aplatir(etat.propositions);
     });

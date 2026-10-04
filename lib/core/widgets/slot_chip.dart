@@ -5,6 +5,7 @@ import '../theme/app_breakpoints.dart';
 import '../theme/app_motion.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_status.dart';
+import 'coin_ailleurs.dart';
 import 'hachures.dart';
 
 /// Les trois densités de la case.
@@ -91,6 +92,7 @@ class SlotChip extends StatelessWidget {
     this.enEnregistrement = false,
     this.erreur = false,
     this.saisiParAdmin = false,
+    this.ailleurs = false,
     this.onTap,
     this.onDragEnter,
     this.onRefus,
@@ -133,6 +135,10 @@ class SlotChip extends StatelessWidget {
   /// La marque est doublée d'un mot dans la sémantique — la couleur n'est
   /// jamais seule (`DESIGN.md § Named Rules`).
   final bool saisiParAdmin;
+
+  /// Le membre a une astreinte dans une autre caserne sur ce créneau (ticket
+  /// 072) : coin rabattu, et la phrase de la case le dit.
+  final bool ailleurs;
 
   final VoidCallback? onTap;
 
@@ -180,12 +186,28 @@ class SlotChip extends StatelessWidget {
     );
 
     Widget dessiner({required bool focalise, bool presse = false}) {
-      final case_ = _Case(
+      final peinte = _Case(
         apparence: apparence
             .avecFocus(context, focalise: focalise)
             .avecAppui(presse: presse),
         tailleGlyphe: densite.glyphe,
       );
+      final case_ = ailleurs
+          ? Stack(
+              fit: StackFit.passthrough,
+              children: <Widget>[
+                peinte,
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: CoinAilleurs(
+                    cote: CoinAilleurs.pourCase(densite.taille),
+                    fond: apparence.fond,
+                  ),
+                ),
+              ],
+            )
+          : peinte;
 
       final dimensionnee = densite == SlotChipDensite.dense
           ? SizedBox.square(dimension: densite.taille, child: case_)
@@ -208,9 +230,11 @@ class SlotChip extends StatelessWidget {
     return Semantics(
       // La marque « saisi par un administrateur » est un contour : elle se
       // double d'un mot, sinon elle ne serait qu'une couleur.
-      label: saisiParAdmin
-          ? '$libelleSemantique, ${AppStrings.matriceCaseSaisieParAdmin}'
-          : libelleSemantique,
+      label: <String>[
+        libelleSemantique,
+        if (saisiParAdmin) AppStrings.matriceCaseSaisieParAdmin,
+        if (ailleurs) AppStrings.matriceCaseAilleursSemantique,
+      ].join(', '),
       hint: verrouille
           ? AppStrings.slotVerrouille
           : actionnable

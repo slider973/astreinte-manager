@@ -22,10 +22,15 @@ class EnTeteTravail extends StatelessWidget {
     required this.titre,
     super.key,
     this.actions = const <Widget>[],
+    this.titreActionnable,
   });
 
   /// Le nom de la caserne quand l'écran le connaît, son propre titre sinon.
   final String titre;
+
+  /// Remplace le titre quand la personne a plusieurs casernes (ticket 072) :
+  /// le nom de la caserne devient le sélecteur (`BoutonCaserne.titre`).
+  final Widget? titreActionnable;
 
   /// Les actions de l'écran, puis la cloche et le compte.
   final List<Widget> actions;
@@ -42,15 +47,17 @@ class EnTeteTravail extends StatelessWidget {
       child: Row(
         children: <Widget>[
           Expanded(
-            child: Semantics(
-              header: true,
-              child: Text(
-                titre,
-                style: Theme.of(context).textTheme.titleLarge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            child:
+                titreActionnable ??
+                Semantics(
+                  header: true,
+                  child: Text(
+                    titre,
+                    style: Theme.of(context).textTheme.titleLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
           ),
           const SizedBox(width: AppSpacing.lg),
           ...actions,

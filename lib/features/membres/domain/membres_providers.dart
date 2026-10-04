@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/reseau/connectivite.dart';
 import '../../../core/session/appartenance.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../data/membres_repository.dart';
@@ -276,6 +277,14 @@ membresControllerProvider =
       isAutoDispose: true,
     );
 
+/// La même source, sans rien de ce qui a été lu dans une autre caserne
+/// (ticket 072, `core/session/caserne_ouverte.dart`) : après une bascule entre
+/// deux casernes administrées, l'écran montre son squelette, jamais les lignes
+/// de l'ancienne.
+final Provider<AsyncValue<EtatMembres>> membresOuvertsProvider =
+    dansLaCaserneOuverte(membresControllerProvider, autoDispose: true);
+
+
 /// Vrai si l'utilisateur courant administre une caserne. L'écran « Membres »
 /// n'a rien à montrer autrement, et la base le refuserait de toute façon.
 final Provider<bool> estAdminCaserneProvider = Provider<bool>((ref) {
@@ -292,7 +301,7 @@ final Provider<bool> estAdminCaserneProvider = Provider<bool>((ref) {
 /// écran ouvert depuis dix minutes peut se tromper, elle non.
 final Provider<ContexteAdministration> contexteAdministrationProvider =
     Provider<ContexteAdministration>((ref) {
-      final etat = ref.watch(membresControllerProvider).value;
+      final etat = caserneOuverteSeulement(ref, membresControllerProvider).value;
       return ContexteAdministration(
         adminsActifs: etat?.adminsActifs ?? 0,
         userIdCourant: ref.watch(sessionProvider).value?.userId,

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../fraicheur/relecture.dart';
+import '../session/caserne_ouverte.dart';
 import '../session/session_providers.dart';
 import '../supabase/supabase_bootstrap.dart';
 import 'caserne_repository.dart';
@@ -109,11 +110,18 @@ etatCaserneProvider =
       EtatCaserneController.new,
     );
 
+/// La même source, sans rien de ce qui a été lu dans une autre caserne
+/// (ticket 072, `core/session/caserne_ouverte.dart`).
+final Provider<AsyncValue<EtatCaserne>> etatCaserneOuvertProvider =
+    dansLaCaserneOuverte(etatCaserneProvider);
+
 /// Vrai quand la caserne est en lecture seule.
 ///
 /// **Faux tant qu'on ne sait pas.** Un écran qui se grise pendant la seconde
 /// de chargement puis se dégrise clignote, et le clignotement ment une fois
 /// sur deux ; le refus serveur reste le filet, comme avant ce ticket.
 final Provider<bool> lectureSeuleCaserneProvider = Provider<bool>(
-  (ref) => ref.watch(etatCaserneProvider).value?.lectureSeule ?? false,
+  (ref) =>
+      caserneOuverteSeulement(ref, etatCaserneProvider).value?.lectureSeule ??
+      false,
 );

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/session/appartenance.dart';
+import '../../../core/session/bascule_caserne.dart';
 import '../../../core/session/jeton_invitation.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
@@ -80,6 +82,7 @@ class AcceptationController extends Notifier<EtatAcceptation> {
           .read(invitationRepositoryProvider)
           .accepter(entree);
       await _relireLesAppartenances();
+      await _ouvrirLaCaserneRejointe(resultat.stationId);
       ref.read(jetonInvitationProvider.notifier).oublier();
       state = EtatAcceptation(acceptee: resultat);
     } on EchecAcceptation catch (echec) {
@@ -94,6 +97,23 @@ class AcceptationController extends Notifier<EtatAcceptation> {
         echec: EchecAcceptation(ErreurAcceptation.inconnue),
       );
     }
+  }
+
+  /// **La caserne rejointe devient la caserne ouverte** (ticket 072). Un
+  /// membre d'une première caserne qui accepte l'invitation d'une seconde y
+  /// entre : rester dans l'ancienne lui ferait lire « Bienvenue » au-dessus de
+  /// l'ancien planning. Pas de bandeau : la page « Bienvenue » le dit déjà.
+  ///
+  /// On ne bascule que vers une appartenance **active** relue en base : une
+  /// relecture en échec laisse la caserne d'avant, et l'écran de démarrage
+  /// propose déjà de réessayer.
+  Future<void> _ouvrirLaCaserneRejointe(String? stationId) async {
+    if (stationId == null) return;
+    final active = ref
+        .read(appartenancesActivesProvider)
+        .any((Appartenance a) => a.stationId == stationId);
+    if (!active) return;
+    await ref.read(basculeCaserneProvider.notifier).choisir(stationId);
   }
 
   /// Rejoue la tentative après un incident réseau.

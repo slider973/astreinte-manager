@@ -91,6 +91,7 @@ class AcceptationInvitation {
     required this.role,
     this.caserne,
     this.inviteur,
+    this.stationId,
   });
 
   factory AcceptationInvitation.depuisJson(Map<String, dynamic> corps) {
@@ -102,8 +103,13 @@ class AcceptationInvitation {
       ),
       caserne: CaserneInvitation.depuisJson(corps['station']),
       inviteur: InviteurInvitation.depuisJson(corps['inviter']),
+      stationId: membership is Map ? membership['station_id'] as String? : null,
     );
   }
+
+  /// `membership.station_id` : la caserne rejointe, qui devient la caserne
+  /// ouverte (ticket 072). `null` si la réponse ne la porte pas.
+  final String? stationId;
 
   /// Vrai quand le même lien est rejoué : ce n'est pas une erreur, l'invité
   /// est déjà dans la caserne.

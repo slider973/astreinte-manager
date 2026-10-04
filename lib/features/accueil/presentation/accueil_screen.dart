@@ -20,6 +20,7 @@ import '../../boite/domain/onglet_boite.dart';
 import '../../dispos/presentation/controllers/rafraichissement_periodes.dart';
 import '../../echanges/domain/echanges_providers.dart';
 import '../../echanges/presentation/widgets/carte_demande_recue.dart';
+import '../../invitation/presentation/widgets/carte_invitation.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../../propositions/domain/propositions_providers.dart';
@@ -66,6 +67,8 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen>
     Donnee.periodes,
     // Ticket 073 : les demandes d'échange comptent parmi ce qu'on te demande.
     Donnee.echanges,
+    // Les invitations d'un membre déjà rattaché (ticket 072).
+    Donnee.invitations,
   };
 
   @override
@@ -76,6 +79,8 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen>
     final tableau = ref.watch(tableauBordProvider);
 
     return AppScaffold(
+      // Sur grand écran, le nom de la caserne devient le sélecteur (072).
+      selecteurCaserne: true,
       titre: AppStrings.accueilTitre,
       destinations: destinations,
       indexSelectionne: indexDestination(destinations, AppRoutes.accueilName),
@@ -167,6 +172,9 @@ class _Contenu extends ConsumerWidget {
             children: <Widget>[
               EnteteAccueil(maintenant: maintenant, avecActions: avecEntete),
               const SizedBox(height: AppSpacing.xl),
+              // **En tête du contenu** (ticket 072) : la seule décision de
+              // l'écran qu'aucun autre écran n'offre. Rien sans invitation.
+              const CartesInvitations(),
 
               _EnteteRangee(
                 titre: AppStrings.accueilMesAstreintes,

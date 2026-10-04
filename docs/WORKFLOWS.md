@@ -408,6 +408,25 @@ change pas : un client qui ignore le paramètre lit le même chemin qu'avant. À
 L'étiquette de regroupement porte la caserne (`<type>:<période>:<8 caractères>`) : les propositions
 d'octobre de B ne remplacent plus celles de A sur l'écran verrouillé.
 
+**Dans la PWA** (chantier PWA du ticket 072), la bascule vit à un seul endroit,
+`BasculeCaserne` (`lib/core/session/bascule_caserne.dart`) : le sélecteur (sans bandeau), le push
+touché (`CoucheNotifications`, `station_id` lu dans `data` au premier plan et posté par
+`web/push/firebase-messaging-sw.js` en arrière-plan, ajouté en `?station=` quand le worker ouvre
+une fenêtre), l'adresse qui porte `?station=` (le routeur la traite **avant** la garde, pour que le
+rôle de cette caserne-là ouvre ou ferme `/admin`, puis la retire de l'adresse), et l'accès retiré
+dans la caserne ouverte (bascule vers la première caserne active qui reste **dans l'ordre
+alphabétique des noms**, celui du sélecteur, bandeau « accès désactivé », sans « Revenir »). La
+redirection du routeur ne change jamais la caserne elle-même : elle note la caserne du lien
+(`LienDeCaserne`), garde le chemin avec le rôle de cette caserne-là, et la bascule part dans une
+microtâche ; un lien gardé au démarrage à froid suit le même chemin. Après l'acceptation d'une invitation, la caserne rejointe devient la caserne ouverte
+(`membership.station_id` de la réponse), sans bandeau : la page « Bienvenue » le dit. Les écrans
+lisent leurs données par `caserneOuverteSeulement` (`lib/core/session/caserne_ouverte.dart`) :
+pendant la relecture qui suit une bascule, et sur l'erreur qui peut la suivre, ils montrent leur
+squelette ou leur « Réessayer », jamais la valeur gardée de l'ancienne caserne. Les caches d'une
+caserne quittée (désactivée, ou absente de la relecture) sont effacés dès la lecture des
+appartenances (`OubliLocal.casernesQuittees`). Les repères « profil d'accueil vu » et « guide
+vu » restent **par appareil** : rejoindre une seconde caserne ne les remontre pas.
+
 Les adresses de la coquille d'avant le ticket 064 — `/?onglet=N`, `/?mois=AAAA-MM`,
 `/notifications` — sont redirigées vers les nouvelles routes (`core/router/destinations.dart`,
 `ongletHerite`). S'y ajoute `/propositions`, l'adresse de l'écran des propositions pendant le

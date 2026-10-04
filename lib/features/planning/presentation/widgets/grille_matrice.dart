@@ -507,6 +507,7 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
       return CaseAttribution(
         etat: attribution.etat,
         erreur: widget.erreurs.contains(cle),
+        ailleurs: ligne.ailleurs(jour, creneau),
         libelleSemantique: AppStrings.matriceCaseAttributionSemantique(
           membre: ligne.nomAffiche,
           jourEtDate: libelle,
@@ -535,6 +536,7 @@ class _GrilleMatriceState extends State<GrilleMatrice> {
       creneau: creneau,
       saisiParAdmin: cellule.parAdmin,
       erreur: widget.erreurs.contains(cle),
+      ailleurs: ligne.ailleurs(jour, creneau),
       libelleSemantique: AppStrings.matriceCaseSemantique(
         membre: ligne.nomAffiche,
         jourEtDate: libelle,

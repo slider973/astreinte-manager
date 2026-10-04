@@ -57,6 +57,7 @@ class AppBanner extends StatelessWidget {
     this.onAction,
     this.onFermer,
     this.libelleFermer,
+    this.actionSousTexte = false,
   }) : assert(
          onFermer == null || variante == AppBannerVariante.information,
          'Une bannière qui décrit un état persistant ne se ferme pas : la '
@@ -89,6 +90,12 @@ class AppBanner extends StatelessWidget {
 
   /// Le nom du bouton de fermeture, annoncé aux lecteurs d'écran.
   final String? libelleFermer;
+
+  /// L'action passe **sous** le texte, au bord droit, au lieu de partager sa
+  /// ligne. Pour un libellé long qui porte un nom (« Revenir à CIS
+  /// Saint-Martin », ticket 072) : sur un téléphone de 390, il ne tiendrait
+  /// pas à côté du texte et de « Fermer ».
+  final bool actionSousTexte;
 
   @override
   Widget build(BuildContext context) {
@@ -195,10 +202,29 @@ class AppBanner extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
+                        if (actionSousTexte &&
+                            onAction != null &&
+                            libelleAction != null)
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: TextButton(
+                              onPressed: onAction,
+                              style: TextButton.styleFrom(
+                                foregroundColor: encre,
+                              ),
+                              child: Text(
+                                libelleAction!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                  if (onAction != null && libelleAction != null) ...<Widget>[
+                  if (!actionSousTexte &&
+                      onAction != null &&
+                      libelleAction != null) ...<Widget>[
                     const SizedBox(width: AppSpacing.sm),
                     TextButton(
                       onPressed: onAction,

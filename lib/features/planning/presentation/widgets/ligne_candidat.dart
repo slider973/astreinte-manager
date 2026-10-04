@@ -109,6 +109,7 @@ class LigneCandidat extends StatelessWidget {
                 if (quota) _libelleQuota,
                 if (!candidat.estDisponible && !candidat.estAttribue)
                   context.statuts.disponibilite(candidat.disponibilite).libelle,
+                if (candidat.ailleurs) AppStrings.candidatAilleurs,
                 if (membre.aUnCommentaire) membre.commentaire!,
               ].join(', '),
               excludeSemantics: true,
@@ -131,6 +132,10 @@ class LigneCandidat extends StatelessWidget {
                         fontFeatures: AppTextStyles.chiffresTabulaires,
                       ),
                     ),
+                    if (candidat.ailleurs) ...<Widget>[
+                      const SizedBox(height: AppSpacing.xxs),
+                      const _Ailleurs(),
+                    ],
                     if (membre.aUnCommentaire) ...<Widget>[
                       const SizedBox(height: AppSpacing.xxs),
                       _Commentaire(texte: membre.commentaire!),
@@ -158,19 +163,25 @@ class LigneCandidat extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.entreCibles),
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xs),
-            // **L'étiquette nomme la personne**, pas seulement l'action : au
-            // lecteur d'écran, douze boutons « Réattribuer » à la suite ne
-            // disent rien de ce qu'on choisit. Elle passe par le texte du
-            // bouton et non par un `Semantics` englobant, qui effacerait
-            // l'action du nœud avec `excludeSemantics`.
-            child: TextButton.icon(
-              onPressed: onAction,
-              icon: Icon(action.icone, size: AppTouch.icone),
-              label: Text(
-                action.libelle,
-                semanticsLabel: '${action.libelle} ${membre.nomAffiche}',
+          // Souple : « Attribuer quand même » (ticket 072) ne tient pas
+          // toujours sur une ligne à côté du nom, à 390 ou en grande échelle
+          // de texte. Il passe à la ligne plutôt que de déborder.
+          Flexible(
+            child: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              // **L'étiquette nomme la personne**, pas seulement l'action : au
+              // lecteur d'écran, douze boutons « Réattribuer » à la suite ne
+              // disent rien de ce qu'on choisit. Elle passe par le texte du
+              // bouton et non par un `Semantics` englobant, qui effacerait
+              // l'action du nœud avec `excludeSemantics`.
+              child: TextButton.icon(
+                onPressed: onAction,
+                icon: Icon(action.icone, size: AppTouch.icone),
+                label: Text(
+                  _libelleAction,
+                  semanticsLabel: '$_libelleAction ${membre.nomAffiche}',
+                  maxLines: 2,
+                ),
               ),
             ),
           ),
@@ -178,6 +189,14 @@ class LigneCandidat extends StatelessWidget {
       ),
     );
   }
+
+  /// « Attribuer quand même » pour qui a une astreinte ailleurs (ticket 072),
+  /// **sans dialogue** : comme le quota, l'information est sur la ligne avant
+  /// le geste, et le pompier pourra refuser la proposition.
+  String get _libelleAction =>
+      candidat.ailleurs && action == ActionCandidat.attribuer
+      ? AppStrings.planningAttribuerQuandMeme
+      : action.libelle;
 
   String get _libelleQuota => candidat.quotaDepasse
       ? AppStrings.planningQuotaDepasse
@@ -199,6 +218,33 @@ class LigneCandidat extends StatelessWidget {
         taille: StatusBadgeTaille.compacte,
       ),
   ];
+}
+
+/// « Astreinte ailleurs sur ce créneau », en gris : un fait sur lequel la
+/// caserne n'a pas la main, pas une alerte (`design/072 § 6.7`).
+class _Ailleurs extends StatelessWidget {
+  const _Ailleurs();
+
+  @override
+  Widget build(BuildContext context) {
+    final encre = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.xxs),
+          child: Icon(Icons.event_busy, size: 16, color: encre),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            AppStrings.candidatAilleurs,
+            style: AppTextStyles.mention.copyWith(color: encre),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Le commentaire du mois, **en clair et non derrière une icône** : c'est la
