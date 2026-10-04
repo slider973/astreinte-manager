@@ -4,8 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 070, 071, 072
 - **Branche** : `feat/073-echange-astreintes`
-- **PR** : —
-- **Statut** : en cours depuis 2026-10-04
+- **PR** : https://github.com/slider973/astreinte-manager/pull/85 (chantier base), https://github.com/slider973/astreinte-manager/pull/87 (chantier PWA), https://github.com/slider973/astreinte-manager/pull/88 (chantier iOS), https://github.com/slider973/astreinte-manager/pull/90 (clôture)
+- **Statut** : terminé le 2026-10-04 (PR créée)
 
 ## Contexte
 
@@ -113,3 +113,54 @@ Ticket découpé en chantiers (une PR par chantier) : base, PWA, iOS.
 - Échange entre casernes différentes.
 - Échange d'une garde contre plusieurs, ou chaîne d'échanges à trois.
 - Bourse aux gardes ouverte hors des disponibles déclarés.
+
+## Livraison
+
+**Fait**, en trois chantiers fusionnés en squash sur `main` :
+
+- **Base** : [#85](https://github.com/slider973/astreinte-manager/pull/85) (`c5023da`) —
+  migration `0041_echanges_astreintes.sql` (`shift_exchanges`, `request_exchange`,
+  `respond_exchange`, `decide_exchange`, `cancel_exchange`, `exchangeable_shifts_of`, expiration
+  par pg_cron, réglages `exchange_auto_approve` / `exchange_deadline_hours`), cinq types de
+  notification `exchange_*`, 230 assertions RLS et 36 tests de concurrence. Revue : deux tours ;
+  le bloquant du premier (registre RGPD) levé, second tour « prêt ».
+- **PWA** : [#87](https://github.com/slider973/astreinte-manager/pull/87) (`237a239`) — « Proposer
+  un échange » en trois étapes, suivi dans « Échanges · N », « Demandes de collègues » dans la
+  Boîte, écran `/admin/echanges` et réglages dans Paramètres, parcours de bout en bout avec une
+  cession validée par l'admin. Revue : deux tours ; le bloquant du premier levé, second tour
+  « prêt ».
+- **iOS** : [#88](https://github.com/slider973/astreinte-manager/pull/88) (`8dc2e41`, commun
+  avec le 072) — pointeur `foco/` sur `c1b75da`, `docs/IOS.md` § 4 nonies, `docs/WORKFLOWS.md`
+  § 8, et correctif PWA du double point après un nom abrégé (« Chloé C.. »,
+  `AppStrings.nomEnFinDePhrase`, tests unitaires).
+- **PR du fork** `slider973/Foco` : [Foco#17](https://github.com/slider973/Foco/pull/17)
+  (`cb5be0c`, ticket 072) et [Foco#18](https://github.com/slider973/Foco/pull/18) (`c1b75da`, ce
+  ticket, visé par le pointeur).
+- **Courses `iOS` vertes** : [37195706808](https://github.com/slider973/Foco/actions/runs/37195706808),
+  [37196395636](https://github.com/slider973/Foco/actions/runs/37196395636),
+  [37197187365](https://github.com/slider973/Foco/actions/runs/37197187365) (Foco#18, 291 tests),
+  [37197977329](https://github.com/slider973/Foco/actions/runs/37197977329) (`main` du fork,
+  `c1b75da`) ; zéro avertissement Swift. Une course rouge **non volontaire**,
+  [37196427941](https://github.com/slider973/Foco/actions/runs/37196427941) (trois tests sur le
+  double point, un avertissement d'isolation), corrigée.
+- **TestFlight** : **1.0 (108)**, course
+  [37199233742](https://github.com/slider973/Foco/actions/runs/37199233742).
+- **Revue iOS** (072 et 073 ensemble) : « prêt », aucun bloquant.
+
+**Suites à faire** (non bloquantes) :
+- Base / RGPD : export RGPD des échanges (`shift_exchanges` absent de l'export du membre).
+- iOS (revue commune 072/073) : `invitationInvitedBy` double encore le point après un nom abrégé ;
+  « Refuser » reste actif dans une caserne en lecture seule ; deux tests manquants relevés par la
+  revue.
+
+**Reste à vérifier par le propriétaire sur l'iPhone** (TestFlight 1.0 (108)) :
+- [ ] « Proposer un échange » sur une astreinte acceptée à venir : cession à un collègue, puis
+  échange contre une de ses gardes ;
+- [ ] demande à toute la caserne : les disponibles la reçoivent, sans bouton « Refuser » ;
+- [ ] côté repreneur : « Demandes de collègues » dans les propositions, « Tu donnes / Tu prends »,
+  accord envoyé ;
+- [ ] suivi dans « Mes astreintes » (section « Échanges », « Échange en cours » sur la garde),
+  annulation confirmée ;
+- [ ] notification d'échange touchée : ouvre les propositions ; validation par l'admin dans la PWA
+  puis planning à jour sur l'iPhone ;
+- [ ] « Proposer un échange » grisé avec sa raison hors ligne ou dans une caserne suspendue.
