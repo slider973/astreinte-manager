@@ -1,6 +1,6 @@
 # Tableau des tickets
 
-Généré par `scripts/ticket.sh board` le 2026-10-03. Ne pas éditer à la main.
+Généré par `scripts/ticket.sh board` le 2026-10-04. Ne pas éditer à la main.
 
 ## En cours
 
@@ -15,6 +15,7 @@ Généré par `scripts/ticket.sh board` le 2026-10-03. Ne pas éditer à la main
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 072 | [Un pompier dans plusieurs casernes, de bout en bout](backlog/072-plusieurs-casernes.md) | P1 | 070 071 | — |
 | 073 | [Échanger ou céder une astreinte entre pompiers](backlog/073-echange-astreintes.md) | P1 | 070 071 072 | — |
+| 075 | [Le site vitrine astreinte-sp.fr](backlog/075-site-vitrine.md) | P1 |  | https://github.com/slider973/astreinte-manager/pull/80 |
 
 ## Terminés
 
@@ -88,6 +89,5 @@ Généré par `scripts/ticket.sh board` le 2026-10-03. Ne pas éditer à la main
 | 070 | [Les écrans de la PWA affichent des données périmées](done/070-fraicheur-ecrans-pwa.md) | P0 | 068 | https://github.com/slider973/astreinte-manager/pull/77 |
 | 071 | [L'app iOS garde la lecture seule et des données périmées](done/071-fraicheur-ecrans-ios.md) | P0 | 068 | https://github.com/slider973/astreinte-manager/pull/79 |
 | 074 | [Aucune notification push n'arrive sur la PWA](done/074-push-web-portee-service-worker.md) | P0 | 070 | https://github.com/slider973/astreinte-manager/pull/78 |
-| 075 | [Le site vitrine astreinte-sp.fr](done/075-site-vitrine.md) | P1 |  | https://github.com/slider973/astreinte-manager/pull/80 |
 | 076 | [Ouvrir l'app iOS à des testeurs externes par TestFlight](done/076-testflight-testeurs-externes.md) | P1 | 067 071 | https://github.com/slider973/astreinte-manager/pull/81 |
 
