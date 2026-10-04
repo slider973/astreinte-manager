@@ -1004,18 +1004,23 @@ réussi et la mention disparaîtrait.
 
 ### Charges utiles par type
 
-| Type                    | Clés lues                                             | Exemple de titre                                                                   |
-| ----------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `invitation`            | `station_name`, `inviter_name`                        | « Invitation à rejoindre CIS Saint-Martin »                                        |
-| `availability_reminder` | `period`, `deadline_at` (ISO)                         | « Dispos d'octobre à saisir »                                                      |
-| `assignment_proposed`   | `period`, `shifts[]`                                  | « Astreinte proposée le 12 octobre, nuit » / « 7 astreintes proposées en octobre » |
-| `assignment_reminder`   | `period`, `shifts[]`                                  | « Réponse attendue : astreinte du 12 octobre, nuit »                               |
-| `assignment_declined`   | `period`, `shifts[]`, `member_name`, `decline_reason` | « Astreinte refusée : 12 octobre, nuit »                                           |
-| `assignment_changed`    | `period`, `shifts[]`                                  | « Astreinte modifiée : 12 octobre, nuit »                                          |
-| `assignment_cancelled`  | `period`, `shifts[]`, `reason`                        | « Astreinte annulée : 12 octobre, nuit »                                           |
-| `schedule_validated`    | `period`, `shifts[]`                                  | « Planning d'octobre validé »                                                      |
-| `schedule_all_accepted` | `period`                                              | « Planning d'octobre complet »                                                     |
-| `late_responders`       | `period`, `pending_count`, `hours`, `members[]`       | « 3 astreintes sans réponse »                                                      |
+| Type                    | Clés lues                                                                        | Exemple de titre                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `invitation`            | `station_name`, `inviter_name`                                                   | « Invitation à rejoindre CIS Saint-Martin »                                                         |
+| `availability_reminder` | `period`, `deadline_at` (ISO)                                                    | « Dispos d'octobre à saisir »                                                                       |
+| `assignment_proposed`   | `period`, `shifts[]`                                                             | « Astreinte proposée le 12 octobre, nuit » / « 7 astreintes proposées en octobre »                  |
+| `assignment_reminder`   | `period`, `shifts[]`                                                             | « Réponse attendue : astreinte du 12 octobre, nuit »                                                |
+| `assignment_declined`   | `period`, `shifts[]`, `member_name`, `decline_reason`                            | « Astreinte refusée : 12 octobre, nuit »                                                            |
+| `assignment_changed`    | `period`, `shifts[]`                                                             | « Astreinte modifiée : 12 octobre, nuit »                                                           |
+| `assignment_cancelled`  | `period`, `shifts[]`, `reason`                                                   | « Astreinte annulée : 12 octobre, nuit »                                                            |
+| `schedule_validated`    | `period`, `shifts[]`                                                             | « Planning d'octobre validé »                                                                       |
+| `schedule_all_accepted` | `period`                                                                         | « Planning d'octobre complet »                                                                      |
+| `late_responders`       | `period`, `pending_count`, `hours`, `members[]`                                  | « 3 astreintes sans réponse »                                                                       |
+| `exchange_requested`    | `kind`, `broadcast`, `shifts[]`, `return_shift`, `requester_name`, `expires_at`  | « Astreinte à reprendre : 12 octobre, nuit » / « Remplaçant cherché : … » / « Échange proposé : … » |
+| `exchange_accepted`     | `kind`, `shifts[]`, `return_shift`, `requester_name`, `taker_name`               | « Échange à valider : 12 octobre, nuit »                                                            |
+| `exchange_approved`     | idem, plus `audience` (`member` \| `admin`, par destinataire) et `auto_approved` | « Échange validé : 12 octobre, nuit »                                                               |
+| `exchange_rejected`     | idem, plus `reason_code` (`peer_declined` \| `admin_rejected`) et `reason`       | « Échange décliné : … » / « Échange refusé : … »                                                    |
+| `exchange_closed`       | idem, plus `outcome` (`expired` \| `cancelled` \| `failed`) et `reason_code`     | « Demande d'échange expirée : 12 octobre, nuit »                                                    |
 
 `shifts` est un tableau de `{ "date": "AAAA-MM-JJ", "slot": "day" | "night",
 "assignment_id"? }`.
@@ -1035,6 +1040,18 @@ client par `lib/features/notifications/domain/destination_push.dart` :
 | `assignment_cancelled`, `schedule_validated`                       | `/schedule/<AAAA-MM>`       |
 | `assignment_declined`, `schedule_all_accepted`, `late_responders`  | `/admin/schedule/<AAAA-MM>` |
 | `invitation`                                                       | `/connexion`                |
+| `exchange_requested`, `exchange_rejected`, `exchange_closed`       | `/exchanges`                |
+| `exchange_accepted`, `exchange_approved` avec `audience = admin`   | `/admin/exchanges`          |
+| `exchange_approved` (pompiers)                                     | `/schedule/<AAAA-MM>`       |
+
+`/exchanges` et `/admin/exchanges` sont arrivés avec le ticket 073 (migration `0041`) : la charge
+utile commune des cinq types d'échange est composée en base par `exchange_payload`, et le motif d'un
+échec (`reason_code` d'une demande `failed`) est traduit par `MOTIFS_ECHEC_ECHANGE`, dont la liste
+est exactement celle de la contrainte `shift_exchanges_reason_code` — un test Deno le vérifie. Tant
+que les clients ne connaissent pas ces deux liens, ils retombent sur l'accueil sans message (règle
+du § 8 de `docs/WORKFLOWS.md`). Leur étiquette de regroupement porte **l'identifiant de la demande**
+au lieu du mois (`exchange_requested:<8>:<caserne 8>`) : deux demandes du même mois sont deux faits,
+elles ne se remplacent pas sur l'écran verrouillé.
 
 `/connexion` est une cinquième forme, que `destination_push.dart` ne connaît pas et rejette : un
 push la portant n'ouvrirait rien. C'est sans conséquence parce que `invitation` ne part que par
