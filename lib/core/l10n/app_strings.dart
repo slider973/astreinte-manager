@@ -14,6 +14,12 @@ abstract final class AppStrings {
   /// pas.
   static const String valueUndefined = 'Non définie';
 
+  /// Un nom placé en fin de phrase, suivi du point final, sans doubler le
+  /// point quand le nom d'usage finit déjà par une initiale abrégée :
+  /// « Chloé C. », jamais « Chloé C.. ».
+  static String nomEnFinDePhrase(String nom) =>
+      nom.endsWith('.') ? nom : '$nom.';
+
   // -------------------------------------------------------------------
   // Navigation
   // -------------------------------------------------------------------
@@ -327,6 +333,7 @@ abstract final class AppStrings {
   static const String codeLienAlternative =
       'L\'e-mail contient aussi un lien : ouvre-le sur cet appareil au lieu de '
       'recopier le code.';
+
   /// **« Demandé », pas « envoyé ».** L'application ne sait qu'une chose :
   /// GoTrue a accepté la demande. Que le courriel soit sorti, aucun signal ne
   /// le rend au client (ticket 055) ; le dire serait promettre à la place du
@@ -1210,7 +1217,8 @@ abstract final class AppStrings {
   static const String invitationChangerCompte = 'Utiliser une autre adresse';
   static const String invitationAccepteeTitre = 'Bienvenue';
 
-  static String invitationParQui(String nom) => 'Invitation envoyée par $nom.';
+  static String invitationParQui(String nom) =>
+      'Invitation envoyée par ${nomEnFinDePhrase(nom)}';
 
   static String invitationRejointe(String caserne) =>
       'Tu fais maintenant partie de $caserne.';
@@ -2617,7 +2625,7 @@ abstract final class AppStrings {
   /// « Modifié à l'instant par Marie L. » — sans second point : un nom
   /// affiché finit souvent par une initiale abrégée.
   static String planningModifieDistant(String qui) =>
-      'Modifié à l\'instant par ${qui.endsWith('.') ? qui : '$qui.'}';
+      'Modifié à l\'instant par ${nomEnFinDePhrase(qui)}';
   static const String planningModifieDistantAnonyme =
       'Modifié à l\'instant par un autre administrateur.';
 
@@ -3321,7 +3329,8 @@ abstract final class AppStrings {
   static const String echangeLesDisponibles =
       'Les collègues disponibles ce créneau';
   static String echangeInfoValidation(String nom) =>
-      'Ton chef de centre devra valider après l\'accord de $nom.';
+      'Ton chef de centre devra valider après l\'accord de '
+      '${nomEnFinDePhrase(nom)}';
   static const String echangeInfoValidationCaserne =
       'Ton chef de centre devra valider après l\'accord d\'un collègue.';
   static String echangeInfoAuto(String nom) =>
@@ -3333,7 +3342,8 @@ abstract final class AppStrings {
   static String echangeExpireLe(String date, String heure) =>
       'La demande expire le $date à $heure.';
   static const String echangeEnvoyer = 'Envoyer la demande';
-  static String echangeEnvoyeeA(String nom) => 'Demande envoyée à $nom.';
+  static String echangeEnvoyeeA(String nom) =>
+      'Demande envoyée à ${nomEnFinDePhrase(nom)}';
   static const String echangeEnvoyeeCaserne =
       'Demande envoyée aux collègues disponibles.';
 
@@ -3428,7 +3438,7 @@ abstract final class AppStrings {
   static String echangeDetailCherchePourB(String nom) =>
       '$nom cherche un remplaçant.';
   static String echangeDetailEnvoyeeAdmin(String depuis, String nom) =>
-      'Envoyée $depuis à $nom.';
+      'Envoyée $depuis à ${nomEnFinDePhrase(nom)}';
   static String echangeDetailEnvoyeeDispos(String depuis) =>
       'Envoyée $depuis aux disponibles.';
   static String echangeDetailAccepteParPourA(String nom, String depuis) =>
@@ -3452,13 +3462,15 @@ abstract final class AppStrings {
       'Validé par $nom le $date.';
   static String echangeDetailRefusePair(String nom) => '$nom a refusé.';
   static const String echangeDetailTuAsRefuse = 'Tu as refusé.';
-  static String echangeDetailRefuseChef(String nom) => 'Refusé par $nom.';
+  static String echangeDetailRefuseChef(String nom) =>
+      'Refusé par ${nomEnFinDePhrase(nom)}';
   static String echangeDetailRefuseChefMotif(String nom, String motif) =>
       'Refusé par $nom : « $motif »';
   static const String echangeDetailAnnuleParA = 'Tu as annulé ta demande.';
   static String echangeDetailAnnulePourB(String nom) =>
       '$nom a annulé sa demande.';
-  static String echangeDetailAnnuleAdmin(String nom) => 'Annulé par $nom.';
+  static String echangeDetailAnnuleAdmin(String nom) =>
+      'Annulé par ${nomEnFinDePhrase(nom)}';
   static const String echangeDetailExpirePourA =
       'Personne n\'a répondu à temps. Ta garde reste la tienne.';
   static const String echangeDetailExpire = 'Cette demande a expiré.';
@@ -3536,7 +3548,8 @@ abstract final class AppStrings {
       'Accord envoyé. Ton chef de centre doit valider.';
   static String echangeAccordValide(String creneau) =>
       'C\'est fait : la garde du $creneau est à toi.';
-  static String echangeRefusEnvoye(String nom) => 'Refus envoyé à $nom.';
+  static String echangeRefusEnvoye(String nom) =>
+      'Refus envoyé à ${nomEnFinDePhrase(nom)}';
   static const String echangeDejaReprise =
       'Cette garde a déjà été reprise par un collègue.';
   static String echangeAnnuleeParA(String nom) => '$nom a annulé sa demande.';
@@ -4639,9 +4652,8 @@ abstract final class AppStrings {
     String caserne,
     String detail, {
     required bool ouverte,
-  }) => ouverte
-      ? '$caserne, $detail, $caserneChoixOuverte'
-      : '$caserne, $detail';
+  }) =>
+      ouverte ? '$caserne, $detail, $caserneChoixOuverte' : '$caserne, $detail';
 
   static const String caserneChoixInvitationsTitre = 'Invitations en attente';
 
@@ -4707,9 +4719,8 @@ abstract final class AppStrings {
 
   // --- Boîte -------------------------------------------------------------
 
-  static String boitePasserelle(String caserne, int n) => n == 1
-      ? '$caserne · 1 non lue'
-      : '$caserne · $n non lues';
+  static String boitePasserelle(String caserne, int n) =>
+      n == 1 ? '$caserne · 1 non lue' : '$caserne · $n non lues';
 
   static const String boitePasserelleAction = 'Ouvrir';
 

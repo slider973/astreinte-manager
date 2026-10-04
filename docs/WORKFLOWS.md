@@ -381,7 +381,7 @@ le push touché (app froide comme chaude) et la ligne touchée dans le centre de
 | `/availability/<period>` | Disponibilités, sur le mois `<period>` |
 | `/admin/schedule/<period>` | la PWA dans Safari, `/admin/suivi?mois=<period>` *(admin seulement)* |
 | `/admin/subscription` | la PWA dans Safari, `/admin/abonnement` *(admin seulement)* |
-| `/exchanges` | *(à brancher au chantier iOS du ticket 073 : les échanges du pompier)* |
+| `/exchanges` | Propositions : « Demandes de collègues », et « Suivre mes échanges » vers Mes astreintes *(chantier iOS du ticket 073)* |
 | `/admin/exchanges` | la PWA dans Safari, file des échanges à valider *(admin seulement ; adresse interne fixée au chantier PWA)* |
 
 L'admin reste dans la PWA (décision 7 du ticket 066) : ses deux liens ouvrent la PWA plutôt qu'un
@@ -426,6 +426,12 @@ squelette ou leur « Réessayer », jamais la valeur gardée de l'ancienne caser
 caserne quittée (désactivée, ou absente de la relecture) sont effacés dès la lecture des
 appartenances (`OubliLocal.casernesQuittees`). Les repères « profil d'accueil vu » et « guide
 vu » restent **par appareil** : rejoindre une seconde caserne ne les remontre pas.
+
+**Dans l'app iOS** (chantier iOS du ticket 072), la même règle vit dans `AppStore.takeRouteRequest`
+(`foco/`) : `station_id` à la racine du `userInfo`, sinon `?station=` dans la route ; appartenances
+relues en base, écran décidé avec le rôle de la caserne du message, puis bascule et bandeau ;
+rien de l'ancienne caserne n'est gardé à l'écran pendant la lecture de la nouvelle. Détail :
+`docs/IOS.md § 4 octies`.
 
 Les adresses de la coquille d'avant le ticket 064 — `/?onglet=N`, `/?mois=AAAA-MM`,
 `/notifications` — sont redirigées vers les nouvelles routes (`core/router/destinations.dart`,
