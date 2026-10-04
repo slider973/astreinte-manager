@@ -1,6 +1,6 @@
 # Tableau des tickets
 
-Généré par `scripts/ticket.sh board` le 2026-10-03. Ne pas éditer à la main.
+Généré par `scripts/ticket.sh board` le 2026-10-04. Ne pas éditer à la main.
 
 ## En cours
 

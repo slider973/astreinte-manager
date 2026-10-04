@@ -5,7 +5,7 @@
 - **Dépend de** : —
 - **Branche** : `feat/075-site-vitrine`
 - **PR** : https://github.com/slider973/astreinte-manager/pull/80
-- **Statut** : terminé le 2026-09-30 (PR créée)
+- **Statut** : terminé le 2026-10-04 (manuel)
 
 ## Contexte
 
@@ -93,3 +93,26 @@ ne le connaît pas : la seule adresse est l'app elle-même (`https://astreinte.s
 
 - Déplacer l'app sur `app.astreinte-sp.fr`.
 - Blog, pages multiples par département, formulaire de contact avec serveur.
+
+## Réouverture (4 octobre 2026) : remplir les mentions à compléter
+
+Branche `feat/075b-mentions-legales`, PR https://github.com/slider973/astreinte-manager/pull/82. Toutes les marques `[À COMPLÉTER …]` de `site/public/*.html`
+sont remplacées par les décisions du propriétaire, pour que `verifier.py --marqueurs` passe et que
+la tâche « Site vitrine — mise en ligne » de `deploy.yml` publie enfin le site :
+
+- **Éditeur** : Staticflow LLC, Limited Liability Company immatriculée dans l'État du Wyoming
+  (États-Unis) le 17 novembre 2025 sous le numéro 2025-001817566, siège 30 N Gould St, Ste R,
+  Sheridan, WY 82801, États-Unis. L'EIN n'est pas publié.
+- **Directeur de la publication** : rubrique **retirée** de `mentions-legales.html` à la demande du
+  propriétaire, sans phrase de remplacement. La LCEN (art. 6, III) prévoit normalement le nom du
+  directeur de la publication ; l'écart est une décision du propriétaire.
+- **Hébergeur** : Vercel Inc. (adresse inchangée), contact `vercel.com/contact` en lien.
+- **TVA** : « Prix hors taxes. TVA applicable selon le statut du client. » sous les tarifs et dans
+  « L'essentiel » (classe `mention` existante ; `style.v1.css`, servi `immutable`, n'est pas touché).
+- **Confidentialité** : journaux Vercel conservés selon la politique de confidentialité de Vercel
+  (lien, aucune durée inventée) ; transfert vers les États-Unis encadré par les clauses
+  contractuelles types de l'hébergeur ; courriels de contact conservés trois ans après le dernier
+  échange ; messagerie : redirection OVH (France) vers la boîte de l'éditeur ; mention du
+  représentant dans l'Union (article 27 du RGPD) supprimée sans remplacement.
+- Dates « Mise à jour » des deux pages portées au 4 octobre 2026. Le script en ligne n'a pas
+  changé : l'empreinte de la CSP reste valide.
