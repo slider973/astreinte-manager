@@ -18,6 +18,8 @@ import '../../../core/widgets/loading_skeleton.dart';
 import '../../astreintes/domain/astreintes_providers.dart';
 import '../../boite/domain/onglet_boite.dart';
 import '../../dispos/presentation/controllers/rafraichissement_periodes.dart';
+import '../../echanges/domain/echanges_providers.dart';
+import '../../echanges/presentation/widgets/carte_demande_recue.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../../propositions/domain/propositions_providers.dart';
@@ -62,6 +64,8 @@ class _AccueilScreenState extends ConsumerState<AccueilScreen>
     Donnee.astreintes,
     Donnee.propositions,
     Donnee.periodes,
+    // Ticket 073 : les demandes d'échange comptent parmi ce qu'on te demande.
+    Donnee.echanges,
   };
 
   @override
@@ -137,6 +141,7 @@ class _Contenu extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final marge = AppWindowClass.of(context).margePage;
     final dispos = tableau.dispos;
+    final demandes = ref.watch(echangesRecusProvider);
 
     return RefreshIndicator(
       // Les trois sources de l'accueil, ensemble : le bloc « Disponibilités »
@@ -201,7 +206,10 @@ class _Contenu extends ConsumerWidget {
               const SizedBox(height: AppSpacing.xl),
               _EnteteRangee(
                 titre: AppStrings.accueilPropositionsSection,
-                compte: tableau.propositions.length,
+                // **Ce qu'on te demande**, demandes de collègues comprises
+                // (`design/073 § 7.1`) : le pompier n'apprend pas deux
+                // endroits.
+                compte: tableau.propositions.length + demandes.length,
                 libelleAction: AppStrings.accueilToutVoirPropositions,
                 onAction: () => _ouvrirReponse(context),
               ),
@@ -217,14 +225,25 @@ class _Contenu extends ConsumerWidget {
                         .rafraichir(),
                   ),
                 )
-              else if (tableau.propositions.isEmpty)
+              else if (tableau.propositions.isEmpty && demandes.isEmpty)
                 const EmptyState(
                   titre: AppStrings.accueilVidePropositionsTitre,
                   texte: AppStrings.accueilVidePropositionsTexte,
                 )
-              else
+              else ...<Widget>[
+                for (final demande in demandes.take(_propositionsMontrees))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: CarteDemandeRecue(
+                      key: ValueKey<String>('demande-${demande.id}'),
+                      echange: demande,
+                      maintenant: maintenant,
+                      onOuvrir: () => _ouvrirReponse(context),
+                    ),
+                  ),
                 for (final proposition in tableau.propositions.take(
-                  _propositionsMontrees,
+                  _propositionsMontrees -
+                      demandes.take(_propositionsMontrees).length,
                 ))
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -236,6 +255,7 @@ class _Contenu extends ConsumerWidget {
                       onOuvrir: () => _ouvrirReponse(context),
                     ),
                   ),
+              ],
 
               if (dispos != null) ...<Widget>[
                 const SizedBox(height: AppSpacing.xl),

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../echanges/domain/echange.dart';
+import '../../echanges/domain/echanges_providers.dart';
 import '../../notifications/domain/centre_providers.dart';
 import '../../notifications/domain/notification_interne.dart';
 import '../../propositions/domain/proposition.dart';
@@ -44,6 +46,20 @@ final class PropositionBoite extends ElementBoite {
   String get cle => proposition.id;
 }
 
+/// Une demande d'échange reçue ou « à reprendre » (ticket 073). Elle ouvre
+/// le panneau d'échange ; dans « Tout », elle se classe à son arrivée.
+final class DemandeBoite extends ElementBoite {
+  const DemandeBoite(this.echange);
+
+  final Echange echange;
+
+  @override
+  DateTime get instant => echange.creeLe;
+
+  @override
+  String get cle => 'echange-${echange.id}';
+}
+
 /// Un rappel : une notification qui n'est pas une proposition.
 final class RappelBoite extends ElementBoite {
   const RappelBoite(this.notification);
@@ -65,16 +81,21 @@ final class RappelBoite extends ElementBoite {
 List<ElementBoite> fusionner({
   required List<Proposition> propositions,
   required List<NotificationInterne> rappels,
+  List<Echange> demandes = const <Echange>[],
 }) {
+  // Ce à quoi on répond — proposition ou demande d'un collègue — passe devant
+  // ce qui est seulement à lire, à instant égal.
+  bool question(ElementBoite e) => e is! RappelBoite;
   final elements =
       <ElementBoite>[
         for (final proposition in propositions) PropositionBoite(proposition),
+        for (final demande in demandes) DemandeBoite(demande),
         for (final rappel in rappels) RappelBoite(rappel),
       ]..sort((ElementBoite a, ElementBoite b) {
         final parInstant = b.instant.compareTo(a.instant);
         if (parInstant != 0) return parInstant;
-        if (a is PropositionBoite && b is! PropositionBoite) return -1;
-        if (b is PropositionBoite && a is! PropositionBoite) return 1;
+        if (question(a) && !question(b)) return -1;
+        if (question(b) && !question(a)) return 1;
         return 0;
       });
   return List<ElementBoite>.unmodifiable(elements);
@@ -96,7 +117,12 @@ class EtatBoite {
     required this.chargeRappels,
     required this.echecPropositions,
     required this.echecRappels,
+    this.demandes = const <Echange>[],
   });
+
+  /// Les demandes d'échange reçues et « à reprendre » (ticket 073), la plus
+  /// récente en premier : le groupe « Demandes de collègues ».
+  final List<Echange> demandes;
 
   /// Les propositions en attente, dans l'ordre du dépôt (le tri par mois est
   /// fait par `elementsPropositionsProvider`).
@@ -131,6 +157,7 @@ class EtatBoite {
 EtatBoite etatBoiteDe({
   required AsyncValue<EtatPropositions> propositions,
   required AsyncValue<EtatCentre> centre,
+  List<Echange> demandes = const <Echange>[],
 }) {
   final listePropositions = propositions.value?.propositions;
   final etatCentre = centre.value;
@@ -142,7 +169,9 @@ EtatBoite etatBoiteDe({
     tout: fusionner(
       propositions: listePropositions ?? const <Proposition>[],
       rappels: rappels,
+      demandes: demandes,
     ),
+    demandes: demandes,
     nonLus: etatCentre?.nonLues ?? 0,
     chargePropositions: listePropositions == null && !propositions.hasError,
     chargeRappels: etatCentre == null && !centre.hasError,
@@ -163,6 +192,7 @@ final Provider<EtatBoite> etatBoiteProvider = Provider<EtatBoite>(
   (ref) => etatBoiteDe(
     propositions: ref.watch(propositionsControllerProvider),
     centre: ref.watch(centreNotificationsProvider),
+    demandes: ref.watch(echangesRecusProvider),
   ),
 );
 
@@ -201,3 +231,17 @@ final Provider<Proposition?> propositionOuverteProvider =
       }
       return null;
     });
+
+/// L'identifiant de la demande d'échange dont le panneau est ouvert
+/// (ticket 073), même raison qu'à [PropositionEnReponse].
+class EchangeEnReponse extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void choisir(String id) => state = id;
+
+  void fermer() => state = null;
+}
+
+final NotifierProvider<EchangeEnReponse, String?> echangeEnReponseProvider =
+    NotifierProvider<EchangeEnReponse, String?>(EchangeEnReponse.new);

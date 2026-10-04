@@ -344,6 +344,39 @@ class _FormulaireParametresState extends State<FormulaireParametres> {
             champ: ChampParametre.rapportRetard,
           ),
         ),
+
+        // --- Échanges d'astreintes (ticket 073) ---------------------------
+        const EnteteSection(
+          titre: AppStrings.parametresEchangesTitre,
+          compte: AppStrings.parametresEchangesNote,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        // Jamais `.adaptive` (`DESIGN.md § Écarts 024`) : une seule apparence.
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text(AppStrings.parametresEchangesAuto),
+          subtitle: const Text(AppStrings.parametresEchangesAutoAide),
+          value: _brouillon.echangeAuto,
+          onChanged: actif
+              ? (bool valeur) =>
+                    widget.onChange(_brouillon.copyWith(echangeAuto: valeur))
+              : null,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        ChampNombre(
+          libelle: AppStrings.parametresEchangesEcheance,
+          valeur: _brouillon.echangeEcheanceHeures,
+          min: LimitesParametres.echeanceEchangeMin,
+          max: LimitesParametres.echeanceEchangeMax,
+          actif: actif,
+          erreur: _erreur(ChampParametre.echeanceEchange),
+          suffixe: AppStrings.parametresEchangesEcheanceSuffixe,
+          onQuitte: () => widget.onToucher(ChampParametre.echeanceEchange),
+          onChange: (int valeur) => widget.onChange(
+            _brouillon.copyWith(echangeEcheanceHeures: valeur),
+            champ: ChampParametre.echeanceEchange,
+          ),
+        ),
       ],
     );
   }

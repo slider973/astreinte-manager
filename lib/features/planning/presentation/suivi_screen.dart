@@ -22,6 +22,7 @@ import '../../../core/widgets/status_badge.dart';
 import '../../dispos/domain/dispos_providers.dart';
 import '../../dispos/domain/periode_saisie.dart';
 import '../../dispos/presentation/widgets/selecteur_mois.dart';
+import '../../echanges/presentation/widgets/bloc_echanges_suivi.dart';
 import '../../membres/domain/membres_providers.dart';
 import '../domain/candidat.dart';
 import '../domain/matrice_providers.dart';
@@ -439,6 +440,9 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
           ),
         ),
         const AppDivider(),
+        // Ticket 073 : la file des échanges à valider, quand elle n'est pas
+        // vide.
+        const BlocEchangesSuivi(),
         Expanded(child: _contenu(etat)),
       ],
     );
@@ -650,6 +654,10 @@ class _MenuAdmin extends StatelessWidget {
       const PopupMenuItem<String>(
         value: AppRoutes.periodesName,
         child: Text(AppStrings.matriceVersPeriodes),
+      ),
+      const PopupMenuItem<String>(
+        value: AppRoutes.echangesAdminName,
+        child: Text(AppStrings.echangesLien),
       ),
     ],
   );

@@ -680,6 +680,11 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen>
       icon: const Icon(Icons.event_available_outlined),
       tooltip: AppStrings.matriceVersPeriodes,
     ),
+    IconButton(
+      onPressed: () => context.goNamed(AppRoutes.echangesAdminName),
+      icon: const Icon(Icons.swap_horiz),
+      tooltip: AppStrings.echangesLien,
+    ),
   ];
 
   Widget _corps({
@@ -1150,6 +1155,10 @@ class _MenuAdmin extends StatelessWidget {
         const PopupMenuItem<String>(
           value: AppRoutes.periodesName,
           child: Text(AppStrings.matriceVersPeriodes),
+        ),
+        const PopupMenuItem<String>(
+          value: AppRoutes.echangesAdminName,
+          child: Text(AppStrings.echangesLien),
         ),
       ],
     );

@@ -311,6 +311,19 @@ void main() {
       await tester.tap(find.text(AppStrings.parametresSurchargeAppliquer));
       await tester.pumpAndSettle();
 
+      // La ligne datée est **au-dessus** du bouton qui l'a ajoutée, et la
+      // section des échanges (ticket 073) allonge la page sous lui : on
+      // remonte jusqu'à elle.
+      await tester.scrollUntilVisible(
+        find.text('31/12/2026'),
+        -200,
+        scrollable: find
+            .descendant(
+              of: find.byType(ParametresScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(find.text('31/12/2026'), findsOneWidget);
     });
   });

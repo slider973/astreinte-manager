@@ -26,6 +26,10 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../astreintes/domain/astreinte.dart';
 import '../../astreintes/domain/astreintes_providers.dart';
+import '../../echanges/domain/echange.dart';
+import '../../echanges/domain/echanges_providers.dart';
+import '../../echanges/presentation/widgets/groupe_demandes.dart';
+import '../../echanges/presentation/widgets/panneau_echange.dart';
 import '../../notifications/domain/centre_providers.dart';
 import '../../notifications/domain/destination_push.dart';
 import '../../notifications/domain/notification_interne.dart';
@@ -92,6 +96,8 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
   Set<Donnee> get donneesAffichees => const <Donnee>{
     Donnee.propositions,
     Donnee.centre,
+    // Ticket 073 : les demandes d'échange reçues et à reprendre.
+    Donnee.echanges,
   };
 
   @override
@@ -157,7 +163,44 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
   void _relire() {
     unawaited(ref.read(centreNotificationsProvider.notifier).rafraichir());
     unawaited(ref.read(propositionsControllerProvider.notifier).rafraichir());
+    unawaited(ref.read(echangesControllerProvider.notifier).rafraichir());
   }
+
+  // -------------------------------------------------------------------
+  // Les demandes d'échange (ticket 073) : le même geste qu'une proposition
+  // -------------------------------------------------------------------
+
+  /// Ouvre le panneau d'échange : le volet en `large`, une feuille dessous.
+  void _ouvrirDemande(Echange echange) {
+    ref.read(propositionEnReponseProvider.notifier).fermer();
+    ref.read(echangeEnReponseProvider.notifier).choisir(echange.id);
+    if (AppWindowClass.of(context).estLarge) return;
+    unawaited(_feuilleDemande(echange.id));
+  }
+
+  Future<void> _feuilleDemande(String id) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (BuildContext feuille) => SafeArea(
+        top: false,
+        child: PanneauEchange(
+          echangeId: id,
+          onFermer: () => Navigator.of(feuille).pop(),
+        ),
+      ),
+    );
+    if (mounted) ref.read(echangeEnReponseProvider.notifier).fermer();
+  }
+
+  Widget _groupeDemandes(EtatBoite etat, DateTime maintenant) => GroupeDemandes(
+    demandes: etat.demandes,
+    maintenant: maintenant,
+    onOuvrir: _ouvrirDemande,
+    suivies: ref.watch(echangesSuivisProvider).length,
+    onSuivre: () => context.goNamed(AppRoutes.astreintesName),
+  );
 
   // -------------------------------------------------------------------
   // Les rappels : une touche, deux effets
@@ -217,6 +260,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
   /// Ouvre la réponse : le volet de droite en `large`, une feuille de bas
   /// d'écran en dessous. Jamais un dialogue (`DESIGN.md § Don't`).
   void _ouvrirReponse(Proposition proposition) {
+    ref.read(echangeEnReponseProvider.notifier).fermer();
     ref.read(propositionEnReponseProvider.notifier).choisir(proposition.id);
     if (!AppWindowClass.of(context).estLarge) unawaited(_ouvrirFeuille());
   }
@@ -430,6 +474,15 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
   /// rappels, et sur une liste vide il inviterait à toucher ce qui n'existe
   /// pas. `null` partout ailleurs, et la zone de travail reprend sa largeur.
   Widget? _volet({required EtatBoite etat, required Proposition? ouverte}) {
+    final demande = ref.watch(echangeEnReponseProvider);
+    if (demande != null) {
+      return PanneauEchange(
+        key: ValueKey<String>('echange-$demande'),
+        echangeId: demande,
+        etendu: true,
+        onFermer: () => ref.read(echangeEnReponseProvider.notifier).fermer(),
+      );
+    }
     if (ouverte != null) return _panneau(ouverte, etendu: true);
     if (widget.onglet != OngletBoite.propositions) return null;
     if (etat.propositions.isEmpty) return null;
@@ -550,6 +603,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
         onProposition: _ouvrirReponse,
         onRappel: (NotificationInterne rappel) =>
             unawaited(_ouvrirRappel(rappel)),
+        onDemande: _ouvrirDemande,
         onRelire: _relire,
       ),
       OngletBoite.propositions => _corpsPropositions(
@@ -565,10 +619,23 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
     required DateTime maintenant,
   }) {
     if (etat.chargePropositions) return const SqueletteBoite();
+    final groupe = _groupeDemandes(etat, maintenant);
     if (etat.echecPropositions) {
       return EmptyState.erreur(
         texte: AppStrings.propositionsErreurTexte,
         onAction: _relire,
+      );
+    }
+    if (etat.propositions.isEmpty &&
+        (etat.demandes.isNotEmpty ||
+            ref.watch(echangesSuivisProvider).isNotEmpty)) {
+      return ListePropositions(
+        enTete: <Widget>[groupe],
+        elements: const <ElementListe>[],
+        heures: _heures(),
+        maintenant: maintenant,
+        onOuvrir: _ouvrirReponse,
+        onRelire: _relire,
       );
     }
     if (etat.propositions.isEmpty) {
@@ -580,6 +647,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
       );
     }
     return ListePropositions(
+      enTete: <Widget>[groupe],
       elements: ref.watch(elementsPropositionsProvider),
       heures: _heures(),
       maintenant: maintenant,
