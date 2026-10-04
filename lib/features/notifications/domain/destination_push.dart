@@ -19,6 +19,7 @@ library;
 
 import '../../../core/router/app_router.dart';
 import '../../boite/domain/onglet_boite.dart';
+import '../../echanges/domain/filtre_echanges.dart';
 
 /// Une période de saisie, `AAAA-MM`. Rien d'autre n'est accepté : un lien
 /// forgé ne doit pas se promener dans l'URL de l'application.
@@ -56,6 +57,21 @@ String? destinationInterne(String? lien, {required bool admin}) {
   // membre ordinaire** : le routeur ferme `/admin` de toute façon, et rendre
   // `null` ici le ramène à l'accueil sans message d'erreur, comme pour un lien
   // qui daterait d'avant une rétrogradation.
+  // `/exchanges` — une demande reçue, à reprendre, ou l'issue d'une demande
+  // (ticket 073) : l'onglet « Propositions » de la Boîte, où les demandes se
+  // répondent et d'où « Suivre mes échanges » mène aux siennes.
+  if (segments.length == 1 && segments.first == 'exchanges') {
+    return AppRoutes.boiteOnglet(OngletBoite.propositions);
+  }
+
+  // `/admin/exchanges` — la file des échanges à valider. Ignoré pour un membre
+  // ordinaire, comme l'abonnement.
+  if (segments.length == 2 &&
+      segments[0] == 'admin' &&
+      segments[1] == 'exchanges') {
+    return admin ? AppRoutes.echangesAdminFiltre(FiltreEchanges.aValider) : null;
+  }
+
   if (segments.length == 2 &&
       segments[0] == 'admin' &&
       segments[1] == 'subscription') {
