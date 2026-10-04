@@ -40,6 +40,13 @@ class CarteDemandeRecue extends StatelessWidget {
         : AppStrings.echangeLigneCession(nom);
     final titre = gardeTitre(context, echange.garde);
     final mention = formaterInstantRelatif(echange.creeLe, maintenant: maintenant);
+    // À grande échelle de texte, l'ancienneté passe sous la ligne : à droite,
+    // elle mangeait la colonne au point d'écrire un mot par ligne (vu à ×1,6
+    // sur 390 points).
+    final enDessous = MediaQuery.textScalerOf(context).scale(10) > 13;
+    final styleMention = theme.textTheme.bodySmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
 
     return Semantics(
       button: true,
@@ -87,17 +94,14 @@ class CarteDemandeRecue extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (enDessous) Text(mention, style: styleMention),
                 ],
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              mention,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-              maxLines: 1,
-            ),
+            if (!enDessous) ...<Widget>[
+              const SizedBox(width: AppSpacing.sm),
+              Text(mention, style: styleMention, maxLines: 1),
+            ],
           ],
         ),
       ),

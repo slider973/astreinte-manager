@@ -339,20 +339,27 @@ class _Charge extends StatelessWidget {
                 if (p.disponibilite case final DisponibiliteEtat dispo)
                   Padding(
                     padding: const EdgeInsets.only(top: AppSpacing.xs),
-                    child: Row(
+                    // Un `Wrap` : à ×1,6 d'échelle de texte, la marque passe
+                    // à la ligne plutôt que de déborder du volet de 360.
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.xs,
                       children: <Widget>[
                         Text(
-                          '${AppStrings.echangesDispoDeclaree} : ',
+                          '${AppStrings.echangesDispoDeclaree} :',
                           style: theme.textTheme.bodyMedium,
                         ),
-                        SlotChip(
-                          etat: dispo,
-                          creneau: echange.garde.creneau,
-                          densite: SlotChipDensite.compacte,
-                          libelleSemantique:
-                              context.statuts.disponibilite(dispo).libelle,
+                        SizedBox.square(
+                          dimension: AppTouch.caseCompacte,
+                          child: SlotChip(
+                            etat: dispo,
+                            creneau: echange.garde.creneau,
+                            densite: SlotChipDensite.compacte,
+                            libelleSemantique:
+                                context.statuts.disponibilite(dispo).libelle,
+                          ),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
                         Text(
                           context.statuts.disponibilite(dispo).libelle,
                           style: theme.textTheme.bodyMedium,
