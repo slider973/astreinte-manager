@@ -1073,6 +1073,24 @@ est construite par `lienApplication()` (`APP_BASE_URL` + `APP_LINK_PATH`), et le
 si l'origine n'est pas en `https` — en développement, le push part donc sans lui, sans conséquence :
 le service worker lit `data.route`.
 
+### La caserne de la notification _(ticket 072)_
+
+Un pompier de plusieurs casernes doit arriver dans **la bonne** quand il touche un push ou un lien
+(décision 2 du ticket 072). Quand la demande porte `station_id` :
+
+- `data.station_id` — dans la ligne `inapp` (le centre de notifications), dans les traces `push` et
+  `email`, et dans le bloc `data` du message FCM, donc à la racine du `userInfo` iOS et dans
+  `FCM_MSG.data` du service worker. `data.route` ne change pas ;
+- `?station=<uuid>` ajouté au lien du courriel et à `webpush.fcm_options.link` par
+  `lienApplication(route, stationId)` — omis si l'identifiant n'a pas la forme d'un uuid ;
+- l'étiquette (`Notification.tag`, `apns-collapse-id`, `thread-id`) devient
+  `<type>:<période>:<8 premiers caractères de la caserne>` : sans cela, les propositions d'octobre
+  de B remplaçaient celles d'octobre de A sur l'écran verrouillé.
+
+Sans `station_id` (aucun type de caserne n'en manque aujourd'hui), rien de tout cela n'est ajouté.
+Le client bascule vers cette caserne seulement si le compte y a une appartenance active
+(`docs/WORKFLOWS.md § 8`).
+
 ### Réponse `200`
 
 ```jsonc

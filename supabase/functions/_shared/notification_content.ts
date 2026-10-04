@@ -977,8 +977,20 @@ function contenuEchange(type: TypeEchange, payload: ChargeUtile, route: string):
  * Deux notifications de même étiquette se remplacent au lieu de s'empiler : un
  * rappel qui repart n'ajoute pas une ligne de plus dans le centre de
  * notifications du système.
+ *
+ * **La caserne en fait partie** depuis le ticket 072 : sans elle, les
+ * propositions d'octobre de B remplaçaient sur l'écran verrouillé celles
+ * d'octobre de A, pour un pompier des deux. Les huit premiers caractères de
+ * l'identifiant suffisent à séparer les casernes d'un même compte et gardent
+ * l'étiquette sous les 64 octets d'`apns-collapse-id` (fcm.ts).
  */
-export function etiquette(type: TypeNotification, payload: ChargeUtile): string {
+export function etiquette(
+  type: TypeNotification,
+  payload: ChargeUtile,
+  stationId?: string | null,
+): string {
   const periode = lirePeriode(payload);
-  return periode ? `${type}:${periode}` : type;
+  const base = periode ? `${type}:${periode}` : type;
+  const caserne = stationId?.trim().toLowerCase().slice(0, 8);
+  return caserne ? `${base}:${caserne}` : base;
 }

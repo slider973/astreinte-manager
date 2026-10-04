@@ -1247,12 +1247,14 @@ export type Database = {
           accepted_previous: number
           comment: string
           day_slots: string
+          day_taken_elsewhere: string
           display_name: string
           first_name: string
           last_name: string
           max_shifts: number
           max_weekends: number
           night_slots: string
+          night_taken_elsewhere: string
           shifts_count: number
           shifts_left: number
           user_id: string
@@ -1491,6 +1493,15 @@ export type Database = {
       is_super_admin: { Args: never; Returns: boolean }
       jours_feries_fr: { Args: { p_annee: number }; Returns: string[] }
       mask_email: { Args: { p_email: string }; Returns: string }
+      member_taken_elsewhere: {
+        Args: {
+          p_date: string
+          p_slot: Database["public"]["Enums"]["slot_type"]
+          p_station: string
+          p_user: string
+        }
+        Returns: boolean
+      }
       my_ics_token: { Args: never; Returns: string }
       my_pending_invitations: {
         Args: never
@@ -1634,6 +1645,15 @@ export type Database = {
       rotate_ics_token: { Args: never; Returns: string }
       schedule_complet: { Args: { p_schedule: string }; Returns: boolean }
       schedule_reevaluer: { Args: { p_schedule: string }; Returns: boolean }
+      shift_window: {
+        Args: {
+          p_date: string
+          p_settings: Json
+          p_slot: Database["public"]["Enums"]["slot_type"]
+          p_timezone: string
+        }
+        Returns: unknown
+      }
       station_access: { Args: { p_station: string }; Returns: Json }
       station_exchange_auto_approve: {
         Args: { p_station: string }

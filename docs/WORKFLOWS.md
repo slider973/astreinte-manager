@@ -90,6 +90,14 @@ Règles :
 - En brouillon, les attributions existent avec `status = 'proposed'` et `proposed_at = null`.
   La publication renseigne `proposed_at`. Les crons de relance ignorent `proposed_at is null`.
   Une attribution née d'une réattribution est horodatée **dès sa création** : elle est partie.
+- **Un pompier de plusieurs casernes n'est jamais proposé deux fois au même moment par le
+  planning automatique** (décision 1 du ticket 072, migration `0040`). `apply_auto_proposal` écarte
+  en `taken_elsewhere` toute ligne dont le pompier est déjà `proposed` (brouillon compris) ou
+  `accepted` dans une autre caserne sur un créneau qui **chevauche** — intervalles réels, aux
+  heures et dans le fuseau de chaque caserne. Premier posé, premier servi ; un refus ou une
+  annulation ailleurs libère le créneau. L'administrateur voit « Astreinte ailleurs » dans la grille
+  (`availability_matrix`, colonnes `day_taken_elsewhere` / `night_taken_elsewhere`), jamais la
+  caserne, l'heure ni le statut de l'autre côté. Il peut toujours attribuer à la main.
 
 ## 3 bis. Échange d'astreinte (`shift_exchanges.status`) *(ticket 073, migration `0041`)*
 
@@ -378,6 +386,23 @@ est ignoré, et un lien inconnu, mal formé ou interdit laisse le membre sur l'a
 Au lancement froid, le lien **attend** que les appartenances soient lues : c'est le rôle, pas le
 lien, qui décide des deux liens de l'admin. Le lien voyage dans `data.route` du message FCM, à la
 racine du `userInfo` iOS.
+
+**Un push ou un lien d'une autre caserne** *(décision 2 du ticket 072)*. La caserne voyage à côté du
+lien public, jamais dedans : `data.station_id` dans le message FCM (racine du `userInfo` iOS,
+`FCM_MSG.data` du service worker) et dans `notifications.data` (centre de notifications), et
+`?station=<uuid>` ajouté à l'adresse du courriel et de `webpush.fcm_options.link`. Le chemin ne
+change pas : un client qui ignore le paramètre lit le même chemin qu'avant. À l'ouverture :
+
+1. `station_id` absent, ou égal à la caserne ouverte : rien ne change, le lien s'ouvre ;
+2. `station_id` d'une autre caserne **où le compte a une appartenance active** : l'app bascule
+   d'elle-même vers cette caserne (le même geste que le sélecteur), **puis** ouvre le lien, et un
+   bandeau dit quelle caserne est ouverte. Aucune donnée de l'ancienne caserne ne reste affichée ;
+3. `station_id` d'une caserne où le compte n'est pas (ou plus) membre actif : pas de bascule, le
+   lien retombe sur l'accueil sans message, comme un lien interdit. La base reste l'autorité — la
+   liste des appartenances relue, jamais un cache.
+
+L'étiquette de regroupement porte la caserne (`<type>:<période>:<8 caractères>`) : les propositions
+d'octobre de B ne remplacent plus celles de A sur l'écran verrouillé.
 
 Les adresses de la coquille d'avant le ticket 064 — `/?onglet=N`, `/?mois=AAAA-MM`,
 `/notifications` — sont redirigées vers les nouvelles routes (`core/router/destinations.dart`,
