@@ -96,7 +96,7 @@ ne le connaît pas : la seule adresse est l'app elle-même (`https://astreinte.s
 
 ## Réouverture (4 octobre 2026) : remplir les mentions à compléter
 
-Branche `feat/075b-mentions-legales`. Toutes les marques `[À COMPLÉTER …]` de `site/public/*.html`
+Branche `feat/075b-mentions-legales`, PR https://github.com/slider973/astreinte-manager/pull/82. Toutes les marques `[À COMPLÉTER …]` de `site/public/*.html`
 sont remplacées par les décisions du propriétaire, pour que `verifier.py --marqueurs` passe et que
 la tâche « Site vitrine — mise en ligne » de `deploy.yml` publie enfin le site :
 
