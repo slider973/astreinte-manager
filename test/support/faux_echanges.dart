@@ -96,8 +96,16 @@ class FauxEchangesRepository implements EchangesRepository {
 
   void definir(List<Echange> echanges) => _echanges = <Echange>[...echanges];
 
+  /// Les arguments de la dernière lecture.
+  ({String moi, bool admin})? derniereLecture;
+
   @override
-  Future<List<Echange>> lister({required String stationId}) async {
+  Future<List<Echange>> lister({
+    required String stationId,
+    String moi = '',
+    bool admin = false,
+  }) async {
+    derniereLecture = (moi: moi, admin: admin);
     lectures++;
     final echec = erreurLecture;
     if (echec != null) throw EchecEchange(echec);

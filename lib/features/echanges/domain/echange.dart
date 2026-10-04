@@ -130,6 +130,7 @@ class Echange {
     this.accepteLe,
     this.decideLe,
     this.closLe,
+    this.ouverteAMoi = true,
   });
 
   /// Les colonnes lues. Les deux créneaux sont joints par leur clé
@@ -150,6 +151,7 @@ class Echange {
   static Echange? depuisJson(
     Map<String, dynamic> ligne, {
     Map<String, String> noms = const <String, String>{},
+    bool ouverteAMoi = true,
   }) {
     final garde = _garde(
       ligne['garde'],
@@ -190,6 +192,7 @@ class Echange {
       accepteLe: _instant(ligne['accepted_at']),
       decideLe: _instant(ligne['decided_at']),
       closLe: _instant(ligne['closed_at']),
+      ouverteAMoi: ouverteAMoi,
     );
   }
 
@@ -233,6 +236,14 @@ class Echange {
   final DateTime? decideLe;
   final DateTime? closLe;
 
+  /// Vrai quand une demande « à la caserne » est **envoyée au lecteur** :
+  /// `exchange_open_to_me` (`docs/SCHEMA.md § 9`). Toujours vrai pour un
+  /// pompier — la RLS ne lui montre que celles-là —, mais un administrateur
+  /// les voit **toutes** (`shift_exchanges_select_admin`) : le dépôt le lui
+  /// demande alors à la base, et une demande qui ne lui est pas envoyée n'est
+  /// ni « à reprendre » ni comptée sur son accueil.
+  final bool ouverteAMoi;
+
   bool get aLaCaserne => cibleId == null;
 
   bool get estEchange => forme == FormeEchange.echange;
@@ -251,7 +262,7 @@ class Echange {
   LecteurEchange lecteur(String moi) {
     if (moi == demandeurId) return LecteurEchange.demandeur;
     if (moi == repreneurId || moi == cibleId) return LecteurEchange.pair;
-    if (aLaCaserne && statut == StatutEchange.ouvert) {
+    if (aLaCaserne && statut == StatutEchange.ouvert && ouverteAMoi) {
       return LecteurEchange.disponible;
     }
     return LecteurEchange.admin;
@@ -262,7 +273,7 @@ class Echange {
   bool aRepondre(String moi) =>
       statut == StatutEchange.ouvert &&
       moi != demandeurId &&
-      (cibleId == moi || aLaCaserne);
+      (cibleId == moi || (aLaCaserne && ouverteAMoi));
 
   /// Vrai quand [moi] suit la demande : je l'ai faite, ou je l'ai acceptée.
   bool suivie(String moi) =>

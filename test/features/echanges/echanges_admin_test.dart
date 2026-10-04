@@ -103,7 +103,7 @@ void main() {
   testWidgets('le lien /admin/exchanges ouvre la file à valider', (
     tester,
   ) async {
-    await _monter(tester, <Echange>[
+    final depot = await _monter(tester, <Echange>[
       _acceptee(),
     ], chemin: AppRoutes.lienEchangesAdmin);
     expect(find.byType(EchangesAdminScreen), findsOneWidget);
@@ -111,6 +111,10 @@ void main() {
       emplacementCourant(tester),
       AppRoutes.echangesAdminFiltre(FiltreEchanges.aValider),
     );
+    // La lecture dit à la base qui lit, pour trier les demandes « à la
+    // caserne » qui ne lui sont pas envoyées.
+    expect(depot.derniereLecture?.admin, isTrue);
+    expect(depot.derniereLecture?.moi, sessionMembre.userId);
     expect(find.text(AppStrings.echangesFiltreAValider(1)), findsOneWidget);
     expect(
       find.text(AppStrings.echangesLigneCede('Antoine C.', 'Chloé C.')),

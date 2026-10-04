@@ -131,7 +131,11 @@ class EchangesController extends AsyncNotifier<EtatEchanges>
 
     final echanges = await ref
         .read(echangesRepositoryProvider)
-        .lister(stationId: appartenance.stationId);
+        .lister(
+          stationId: appartenance.stationId,
+          moi: session.userId,
+          admin: appartenance.estAdmin,
+        );
     if (ref.mounted) marquerLu();
     return EtatEchanges(echanges: echanges, moi: session.userId);
   }
@@ -152,7 +156,11 @@ class EchangesController extends AsyncNotifier<EtatEchanges>
     try {
       final echanges = await ref
           .read(echangesRepositoryProvider)
-          .lister(stationId: appartenance.stationId);
+          .lister(
+          stationId: appartenance.stationId,
+          moi: session.userId,
+          admin: appartenance.estAdmin,
+        );
       if (!ref.mounted) return Relecture.inchangee;
       marquerLu();
       if (ecritureEnAttente || (publierSi != null && !publierSi())) {

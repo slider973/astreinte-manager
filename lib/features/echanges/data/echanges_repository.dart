@@ -114,7 +114,16 @@ abstract interface class EchangesRepository {
   /// siennes, celles « à la caserne » qui lui sont envoyées, et toutes pour un
   /// administrateur. Les demandes closes depuis plus de trente jours ne sont
   /// pas relues.
-  Future<List<Echange>> lister({required String stationId});
+  ///
+  /// Pour un [admin], chaque demande « à la caserne » encore ouverte et qui
+  /// n'est pas la sienne est soumise à `exchange_open_to_me` : la RLS les lui
+  /// montre toutes, et seules celles qui lui sont envoyées sont « à
+  /// reprendre » (une requête par demande, peu nombreuses).
+  Future<List<Echange>> lister({
+    required String stationId,
+    String moi = '',
+    bool admin = false,
+  });
 
   /// Les membres actifs de la caserne, sauf [moi], par ordre alphabétique.
   Future<List<Collegue>> collegues({
@@ -165,7 +174,11 @@ class SupabaseEchangesRepository implements EchangesRepository {
   static const Duration historique = Duration(days: 30);
 
   @override
-  Future<List<Echange>> lister({required String stationId}) async {
+  Future<List<Echange>> lister({
+    required String stationId,
+    String moi = '',
+    bool admin = false,
+  }) async {
     try {
       final depuis = _horloge().toUtc().subtract(historique).toIso8601String();
       final lignes = await _client
@@ -179,10 +192,30 @@ class SupabaseEchangesRepository implements EchangesRepository {
       if (lignes.isEmpty) return const <Echange>[];
 
       final noms = await _noms(stationId);
-      return <Echange>[
-        for (final ligne in lignes)
-          if (Echange.depuisJson(ligne, noms: noms) case final Echange e) e,
-      ];
+      final echanges = <Echange>[];
+      for (final ligne in lignes) {
+        var ouverte = true;
+        if (admin &&
+            ligne['target_id'] == null &&
+            ligne['status'] == 'open' &&
+            ligne['requester_id'] != moi) {
+          ouverte =
+              await _client.rpc<dynamic>(
+                'exchange_open_to_me',
+                params: <String, dynamic>{
+                  'p_station': ligne['station_id'],
+                  'p_shift': ligne['shift_id'],
+                  'p_requester': ligne['requester_id'],
+                },
+              ) ==
+              true;
+        }
+        if (Echange.depuisJson(ligne, noms: noms, ouverteAMoi: ouverte)
+            case final Echange e) {
+          echanges.add(e);
+        }
+      }
+      return echanges;
     } on Object catch (echec) {
       throw EchecEchange(_traduire(echec));
     }

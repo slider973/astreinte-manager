@@ -179,6 +179,63 @@ void main() {
     },
   );
 
+  test('un admin demande exchange_open_to_me pour chaque demande à la '
+      'caserne qui n\'est pas la sienne', () async {
+    Map<String, dynamic> ligne(String id, String demandeur) =>
+        <String, dynamic>{
+          'id': id,
+          'station_id': 'st-1',
+          'kind': 'give',
+          'status': 'open',
+          'requester_id': demandeur,
+          'assignment_id': 'att-$id',
+          'shift_id': 'c-$id',
+          'target_id': null,
+          'expires_at': '2026-10-23T17:00:00Z',
+          'created_at': '2026-10-04T08:00:00Z',
+          'garde': <String, dynamic>{'date': '2026-10-24', 'slot': 'night'},
+          'rendue': null,
+        };
+    fil.reponse = (http.Request r) {
+      if (r.url.path.endsWith('shift_exchanges')) {
+        return <Map<String, dynamic>>[
+          ligne('e-1', 'u-a'),
+          ligne('e-2', 'u-admin'),
+        ];
+      }
+      if (r.url.path.endsWith('exchange_open_to_me')) return false;
+      return <Map<String, dynamic>>[];
+    };
+    final echanges = await depot.lister(
+      stationId: 'st-1',
+      moi: 'u-admin',
+      admin: true,
+    );
+    final appels = fil.requetes
+        .where((http.Request r) => r.url.path.endsWith('exchange_open_to_me'))
+        .toList();
+    expect(appels, hasLength(1));
+    expect(jsonDecode(appels.single.body), <String, dynamic>{
+      'p_station': 'st-1',
+      'p_shift': 'c-e-1',
+      'p_requester': 'u-a',
+    });
+    expect(
+      echanges.firstWhere((Echange e) => e.id == 'e-1').ouverteAMoi,
+      isFalse,
+    );
+
+    // Un pompier ne la demande jamais : la RLS a déjà trié.
+    fil.requetes.clear();
+    await depot.lister(stationId: 'st-1', moi: 'u-b');
+    expect(
+      fil.requetes.where(
+        (http.Request r) => r.url.path.endsWith('exchange_open_to_me'),
+      ),
+      isEmpty,
+    );
+  });
+
   test('une réponse qui n\'arrive pas est une panne de réseau', () async {
     final panne = SupabaseEchangesRepository(
       SupabaseClient(

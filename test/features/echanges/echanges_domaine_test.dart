@@ -153,6 +153,32 @@ void main() {
       ]);
     });
 
+    test('admin non disponible : la demande à la caserne n\'est pas dans '
+        'recues, et il la lit en administrateur', () {
+      final pasAMoi = Echange(
+        id: 'caserne',
+        stationId: 'st-1',
+        forme: FormeEchange.cession,
+        statut: StatutEchange.ouvert,
+        demandeurId: 'u-antoine',
+        demandeurNom: 'Antoine C.',
+        garde: GardeEchange(
+          jour: DateTime(2026, 10, 24),
+          creneau: CreneauType.nuit,
+        ),
+        expireLe: DateTime(2026, 10, 23, 19),
+        creeLe: DateTime(2026, 10, 4, 8),
+        ouverteAMoi: false,
+      );
+      final etat = EtatEchanges(moi: 'u-admin', echanges: <Echange>[pasAMoi]);
+      expect(etat.recues, isEmpty);
+      expect(pasAMoi.lecteur('u-admin'), LecteurEchange.admin);
+      expect(pasAMoi.aRepondre('u-admin'), isFalse);
+      // Envoyée à lui : il la reprend comme un pompier.
+      final aMoi = echange(cibleId: null, cibleNom: null);
+      expect(aMoi.lecteur('u-admin'), LecteurEchange.disponible);
+    });
+
     test('enCoursSur trouve la garde cédée et la garde rendue', () {
       final etat = EtatEchanges(
         moi: moi,
@@ -236,6 +262,16 @@ void main() {
         causeEchange('weekend_quota_reached', qui: 'target', nomPair: 'Chloé'),
         AppStrings.echangeCausePlafondWeekends('Chloé'),
       );
+    });
+
+    test('les codes sans phrase propre prennent la phrase de repli', () {
+      for (final code in <String>[
+        'target_is_self',
+        'swap_requires_target',
+        'member_not_active',
+      ]) {
+        expect(causeEchange(code), AppStrings.echangeCauseAutre, reason: code);
+      }
     });
 
     test('aucune phrase ne dit « ailleurs » à un pompier', () {

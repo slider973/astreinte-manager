@@ -1739,41 +1739,71 @@ class _EchangesMemoire implements EchangesRepository {
     return null;
   }
 
+  /// `exchange_open_to_me` : l'appelant a déclaré `available` sur le créneau,
+  /// n'est pas le demandeur et n'est pas déjà dessus. Les plafonds et « pris
+  /// ailleurs » sont éprouvés en SQL.
+  bool _ouverteAMoi(EchangeMemoire e) {
+    final c = _creneau(e.creneauId);
+    if (c == null || e.demandeurId == _moi) return false;
+    final dejaLa = _base
+        .attributionsDe(e.creneauId)
+        .any((AttributionMemoire a) => a.userId == _moi && a.active);
+    return !dejaLa && _base._etaitDisponible(_moi, c);
+  }
+
+  /// La RLS de `shift_exchanges` (0041) : un pompier voit les siennes —
+  /// demandeur, destinataire, repreneur — et les demandes « à la caserne »
+  /// ouvertes qui lui sont envoyées ; un administrateur voit toute la caserne.
+  bool _visible(EchangeMemoire e, {required bool admin}) =>
+      admin ||
+      e.demandeurId == _moi ||
+      e.cibleId == _moi ||
+      e.repreneurId == _moi ||
+      (e.cibleId == null &&
+          e.statut == StatutEchange.ouvert &&
+          _ouverteAMoi(e));
+
   @override
-  Future<List<Echange>> lister({required String stationId}) async => <Echange>[
+  Future<List<Echange>> lister({
+    required String stationId,
+    String moi = '',
+    bool admin = false,
+  }) async => <Echange>[
     for (final e in _base.echanges)
-      if (_creneau(e.creneauId) case final CreneauPlanning c)
-        Echange(
-          id: e.id,
-          stationId: stationId,
-          forme: FormeEchange.cession,
-          statut: e.statut,
-          demandeurId: e.demandeurId,
-          demandeurNom: _base.membreParId(e.demandeurId)?.libelle ?? '',
-          cibleId: e.cibleId,
-          cibleNom: e.cibleId == null
-              ? null
-              : _base.membreParId(e.cibleId!)?.libelle,
-          repreneurId: e.repreneurId,
-          repreneurNom: e.repreneurId == null
-              ? null
-              : _base.membreParId(e.repreneurId!)?.libelle,
-          decideurId: e.decideurId,
-          decideurNom: e.decideurId == null
-              ? null
-              : _base.membreParId(e.decideurId!)?.libelle,
-          garde: GardeEchange(
-            jour: DateTime(_base.annee, _base.mois, c.jour),
-            creneau: c.creneau,
-            attributionId: e.attributionId,
-            creneauId: c.id,
+      if (_visible(e, admin: _base.membreParId(_moi)?.role == RoleMembre.admin))
+        if (_creneau(e.creneauId) case final CreneauPlanning c)
+          Echange(
+            ouverteAMoi: e.cibleId != null || _ouverteAMoi(e),
+            id: e.id,
+            stationId: stationId,
+            forme: FormeEchange.cession,
+            statut: e.statut,
+            demandeurId: e.demandeurId,
+            demandeurNom: _base.membreParId(e.demandeurId)?.libelle ?? '',
+            cibleId: e.cibleId,
+            cibleNom: e.cibleId == null
+                ? null
+                : _base.membreParId(e.cibleId!)?.libelle,
+            repreneurId: e.repreneurId,
+            repreneurNom: e.repreneurId == null
+                ? null
+                : _base.membreParId(e.repreneurId!)?.libelle,
+            decideurId: e.decideurId,
+            decideurNom: e.decideurId == null
+                ? null
+                : _base.membreParId(e.decideurId!)?.libelle,
+            garde: GardeEchange(
+              jour: DateTime(_base.annee, _base.mois, c.jour),
+              creneau: c.creneau,
+              attributionId: e.attributionId,
+              creneauId: c.id,
+            ),
+            expireLe: e.expireLe,
+            creeLe: e.creeLe,
+            accepteLe: e.accepteLe,
+            decideLe: e.decideLe,
+            closLe: e.decideLe,
           ),
-          expireLe: e.expireLe,
-          creeLe: e.creeLe,
-          accepteLe: e.accepteLe,
-          decideLe: e.decideLe,
-          closLe: e.decideLe,
-        ),
   ];
 
   @override
