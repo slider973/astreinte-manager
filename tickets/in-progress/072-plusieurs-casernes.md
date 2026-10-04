@@ -62,3 +62,49 @@ le permet (`memberships unique (station_id, user_id)`), mais l'audit du même jo
 ## Hors périmètre
 
 - Vue consolidée de plusieurs casernes sur un même écran.
+
+## Livraison
+
+**Fait**, en trois chantiers fusionnés en squash sur `main` :
+
+- **Base** : [#84](https://github.com/slider973/astreinte-manager/pull/84) (`f060939`) —
+  migration `0040_plusieurs_casernes.sql` (`member_taken_elsewhere`, motif `taken_elsewhere` dans
+  `apply_auto_proposal`, colonnes « pris ailleurs » de `availability_matrix`), `station_id` et
+  `?station=` dans les push, tests SQL à deux appartenances. Revue : « prêt », aucun bloquant.
+- **PWA** : [#86](https://github.com/slider973/astreinte-manager/pull/86) (`7e7f26c`) — sélecteur
+  de caserne, invitations en attente, bascule sur push ou lien avec bandeau et « Revenir », centre
+  filtré, « Astreinte ailleurs » chez l'admin, caches d'une caserne quittée effacés. Revue : deux
+  tours ; les deux bloquants du premier (démarrage à froid, écrans d'administration) levés ; sondes
+  de sécurité (lien forgé, cache admin hors ligne) 15/15 sans accès admin.
+- **iOS** : [#88](https://github.com/slider973/astreinte-manager/pull/88) (`8dc2e41`, commun
+  avec le 073) — pointeur `foco/` sur `c1b75da`, `docs/IOS.md` § 4 octies, et correctif PWA du
+  double point après un nom abrégé (`AppStrings.nomEnFinDePhrase`).
+- **PR du fork** `slider973/Foco` : [Foco#17](https://github.com/slider973/Foco/pull/17)
+  (`cb5be0c`, ce ticket) et [Foco#18](https://github.com/slider973/Foco/pull/18) (`c1b75da`,
+  ticket 073, visé par le pointeur).
+- **Courses `iOS` vertes** : [37195706808](https://github.com/slider973/Foco/actions/runs/37195706808),
+  [37196395636](https://github.com/slider973/Foco/actions/runs/37196395636) (`main` du fork,
+  `cb5be0c`), [37197187365](https://github.com/slider973/Foco/actions/runs/37197187365),
+  [37197977329](https://github.com/slider973/Foco/actions/runs/37197977329) (`main`, `c1b75da`,
+  291 tests) ; zéro avertissement Swift. Une course rouge **non volontaire**,
+  [37196427941](https://github.com/slider973/Foco/actions/runs/37196427941) (Foco#18), corrigée.
+- **TestFlight** : **1.0 (108)**, course
+  [37199233742](https://github.com/slider973/Foco/actions/runs/37199233742).
+- **Revue iOS** (072 et 073 ensemble) : « prêt », aucun bloquant.
+
+**Suites à faire** (non bloquantes) :
+- PWA : tests de lien forgé gardés au dépôt (les sondes de la revue n'ont pas été commitées) ;
+  relance du routeur quand une bascule de caserne échoue.
+- iOS (revue commune 072/073) : `invitationInvitedBy` double encore le point après un nom abrégé ;
+  « Refuser » reste actif dans une caserne en lecture seule ; deux tests manquants relevés par la
+  revue.
+
+**Reste à vérifier par le propriétaire sur l'iPhone** (TestFlight 1.0 (108)) :
+- [ ] push d'une autre caserne : l'app bascule, le bandeau dit laquelle est ouverte, « Revenir »
+  ramène à la précédente ;
+- [ ] pendant la bascule, aucune donnée de l'ancienne caserne à l'écran ;
+- [ ] sélecteur sur l'accueil avec deux casernes, non-lues des autres casernes comptées ;
+- [ ] invitation d'une seconde caserne visible sur l'accueil, puis rejointe : la nouvelle caserne
+  s'ouvre ;
+- [ ] centre de notifications limité à la caserne ouverte, passerelle vers l'autre ;
+- [ ] accès retiré dans la caserne ouverte : bascule vers l'autre, sans « Revenir ».
