@@ -56,17 +56,17 @@ class LigneDAstreinte extends StatelessWidget {
     final ferie = nomJourFerie(astreinte.jour);
 
     final semantique = AppStrings.astreintesLigneSemantique(
-        jourEtDate: jourEtDate,
-        creneau: creneau.libelle,
-        heures: AppStrings.astreintesIntervalleDit(
-          astreinte.creneau == CreneauType.jour
-              ? heures.debutJour
-              : heures.finJour,
-          astreinte.creneau == CreneauType.jour
-              ? heures.finJour
-              : heures.debutJour,
-        ),
-      );
+      jourEtDate: jourEtDate,
+      creneau: creneau.libelle,
+      heures: AppStrings.astreintesIntervalleDit(
+        astreinte.creneau == CreneauType.jour
+            ? heures.debutJour
+            : heures.finJour,
+        astreinte.creneau == CreneauType.jour
+            ? heures.finJour
+            : heures.debutJour,
+      ),
+    );
 
     return Semantics(
       button: true,

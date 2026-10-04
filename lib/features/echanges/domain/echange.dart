@@ -265,7 +265,9 @@ class Echange {
       (cibleId == moi || aLaCaserne);
 
   /// Vrai quand [moi] suit la demande : je l'ai faite, ou je l'ai acceptée.
-  bool suivie(String moi) => moi == demandeurId || moi == repreneurId ||
+  bool suivie(String moi) =>
+      moi == demandeurId ||
+      moi == repreneurId ||
       (moi == cibleId && statut != StatutEchange.ouvert);
 
   /// Vrai si le créneau cédé est encore à venir à [aujourdhui]. Une demande

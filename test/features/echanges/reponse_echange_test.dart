@@ -123,7 +123,10 @@ void main() {
     await _toucher(tester, _bouton(AppStrings.echangeRefuser));
 
     expect(depot.appels.single.$2['p_accept'], isFalse);
-    expect(find.text(AppStrings.echangeRefusEnvoye('Antoine C.')), findsOneWidget);
+    expect(
+      find.text(AppStrings.echangeRefusEnvoye('Antoine C.')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('à reprendre : « Je la prends », et rien pour refuser', (

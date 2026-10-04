@@ -241,7 +241,9 @@ class SupabaseEchangesRepository implements EchangesRepository {
       );
       return <GardeProposable>[
         for (final ligne in lignes)
-          if (GardeProposable.depuisJson(Map<String, dynamic>.from(ligne as Map))
+          if (GardeProposable.depuisJson(
+                Map<String, dynamic>.from(ligne as Map),
+              )
               case final GardeProposable garde
               // La fonction rend les gardes de **toutes** les casernes
               // partagées : l'échange entre casernes est hors périmètre.
@@ -332,6 +334,8 @@ class SupabaseEchangesRepository implements EchangesRepository {
 
   static ErreurEchange _traduire(Object echec) {
     if (echec is EchecEchange) return echec.erreur;
-    return echecDeTransport(echec) ? ErreurEchange.reseau : ErreurEchange.inconnue;
+    return echecDeTransport(echec)
+        ? ErreurEchange.reseau
+        : ErreurEchange.inconnue;
   }
 }

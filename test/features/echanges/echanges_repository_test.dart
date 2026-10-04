@@ -16,8 +16,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class _Fil {
   final List<http.Request> requetes = <http.Request>[];
-  Object? Function(http.Request requete) reponse = (_) =>
-      <String, dynamic>{'ok': true};
+  Object? Function(http.Request requete) reponse = (_) => <String, dynamic>{
+    'ok': true,
+  };
 
   late final SupabaseClient client = SupabaseClient(
     'https://caserne.exemple.test',
@@ -132,42 +133,51 @@ void main() {
     expect(gardes.single.attributionId, 'att-b1');
   });
 
-  test('lister : la caserne, les en cours, et trente jours de closes', () async {
-    fil.reponse = (http.Request r) => r.url.path.endsWith('shift_exchanges')
-        ? <Map<String, dynamic>>[
-            <String, dynamic>{
-              'id': 'e-1',
-              'station_id': 'st-1',
-              'kind': 'give',
-              'status': 'open',
-              'requester_id': 'u-a',
-              'assignment_id': 'att-a',
-              'shift_id': 'c-a',
-              'target_id': null,
-              'expires_at': '2026-10-23T17:00:00Z',
-              'created_at': '2026-10-04T08:00:00Z',
-              'garde': <String, dynamic>{'date': '2026-10-24', 'slot': 'night'},
-              'rendue': null,
-            },
-          ]
-        : <Map<String, dynamic>>[
-            <String, dynamic>{
-              'user_id': 'u-a',
-              'display_name': 'Antoine C.',
-              'profiles': <String, dynamic>{'first_name': 'A', 'last_name': 'C'},
-            },
-          ];
-    final echanges = await depot.lister(stationId: 'st-1');
-    final url = fil.requetes.first.url;
-    expect(url.queryParameters['station_id'], 'eq.st-1');
-    expect(
-      url.queryParameters['or'],
-      '(status.in.(open,accepted_by_peer),'
-      'updated_at.gte.2026-09-04T12:00:00.000Z)',
-    );
-    expect(echanges.single.demandeurNom, 'Antoine C.');
-    expect(echanges.single.aLaCaserne, isTrue);
-  });
+  test(
+    'lister : la caserne, les en cours, et trente jours de closes',
+    () async {
+      fil.reponse = (http.Request r) => r.url.path.endsWith('shift_exchanges')
+          ? <Map<String, dynamic>>[
+              <String, dynamic>{
+                'id': 'e-1',
+                'station_id': 'st-1',
+                'kind': 'give',
+                'status': 'open',
+                'requester_id': 'u-a',
+                'assignment_id': 'att-a',
+                'shift_id': 'c-a',
+                'target_id': null,
+                'expires_at': '2026-10-23T17:00:00Z',
+                'created_at': '2026-10-04T08:00:00Z',
+                'garde': <String, dynamic>{
+                  'date': '2026-10-24',
+                  'slot': 'night',
+                },
+                'rendue': null,
+              },
+            ]
+          : <Map<String, dynamic>>[
+              <String, dynamic>{
+                'user_id': 'u-a',
+                'display_name': 'Antoine C.',
+                'profiles': <String, dynamic>{
+                  'first_name': 'A',
+                  'last_name': 'C',
+                },
+              },
+            ];
+      final echanges = await depot.lister(stationId: 'st-1');
+      final url = fil.requetes.first.url;
+      expect(url.queryParameters['station_id'], 'eq.st-1');
+      expect(
+        url.queryParameters['or'],
+        '(status.in.(open,accepted_by_peer),'
+        'updated_at.gte.2026-09-04T12:00:00.000Z)',
+      );
+      expect(echanges.single.demandeurNom, 'Antoine C.');
+      expect(echanges.single.aLaCaserne, isTrue);
+    },
+  );
 
   test('une réponse qui n\'arrive pas est une panne de réseau', () async {
     final panne = SupabaseEchangesRepository(

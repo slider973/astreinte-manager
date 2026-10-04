@@ -118,10 +118,7 @@ class _EtapeQuiState extends ConsumerState<EtapeQui> {
           ),
         ];
       }
-      return const <Widget>[
-        SizedBox(height: AppSpacing.lg),
-        _Fantomes(),
-      ];
+      return const <Widget>[SizedBox(height: AppSpacing.lg), _Fantomes()];
     }
 
     final q = _recherche.text.trim().toLowerCase();
@@ -133,10 +130,7 @@ class _EtapeQuiState extends ConsumerState<EtapeQui> {
           ];
 
     return <Widget>[
-      const EnteteSection(
-        titre: AppStrings.echangeCollegues,
-        discret: true,
-      ),
+      const EnteteSection(titre: AppStrings.echangeCollegues, discret: true),
       if (liste.length > seuilRecherche) ...<Widget>[
         ChampTexte(
           libelle: AppStrings.echangeChercher,
@@ -235,16 +229,21 @@ class EtapeQuoi extends ConsumerWidget {
           const SizedBox(height: AppSpacing.lg),
           EmptyState.erreur(
             texte: AppStrings.echangeGardesErreur,
-            onAction: () => ref.invalidate(gardesProposablesProvider(pair.userId)),
+            onAction: () =>
+                ref.invalidate(gardesProposablesProvider(pair.userId)),
           ),
         ];
       }
       return const <Widget>[SizedBox(height: AppSpacing.lg), _Fantomes()];
     }
 
-    final plusieursMois = liste.map((GardeProposable g) => g.garde.cleMois).toSet().length > 1;
+    final plusieursMois =
+        liste.map((GardeProposable g) => g.garde.cleMois).toSet().length > 1;
     final elements = <Widget>[
-      EnteteSection(titre: AppStrings.echangeSesGardes(pair.nom), discret: true),
+      EnteteSection(
+        titre: AppStrings.echangeSesGardes(pair.nom),
+        discret: true,
+      ),
     ];
     String? mois;
     for (final garde in liste) {
@@ -266,7 +265,8 @@ class EtapeQuoi extends ConsumerWidget {
             avantTitre: ExcludeSemantics(
               child: CarreCreneau(creneau: garde.creneau),
             ),
-            titre: '${gardeCourte(context, garde.garde)} · '
+            titre:
+                '${gardeCourte(context, garde.garde)} · '
                 '${AppStrings.astreintesIntervalle(debut, fin)}',
             libelleAnnonce: AppStrings.echangeRangeeSemantique(
               verbe: AppStrings.echangeTuPrends,
@@ -399,7 +399,9 @@ class EtapeVerifier extends ConsumerWidget {
                   child: Text(
                     '$validation\n${AppStrings.echangeExpireLe(dateAvecJourSemaine(echeance), heureMinute(echeance))}',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: context.statuts.planning(PlanningEtat.publie).encre,
+                      color: context.statuts
+                          .planning(PlanningEtat.publie)
+                          .encre,
                     ),
                   ),
                 ),

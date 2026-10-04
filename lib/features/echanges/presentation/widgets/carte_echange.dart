@@ -42,12 +42,12 @@ class PaireGardes extends StatelessWidget {
           if (rendue != null)
             (AppStrings.echangeTuPrends, SensGarde.prend, rendue),
         ],
-        LecteurEchange.pair || LecteurEchange.disponible =>
-          <(String, SensGarde, GardeEchange)>[
-            if (rendue != null)
-              (AppStrings.echangeTuDonnes, SensGarde.donne, rendue),
-            (AppStrings.echangeTuPrends, SensGarde.prend, echange.garde),
-          ],
+        LecteurEchange.pair ||
+        LecteurEchange.disponible => <(String, SensGarde, GardeEchange)>[
+          if (rendue != null)
+            (AppStrings.echangeTuDonnes, SensGarde.donne, rendue),
+          (AppStrings.echangeTuPrends, SensGarde.prend, echange.garde),
+        ],
         LecteurEchange.admin => <(String, SensGarde, GardeEchange)>[
           (
             AppStrings.echangesCede(_nom(echange.demandeurNom)),
@@ -134,7 +134,8 @@ class CarteEchange extends StatelessWidget {
 
     return Semantics(
       button: onOuvrir != null,
-      label: '${AppStrings.echangeCarteSemantique(titreEchange(echange), descripteur.libelle)}. $detail',
+      label:
+          '${AppStrings.echangeCarteSemantique(titreEchange(echange), descripteur.libelle)}. $detail',
       excludeSemantics: true,
       child: CarteDouce(
         onTap: onOuvrir,
@@ -195,6 +196,5 @@ class CarteEchange extends StatelessWidget {
   }
 }
 
-String _nom(String? nom) => (nom ?? '').trim().isEmpty
-    ? AppStrings.echangeMembreInconnu
-    : nom!.trim();
+String _nom(String? nom) =>
+    (nom ?? '').trim().isEmpty ? AppStrings.echangeMembreInconnu : nom!.trim();

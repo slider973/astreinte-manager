@@ -114,9 +114,7 @@ class _ConfirmationState extends State<_Confirmation> {
           pleineLargeur: false,
           onPressed: () {
             final motif = _motif.text.trim();
-            Navigator.of(
-              context,
-            ).pop((motif: motif.isEmpty ? null : motif));
+            Navigator.of(context).pop((motif: motif.isEmpty ? null : motif));
           },
         ),
       ],

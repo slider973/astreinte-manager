@@ -236,8 +236,7 @@ class BackendMemoire {
          annee: annee,
          mois: mois,
          statut: PeriodeEtat.ouverte,
-         dateLimite:
-             dateLimite ?? DateTime.now().add(const Duration(days: 7)),
+         dateLimite: dateLimite ?? DateTime.now().add(const Duration(days: 7)),
        );
 
   final String stationId;
@@ -350,10 +349,11 @@ class BackendMemoire {
     return null;
   }
 
-  List<AttributionMemoire> attributionsDe(String creneauId) => <AttributionMemoire>[
-    for (final attribution in attributions)
-      if (attribution.creneauId == creneauId) attribution,
-  ];
+  List<AttributionMemoire> attributionsDe(String creneauId) =>
+      <AttributionMemoire>[
+        for (final attribution in attributions)
+          if (attribution.creneauId == creneauId) attribution,
+      ];
 
   AttributionMemoire? attributionParId(String id) {
     for (final attribution in attributions) {
@@ -394,9 +394,9 @@ class BackendMemoire {
   /// attributions acceptées**.
   bool get _complet {
     for (final creneau in creneaux) {
-      final acceptees = attributionsDe(
-        creneau.id,
-      ).where((AttributionMemoire a) => a.etat == AttributionEtat.accepte).length;
+      final acceptees = attributionsDe(creneau.id)
+          .where((AttributionMemoire a) => a.etat == AttributionEtat.accepte)
+          .length;
       if (acceptees < creneau.effectifRequis) return false;
     }
     return true;
@@ -486,7 +486,8 @@ class BackendMemoire {
 
   /// Le dépôt d'échanges **d'une session donnée** : `auth.uid()` décide de
   /// qui demande, répond ou tranche.
-  EchangesRepository echangesDe(String userId) => _EchangesMemoire(this, userId);
+  EchangesRepository echangesDe(String userId) =>
+      _EchangesMemoire(this, userId);
 }
 
 /// Une ligne de `shift_exchanges`.
@@ -528,20 +529,24 @@ class _MembresMemoire implements MembresRepository {
 
   @override
   Future<List<MembreCaserne>> membres(String stationId) async {
-    final liste = <MembreCaserne>[
-      for (final membre in _base.membres)
-        if (membre.statut != StatutMembre.invite)
-          MembreCaserne(
-            id: membre.membershipId,
-            userId: membre.userId,
-            role: membre.role,
-            statut: membre.statut,
-            prenom: membre.prenom,
-            nom: membre.nom,
-            email: membre.email,
-            nomAffiche: membre.nomAffiche,
-          ),
-    ]..sort((MembreCaserne a, MembreCaserne b) => a.cleDeTri.compareTo(b.cleDeTri));
+    final liste =
+        <MembreCaserne>[
+          for (final membre in _base.membres)
+            if (membre.statut != StatutMembre.invite)
+              MembreCaserne(
+                id: membre.membershipId,
+                userId: membre.userId,
+                role: membre.role,
+                statut: membre.statut,
+                prenom: membre.prenom,
+                nom: membre.nom,
+                email: membre.email,
+                nomAffiche: membre.nomAffiche,
+              ),
+        ]..sort(
+          (MembreCaserne a, MembreCaserne b) =>
+              a.cleDeTri.compareTo(b.cleDeTri),
+        );
     return List<MembreCaserne>.unmodifiable(liste);
   }
 
@@ -614,9 +619,7 @@ class _MembresMemoire implements MembresRepository {
       }
 
       final existante = _base.invitations
-          .where(
-            (InvitationMemoire i) => i.enAttente && i.email == email,
-          )
+          .where((InvitationMemoire i) => i.enAttente && i.email == email)
           .toList(growable: false);
       if (existante.isNotEmpty) {
         // Une invitation qui court encore est **renvoyée**, pas dupliquée.
@@ -647,8 +650,7 @@ class _MembresMemoire implements MembresRepository {
       // L'**appartenance**, elle, n'arrive qu'à l'acceptation : la personne
       // existe, elle n'est pas encore de la caserne.
       if (_base.membreParEmail(email) == null) {
-        final identite =
-            _base.annuaire[email] ?? (prenom: '', nom: '');
+        final identite = _base.annuaire[email] ?? (prenom: '', nom: '');
         _base.membres.add(
           MembreMemoire(
             membershipId: _base._id('m'),
@@ -676,10 +678,8 @@ class _MembresMemoire implements MembresRepository {
   }
 
   @override
-  Future<void> annuler(String invitationId) async =>
-      _base.invitations.removeWhere(
-        (InvitationMemoire i) => i.id == invitationId,
-      );
+  Future<void> annuler(String invitationId) async => _base.invitations
+      .removeWhere((InvitationMemoire i) => i.id == invitationId);
 
   @override
   Future<void> changerRole({
@@ -701,9 +701,7 @@ class _MembresMemoire implements MembresRepository {
 
   MembreMemoire _membre(String membershipId) => _base.membres.firstWhere(
     (MembreMemoire m) => m.membershipId == membershipId,
-    orElse: () => throw const EchecAdministration(
-      ErreurAdministration.refusee,
-    ),
+    orElse: () => throw const EchecAdministration(ErreurAdministration.refusee),
   );
 }
 
@@ -784,10 +782,7 @@ class _InvitationMemoire implements InvitationRepository {
           caserne: caserne,
         );
       }
-      throw EchecAcceptation(
-        ErreurAcceptation.dejaAcceptee,
-        caserne: caserne,
-      );
+      throw EchecAcceptation(ErreurAcceptation.dejaAcceptee, caserne: caserne);
     }
 
     if (invitation.expireLe.isBefore(_base.horloge())) {
@@ -844,7 +839,8 @@ class _DisposMemoire implements DisposRepository {
     required int annee,
     required int mois,
   }) async {
-    final carte = _base.dispos[userId] ?? const <CreneauCle, DisponibiliteEtat>{};
+    final carte =
+        _base.dispos[userId] ?? const <CreneauCle, DisponibiliteEtat>{};
     return <CreneauCle, DisponibiliteEtat>{
       for (final entree in carte.entries)
         if (entree.key.date.year == annee && entree.key.date.month == mois)
@@ -940,11 +936,14 @@ class _MatriceMemoire implements MatriceRepository {
     final jours = _base.periode.nombreDeJours;
     final charges = _charges();
 
-    final lignes = <LigneMatrice>[
-      for (final membre in _base.membres)
-        if (membre.actif)
-          _ligne(membre, jours, charges[membre.userId]),
-    ]..sort((LigneMatrice a, LigneMatrice b) => a.nomAffiche.compareTo(b.nomAffiche));
+    final lignes =
+        <LigneMatrice>[
+          for (final membre in _base.membres)
+            if (membre.actif) _ligne(membre, jours, charges[membre.userId]),
+        ]..sort(
+          (LigneMatrice a, LigneMatrice b) =>
+              a.nomAffiche.compareTo(b.nomAffiche),
+        );
     return List<LigneMatrice>.unmodifiable(lignes);
   }
 
@@ -979,15 +978,13 @@ class _MatriceMemoire implements MatriceRepository {
   /// L'alphabet de `availability_matrix` : `.`, `D`, `A`, et leurs minuscules
   /// quand un administrateur a saisi à la place du membre.
   String _chaine(String userId, int jours, CreneauType creneau) {
-    final carte = _base.dispos[userId] ?? const <CreneauCle, DisponibiliteEtat>{};
+    final carte =
+        _base.dispos[userId] ?? const <CreneauCle, DisponibiliteEtat>{};
     final auteurs = _base.auteursDispos[userId] ?? const <CreneauCle, String>{};
     final tampon = StringBuffer();
 
     for (var jour = 1; jour <= jours; jour++) {
-      final cle = CreneauCle(
-        DateTime(_base.annee, _base.mois, jour),
-        creneau,
-      );
+      final cle = CreneauCle(DateTime(_base.annee, _base.mois, jour), creneau);
       final etat = carte[cle];
       if (etat == null) {
         tampon.write('.');
@@ -1045,8 +1042,10 @@ class _MatriceMemoire implements MatriceRepository {
   }) async {
     if (etat == DisponibiliteEtat.nonSaisi) return false;
     final cle = CreneauCle(jour, creneau);
-    _base.dispos.putIfAbsent(userId, () => <CreneauCle, DisponibiliteEtat>{})[cle] =
-        etat;
+    _base.dispos.putIfAbsent(
+      userId,
+      () => <CreneauCle, DisponibiliteEtat>{},
+    )[cle] = etat;
     // `availabilities_trace_auteur` : l'auteur est l'appelant, et ici c'est
     // toujours un administrateur — d'où la minuscule au relecture.
     _base.auteursDispos.putIfAbsent(userId, () => <CreneauCle, String>{})[cle] =
@@ -1227,7 +1226,9 @@ class _PlanningMemoire implements PlanningRepository {
       if (!_base._etaitDisponible(userId, creneau)) continue;
 
       final lignes = _base.attributionsDe(creneauId);
-      if (lignes.any((AttributionMemoire a) => a.userId == userId && a.active)) {
+      if (lignes.any(
+        (AttributionMemoire a) => a.userId == userId && a.active,
+      )) {
         continue;
       }
       if (lignes.where((AttributionMemoire a) => a.active).length >=
@@ -1366,7 +1367,10 @@ class _PlanningMemoire implements PlanningRepository {
     await Completer<void>().future;
   }
 
-  static int _ordreDuPlusAncienTrou(AttributionMemoire a, AttributionMemoire b) {
+  static int _ordreDuPlusAncienTrou(
+    AttributionMemoire a,
+    AttributionMemoire b,
+  ) {
     final reponseA = a.repondueLe;
     final reponseB = b.repondueLe;
     if (reponseA != null && reponseB != null && reponseA != reponseB) {
@@ -1586,7 +1590,8 @@ class _PropositionsMemoire implements PropositionsRepository {
         if (attribution.userId == userId &&
             attribution.etat == AttributionEtat.propose &&
             attribution.proposeeLe != null)
-          if (_creneau(attribution.creneauId) case final CreneauPlanning creneau)
+          if (_creneau(attribution.creneauId)
+              case final CreneauPlanning creneau)
             Proposition(
               id: attribution.id,
               creneauId: attribution.creneauId,
@@ -1899,8 +1904,7 @@ class _EchangesMemoire implements EchangesRepository {
     // actifs, sauf le repreneur.
     _base._notifier('exchange_accepted', <String>[
       for (final m in _base.membres)
-        if (m.actif && m.role == RoleMembre.admin && m.userId != _moi)
-          m.userId,
+        if (m.actif && m.role == RoleMembre.admin && m.userId != _moi) m.userId,
     ]);
     return const ResultatEchange(
       ok: true,

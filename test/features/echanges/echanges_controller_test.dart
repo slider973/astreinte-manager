@@ -138,7 +138,9 @@ void main() {
     final c = _conteneur(depot);
     await _lu(c);
 
-    final geste = c.read(echangesControllerProvider.notifier).annuler(echange());
+    final geste = c
+        .read(echangesControllerProvider.notifier)
+        .annuler(echange());
     await Future<void>.delayed(Duration.zero);
     expect(
       c.read(echangesControllerProvider.notifier).ecritureEnAttente,

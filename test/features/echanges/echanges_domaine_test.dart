@@ -254,8 +254,10 @@ void main() {
 
     test('demande : envoyée, à la caserne, personne prévenu', () {
       expect(
-        issueDemande(const ResultatEchange(ok: true, notifies: 1), cible: chloe)
-            .message,
+        issueDemande(
+          const ResultatEchange(ok: true, notifies: 1),
+          cible: chloe,
+        ).message,
         AppStrings.echangeEnvoyeeA('Chloé C.'),
       );
       expect(
@@ -316,31 +318,34 @@ void main() {
       );
     });
 
-    test('réponse : une course perdue est une information, jamais un rouge', () {
-      final prise = issueReponse(
-        const ResultatEchange(
-          ok: false,
-          code: 'exchange_not_open',
-          statut: StatutEchange.accepteParPair,
-        ),
-        echange(cibleId: null, cibleNom: null),
-        accepte: true,
-      );
-      expect(prise.ton, TonIssue.information);
-      expect(prise.retiree, isTrue);
-      expect(prise.message, AppStrings.echangeDejaReprise);
+    test(
+      'réponse : une course perdue est une information, jamais un rouge',
+      () {
+        final prise = issueReponse(
+          const ResultatEchange(
+            ok: false,
+            code: 'exchange_not_open',
+            statut: StatutEchange.accepteParPair,
+          ),
+          echange(cibleId: null, cibleNom: null),
+          accepte: true,
+        );
+        expect(prise.ton, TonIssue.information);
+        expect(prise.retiree, isTrue);
+        expect(prise.message, AppStrings.echangeDejaReprise);
 
-      final annulee = issueReponse(
-        const ResultatEchange(
-          ok: false,
-          code: 'exchange_not_open',
-          statut: StatutEchange.annule,
-        ),
-        echange(),
-        accepte: true,
-      );
-      expect(annulee.message, AppStrings.echangeAnnuleeParA('Antoine C.'));
-    });
+        final annulee = issueReponse(
+          const ResultatEchange(
+            ok: false,
+            code: 'exchange_not_open',
+            statut: StatutEchange.annule,
+          ),
+          echange(),
+          accepte: true,
+        );
+        expect(annulee.message, AppStrings.echangeAnnuleeParA('Antoine C.'));
+      },
+    );
 
     test('réponse : une règle refuse en erreur, la carte reste', () {
       final regle = issueReponse(
@@ -428,7 +433,9 @@ void main() {
         (String cle, String id) => ligne(id, max: 4),
       );
       final b = charge.firstWhere((ChargePersonne p) => p.userId == 'u-chloe');
-      final a = charge.firstWhere((ChargePersonne p) => p.userId == 'u-antoine');
+      final a = charge.firstWhere(
+        (ChargePersonne p) => p.userId == 'u-antoine',
+      );
       expect(b.astreintes, 4);
       expect(b.depasseAstreintes, isFalse);
       expect(b.disponibilite, DisponibiliteEtat.disponible);
@@ -448,7 +455,8 @@ void main() {
         (String cle, String id) => ligne(id, n: 4, max: 4),
       );
       expect(
-        charge.firstWhere((ChargePersonne p) => p.userId == 'u-chloe')
+        charge
+            .firstWhere((ChargePersonne p) => p.userId == 'u-chloe')
             .depasseAstreintes,
         isTrue,
       );

@@ -174,7 +174,10 @@ void main() {
     await _toucher(tester, find.text('Bruno D.'));
     await _toucher(tester, _bouton(AppStrings.echangeContinuer));
 
-    expect(find.text(AppStrings.echangeAucuneGarde('Bruno D.')), findsOneWidget);
+    expect(
+      find.text(AppStrings.echangeAucuneGarde('Bruno D.')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('un refus de la base garde le récapitulatif, avec la cause', (
@@ -264,7 +267,9 @@ void main() {
 
     await _toucher(tester, find.byType(CarteEchange));
     expect(
-      find.text(AppStrings.echangeDetailTitreCession('nuit du samedi 24 octobre')),
+      find.text(
+        AppStrings.echangeDetailTitreCession('nuit du samedi 24 octobre'),
+      ),
       findsOneWidget,
     );
     await _toucher(tester, _bouton(AppStrings.echangeAnnuler));

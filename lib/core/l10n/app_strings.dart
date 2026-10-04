@@ -3250,7 +3250,8 @@ abstract final class AppStrings {
     required int jour,
     required int mois,
     required String creneau,
-  }) => '$jourCourt ${jour == 1 ? '1er' : jour} ${moisCourts[mois - 1]} · '
+  }) =>
+      '$jourCourt ${jour == 1 ? '1er' : jour} ${moisCourts[mois - 1]} · '
       '$creneau';
 
   /// « Samedi 12 octobre · Nuit » : le titre d'une carte.
@@ -3394,8 +3395,9 @@ abstract final class AppStrings {
       'L\'annulation n\'est pas partie. Vérifie le réseau et réessaie.';
   static const String echangeFermer = 'Fermer';
   static const String echangeSuivreMesDemandes = 'Suivre mes échanges';
-  static String echangeMesDemandes(int n) =>
-      n <= 1 ? '$n demande d\'échange suivie' : '$n demandes d\'échange suivies';
+  static String echangeMesDemandes(int n) => n <= 1
+      ? '$n demande d\'échange suivie'
+      : '$n demandes d\'échange suivies';
 
   // --- États ------------------------------------------------------------
 
@@ -3407,8 +3409,11 @@ abstract final class AppStrings {
   static const String echangeEtatAnnule = 'Annulé';
   static const String echangeEtatExpire = 'Expiré';
   static const String echangeEtatEchec = 'N\'a pas pu se faire';
-  static String echangeDetailEnvoyee(String depuis, String date, String heure) =>
-      'Envoyée $depuis. Expire le $date à $heure.';
+  static String echangeDetailEnvoyee(
+    String depuis,
+    String date,
+    String heure,
+  ) => 'Envoyée $depuis. Expire le $date à $heure.';
   static String echangeDetailVisibleDispos(String date, String heure) =>
       'Visible des collègues disponibles ce créneau. Expire le $date à '
       '$heure.';
@@ -3468,7 +3473,8 @@ abstract final class AppStrings {
 
   // --- Causes -----------------------------------------------------------
 
-  static const String echangeCauseGardeChangee = 'la garde a changé entre-temps';
+  static const String echangeCauseGardeChangee =
+      'la garde a changé entre-temps';
   static String echangeCauseDejaPris(String nom) =>
       '$nom est déjà pris sur ce créneau';
   static String echangeCausePlafondAstreintes(String nom) =>
@@ -3505,8 +3511,11 @@ abstract final class AppStrings {
       'Garde proposée par $nom';
   static String echangePanneauTitreReprendre(String nom) =>
       '$nom cherche un remplaçant';
-  static String echangePanneauExpire(String depuis, String date, String heure) =>
-      '$depuis · expire le $date à $heure';
+  static String echangePanneauExpire(
+    String depuis,
+    String date,
+    String heure,
+  ) => '$depuis · expire le $date à $heure';
   static const String echangePanneauInfo =
       'Ton chef de centre validera après ton accord.';
   static const String echangePanneauInfoReprendre =
@@ -3594,7 +3603,9 @@ abstract final class AppStrings {
     required int? maxWeekends,
   }) => <String>[
     mois,
-    maxAstreintes == null ? '$astreintes astr.' : '$astreintes/$maxAstreintes astr.',
+    maxAstreintes == null
+        ? '$astreintes astr.'
+        : '$astreintes/$maxAstreintes astr.',
     maxWeekends == null ? '$weekends w-e' : '$weekends/$maxWeekends w-e',
   ].join(' · ');
   static const String echangesChargeErreur =

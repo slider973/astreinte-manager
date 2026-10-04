@@ -330,7 +330,9 @@ class _Charge extends StatelessWidget {
                     ),
                   ),
                 if (p.depasseAstreintes)
-                  _Alerte(AppStrings.echangesDepasseAstreintes(p.maxAstreintes!)),
+                  _Alerte(
+                    AppStrings.echangesDepasseAstreintes(p.maxAstreintes!),
+                  ),
                 if (p.depasseWeekends)
                   _Alerte(
                     '${AppStrings.echangesDepasseWeekends(p.maxWeekends!)} '
@@ -356,8 +358,9 @@ class _Charge extends StatelessWidget {
                             etat: dispo,
                             creneau: echange.garde.creneau,
                             densite: SlotChipDensite.compacte,
-                            libelleSemantique:
-                                context.statuts.disponibilite(dispo).libelle,
+                            libelleSemantique: context.statuts
+                                .disponibilite(dispo)
+                                .libelle,
                           ),
                         ),
                         Text(

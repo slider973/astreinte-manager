@@ -267,7 +267,8 @@ echangesControllerProvider =
 
 /// Les demandes auxquelles je dois répondre, pour la Boîte et l'accueil.
 final Provider<List<Echange>> echangesRecusProvider = Provider<List<Echange>>(
-  (ref) => ref.watch(echangesControllerProvider).value?.recues ?? const <Echange>[],
+  (ref) =>
+      ref.watch(echangesControllerProvider).value?.recues ?? const <Echange>[],
 );
 
 /// Les demandes que je suis, pour la section « Échanges » d'Astreintes.

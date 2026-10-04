@@ -69,7 +69,9 @@ String? destinationInterne(String? lien, {required bool admin}) {
   if (segments.length == 2 &&
       segments[0] == 'admin' &&
       segments[1] == 'exchanges') {
-    return admin ? AppRoutes.echangesAdminFiltre(FiltreEchanges.aValider) : null;
+    return admin
+        ? AppRoutes.echangesAdminFiltre(FiltreEchanges.aValider)
+        : null;
   }
 
   if (segments.length == 2 &&

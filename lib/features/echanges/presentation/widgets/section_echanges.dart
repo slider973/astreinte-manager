@@ -80,7 +80,8 @@ class _SectionEchangesState extends ConsumerState<SectionEchanges> {
               moi: moi,
               heures: heuresCaserne(ref),
               maintenant: maintenant,
-              onOuvrir: () => unawaited(ouvrirDetailEchange(context, echange.id)),
+              onOuvrir: () =>
+                  unawaited(ouvrirDetailEchange(context, echange.id)),
             ),
           ),
         if (suivis.length > SectionEchanges.repliee)

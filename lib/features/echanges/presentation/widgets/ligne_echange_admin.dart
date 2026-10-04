@@ -60,7 +60,8 @@ class LigneEchangeAdmin extends StatelessWidget {
     return Semantics(
       button: true,
       selected: choisie,
-      label: '${gardeCourte(context, echange.garde)}, $noms, '
+      label:
+          '${gardeCourte(context, echange.garde)}, $noms, '
           '${descripteur.libelle}. $mention',
       excludeSemantics: true,
       child: Material(

@@ -439,7 +439,8 @@ class _DemandeEchangeScreenState extends ConsumerState<DemandeEchangeScreen> {
       case EtapeDemande.verifier:
         final pret =
             _mode == _Mode.caserne ||
-            (_collegueResolu() != null && (!_echanger || _rendueResolue() != null));
+            (_collegueResolu() != null &&
+                (!_echanger || _rendueResolue() != null));
         raison = lectureSeule
             ? AppStrings.echangeLectureSeuleRaison
             : !enLigne

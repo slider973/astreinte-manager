@@ -129,8 +129,9 @@ String ligneDetail(
       formaterInstantRelatif(instant, maintenant: maintenant);
   String date(DateTime? instant) =>
       instant == null ? '' : formaterDateCourte(instant);
-  String decideur() =>
-      echange.decideurId == moi ? AppStrings.echangeToi : _nom(echange.decideurNom);
+  String decideur() => echange.decideurId == moi
+      ? AppStrings.echangeToi
+      : _nom(echange.decideurNom);
   final cause = causeEchange(
     echange.codeMotif,
     nomDemandeur: demandeur,
@@ -220,7 +221,9 @@ List<String> filEchange(Echange echange, {required String moi}) {
   final fil = <String>[AppStrings.echangeFilDemandee(instant(echange.creeLe))];
   final accepte = echange.accepteLe;
   if (accepte != null) {
-    fil.add(AppStrings.echangeFilAcceptee(_nom(echange.pairNom), instant(accepte)));
+    fil.add(
+      AppStrings.echangeFilAcceptee(_nom(echange.pairNom), instant(accepte)),
+    );
   }
   final fin = echange.decideLe ?? echange.closLe;
   if (fin == null) return fil;
@@ -249,6 +252,5 @@ List<String> filEchange(Echange echange, {required String moi}) {
   return fil;
 }
 
-String _nom(String? nom) => (nom ?? '').trim().isEmpty
-    ? AppStrings.echangeMembreInconnu
-    : nom!.trim();
+String _nom(String? nom) =>
+    (nom ?? '').trim().isEmpty ? AppStrings.echangeMembreInconnu : nom!.trim();

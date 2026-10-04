@@ -69,9 +69,7 @@ void main() {
       session: sessionMembre,
       appartenances: const <Appartenance>[appartenanceMembre],
       echanges: FauxEchangesRepository(
-        echanges: <Echange>[
-          _echangeAMoi(statut: StatutEchange.accepteParPair),
-        ],
+        echanges: <Echange>[_echangeAMoi(statut: StatutEchange.accepteParPair)],
       ),
       horloge: () => _aujourdhui,
     );

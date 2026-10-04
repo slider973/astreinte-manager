@@ -187,7 +187,12 @@ class _EchangesAdminScreenState extends ConsumerState<EchangesAdminScreen>
             ref.read(echangesControllerProvider.notifier).rafraichir(),
         child: ListView.separated(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(marge, AppSpacing.md, marge, AppSpacing.xl),
+          padding: EdgeInsets.fromLTRB(
+            marge,
+            AppSpacing.md,
+            marge,
+            AppSpacing.xl,
+          ),
           itemCount: liste.length,
           separatorBuilder: (_, _) =>
               const SizedBox(height: AppSpacing.entreCibles),
@@ -280,7 +285,10 @@ class _Squelette extends StatelessWidget {
     final marge = AppWindowClass.of(context).margePage;
     return LoadingSkeleton(
       child: ListView(
-        padding: EdgeInsets.symmetric(horizontal: marge, vertical: AppSpacing.md),
+        padding: EdgeInsets.symmetric(
+          horizontal: marge,
+          vertical: AppSpacing.md,
+        ),
         children: const <Widget>[
           SkeletonBloc(hauteur: 72),
           SizedBox(height: AppSpacing.entreCibles),

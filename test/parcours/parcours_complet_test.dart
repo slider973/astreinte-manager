@@ -434,7 +434,10 @@ void main() {
       final demande = backend.echanges.single;
       expect(demande.statut, StatutEchange.ouvert);
       expect(demande.cibleId, thomasId);
-      expect(demande.attributionId, _attributionDe(_creneauAccepte, _marieId)!.id);
+      expect(
+        demande.attributionId,
+        _attributionDe(_creneauAccepte, _marieId)!.id,
+      );
       expect(backend.notifications.last.type, 'exchange_requested');
       expect(backend.notifications.last.destinataires, <String>[thomasId]);
       expect(

@@ -70,11 +70,7 @@ class ChoixExclusif extends StatelessWidget {
           selected: choisi,
           inMutuallyExclusiveGroup: true,
           enabled: actif,
-          label: <String>[
-            libelleAnnonce ?? titre,
-            ?aide,
-            ?raison,
-          ].join('. '),
+          label: <String>[libelleAnnonce ?? titre, ?aide, ?raison].join('. '),
           excludeSemantics: true,
           child: Material(
             color: choisi ? scheme.primaryContainer : scheme.surface,
@@ -112,7 +108,9 @@ class ChoixExclusif extends StatelessWidget {
                               titre,
                               style: theme.textTheme.bodyLarge?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: choisi ? scheme.onPrimaryContainer : encre,
+                                color: choisi
+                                    ? scheme.onPrimaryContainer
+                                    : encre,
                               ),
                             ),
                             if (aide != null) ...<Widget>[

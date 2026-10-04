@@ -42,7 +42,11 @@ class BlocEchangesSuivi extends ConsumerWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: AppSpacing.sm,
             children: <Widget>[
-              Icon(Icons.how_to_reg, size: AppTouch.icone, color: attente.encre),
+              Icon(
+                Icons.how_to_reg,
+                size: AppTouch.icone,
+                color: attente.encre,
+              ),
               Text(
                 AppStrings.echangesBlocSuivi(n),
                 style: theme.textTheme.bodyLarge?.copyWith(

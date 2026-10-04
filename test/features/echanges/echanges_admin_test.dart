@@ -103,11 +103,9 @@ void main() {
   testWidgets('le lien /admin/exchanges ouvre la file à valider', (
     tester,
   ) async {
-    await _monter(
-      tester,
-      <Echange>[_acceptee()],
-      chemin: AppRoutes.lienEchangesAdmin,
-    );
+    await _monter(tester, <Echange>[
+      _acceptee(),
+    ], chemin: AppRoutes.lienEchangesAdmin);
     expect(find.byType(EchangesAdminScreen), findsOneWidget);
     expect(
       emplacementCourant(tester),
@@ -131,10 +129,16 @@ void main() {
     // Chloé passe à 3/4 astreintes en octobre ; Antoine libère sa garde.
     expect(find.textContaining('3/4 astr.'), findsOneWidget);
     expect(find.text(AppStrings.echangesLibere), findsOneWidget);
-    expect(find.textContaining(AppStrings.echangesDispoDeclaree), findsOneWidget);
+    expect(
+      find.textContaining(AppStrings.echangesDispoDeclaree),
+      findsOneWidget,
+    );
 
     await _toucher(tester, _bouton(AppStrings.echangesValiderCession));
-    expect(find.text(AppStrings.echangesConfirmerValiderCession), findsOneWidget);
+    expect(
+      find.text(AppStrings.echangesConfirmerValiderCession),
+      findsOneWidget,
+    );
     expect(
       find.text(
         AppStrings.echangesConfirmerCession(
@@ -191,21 +195,24 @@ void main() {
   testWidgets('un plafond d\'astreintes dépassé grise « Valider »', (
     tester,
   ) async {
-    await _monter(
-      tester,
-      <Echange>[_acceptee()],
-      matrice: _matrice(chargeChloe: 4),
-    );
+    await _monter(tester, <Echange>[
+      _acceptee(),
+    ], matrice: _matrice(chargeChloe: 4));
     await _toucher(tester, find.byType(LigneEchangeAdmin));
 
     final valider = tester.widget<PrimaryButton>(
       _bouton(AppStrings.echangesValiderCession),
     );
     expect(valider.onPressed, isNull);
-    expect(valider.raisonDesactivation, AppStrings.echangesDepasseAstreintes(4));
+    expect(
+      valider.raisonDesactivation,
+      AppStrings.echangesDepasseAstreintes(4),
+    );
     // « Refuser » reste.
     expect(
-      tester.widget<PrimaryButton>(_bouton(AppStrings.echangesRefuser)).onPressed,
+      tester
+          .widget<PrimaryButton>(_bouton(AppStrings.echangesRefuser))
+          .onPressed,
       isNotNull,
     );
   });
@@ -287,19 +294,15 @@ void main() {
   });
 
   testWidgets('un membre ordinaire ne l\'ouvre pas', (tester) async {
-    await _monter(
-      tester,
-      <Echange>[_acceptee()],
-      appartenance: appartenanceMembre,
-    );
+    await _monter(tester, <Echange>[
+      _acceptee(),
+    ], appartenance: appartenanceMembre);
     expect(find.byType(EchangesAdminScreen), findsNothing);
     expect(emplacementCourant(tester), AppRoutes.accueil);
   });
 
   testWidgets('le Suivi annonce les échanges à valider', (tester) async {
-    await _monter(tester, <Echange>[
-      _acceptee(),
-    ], chemin: AppRoutes.suivi);
+    await _monter(tester, <Echange>[_acceptee()], chemin: AppRoutes.suivi);
     expect(find.text(AppStrings.echangesBlocSuivi(1)), findsOneWidget);
     await _toucher(tester, find.text(AppStrings.echangesBlocSuiviAction));
     expect(find.byType(EchangesAdminScreen), findsOneWidget);

@@ -39,7 +39,10 @@ class CarteDemandeRecue extends StatelessWidget {
         ? AppStrings.echangeLigneEchange(nom, phraseGarde(rendue))
         : AppStrings.echangeLigneCession(nom);
     final titre = gardeTitre(context, echange.garde);
-    final mention = formaterInstantRelatif(echange.creeLe, maintenant: maintenant);
+    final mention = formaterInstantRelatif(
+      echange.creeLe,
+      maintenant: maintenant,
+    );
     // À grande échelle de texte, l'ancienneté passe sous la ligne : à droite,
     // elle mangeait la colonne au point d'écrire un mot par ligne (vu à ×1,6
     // sur 390 points).

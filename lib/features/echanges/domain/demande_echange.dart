@@ -60,7 +60,9 @@ BlocageProposition? blocageProposition({
 }) {
   if (lectureSeule) return BlocageProposition.lectureSeule;
   if (!enLigne) return BlocageProposition.horsLigne;
-  if (!maintenant.isBefore(reglages.echeance(<GardeEchange>[gardeDe(astreinte)]))) {
+  if (!maintenant.isBefore(
+    reglages.echeance(<GardeEchange>[gardeDe(astreinte)]),
+  )) {
     return BlocageProposition.tropTard;
   }
   return null;

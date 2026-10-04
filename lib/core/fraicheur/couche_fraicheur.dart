@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/echanges/domain/echanges_providers.dart';
 import 'fraicheur.dart';
 
 /// **Le retour au premier plan, écouté une fois pour toute l'application**
@@ -49,7 +50,17 @@ class _CoucheFraicheurState extends ConsumerState<CoucheFraicheur> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) {
+    // **Les échanges (ticket 073) restent écoutés au-dessus des routes.**
+    // L'accueil, Astreintes et la Boîte les lisent ; sans écoute qui tienne,
+    // Riverpod mettait le contrôleur en pause dès qu'aucun de ces écrans
+    // n'était à l'écran, et un changement de caserne ou de rôle pendant ce
+    // temps le faisait se relire **pendant** la construction de l'accueil
+    // (assertion de débogage, vue au retour d'un écran d'administration
+    // après une rétrogradation). Écouté ici, il se relit tout de suite.
+    ref.listen<AsyncValue<EtatEchanges>>(echangesControllerProvider, (_, _) {});
+    return widget.child;
+  }
 }
 
 /// **Ce qu'un écran affiche**, déclaré au coordinateur.
