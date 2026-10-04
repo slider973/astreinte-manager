@@ -136,6 +136,8 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
     final destinations = ref.watch(destinationsProvider);
 
     return AppScaffold(
+      // Sur grand écran, le nom de la caserne devient le sélecteur (072).
+      selecteurCaserne: true,
       // Le titre suit la portée : la barre d'application est ce qu'un lecteur
       // d'écran annonce en arrivant, et « Mes astreintes » serait faux de
       // l'autre côté du sélecteur.
@@ -200,7 +202,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
   /// fait que lire. Ce qu'il dit, c'est l'âge de ce qu'on lit
   /// (`design/027 § 9`).
   AppBanner? _banniereMoi({required bool enLigne}) {
-    final valeur = ref.watch(astreintesControllerProvider).value;
+    final valeur = ref.watch(astreintesOuvertesProvider).value;
     if (valeur == null) return null;
     final detail = _fraicheur(valeur.donnees.luLe);
 
@@ -230,7 +232,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
   /// pompier hors ligne perdrait l'explication dont il a besoin
   /// (`design/023 § 4`).
   AppBanner? _banniereCaserne({required bool enLigne}) {
-    final valeur = ref.watch(planningCaserneControllerProvider).value;
+    final valeur = ref.watch(planningCaserneOuvertProvider).value;
     if (valeur == null) return null;
     final detail = _fraicheur(valeur.planning?.luLe);
 
@@ -258,7 +260,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
   }
 
   Widget _corpsCaserne() {
-    final etat = ref.watch(planningCaserneControllerProvider);
+    final etat = ref.watch(planningCaserneOuvertProvider);
 
     if (etat.isLoading && !etat.hasValue) {
       return const SquelettePlanningCaserne();
@@ -294,7 +296,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
   }
 
   Widget _corpsMoi() {
-    final etat = ref.watch(astreintesControllerProvider);
+    final etat = ref.watch(astreintesOuvertesProvider);
     // Le bouton « Calendrier » cesse d'être sélectionnable **et** la vue
     // retombe sur la liste : un bouton sélectionné qui montre autre chose que
     // ce qu'il nomme est un mensonge.

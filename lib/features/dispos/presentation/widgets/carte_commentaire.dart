@@ -44,7 +44,7 @@ class _CarteCommentaireState extends ConsumerState<CarteCommentaire> {
     // préférences le porte toujours.
     if (!AppWindowClass.of(context).estCompact) return const SizedBox.shrink();
 
-    final etat = ref.watch(saisieControllerProvider).value;
+    final etat = ref.watch(saisieOuverteProvider).value;
     if (etat == null) return const SizedBox.shrink();
 
     final valeurs = etat.preferences.valeurs;

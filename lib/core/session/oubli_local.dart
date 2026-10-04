@@ -9,6 +9,7 @@ import '../../features/astreintes/data/cache_astreintes.dart';
 import '../../features/astreintes/data/cache_planning_caserne.dart';
 import '../../features/dispos/data/file_locale.dart';
 import '../../features/notifications/domain/notifications_providers.dart';
+import 'appartenance.dart';
 import 'appartenances_locales.dart';
 import 'caserne_choisie.dart';
 import 'session_providers.dart';
@@ -54,7 +55,9 @@ import 'session_providers.dart';
 /// **La boucle porte sur toutes les appartenances, pas sur la caserne
 /// courante.** Depuis le sélecteur du ticket 007, quelqu'un peut avoir consulté
 /// deux casernes dans la même session ; n'effacer que celle affichée laissait
-/// derrière lui l'annuaire de l'autre.
+/// derrière lui l'annuaire de l'autre. **Désactivées comprises** (ticket 072) :
+/// une caserne qui a retiré l'accès en cours de session a pu laisser ses mois
+/// sur l'appareil avant que [casernesQuittees] ne passe.
 ///
 /// Aucune panne de stockage ne remonte : elles sont déjà avalées par les
 /// dépôts. Un effacement qui échoue ne doit retenir personne dans une session
@@ -76,6 +79,9 @@ class OubliLocal {
     // Les casernes sont relues **avant** d'effacer la liste : c'est elle qui
     // dit quelles clés composer.
     final stations = <String>{
+      for (final appartenance
+          in _ref.read(appartenancesProvider).value ?? const <Appartenance>[])
+        appartenance.stationId,
       for (final appartenance in _ref.read(appartenancesActivesProvider))
         appartenance.stationId,
       ?_ref.read(caserneChoisieProvider),
@@ -84,6 +90,26 @@ class OubliLocal {
     await _ref.read(appartenancesLocalesProvider).effacer(userId);
     await _ref.read(caserneChoisieLocaleProvider).effacer(userId);
 
+    await _effacerCaches(userId: userId, stations: stations);
+  }
+
+  /// **Les caches d'une caserne qu'on a quittée** (ticket 072) : accès
+  /// désactivé, ou appartenance retirée. Ses mois portent les noms de toute
+  /// une caserne qui n'a plus rien à faire sur ce téléphone, et sa file de
+  /// saisie ne serait jamais acceptée par la base.
+  ///
+  /// Appelée par `appartenancesProvider` après chaque lecture **réussie** de
+  /// `memberships` — jamais sur un repli hors ligne : seule la base dit qu'un
+  /// accès a pris fin.
+  Future<void> casernesQuittees({
+    required String userId,
+    required Set<String> stations,
+  }) => _effacerCaches(userId: userId, stations: stations);
+
+  Future<void> _effacerCaches({
+    required String userId,
+    required Set<String> stations,
+  }) async {
     final astreintes = _ref.read(cacheAstreintesProvider);
     final planning = _ref.read(cachePlanningCaserneProvider);
     final file = _ref.read(fileLocaleProvider);

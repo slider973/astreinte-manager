@@ -209,7 +209,7 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
   /// notification partirait une heure plus tard, pour un créneau peut-être déjà
   /// pourvu par l'adjoint.
   String? _raisonReattribution() {
-    final etat = ref.watch(suiviControllerProvider).value;
+    final etat = ref.watch(suiviOuvertProvider).value;
     if (etat == null) return null;
     if (etat.lectureSeule) return AppStrings.lectureSeuleDetail;
     if (!(ref.watch(enLigneProvider).value ?? true)) {
@@ -343,7 +343,7 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
   @override
   Widget build(BuildContext context) {
     final admin = ref.watch(estAdminCaserneProvider);
-    final asynchrone = ref.watch(suiviControllerProvider);
+    final asynchrone = ref.watch(suiviOuvertProvider);
     final etat = asynchrone.value;
     final destinations = ref.watch(destinationsProvider);
     final compact = AppWindowClass.of(context).estCompact;
@@ -412,7 +412,7 @@ class _SuiviScreenState extends ConsumerState<SuiviScreen> {
     }
 
     final periodes =
-        ref.watch(periodesProvider).value ?? const <PeriodeSaisie>[];
+        ref.watch(periodesOuvertesProvider).value ?? const <PeriodeSaisie>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

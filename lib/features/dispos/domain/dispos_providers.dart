@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/fraicheur/relecture.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../data/dispos_repository.dart';
@@ -109,6 +110,11 @@ final AsyncNotifierProvider<PeriodesCaserne, List<PeriodeSaisie>>
 periodesProvider = AsyncNotifierProvider<PeriodesCaserne, List<PeriodeSaisie>>(
   PeriodesCaserne.new,
 );
+
+/// La même source, sans rien de ce qui a été lu dans une autre caserne
+/// (ticket 072, `core/session/caserne_ouverte.dart`).
+final Provider<AsyncValue<List<PeriodeSaisie>>> periodesOuvertesProvider =
+    dansLaCaserneOuverte(periodesProvider);
 
 /// Le mois affiché, sous la forme `2026-10`.
 ///

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/fraicheur/relecture.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../data/astreintes_repository.dart';
@@ -169,6 +170,13 @@ astreintesControllerProvider =
       AstreintesController.new,
     );
 
+/// La même source, **sans rien de ce qui a été lu dans une autre caserne**
+/// (ticket 072, `core/session/caserne_ouverte.dart`). C'est elle que les écrans
+/// lisent : après une bascule, ils montrent leur squelette jusqu'à la première
+/// réponse de la nouvelle caserne, jamais les lignes de l'ancienne.
+final Provider<AsyncValue<EtatAstreintes>> astreintesOuvertesProvider =
+    dansLaCaserneOuverte(astreintesControllerProvider);
+
 /// L'état du repli des passées. Un provider plutôt qu'un `setState` : la
 /// liste aplatie en dépend, et elle est mémorisée.
 final NotifierProvider<PasseesOuvertes, bool> passeesOuvertesProvider =
@@ -187,7 +195,10 @@ class PasseesOuvertes extends Notifier<bool> {
 /// construits **une fois par état** et mémorisés.
 final Provider<List<ElementAstreintes>> elementsAstreintesProvider =
     Provider<List<ElementAstreintes>>((ref) {
-      final etat = ref.watch(astreintesControllerProvider).value;
+      final etat = caserneOuverteSeulement(
+        ref,
+        astreintesControllerProvider,
+      ).value;
       if (etat == null) return const <ElementAstreintes>[];
       return aplatirAstreintes(
         donnees: etat.donnees,

@@ -86,6 +86,8 @@ class LigneMatrice {
     this.astreintesRestantes,
     this.weekendsRestants,
     this.accepteesPrecedentes = 0,
+    this.ailleursJours = '',
+    this.ailleursNuits = '',
   }) : _jours = _decoder(jours),
        _nuits = _decoder(nuits);
 
@@ -106,6 +108,10 @@ class LigneMatrice {
     accepteesPrecedentes: (ligne['accepted_previous'] as int?) ?? 0,
     jours: (ligne['day_slots'] as String?) ?? '',
     nuits: (ligne['night_slots'] as String?) ?? '',
+    // Migration `0040`, ticket 072 : absentes d'une base plus ancienne, elles
+    // valent « libre » partout.
+    ailleursJours: (ligne['day_taken_elsewhere'] as String?) ?? '',
+    ailleursNuits: (ligne['night_taken_elsewhere'] as String?) ?? '',
   );
 
   final String userId;
@@ -135,6 +141,24 @@ class LigneMatrice {
 
   final List<CelluleMatrice> _jours;
   final List<CelluleMatrice> _nuits;
+
+  /// `day_taken_elsewhere` / `night_taken_elsewhere` (`docs/SCHEMA.md § 6`) :
+  /// un caractère par jour, `X` quand le membre est **pris ailleurs** —
+  /// proposé ou accepté dans une autre caserne sur un créneau qui chevauche.
+  /// Rien d'autre de l'autre caserne n'est connu, ni n'est affichable.
+  final String ailleursJours;
+  final String ailleursNuits;
+
+  /// Vrai si le membre a une astreinte dans une autre caserne sur ce créneau.
+  bool ailleurs(int jour, CreneauType creneau) {
+    final chaine = creneau == CreneauType.jour ? ailleursJours : ailleursNuits;
+    final index = jour - 1;
+    return index >= 0 && index < chaine.length && chaine[index] == 'X';
+  }
+
+  /// Vrai si au moins un créneau du mois est pris ailleurs.
+  bool get aUneAstreinteAilleurs =>
+      ailleursJours.contains('X') || ailleursNuits.contains('X');
 
   /// Le nombre de jours du mois, tel que la base l'a encodé : 28, 30 ou 31.
   /// **Jamais supposé** — un mois court a une chaîne courte.
@@ -191,6 +215,8 @@ class LigneMatrice {
       accepteesPrecedentes: accepteesPrecedentes,
       jours: jours.map((CelluleMatrice c) => c.code).join(),
       nuits: nuits.map((CelluleMatrice c) => c.code).join(),
+      ailleursJours: ailleursJours,
+      ailleursNuits: ailleursNuits,
     );
   }
 
@@ -228,6 +254,8 @@ class LigneMatrice {
       accepteesPrecedentes: accepteesPrecedentes,
       jours: _jours.map((CelluleMatrice c) => c.code).join(),
       nuits: _nuits.map((CelluleMatrice c) => c.code).join(),
+      ailleursJours: ailleursJours,
+      ailleursNuits: ailleursNuits,
     );
   }
 
@@ -251,6 +279,8 @@ class LigneMatrice {
           other.astreintesRestantes == astreintesRestantes &&
           other.weekendsRestants == weekendsRestants &&
           other.accepteesPrecedentes == accepteesPrecedentes &&
+          other.ailleursJours == ailleursJours &&
+          other.ailleursNuits == ailleursNuits &&
           listEquals(other._jours, _jours) &&
           listEquals(other._nuits, _nuits);
 
@@ -266,6 +296,8 @@ class LigneMatrice {
     astreintesRestantes,
     weekendsRestants,
     accepteesPrecedentes,
+    ailleursJours,
+    ailleursNuits,
     Object.hashAll(_jours),
     Object.hashAll(_nuits),
   );

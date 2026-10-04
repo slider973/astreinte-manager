@@ -61,7 +61,7 @@ class _SectionPreferencesState extends ConsumerState<SectionPreferences> {
 
   @override
   Widget build(BuildContext context) {
-    final etat = ref.watch(saisieControllerProvider).value;
+    final etat = ref.watch(saisieOuverteProvider).value;
     if (etat == null) return const SizedBox.shrink();
 
     final preferences = etat.preferences;

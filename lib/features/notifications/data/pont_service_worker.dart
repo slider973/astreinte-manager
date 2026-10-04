@@ -1,3 +1,4 @@
+import '../domain/message_push.dart';
 import 'pont_stub.dart' if (dart.library.js_interop) 'pont_web.dart';
 
 /// Les destinations envoyées par le service worker quand on touche une
@@ -14,7 +15,9 @@ import 'pont_stub.dart' if (dart.library.js_interop) 'pont_web.dart';
 ///    minimisée) → le service worker la ramène au premier plan et lui poste la
 ///    destination. **C'est ce flux-ci**, et sans lui on reviendrait sur
 ///    l'écran quitté au lieu de la proposition.
-Stream<String> routesDepuisServiceWorker() => ecouterServiceWorker();
+///
+/// Depuis le ticket 072, la caserne de la notification voyage avec le lien.
+Stream<OuverturePush> routesDepuisServiceWorker() => ecouterServiceWorker();
 
 /// Range les service workers de l'origine, **sans réseau** (voir
 /// `nettoyerEnregistrements`).

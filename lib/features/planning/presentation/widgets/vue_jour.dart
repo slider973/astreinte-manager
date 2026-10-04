@@ -506,6 +506,7 @@ class _Case extends StatelessWidget {
       creneau: creneau,
       saisiParAdmin: cellule.parAdmin,
       erreur: erreurs.contains(cle),
+      ailleurs: ligne.ailleurs(jour, creneau),
       libelleSemantique: AppStrings.matriceCaseSemantique(
         membre: ligne.nomAffiche,
         jourEtDate: dateAvecJourSemaine(date),

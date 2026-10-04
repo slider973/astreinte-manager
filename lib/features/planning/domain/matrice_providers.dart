@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/fraicheur/relecture.dart';
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
@@ -362,3 +363,10 @@ matriceControllerProvider =
       MatriceController.new,
       isAutoDispose: true,
     );
+
+/// La même source, sans rien de ce qui a été lu dans une autre caserne
+/// (ticket 072, `core/session/caserne_ouverte.dart`) : après une bascule entre
+/// deux casernes administrées, l'écran montre son squelette, jamais les lignes
+/// de l'ancienne.
+final Provider<AsyncValue<EtatMatrice?>> matriceOuverteProvider =
+    dansLaCaserneOuverte(matriceControllerProvider, autoDispose: true);

@@ -4,6 +4,8 @@ import 'dart:js_interop_unsafe';
 
 import 'package:web/web.dart' as web;
 
+import '../domain/message_push.dart';
+
 /// Le type de message convenu avec `web/push/firebase-messaging-sw.js`. Le
 /// service worker poste aussi d'autres messages (ceux du SDK Firebase) : on ne
 /// réagit qu'au nôtre.
@@ -74,11 +76,11 @@ void avertir(String message) =>
     web.console.warn('Astreinte SP — $message'.toJS);
 
 /// Écoute les destinations postées par le service worker.
-Stream<String> ecouterServiceWorker() {
+Stream<OuverturePush> ecouterServiceWorker() {
   // Le contrôleur vit aussi longtemps que l'abonnement : il se ferme quand le
   // dernier auditeur se retire, dans `onCancel`.
   // ignore: close_sinks
-  late final StreamController<String> controleur;
+  late final StreamController<OuverturePush> controleur;
 
   void ecouter(web.MessageEvent evenement) {
     final donnees = evenement.data;
@@ -94,12 +96,25 @@ Stream<String> ecouterServiceWorker() {
     if (!route.isA<JSString>()) return;
 
     final valeur = (route! as JSString).toDart;
-    if (valeur.isNotEmpty) controleur.add(valeur);
+    if (valeur.isEmpty) return;
+
+    // La caserne de la notification (ticket 072). Absente d'un worker d'avant
+    // ce ticket, ou d'une notification rattachée au compte.
+    final caserne = objet.getProperty<JSAny?>('station_id'.toJS);
+    final stationId = caserne.isA<JSString>()
+        ? (caserne! as JSString).toDart
+        : null;
+    controleur.add(
+      OuverturePush(
+        route: valeur,
+        stationId: (stationId == null || stationId.isEmpty) ? null : stationId,
+      ),
+    );
   }
 
   final rappel = ecouter.toJS;
 
-  controleur = StreamController<String>(
+  controleur = StreamController<OuverturePush>(
     onListen: () => web.window.navigator.serviceWorker.addEventListener(
       'message',
       rappel,

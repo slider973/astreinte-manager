@@ -16,6 +16,12 @@ String formaterDateLongue(DateTime date) {
   );
 }
 
+/// « 18 octobre », sans l'année : l'échéance d'une invitation (ticket 072).
+String formaterDateLongueSansAnnee(DateTime date) {
+  final locale = date.toLocal();
+  return AppStrings.jourEtMois(jour: locale.day, mois: locale.month);
+}
+
 /// Une date courte pour une ligne d'état : « 15 sept. ».
 String formaterDateCourte(DateTime date) {
   final locale = date.toLocal();

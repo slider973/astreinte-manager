@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:astreinte_sp/app.dart';
 import 'package:astreinte_sp/core/l10n/app_strings.dart';
 import 'package:astreinte_sp/core/l10n/format_date.dart';
 import 'package:astreinte_sp/core/preferences/reperes_locaux.dart';
 import 'package:astreinte_sp/core/reseau/connectivite.dart';
 import 'package:astreinte_sp/core/session/appartenance.dart';
+import 'package:astreinte_sp/core/session/bascule_caserne.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/empty_state.dart';
 import 'package:astreinte_sp/core/widgets/slot_chip.dart';
@@ -14,6 +18,7 @@ import 'package:astreinte_sp/features/planning/presentation/widgets/grille_matri
 import 'package:astreinte_sp/features/planning/presentation/widgets/vue_jour.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/faux_auth.dart';
@@ -764,5 +769,69 @@ void main() {
       expect(find.byType(GrilleMatrice), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+  });
+
+  // -------------------------------------------------------------------
+  // Plusieurs casernes (ticket 072)
+  // -------------------------------------------------------------------
+
+  testWidgets('après une bascule entre deux casernes administrées, aucune '
+      'ligne de l\'ancienne n\'est peinte avant la première réponse', (
+    tester,
+  ) async {
+    const sud = Appartenance(
+      id: 'm-sud',
+      stationId: 'bbbbbbbb-0000-4000-8000-000000000001',
+      nomCaserne: 'CIS Val-de-Loue',
+      role: RoleMembre.admin,
+      statut: StatutMembre.actif,
+    );
+    final jours = _joursDuMois(0);
+    final depot = FauxMatriceRepository(lignes: _deuxMembres());
+    depot.parCaserne[sud.stationId] = <LigneMatrice>[
+      ligneMatrice(
+        userId: 'u-sud',
+        nom: 'Lefebvre Marie',
+        jours: 'D' * jours,
+        nuits: '.' * jours,
+      ),
+    ];
+    final retenue = Completer<void>();
+    depot.retenues[sud.stationId] = retenue;
+
+    await monterApp(
+      tester,
+      session: sessionMembre,
+      appartenances: const <Appartenance>[appartenanceAdmin, sud],
+      dispos: FauxDisposRepository(periodes: <PeriodeSaisie>[_ouverte(0)]),
+      matrice: depot,
+      reperes: ReperesLocauxMemoire(<RepereAccueil>{
+        RepereAccueil.saisieProcuration,
+      }),
+      taille: _poste,
+    );
+    await ouvrirRoute(tester, _chemin);
+    expect(find.text('Dubois Jean-Marc'), findsWidgets);
+
+    unawaited(
+      ProviderScope.containerOf(
+        tester.element(find.byType(AstreinteApp)),
+      ).read(basculeCaserneProvider.notifier).choisir(sud.stationId),
+    );
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    // Nord a disparu, Sud n'est pas encore là : le squelette.
+    expect(find.text('Dubois Jean-Marc'), findsNothing);
+    expect(find.text('Martin Alice'), findsNothing);
+    expect(find.text('Lefebvre Marie'), findsNothing);
+
+    retenue.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lefebvre Marie'), findsWidgets);
+    expect(find.text('Dubois Jean-Marc'), findsNothing);
+    tester.takeException();
   });
 }

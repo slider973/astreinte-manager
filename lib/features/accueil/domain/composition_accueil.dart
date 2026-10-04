@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../astreintes/domain/astreinte.dart';
 import '../../astreintes/domain/astreintes_providers.dart';
@@ -48,8 +49,10 @@ PeriodeSaisie? premierePeriodeOuverte(List<PeriodeSaisie> periodes) {
 /// saisir plutôt que d'annoncer un compte qui décrirait un autre mois.
 final Provider<AppelDispos?> appelDisposProvider = Provider<AppelDispos?>(
   (ref) => appelDispos(
-    periodes: ref.watch(periodesProvider).value ?? const <PeriodeSaisie>[],
-    saisie: ref.watch(saisieControllerProvider).value,
+    periodes:
+        caserneOuverteSeulement(ref, periodesProvider).value ??
+        const <PeriodeSaisie>[],
+    saisie: caserneOuverteSeulement(ref, saisieControllerProvider).value,
     maintenant: ref.watch(horlogeAstreintesProvider)(),
   ),
 );
@@ -95,8 +98,13 @@ AppelDispos? appelDispos({
 final Provider<AsyncValue<TableauBord>> tableauBordProvider =
     Provider<AsyncValue<TableauBord>>(
       (ref) => tableauBordDe(
-        astreintes: ref.watch(astreintesControllerProvider),
-        propositions: ref.watch(propositionsControllerProvider),
+        // Les deux sources **de la caserne ouverte** (ticket 072) : après une
+        // bascule, l'accueil montre son squelette, jamais l'ancienne caserne.
+        astreintes: caserneOuverteSeulement(ref, astreintesControllerProvider),
+        propositions: caserneOuverteSeulement(
+          ref,
+          propositionsControllerProvider,
+        ),
         aujourdhui: ref.watch(horlogeAstreintesProvider)(),
         nomCaserne: ref.watch(appartenanceCouranteProvider)?.nomCaserne ?? '',
         dispos: ref.watch(appelDisposProvider),

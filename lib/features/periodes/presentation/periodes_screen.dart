@@ -131,7 +131,7 @@ class _PeriodesScreenState extends ConsumerState<PeriodesScreen> {
   @override
   Widget build(BuildContext context) {
     final admin = ref.watch(estAdminCaserneProvider);
-    final etat = ref.watch(periodesControllerProvider);
+    final etat = ref.watch(periodesAdminOuvertesProvider);
     final destinations = ref.watch(destinationsProvider);
 
     final donnees = etat.value;

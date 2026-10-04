@@ -118,50 +118,50 @@ Future<void> _remplirLesCaches({
   required FileLocale file,
   required CaserneChoisieLocale caserneChoisie,
   required ReperesLocaux reperes,
+  List<Appartenance> casernes = const <Appartenance>[appartenanceMembre],
 }) async {
-  await appartenances.ecrire(sessionMembre.userId, <Appartenance>[
-    appartenanceMembre,
-  ]);
-  await caserneChoisie.ecrire(
-    sessionMembre.userId,
-    appartenanceMembre.stationId,
-  );
-  await astreintes.ecrire(
-    stationId: appartenanceMembre.stationId,
-    userId: sessionMembre.userId,
-    donnees: _uneAstreinte(),
-  );
-  await planning.ecrireMois(
-    stationId: appartenanceMembre.stationId,
-    userId: sessionMembre.userId,
-    mois: <MoisPlanning>[
-      moisPlanning(annee: 2026, mois: 10),
-      moisPlanning(annee: 2026, mois: 11),
-    ],
-  );
-  for (final mois in _deuxMois()) {
-    await planning.ecrirePlanning(
-      stationId: appartenanceMembre.stationId,
+  await appartenances.ecrire(sessionMembre.userId, casernes);
+  await caserneChoisie.ecrire(sessionMembre.userId, casernes.first.stationId);
+  // **Chaque caserne a ses caches** (ticket 072) : un membre de deux casernes
+  // a pu consulter les deux, et une troisième l'a peut-être désactivé.
+  for (final caserne in casernes) {
+    await astreintes.ecrire(
+      stationId: caserne.stationId,
       userId: sessionMembre.userId,
-      planning: mois,
+      donnees: _uneAstreinte(),
+    );
+    await planning.ecrireMois(
+      stationId: caserne.stationId,
+      userId: sessionMembre.userId,
+      mois: <MoisPlanning>[
+        moisPlanning(annee: 2026, mois: 10),
+        moisPlanning(annee: 2026, mois: 11),
+      ],
+    );
+    for (final mois in _deuxMois()) {
+      await planning.ecrirePlanning(
+        stationId: caserne.stationId,
+        userId: sessionMembre.userId,
+        planning: mois,
+      );
+    }
+    // La saisie hors ligne : une case et une préférence en attente.
+    await file.enregistrer(
+      stationId: caserne.stationId,
+      userId: sessionMembre.userId,
+      mois: '2026-11',
+      entrees: <CreneauCle, DisponibiliteEtat>{
+        CreneauCle(DateTime(2026, 11, 4), CreneauType.nuit):
+            DisponibiliteEtat.disponible,
+      },
+    );
+    await file.enregistrerPreferences(
+      stationId: caserne.stationId,
+      userId: sessionMembre.userId,
+      periodId: 'p-2026-11',
+      preferences: const PreferencesMois(maxAstreintes: 4),
     );
   }
-  // La saisie hors ligne : une case et une préférence en attente.
-  await file.enregistrer(
-    stationId: appartenanceMembre.stationId,
-    userId: sessionMembre.userId,
-    mois: '2026-11',
-    entrees: <CreneauCle, DisponibiliteEtat>{
-      CreneauCle(DateTime(2026, 11, 4), CreneauType.nuit):
-          DisponibiliteEtat.disponible,
-    },
-  );
-  await file.enregistrerPreferences(
-    stationId: appartenanceMembre.stationId,
-    userId: sessionMembre.userId,
-    periodId: 'p-2026-11',
-    preferences: const PreferencesMois(maxAstreintes: 4),
-  );
   // Un repère : il doit survivre, et le filet doit le savoir.
   await reperes.marquerVu(RepereAccueil.guide);
 }
@@ -175,7 +175,10 @@ Future<void> _remplirLesCaches({
 /// pas, un dépôt remplacé par un faux en mémoire dans `monterApp` — n'écrit
 /// rien ici, et le filet ne le voit pas. Tout nouveau stockage local doit donc
 /// aussi être écrit par ce décor (ou par le parcours), avec son vrai dépôt.
-Future<AppMontee> _monterSurLeVraiStockage(WidgetTester tester) async {
+Future<AppMontee> _monterSurLeVraiStockage(
+  WidgetTester tester, {
+  List<Appartenance> casernes = const <Appartenance>[appartenanceMembre],
+}) async {
   const cacheAstreintes = CacheAstreintesPartage();
   const appartenancesLocales = AppartenancesLocalesPartagees();
   const cachePlanning = CachePlanningCasernePartage();
@@ -190,6 +193,7 @@ Future<AppMontee> _monterSurLeVraiStockage(WidgetTester tester) async {
     file: file,
     caserneChoisie: caserneChoisie,
     reperes: reperes,
+    casernes: casernes,
   );
 
   // Le décor doit vraiment avoir tout écrit, sinon le filet serait vide par
@@ -220,7 +224,7 @@ Future<AppMontee> _monterSurLeVraiStockage(WidgetTester tester) async {
   final faux = await monterApp(
     tester,
     session: sessionMembre,
-    appartenances: const <Appartenance>[appartenanceMembre],
+    appartenances: casernes,
     astreintes: FauxAstreintesRepository(),
     cacheAstreintes: cacheAstreintes,
     cachePlanningCaserne: cachePlanning,
@@ -297,6 +301,67 @@ void main() {
       // justement ne plus avoir.
       expect(find.text(AuthErreur.reseau.message), findsOneWidget);
       expect(await _clesRestantes(), isEmpty);
+    });
+  });
+
+  group('plusieurs casernes (ticket 072)', () {
+    const sud = Appartenance(
+      id: 'm-sud',
+      stationId: 'bbbbbbbb-0000-4000-8000-000000000001',
+      nomCaserne: 'CIS Val-de-Loue',
+      role: RoleMembre.admin,
+      statut: StatutMembre.actif,
+    );
+    const quittee = Appartenance(
+      id: 'm-quittee',
+      stationId: 'cccccccc-0000-4000-8000-000000000001',
+      nomCaserne: 'CIS Ancienne',
+      role: RoleMembre.membre,
+      statut: StatutMembre.desactive,
+    );
+
+    Future<Set<String>> clesDe(String stationId) async => <String>{
+      for (final cle in await _clesRestantes())
+        if (cle.contains(stationId)) cle,
+    };
+
+    testWidgets('les caches d\'une caserne désactivée partent dès la lecture '
+        'des appartenances', (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      await _monterSurLeVraiStockage(
+        tester,
+        casernes: const <Appartenance>[appartenanceMembre, sud, quittee],
+      );
+
+      expect(
+        await clesDe(quittee.stationId),
+        isEmpty,
+        reason:
+            'Les noms de toute une caserne qui a retiré l\'accès n\'ont plus '
+            'rien à faire sur ce téléphone.',
+      );
+      // Les deux casernes actives gardent les leurs (la file de la caserne
+      // ouverte est rejouée au démarrage, d'où le seul cache d'astreintes).
+      expect(await clesDe(sud.stationId), isNotEmpty);
+    });
+
+    testWidgets('la déconnexion à deux casernes efface tout', (
+      WidgetTester tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final faux = await _monterSurLeVraiStockage(
+        tester,
+        casernes: const <Appartenance>[appartenanceMembre, sud, quittee],
+      );
+
+      await _seDeconnecter(tester);
+
+      expect(faux.auth.deconnexions, 1);
+      expect(
+        await _clesRestantes(),
+        isEmpty,
+        reason: 'Rien d\'aucune des casernes ne reste sur l\'appareil.',
+      );
     });
   });
 

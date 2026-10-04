@@ -228,3 +228,63 @@ test('le SDK des tests est à la version épinglée dans le worker', () => {
   assert.equal(declare, version, 'package.json → devDependencies.firebase');
   assert.equal(paquet.version, version, 'node_modules/firebase installé');
 });
+
+// --- Ticket 072 : la caserne voyage avec la notification --------------------
+
+const SUD = '5f0c1a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b';
+
+test('en arrière-plan, la caserne est gardée avec la destination', async () => {
+  const worker = charger(WORKER, `https://astreinte.test/push/firebase-messaging-sw.js${CONFIG}`);
+  await worker.arrierePlan({data: {title: 'Proposition', route: '/proposals', station_id: SUD}});
+  await worker.arrierePlan({data: {title: 'Compte', route: '/proposals'}});
+  await worker.arrierePlan({data: {title: 'Piège', route: '/proposals', station_id: '../piege'}});
+
+  assert.deepEqual(
+    worker.notifications.map(({options}) => options.data.station_id),
+    [SUD, undefined, undefined],
+  );
+});
+
+test('un clic, application fermée, ouvre la destination avec ?station=', async () => {
+  const worker = charger(WORKER, `https://astreinte.test/push/firebase-messaging-sw.js${CONFIG}`);
+
+  await cliquer(worker, {route: '/proposals', station_id: SUD});
+  await cliquer(worker, {FCM_MSG: {data: {route: '/availability/2026-11', station_id: SUD}}});
+  await cliquer(worker, {route: '/proposals', station_id: 'pas-un-uuid'});
+  await cliquer(worker, {route: 'https://ailleurs.test/', station_id: SUD});
+
+  assert.deepEqual(worker.fenetresOuvertes, [
+    `https://astreinte.test/proposals?station=${SUD}`,
+    `https://astreinte.test/availability/2026-11?station=${SUD}`,
+    'https://astreinte.test/proposals',
+    'https://astreinte.test/',
+  ]);
+});
+
+test('un clic, application ouverte, poste la route et la caserne', async () => {
+  const worker = charger(WORKER, `https://astreinte.test/push/firebase-messaging-sw.js${CONFIG}`);
+  const postes = [];
+  worker.contexte.self.clients.matchAll = async () => [
+    {
+      url: 'https://astreinte.test/',
+      focus: async () => {},
+      postMessage: (message) => postes.push(message),
+    },
+  ];
+
+  await cliquer(worker, {route: '/proposals', station_id: SUD});
+  await cliquer(worker, {FCM_MSG: {data: {route: '/proposals', station_id: SUD}}});
+  await cliquer(worker, {route: '/proposals'});
+
+  // Les objets viennent du contexte `vm` : on compare leurs champs, pas leur
+  // prototype.
+  assert.deepEqual(
+    postes.map(({type, route, station_id}) => [type, route, station_id ?? null]),
+    [
+      ['astreinte-sp/navigation', '/proposals', SUD],
+      ['astreinte-sp/navigation', '/proposals', SUD],
+      ['astreinte-sp/navigation', '/proposals', null],
+    ],
+  );
+  assert.deepEqual(worker.fenetresOuvertes, []);
+});

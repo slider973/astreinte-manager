@@ -193,6 +193,7 @@ class MessageriePushFirebase implements MessageriePush {
           titre: message.notification?.title,
           corps: message.notification?.body,
           route: message.data['route'] as String?,
+          stationId: message.data['station_id'] as String?,
         ),
       );
 
