@@ -805,14 +805,17 @@ verte ([37197977329](https://github.com/slider973/Foco/actions/runs/37197977329)
   que d'une lecture à part : même requête, une de moins ; tant qu'elle n'est pas faite, les
   défauts (24 h, validation par le chef), et la base reste juge.
 
-### Écart relevé dans la PWA au 073 (signalé, non corrigé : `lib/` n'est pas touché)
+### Écart relevé dans la PWA au 073 (corrigé dans la PR #88)
 
 - **Double point après un nom abrégé.** `AppStrings.echangeEnvoyeeA`, `echangeRefusEnvoye`,
   `echangeInfoValidation` et `echangeDetailRefuseChef` ajoutent un point après le nom ; quand le
   nom d'usage (`memberships.display_name`) finit par le sien, comme « Marie L. » et « Thomas M. »
   du seed, la PWA écrit « Demande envoyée à Thomas M.. ». L'app iOS ne
   l'ajoute pas s'il y est déjà (`FocoStrings.endingSentence`) ; relevé par la première course de
-  la PR, rouge sur trois tests.
+  la PR, rouge sur trois tests. **Corrigé** dans la PR
+  [#88](https://github.com/slider973/astreinte-manager/pull/88) : `AppStrings.nomEnFinDePhrase`,
+  la règle de `FocoStrings.endingSentence`, sert à toutes les phrases de la PWA qui finissent par
+  un nom (échanges, invitation, bandeau du planning).
 
 ## 5. Déconnexion et caches locaux
 
