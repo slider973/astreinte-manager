@@ -5,7 +5,7 @@
 - **Dépend de** : 075
 - **Branche** : `feat/077-app-sur-app-astreinte-sp-fr`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-10-04
 
 ## Contexte
 
