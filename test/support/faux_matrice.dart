@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/l10n/format_date.dart';
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/planning/data/matrice_repository.dart';
@@ -70,6 +72,15 @@ class FauxMatriceRepository implements MatriceRepository {
 
   int lectures = 0;
 
+  /// **Une matrice par caserne** (ticket 072) : la lecture d'une caserne
+  /// présente ici ne rend que la sienne.
+  final Map<String, List<LigneMatrice>> parCaserne =
+      <String, List<LigneMatrice>>{};
+
+  /// Les lectures d'une caserne retenues jusqu'à ce que le test complète le
+  /// verrou : l'instant entre la bascule et la première réponse.
+  final Map<String, Completer<void>> retenues = <String, Completer<void>>{};
+
   /// Tout ce qui a été écrit, dans l'ordre.
   final List<
     ({String userId, String date, CreneauType creneau, DisponibiliteEtat etat})
@@ -93,9 +104,11 @@ class FauxMatriceRepository implements MatriceRepository {
     required String periodeId,
   }) async {
     lectures++;
+    final retenue = retenues[stationId];
+    if (retenue != null) await retenue.future;
     final echec = erreurLecture;
     if (echec != null) throw EchecMatrice(echec);
-    return <LigneMatrice>[...lignes];
+    return <LigneMatrice>[...parCaserne[stationId] ?? lignes];
   }
 
   @override

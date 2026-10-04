@@ -284,7 +284,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen>
   }
 
   Widget _panneau(PanneauCandidats panneau, {VoidCallback? onFermer}) {
-    final etat = ref.watch(planningControllerProvider).value;
+    final etat = ref.watch(planningOuvertProvider).value;
     final distant = etat?.distant;
 
     return PanneauCreneau(
@@ -618,7 +618,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen>
     });
 
     final admin = ref.watch(estAdminCaserneProvider);
-    final asynchrone = ref.watch(matriceControllerProvider);
+    final asynchrone = ref.watch(matriceOuverteProvider);
     final etat = asynchrone.value;
     final panneau = ref.watch(panneauCandidatsProvider);
     final destinations = ref.watch(destinationsProvider);
@@ -661,7 +661,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen>
       // défile pas avec elle.
       filActions: _matriceVisible(context)
           ? null
-          : _filActions(ref.watch(planningControllerProvider).value),
+          : _filActions(ref.watch(planningOuvertProvider).value),
       child: _corps(admin: admin, asynchrone: asynchrone, etat: etat),
     );
   }
@@ -738,8 +738,8 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen>
     final filtres = ref.watch(filtresMatriceProvider);
     final visibles = ref.watch(lignesVisiblesProvider);
     final periodes =
-        ref.watch(periodesProvider).value ?? const <PeriodeSaisie>[];
-    final etatPlanning = ref.watch(planningControllerProvider).value;
+        ref.watch(periodesOuvertesProvider).value ?? const <PeriodeSaisie>[];
+    final etatPlanning = ref.watch(planningOuvertProvider).value;
     final planning = etatPlanning?.planning ?? PlanningMois.vide();
     final creneauChoisi = ref.watch(creneauSelectionneProvider);
 
@@ -1051,7 +1051,7 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen>
   AppBanner? _banniere(EtatMatrice? etat, AsyncValue<EtatMatrice?> asynchrone) {
     if (etat == null) return null;
 
-    final planning = ref.watch(planningControllerProvider).value;
+    final planning = ref.watch(planningOuvertProvider).value;
     final horsLigne = !(ref.watch(enLigneProvider).value ?? true);
     // Une seule bannière à la fois : l'erreur de la matrice passe devant celle
     // du planning, parce que c'est elle qui décide de ce qui est lisible.

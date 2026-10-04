@@ -165,8 +165,9 @@ class _Invitations extends ConsumerWidget {
                     child: Text(
                       AppStrings.caserneChoixInvitationAction,
                       semanticsLabel:
-                          '${AppStrings.caserneChoixInvitationAction} · '
-                          '${AppStrings.caserneChoixInvitation(invitation.caserne)}',
+                          AppStrings.caserneChoixInvitationSemantique(
+                            invitation.caserne,
+                          ),
                     ),
                   ),
                 ],

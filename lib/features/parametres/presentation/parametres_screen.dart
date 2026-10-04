@@ -125,7 +125,7 @@ class _ParametresScreenState extends ConsumerState<ParametresScreen> {
   @override
   Widget build(BuildContext context) {
     final admin = ref.watch(estAdminCaserneProvider);
-    final asynchrone = ref.watch(parametresControllerProvider);
+    final asynchrone = ref.watch(parametresOuvertsProvider);
     final destinations = ref.watch(destinationsProvider);
 
     final etat = asynchrone.value;

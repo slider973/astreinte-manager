@@ -316,8 +316,11 @@ touché (`CoucheNotifications`, `station_id` lu dans `data` au premier plan et p
 `web/push/firebase-messaging-sw.js` en arrière-plan, ajouté en `?station=` quand le worker ouvre
 une fenêtre), l'adresse qui porte `?station=` (le routeur la traite **avant** la garde, pour que le
 rôle de cette caserne-là ouvre ou ferme `/admin`, puis la retire de l'adresse), et l'accès retiré
-dans la caserne ouverte (bascule vers la première qui reste, bandeau « accès désactivé », sans
-« Revenir »). Après l'acceptation d'une invitation, la caserne rejointe devient la caserne ouverte
+dans la caserne ouverte (bascule vers la première caserne active qui reste **dans l'ordre
+alphabétique des noms**, celui du sélecteur, bandeau « accès désactivé », sans « Revenir »). La
+redirection du routeur ne change jamais la caserne elle-même : elle note la caserne du lien
+(`LienDeCaserne`), garde le chemin avec le rôle de cette caserne-là, et la bascule part dans une
+microtâche ; un lien gardé au démarrage à froid suit le même chemin. Après l'acceptation d'une invitation, la caserne rejointe devient la caserne ouverte
 (`membership.station_id` de la réponse), sans bandeau : la page « Bienvenue » le dit. Les écrans
 lisent leurs données par `caserneOuverteSeulement` (`lib/core/session/caserne_ouverte.dart`) :
 pendant la relecture qui suit une bascule, et sur l'erreur qui peut la suivre, ils montrent leur

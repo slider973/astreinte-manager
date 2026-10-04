@@ -160,8 +160,11 @@ class _LigneCaserne extends StatelessWidget {
       selected: ouverte,
       button: true,
       inMutuallyExclusiveGroup: true,
-      label: '${appartenance.nomCaserne}, $secondaire'
-          '${ouverte ? ', ${AppStrings.caserneChoixOuverte}' : ''}',
+      label: AppStrings.caserneChoixLigneSemantique(
+        appartenance.nomCaserne,
+        secondaire,
+        ouverte: ouverte,
+      ),
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
@@ -247,9 +250,9 @@ class _LigneInvitation extends StatelessWidget {
             ),
             child: Text(
               AppStrings.caserneChoixInvitationAction,
-              semanticsLabel:
-                  '${AppStrings.caserneChoixInvitationAction} · '
-                  '${AppStrings.caserneChoixInvitation(invitation.caserne)}',
+              semanticsLabel: AppStrings.caserneChoixInvitationSemantique(
+                invitation.caserne,
+              ),
             ),
           ),
         ],

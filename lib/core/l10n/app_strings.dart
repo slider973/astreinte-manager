@@ -4181,12 +4181,27 @@ abstract final class AppStrings {
       ? '$role · 1 non lue'
       : '$role · $nonLues non lues';
 
+  /// La phrase d'une ligne du choix : « CIS Ury, Membre · 2 non lues,
+  /// Ouverte ». L'état ouvert se dit en mot, pas seulement par le radio.
+  static String caserneChoixLigneSemantique(
+    String caserne,
+    String detail, {
+    required bool ouverte,
+  }) => ouverte
+      ? '$caserne, $detail, $caserneChoixOuverte'
+      : '$caserne, $detail';
+
   static const String caserneChoixInvitationsTitre = 'Invitations en attente';
 
   static String caserneChoixInvitation(String caserne) =>
       'Invitation : $caserne';
 
   static const String caserneChoixInvitationAction = 'Voir';
+
+  /// « Voir l'invitation de CIS Ury » : deux « Voir » ne se distinguent pas à
+  /// l'oreille.
+  static String caserneChoixInvitationSemantique(String caserne) =>
+      'Voir l\'invitation de $caserne';
 
   static String caserneOuverteAnnonce(String caserne) => '$caserne ouverte.';
 

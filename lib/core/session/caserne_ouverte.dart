@@ -48,9 +48,16 @@ class _Memoire {
 /// en place : un maillon de plus dans une chaîne que seul un écran recouvert
 /// lit se recalculerait pendant la construction de son retour, ce dont Riverpod
 /// 3.3 se plaint (`composition_accueil.dart`).
+///
+/// [autoDispose] pour une source auto-disposée (les écrans d'administration) :
+/// un dérivé permanent la garderait en vie, et avec elle ses lectures.
 Provider<AsyncValue<T>> dansLaCaserneOuverte<T>(
-  ProviderListenable<AsyncValue<T>> source,
-) => Provider<AsyncValue<T>>((ref) => caserneOuverteSeulement<T>(ref, source));
+  ProviderListenable<AsyncValue<T>> source, {
+  bool autoDispose = false,
+}) => Provider<AsyncValue<T>>(
+  (ref) => caserneOuverteSeulement<T>(ref, source),
+  isAutoDispose: autoDispose,
+);
 
 /// [source] lue par [ref], filtrée comme le dit [dansLaCaserneOuverte].
 AsyncValue<T> caserneOuverteSeulement<T>(

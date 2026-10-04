@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/caserne/caserne_providers.dart';
 import '../../../core/fraicheur/relecture.dart';
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../../core/theme/app_status.dart';
@@ -799,6 +800,14 @@ planningControllerProvider =
       isAutoDispose: true,
     );
 
+/// La même source, sans rien de ce qui a été lu dans une autre caserne
+/// (ticket 072, `core/session/caserne_ouverte.dart`) : après une bascule entre
+/// deux casernes administrées, l'écran montre son squelette, jamais les lignes
+/// de l'ancienne.
+final Provider<AsyncValue<EtatPlanning?>> planningOuvertProvider =
+    dansLaCaserneOuverte(planningControllerProvider, autoDispose: true);
+
+
 /// Les lignes de la matrice, **avec la charge du mois telle qu'elle est à
 /// l'écran**.
 ///
@@ -808,10 +817,10 @@ planningControllerProvider =
 /// fait sur les attributions déjà chargées.
 final Provider<List<LigneMatrice>> lignesAvecChargeProvider =
     Provider<List<LigneMatrice>>((ref) {
-      final matrice = ref.watch(matriceControllerProvider).value;
+      final matrice = caserneOuverteSeulement(ref, matriceControllerProvider).value;
       if (matrice == null) return const <LigneMatrice>[];
 
-      final etat = ref.watch(planningControllerProvider).value;
+      final etat = caserneOuverteSeulement(ref, planningControllerProvider).value;
       if (etat == null || !etat.planning.existe) return matrice.matrice.lignes;
 
       final charges = etat.planning.charges(
@@ -852,7 +861,7 @@ final Provider<List<LigneMatrice>> lignesVisiblesProvider =
 /// **Mémorisé par Riverpod** : le parcours des soixante-deux créneaux n'est
 /// refait qu'au changement de planning, pas à chaque image.
 final Provider<bool> resteAPourvoirProvider = Provider<bool>((ref) {
-  final etat = ref.watch(planningControllerProvider).value;
+  final etat = caserneOuverteSeulement(ref, planningControllerProvider).value;
   final planning = etat?.planning;
   if (planning == null || !planning.modifiable) return false;
 
@@ -872,7 +881,7 @@ final Provider<PanneauCandidats?> panneauCandidatsProvider =
       final creneauId = ref.watch(creneauSelectionneProvider);
       if (creneauId == null) return null;
 
-      final etat = ref.watch(planningControllerProvider).value;
+      final etat = caserneOuverteSeulement(ref, planningControllerProvider).value;
       final creneau = etat?.planning.creneauParId(creneauId);
       if (etat == null || creneau == null) return null;
 

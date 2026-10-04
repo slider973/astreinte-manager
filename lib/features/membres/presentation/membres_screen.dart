@@ -182,7 +182,7 @@ class _MembresScreenState extends ConsumerState<MembresScreen> {
   @override
   Widget build(BuildContext context) {
     final admin = ref.watch(estAdminCaserneProvider);
-    final etat = ref.watch(membresControllerProvider);
+    final etat = ref.watch(membresOuvertsProvider);
     final destinations = ref.watch(destinationsProvider);
 
     final donnees = etat.value;
