@@ -128,7 +128,7 @@ function dependances(admin: AdminClient): Deps {
         console.error("lecture caserne", error.message);
         return null;
       }
-      return data ? { name: data.name, timezone: data.timezone } : null;
+      return data ? { id: stationId, name: data.name, timezone: data.timezone } : null;
     },
 
     async lireProfils(userIds: string[]): Promise<Profil[]> {
@@ -198,7 +198,10 @@ function dependances(admin: AdminClient): Deps {
     },
 
     async envoyerCourriel(destinataire: string, contenu: Contenu, caserne: Caserne | null) {
-      const courriel = renderNotificationEmail(contenu, { stationName: caserne?.name ?? null });
+      const courriel = renderNotificationEmail(contenu, {
+        stationName: caserne?.name ?? null,
+        stationId: caserne?.id ?? null,
+      });
       return await sendMail({
         to: destinataire,
         subject: courriel.subject,

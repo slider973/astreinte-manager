@@ -33,7 +33,11 @@ import {
 import type { ResultatPush } from "../_shared/fcm.ts";
 import type { MailResult } from "../_shared/mailer.ts";
 
-const CASERNE: Caserne = { name: "CIS Saint-Martin", timezone: "Europe/Paris" };
+const CASERNE: Caserne = {
+  id: "aaaaaaaa-0000-4000-8000-000000000001",
+  name: "CIS Saint-Martin",
+  timezone: "Europe/Paris",
+};
 
 const MEMBRE = "11111111-1111-4111-8111-111111111111";
 const AUTRE = "22222222-2222-4222-8222-222222222222";
@@ -57,6 +61,7 @@ type Journal = {
     titre: string;
     donnees: Record<string, string>;
     lien?: string;
+    etiquette?: string;
   }[];
 };
 
@@ -100,6 +105,7 @@ function faussesDeps(options: {
         titre: message.titre,
         donnees: message.donnees,
         lien: message.lien,
+        etiquette: message.etiquette,
       });
       return Promise.resolve(
         options.push?.(jetons) ??
@@ -215,7 +221,12 @@ Deno.test("le lien du push est une adresse complète, pas le chemin interne", as
   await traiterEnvoi(deps, demande());
 
   const lien = journal.pushEnvoyes[0].lien;
-  assert(lien !== undefined && lien.endsWith("/proposals"), `lien inattendu : ${lien}`);
+  // Le chemin public, puis la caserne (ticket 072) : `?station=<uuid>`.
+  assert(
+    lien !== undefined &&
+      lien.endsWith("/proposals?station=aaaaaaaa-0000-4000-8000-000000000001"),
+    `lien inattendu : ${lien}`,
+  );
   assert(
     lien.startsWith("http://") || lien.startsWith("https://"),
     "le lien doit être une adresse complète",
@@ -613,4 +624,63 @@ Deno.test("une marque d'échec vide ou mal formée ne laisse jamais « error » 
   );
   assertEquals(ordinaire.journal.notifications[0].error, null);
   assertEquals(ordinaire.journal.notifications[0].delivered, true);
+});
+
+// ---------------------------------------------------------------------------
+// 8. Plusieurs casernes (ticket 072, décision 2)
+// ---------------------------------------------------------------------------
+// Un pompier de deux casernes touche un push de B alors que l'app est ouverte
+// sur A : l'app doit savoir **quelle** caserne ouvrir. Elle le lit dans
+// `station_id`, présent partout où la notification voyage.
+
+const CASERNE_B = "bbbbbbbb-0000-4000-8000-000000000001";
+
+Deno.test("station_id voyage dans le push, la ligne interne, la trace et le lien", async () => {
+  const { deps, journal } = faussesDeps({
+    jetons: { [MEMBRE]: [{ token: "T1", platform: "ios" }] },
+  });
+
+  await traiterEnvoi(deps, demande({ station_id: CASERNE_B }));
+
+  const push = journal.pushEnvoyes[0];
+  // Le bloc `data` du message FCM : racine du `userInfo` iOS, `FCM_MSG.data`
+  // du service worker.
+  assertEquals(push.donnees.station_id, CASERNE_B);
+  // Le lien public n'a pas changé : la caserne voyage **à côté**.
+  assertEquals(push.donnees.route, "/proposals");
+  assertStringIncludes(push.lien ?? "", `/proposals?station=${CASERNE_B}`);
+
+  // La ligne du centre de notifications, et la trace du push.
+  for (const canal of ["inapp", "push"] as const) {
+    const ligne = journal.notifications.find((n) => n.channel === canal);
+    assert(ligne !== undefined, `ligne ${canal} absente`);
+    assertEquals(ligne.station_id, CASERNE_B);
+    assertEquals(ligne.data.station_id, CASERNE_B);
+  }
+});
+
+Deno.test("deux casernes, même mois : les étiquettes ne se remplacent pas", async () => {
+  const a = faussesDeps({ jetons: { [MEMBRE]: [{ token: "T1", platform: "web" }] } });
+  const b = faussesDeps({ jetons: { [MEMBRE]: [{ token: "T1", platform: "web" }] } });
+
+  await traiterEnvoi(a.deps, demande());
+  await traiterEnvoi(b.deps, demande({ station_id: CASERNE_B }));
+
+  const etiquetteA = a.journal.pushEnvoyes[0].etiquette;
+  const etiquetteB = b.journal.pushEnvoyes[0].etiquette;
+  assertEquals(etiquetteA, "assignment_proposed:2026-10:aaaaaaaa");
+  assertEquals(etiquetteB, "assignment_proposed:2026-10:bbbbbbbb");
+});
+
+Deno.test("sans caserne, ni station_id, ni paramètre dans le lien", async () => {
+  const { deps, journal } = faussesDeps({
+    jetons: { [MEMBRE]: [{ token: "T1", platform: "web" }] },
+  });
+
+  await traiterEnvoi(deps, demande({ station_id: null }));
+
+  const push = journal.pushEnvoyes[0];
+  assertEquals(push.donnees.station_id, undefined);
+  assert(!(push.lien ?? "").includes("station="), `lien inattendu : ${push.lien}`);
+  assertEquals(push.etiquette, "assignment_proposed:2026-10");
 });

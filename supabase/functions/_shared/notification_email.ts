@@ -35,11 +35,30 @@ function escapeHtml(valeur: string): string {
  * Depuis le ticket 046, la route est le chemin de l'adresse, **sans dièse** :
  * le fragment appartient au fournisseur d'authentification, qui y dépose ses
  * jetons.
+ *
+ * **La caserne voyage dans le lien** depuis le ticket 072 (décision 2 du
+ * propriétaire) : `?station=<uuid>`. Un pompier de deux casernes qui touche le
+ * lien d'un courriel de B alors que l'app est ouverte sur A doit arriver dans B.
+ * Le chemin, lui, ne change pas d'un caractère — les liens publics de
+ * `docs/WORKFLOWS.md § 8` restent ce qu'ils sont, et un client qui ignore le
+ * paramètre lit le même chemin qu'avant (`destinationInterne` ne lit que les
+ * segments). Un identifiant qui n'a pas la forme d'un uuid est omis plutôt que
+ * recopié dans une adresse.
  */
-export function lienApplication(route: string): string {
+export function lienApplication(route: string, stationId?: string | null): string {
   const base = (Deno.env.get("APP_BASE_URL") ?? "http://127.0.0.1:3000").replace(/\/+$/, "");
   const modele = Deno.env.get("APP_LINK_PATH") ?? "{route}";
-  return base + modele.replace("{route}", route.startsWith("/") ? route : `/${route}`);
+  return base +
+    modele.replace("{route}", avecCaserne(route.startsWith("/") ? route : `/${route}`, stationId));
+}
+
+const FORME_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** La route, plus `station=<uuid>` quand la caserne est connue et bien formée. */
+export function avecCaserne(route: string, stationId?: string | null): string {
+  if (!stationId || !FORME_UUID.test(stationId)) return route;
+  const separateur = route.includes("?") ? "&" : "?";
+  return `${route}${separateur}station=${stationId.toLowerCase()}`;
 }
 
 /** Le libellé du bouton, adapté à la destination. */
@@ -54,11 +73,11 @@ function libelleBouton(route: string): string {
 
 export function renderNotificationEmail(
   contenu: Contenu,
-  options: { stationName?: string | null } = {},
+  options: { stationName?: string | null; stationId?: string | null } = {},
 ): CourrielNotification {
   const titre = escapeHtml(contenu.titre);
   const corps = escapeHtml(contenu.corps);
-  const url = lienApplication(contenu.route);
+  const url = lienApplication(contenu.route, options.stationId);
   const urlEchappee = escapeHtml(url);
   const bouton = escapeHtml(libelleBouton(contenu.route));
   const caserne = options.stationName?.trim() ? escapeHtml(options.stationName.trim()) : null;

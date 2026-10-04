@@ -5,7 +5,7 @@
 - **Dépend de** : 070, 071, 072
 - **Branche** : `feat/073-echange-astreintes`
 - **PR** : —
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-10-04
 
 ## Contexte
 
