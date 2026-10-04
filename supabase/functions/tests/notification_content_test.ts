@@ -646,11 +646,9 @@ Deno.test("échange : chaque motif d'échec de la liste fermée a sa phrase", ()
     "peer_already_assigned",
     "peer_shift_quota_reached",
     "peer_weekend_quota_reached",
-    "peer_taken_elsewhere",
     "requester_already_assigned",
     "requester_shift_quota_reached",
     "requester_weekend_quota_reached",
-    "requester_taken_elsewhere",
   ];
   assertEquals(Object.keys(MOTIFS_ECHEC_ECHANGE).sort(), [...liste].sort());
 });

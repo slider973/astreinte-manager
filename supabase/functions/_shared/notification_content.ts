@@ -479,6 +479,11 @@ const MOTIFS: Record<string, string> = {
  * Pourquoi un échange n'a pas pu se faire : la liste fermée de
  * `shift_exchanges.reason_code` pour une demande `failed` (migration 0041).
  * Les codes `peer_*` parlent du repreneur, `requester_*` du demandeur.
+ *
+ * « Pris dans une autre caserne » (ticket 072) n'y figure **pas** : A et B
+ * lisent ce motif, et rien de l'agenda d'un collègue dans une autre caserne ne
+ * doit leur parvenir. La base le rend en `*_already_assigned` — « déjà sur ce
+ * créneau » — et garde le détail au journal des administrateurs.
  */
 export const MOTIFS_ECHEC_ECHANGE: Record<string, string> = {
   station_suspended: "la caserne est en lecture seule",
@@ -491,11 +496,9 @@ export const MOTIFS_ECHEC_ECHANGE: Record<string, string> = {
   peer_already_assigned: "le remplaçant est déjà sur ce créneau",
   peer_shift_quota_reached: "le remplaçant a atteint son plafond d'astreintes du mois",
   peer_weekend_quota_reached: "le remplaçant a atteint son plafond de weekends du mois",
-  peer_taken_elsewhere: "le remplaçant est déjà pris dans une autre caserne",
   requester_already_assigned: "le demandeur est déjà sur le créneau rendu",
   requester_shift_quota_reached: "le demandeur a atteint son plafond d'astreintes du mois",
   requester_weekend_quota_reached: "le demandeur a atteint son plafond de weekends du mois",
-  requester_taken_elsewhere: "le demandeur est déjà pris dans une autre caserne",
 };
 
 function motifCode(payload: ChargeUtile): string | null {
