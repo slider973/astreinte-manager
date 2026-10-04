@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 070, 071
 - **Branche** : `feat/072-plusieurs-casernes`
-- **PR** : https://github.com/slider973/astreinte-manager/pull/89
+- **PR** : https://github.com/slider973/astreinte-manager/pull/84 (chantier base), https://github.com/slider973/astreinte-manager/pull/86 (chantier PWA), https://github.com/slider973/astreinte-manager/pull/88 (chantier iOS), https://github.com/slider973/astreinte-manager/pull/89 (clôture)
 - **Statut** : terminé le 2026-10-04 (PR créée)
 
 ## Contexte
