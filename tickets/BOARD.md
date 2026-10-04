@@ -15,6 +15,7 @@ Généré par `scripts/ticket.sh board` le 2026-10-04. Ne pas éditer à la main
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
 | 072 | [Un pompier dans plusieurs casernes, de bout en bout](backlog/072-plusieurs-casernes.md) | P1 | 070 071 | — |
 | 073 | [Échanger ou céder une astreinte entre pompiers](backlog/073-echange-astreintes.md) | P1 | 070 071 072 | — |
+| 077 | [Servir l'app sur app.astreinte-sp.fr](backlog/077-app-sur-app-astreinte-sp-fr.md) | P1 | 075 | — |
 
 ## Terminés
 
