@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 070, 071, 072
 - **Branche** : `feat/073-echange-astreintes`
-- **PR** : —
+- **PR** : https://github.com/slider973/astreinte-manager/pull/90
 - **Statut** : terminé le 2026-10-04 (PR créée)
 
 ## Contexte
