@@ -7,6 +7,7 @@ Généré par `scripts/ticket.sh board` le 2026-10-04. Ne pas éditer à la main
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 072 | [Un pompier dans plusieurs casernes, de bout en bout](in-progress/072-plusieurs-casernes.md) | P1 | 070 071 | — |
+| 073 | [Échanger ou céder une astreinte entre pompiers](in-progress/073-echange-astreintes.md) | P1 | 070 071 072 | — |
 | 077 | [Servir l'app sur app.astreinte-sp.fr](in-progress/077-app-sur-app-astreinte-sp-fr.md) | P1 | 075 | — |
 
 ## À faire
@@ -15,7 +16,6 @@ Généré par `scripts/ticket.sh board` le 2026-10-04. Ne pas éditer à la main
 |---|---|---|---|---|
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
-| 073 | [Échanger ou céder une astreinte entre pompiers](backlog/073-echange-astreintes.md) | P1 | 070 071 072 | — |
 
 ## Terminés
 
