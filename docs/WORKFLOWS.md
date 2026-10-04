@@ -135,8 +135,9 @@ Règles :
   `exchange_auto_approve` **et** si le remplaçant avait déclaré `available` sur le créneau (pour un
   échange, chacun sur celui qu'il reprend) ; l'administrateur est alors seulement informé.
 - **À la validation, tout ou rien** : chaque règle revérifiée — garde de A toujours acceptée,
-  remplaçant actif, pas déjà sur le créneau, plafonds du mois non dépassés (un plafond dépassé
-  **bloque**), caserne inscriptible. Une seule qui ne tient plus : rien ne bouge, `failed` avec
+  remplaçant actif, pas déjà sur le créneau, **pas pris sur un créneau qui chevauche dans une
+  autre caserne** (ticket 072), plafonds du mois non dépassés (un plafond dépassé **bloque**),
+  caserne inscriptible. Une seule qui ne tient plus : rien ne bouge, `failed` avec
   son motif. Sinon : l'ancienne garde passe `replaced` (§ 3), `replaced_by` vers la nouvelle,
   **née `accepted`** — B a déjà dit oui.
 - **Échéance** : au début du créneau moins `exchange_deadline_hours` (24 h par défaut, de 1 à

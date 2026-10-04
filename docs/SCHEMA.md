@@ -721,9 +721,8 @@ né d'une réattribution ou d'une annulation de garde par l'administrateur (`ass
 | `failed` | `station_suspended`, `assignment_changed`, `assignment_not_accepted`, `return_assignment_not_accepted`, `schedule_not_published`, `requester_not_active`, `peer_not_active`, `peer_already_assigned`, `peer_shift_quota_reached`, `peer_weekend_quota_reached`, `peer_taken_elsewhere`, `requester_already_assigned`, `requester_shift_quota_reached`, `requester_weekend_quota_reached`, `requester_taken_elsewhere` |
 
 `peer_*` parle du repreneur, `requester_*` du demandeur (le second mouvement d'un échange).
-`*_taken_elsewhere` est **réservé au ticket 072** — pris sur un créneau qui chevauche dans une autre
-caserne : la valeur existe pour que les clients la traduisent dès maintenant, aucune fonction ne la
-produit encore (point d'extension dans `exchange_rule_check`, § 3).
+`*_taken_elsewhere` : proposé ou accepté (brouillon compris) sur un créneau qui chevauche dans une
+autre caserne, au sens de `member_taken_elsewhere` (`0040`, ticket 072).
 
 « Une seule demande ouverte par attribution » : l'index partiel tient la garde **cédée** ; la garde
 **rendue** d'un échange est vérifiée par `request_exchange` sous le verrou des deux attributions.
@@ -976,8 +975,8 @@ Function : l'identité vient de `auth.uid()`, jamais d'un paramètre, et les not
 
 | Fonction | Qui | Rôle |
 |---|---|---|
-| `request_exchange(p_assignment uuid, p_target uuid default null, p_return_assignment uuid default null) returns jsonb` | A | Propose sa garde **`accepted`**, d'un planning publié ou validé, avant l'échéance. `p_target` nul : demande « à la caserne », envoyée aux membres actifs **qui ont déclaré `available`** sur ce créneau et que les règles laissent reprendre ; sinon au collègue désigné. `p_return_assignment` : échange contre une garde **acceptée** de ce collègue (exige `p_target`). Rend `{ok, exchange_id, status: 'open', kind, broadcast, expires_at, notified}` — `notified` est le nombre de destinataires **mis en file** (0 pour une demande à la caserne que personne n'est libre de reprendre). Codes : `assignment_not_found`, `not_member`, `station_suspended`, `swap_requires_target`, `target_is_self`, `target_not_member`, `return_assignment_not_found`, `assignment_not_accepted`, `return_assignment_not_accepted`, `schedule_not_published` (+`status`), `too_late` (+`expires_at`), `exchange_already_open`, et les règles du remplaçant `already_assigned`, `shift_quota_reached`, `weekend_quota_reached` avec `who: 'target' \| 'requester'` |
-| `respond_exchange(p_exchange uuid, p_accept boolean default true) returns jsonb` | B | Accepte, ou décline une demande **qui lui est adressée** (une demande à la caserne ne se décline pas : `not_target`, elle s'ignore). B ne donne pas de motif et **ne revient pas sur son accord** (il passe par le chef). Le premier qui accepte une demande à la caserne la prend. Après l'accord : exécution immédiate si `exchange_auto_approve` **et** disponibilité `available` déclarée (pour un échange, chacun sur le créneau qu'il reprend), sinon `exchange_accepted` aux administrateurs. Rend `{ok, exchange_id, status: 'accepted_by_peer' \| 'approved' \| 'rejected', auto_approved}`. Codes : `exchange_not_found`, `not_target`, `station_suspended` (accepter seulement), `exchange_not_open` (+`status`), `exchange_expired`, `not_available`, `already_assigned`, `shift_quota_reached`, `weekend_quota_reached`, `exchange_failed` (+`reason_code`) |
+| `request_exchange(p_assignment uuid, p_target uuid default null, p_return_assignment uuid default null) returns jsonb` | A | Propose sa garde **`accepted`**, d'un planning publié ou validé, avant l'échéance. `p_target` nul : demande « à la caserne », envoyée aux membres actifs **qui ont déclaré `available`** sur ce créneau et que les règles laissent reprendre ; sinon au collègue désigné. `p_return_assignment` : échange contre une garde **acceptée** de ce collègue (exige `p_target`). Rend `{ok, exchange_id, status: 'open', kind, broadcast, expires_at, notified}` — `notified` est le nombre de destinataires **mis en file** (0 pour une demande à la caserne que personne n'est libre de reprendre). Codes : `assignment_not_found`, `not_member`, `station_suspended`, `swap_requires_target`, `target_is_self`, `target_not_member`, `return_assignment_not_found`, `assignment_not_accepted`, `return_assignment_not_accepted`, `schedule_not_published` (+`status`), `too_late` (+`expires_at`), `exchange_already_open`, et les règles du remplaçant `already_assigned`, `shift_quota_reached`, `weekend_quota_reached`, `taken_elsewhere` avec `who: 'target' \| 'requester'` |
+| `respond_exchange(p_exchange uuid, p_accept boolean default true) returns jsonb` | B | Accepte, ou décline une demande **qui lui est adressée** (une demande à la caserne ne se décline pas : `not_target`, elle s'ignore). B ne donne pas de motif et **ne revient pas sur son accord** (il passe par le chef). Le premier qui accepte une demande à la caserne la prend. Après l'accord : exécution immédiate si `exchange_auto_approve` **et** disponibilité `available` déclarée (pour un échange, chacun sur le créneau qu'il reprend), sinon `exchange_accepted` aux administrateurs. Rend `{ok, exchange_id, status: 'accepted_by_peer' \| 'approved' \| 'rejected', auto_approved}`. Codes : `exchange_not_found`, `not_target`, `station_suspended` (accepter seulement), `exchange_not_open` (+`status`), `exchange_expired`, `not_available`, `already_assigned`, `shift_quota_reached`, `weekend_quota_reached`, `taken_elsewhere`, `exchange_failed` (+`reason_code`) |
 | `decide_exchange(p_exchange uuid, p_approve boolean, p_reason text default null) returns jsonb` | admin | Valide (exécution, ci-dessous) ou refuse, motif facultatif ≤ 500, une demande **`accepted_by_peer`**. Rend `{ok, exchange_id, status: 'approved' \| 'rejected', auto_approved, new_assignment_id, new_return_assignment_id}`. Codes : `exchange_not_found`, `not_admin`, `reason_too_long`, `exchange_not_pending` (+`status`), `exchange_expired`, `exchange_failed` (+`reason_code`) |
 | `cancel_exchange(p_exchange uuid) returns jsonb` | A | Retire sa demande tant qu'elle n'est pas validée (`open` ou `accepted_by_peer`). **L'administrateur n'annule pas la demande d'un pompier** ; il peut refuser une demande acceptée. Codes : `exchange_not_found`, `exchange_not_open` (+`status`) |
 | `exchangeable_shifts_of(p_peer uuid) returns table (assignment_id, shift_id, station_id, date, slot, expires_at)` | A | Les gardes de B que A peut demander en retour : `accepted`, planning publié ou validé, échéance non passée, **pas engagées dans une demande ouverte**, sur un créneau que A ne tient pas, dans les casernes où A et B sont tous deux actifs. Rien d'autre de B. Vide pour soi-même ou un inconnu. Sans elle, un échange ne se compose pas sur un planning seulement publié : la RLS n'ouvre les attributions des autres que sur un planning validé |
@@ -988,8 +987,11 @@ créneau, plafonds `max_shifts` et `max_weekends` du mois **comptés comme `v_me
 `apply_auto_proposal`) — hors la garde quittée dans le même mouvement, sans quoi un échange dans un
 même mois serait refusé à qui reste à sa charge. Un plafond dépassé **bloque**, à la demande, à
 l'accord et à la validation. Elles s'appliquent au repreneur, et au demandeur pour le second
-mouvement d'un échange. **Point d'extension du ticket 072** (« pas pris ailleurs ») : commenté dans
-la fonction, code `taken_elsewhere`, branché nulle part encore.
+mouvement d'un échange. **Pas pris ailleurs** (ticket 072) : `member_taken_elsewhere`, appelée par
+`exchange_rule_check` — code `taken_elsewhere` à la demande et à l'accord (`who` dit qui), motif
+`peer_taken_elsewhere` / `requester_taken_elsewhere` à la validation. Rien de l'autre caserne ne
+sort : un booléen, et un code. Une demande « à la caserne » ne parvient pas à qui est pris
+ailleurs.
 
 **L'exécution** (`exchange_apply`, interne, appelée par `decide_exchange` et, en validation
 automatique, par `respond_exchange`) est **tout ou rien** : verrous des plannings, puis **chaque**
@@ -1008,12 +1010,19 @@ sa trace `assignment.force` comme toute autre (§ 5).
 **L'ordre des verrous** : les attributions concernées (cédée, rendue) dans l'ordre de leurs
 identifiants, puis la demande, puis les plannings dans l'ordre de leurs identifiants. C'est l'ordre
 de `reassign_shift` et d'une réponse de membre (attribution, puis planning), et il ne s'inverse
-nulle part : personne ne prend une demande puis une attribution. Deux conséquences vérifiées à deux
+nulle part : personne ne prend une demande puis une attribution. À l'exécution seulement vient en
+dernier **le verrou consultatif par pompier** d'`apply_auto_proposal` (`0040`), sur chaque pompier
+qui reçoit une garde, dans l'ordre des identifiants : sans lui, une validation ici et un remplissage
+automatique dans une autre caserne liraient chacun « pas pris ailleurs » et poseraient la même
+personne deux fois. Aucun cycle : le remplissage prend son planning **brouillon** puis ce verrou,
+et ces fonctions-ci ne touchent jamais un brouillon. Trois conséquences vérifiées à deux
 sessions réelles par `scripts/test_concurrence.sh` : **deux repreneurs** simultanés — le second
 attend sur la garde, puis lit `exchange_not_open` ; **une validation pendant une réattribution** sur
 la même garde, dans les deux ordres — la seconde arrivée attend, puis refuse
 (`assignment_not_replaceable` ou `exchange_not_pending`), jamais deux titulaires, jamais
-d'interblocage.
+d'interblocage ; **une validation pendant un remplissage automatique d'une autre caserne** sur la
+même personne — la validation attend le verrou du pompier, puis échoue en
+`peer_taken_elsewhere`.
 
 **Lecture seule (suspension)** : aucune demande ne se crée (`station_suspended`), aucune ne
 s'accepte, et une validation passe `failed` (`station_suspended`). Les clôtures — décliner, annuler,

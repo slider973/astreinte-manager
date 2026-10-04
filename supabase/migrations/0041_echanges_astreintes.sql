@@ -3,8 +3,9 @@
 -- § 4 (RLS), § 8 (tâche `expire_exchanges`) ; docs/WORKFLOWS.md § 3 bis
 -- (machine à états), § 5 bis (séquence) et § 8 (notifications, liens profonds).
 --
--- Le rang 0040 est réservé au ticket 072, mené en parallèle. Ce fichier ne
--- dépend d'aucun de ses objets : il s'applique après une 0040 quelconque.
+-- S'applique après 0040 (ticket 072), dont il utilise `member_taken_elsewhere`
+-- (règle « pas pris ailleurs ») et le verrou consultatif par pompier
+-- d'`apply_auto_proposal`.
 --
 -- Ce que la migration pose
 -- ------------------------
@@ -33,7 +34,9 @@
 -- puis les plannings dans l'ordre de leurs identifiants. Le déclencheur du § 6
 -- prend la demande **après** l'attribution qu'on vient de modifier : même sens.
 -- Personne ne prend une demande puis une attribution, donc aucun cycle. La
--- tâche d'expiration ne prend que des demandes, en `skip locked`.
+-- tâche d'expiration ne prend que des demandes, en `skip locked`. Enfin, à
+-- l'exécution seulement, le verrou consultatif par pompier du ticket 072
+-- (0040), après les plannings — voir `exchange_apply`.
 --
 -- **Pourquoi verrouiller l'attribution avant la demande**, et pas l'inverse :
 -- c'est ce qui sérialise la validation d'un échange avec une réattribution de
@@ -311,9 +314,8 @@ create table shift_exchanges (
   constraint shift_exchanges_reason_admin_only
     check (reason is null or reason_code = 'admin_rejected'),
   -- La liste fermée des motifs, par statut. Une demande ouverte ou validée n'en
-  -- porte aucun. `taken_elsewhere` est réservé au ticket 072 (pris sur un
-  -- créneau qui chevauche dans une autre caserne) : la valeur existe pour que
-  -- les clients la traduisent dès aujourd'hui.
+  -- porte aucun. `*_taken_elsewhere` : pris sur un créneau qui chevauche dans
+  -- une autre caserne (ticket 072, `member_taken_elsewhere`).
   constraint shift_exchanges_reason_code check (
     case status
       when 'open'             then reason_code is null
@@ -625,18 +627,14 @@ begin
     return 'already_assigned';
   end if;
 
-  -- POINT D'EXTENSION — ticket 072 (« pas pris ailleurs »).
-  -- Avec le 072, un pompier peut servir dans plusieurs casernes, et la règle
-  -- « pas pris sur un créneau qui chevauche dans une autre caserne » vaut aussi
-  -- pour un échange. Elle n'est **pas** dans ce chantier : la fonction qui la
-  -- porte (security definer, ne rendant qu'un booléen) appartient au 072 et
-  -- n'existe pas encore au moment où ce fichier s'écrit. Le jour où elle
-  -- existe, elle se branche ici, et seulement ici — `request_exchange`,
-  -- `respond_exchange` et `exchange_apply` passent tous par cette fonction :
-  --
-  --   if <fonction du 072>(p_user, creneau.date, creneau.slot, p_station) then
-  --     return 'taken_elsewhere';
-  --   end if;
+  -- Ticket 072 (migration 0040) : pas pris sur un créneau qui chevauche dans
+  -- une autre caserne — proposé ou accepté, brouillon compris, aux heures et
+  -- dans le fuseau de chaque caserne. `member_taken_elsewhere` ne rend qu'un
+  -- booléen : rien de l'autre caserne ne sort d'ici. `request_exchange`,
+  -- `respond_exchange` et `exchange_apply` passent tous par cette fonction.
+  if member_taken_elsewhere(p_station, p_user, creneau.date, creneau.slot) then
+    return 'taken_elsewhere';
+  end if;
 
   premier := date_trunc('month', creneau.date)::date;
   suivant := (premier + interval '1 month')::date;
@@ -903,6 +901,7 @@ declare
   admins          uuid[];
   destinataires   jsonb;
   pl              uuid;
+  receveur        uuid;
 begin
   select * into demande from shift_exchanges where id = p_exchange;
   select * into cedee   from assignments where id = demande.assignment_id;
@@ -921,6 +920,26 @@ begin
      order by x);
 
   perform 1 from schedules where id = any(plannings) order by id for update;
+
+  -- Le verrou par pompier du ticket 072 (`apply_auto_proposal`, 0040), sur
+  -- chaque pompier qui **reçoit** une garde — B, et A pour un échange —, dans
+  -- l'ordre des identifiants, avant toute lecture des règles. Sans lui, une
+  -- validation ici et un remplissage automatique dans une autre caserne
+  -- liraient chacun « pas pris ailleurs » et poseraient la même personne sur
+  -- deux créneaux qui se chevauchent. Il vient en dernier : le remplissage le
+  -- prend après le verrou de **son** planning brouillon, qu'aucune fonction de
+  -- ce fichier ne touche, et n'attend ensuite aucune ligne que nous tenons —
+  -- aucun cycle possible.
+  for receveur in
+    select distinct u
+      from unnest(case when demande.kind = 'swap'
+                       then array[demande.taker_id, demande.requester_id]
+                       else array[demande.taker_id] end) as u
+     order by 1
+  loop
+    perform pg_advisory_xact_lock(
+      hashtextextended('apply_auto_proposal:user:' || receveur::text, 0));
+  end loop;
 
   select * into planning from schedules where id = creneau.schedule_id;
   if demande.kind = 'swap' then

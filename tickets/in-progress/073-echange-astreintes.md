@@ -76,13 +76,12 @@ Ticket découpé en chantiers (une PR par chantier) : base, PWA, iOS.
 
 ## Notes du chantier base (073a, migration `0041`)
 
-- **Règle du 072 « pas pris ailleurs » : non branchée.** Point d'extension commenté dans
-  `exchange_rule_check` (`supabase/migrations/0041_echanges_astreintes.sql`), seul endroit à
-  toucher : `request_exchange`, `respond_exchange` et la validation y passent tous. Les codes
-  `peer_taken_elsewhere` / `requester_taken_elsewhere` sont déjà dans la liste fermée de
-  `shift_exchanges.reason_code` et traduits par `send-notification` ; le 072 n'aura qu'à appeler sa
-  fonction et rendre `taken_elsewhere`.
-- Le rang `0040` reste au 072 ; `0041` ne dépend d'aucun de ses objets.
+- **Règle du 072 « pas pris ailleurs » : branchée** après la fusion de la PR #84.
+  `exchange_rule_check` appelle `member_taken_elsewhere` (`0040`) : code `taken_elsewhere` à la
+  demande et à l'accord, motif `peer_taken_elsewhere` / `requester_taken_elsewhere` à la
+  validation ; une demande à la caserne ne parvient pas à qui est pris ailleurs. `exchange_apply`
+  prend le verrou consultatif par pompier d'`apply_auto_proposal`, même clé, même ordre (uuid
+  trié), après ses propres verrous : course vérifiée à deux sessions.
 - Décisions du brief de design retenues en base : B ne revient pas sur son accord ; une demande à
   la caserne ne se décline pas ; B ne donne pas de motif ; l'admin n'annule pas la demande d'un
   pompier ; un plafond dépassé bloque ; échéance de 1 à 168 h, 24 par défaut ; une garde engagée

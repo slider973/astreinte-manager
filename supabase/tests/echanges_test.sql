@@ -32,6 +32,9 @@
 -- 12. `exchangeable_shifts_of` : les gardes de B que A peut demander, et rien
 --     d'autre.
 -- 13. La machine à états, les droits d'exécution et la tâche planifiée.
+-- 14. « Pas pris ailleurs » (ticket 072) : un repreneur ou un demandeur
+--     proposé ou accepté sur un créneau qui chevauche dans une autre caserne
+--     est refusé à la demande, à l'accord et à la validation.
 --
 -- Les courses à deux sessions réelles (deux repreneurs en même temps ; une
 -- validation pendant une réattribution) sont dans scripts/test_concurrence.sh.
@@ -1088,6 +1091,125 @@ begin
     '2-59/10 * * * * | select public.cron_expire_exchanges();',
     'la tâche expire_exchanges est planifiée, qualifiée, sans argument');
 end $$;
+
+-- ===========================================================================
+-- 14. Pris ailleurs (ticket 072) : deux casernes
+-- ===========================================================================
+\echo ''
+\echo '--- 14. Pas pris sur un créneau qui chevauche dans une autre caserne'
+savepoint s14;
+create temporary table t14 (cle text primary key, val uuid);
+grant all on t14 to authenticated;
+
+-- Damien et Bruno servent aussi dans la voisine. Bruno y tient la nuit du 5
+-- (chevauche la nuit du 5 chez nous), Damien rien encore.
+insert into memberships (station_id, user_id, role, status, display_name) values
+  (:V, :C, 'member', 'active', 'Damien D.'),
+  (:V, :A, 'member', 'active', 'Bruno B.');
+insert into shifts (id, station_id, schedule_id, date, slot, required_count) values
+  ('07300000-0000-4000-8000-000000000408', :V, '07300000-0000-4000-8000-000000000302', '2029-03-05', 'night', 1),
+  ('07300000-0000-4000-8000-000000000409', :V, '07300000-0000-4000-8000-000000000302', '2029-03-06', 'day', 1);
+update shifts set required_count = 2 where id = :S6;
+insert into assignments (station_id, shift_id, user_id, status, proposed_at, responded_at, created_by) values
+  (:V, '07300000-0000-4000-8000-000000000408', :A, 'accepted', now(), now(), :VADM),
+  -- Le 6 de jour chez la voisine ne chevauche pas le 5 de jour : sans effet.
+  (:V, '07300000-0000-4000-8000-000000000409', :C, 'accepted', now(), now(), :VADM);
+
+set local role authenticated;
+select tests_ech.qui(:A);
+insert into t14 select 'libre', (tests_ech.ok(request_exchange(:A1, :C),
+  'Damien, pris le 6 ailleurs, reste libre le 5 : demande acceptée') ->> 'exchange_id')::uuid;
+select tests_ech.qui(:C);
+select tests_ech.ok(respond_exchange((select val from t14 where cle = 'libre')), 'Damien accepte');
+
+-- Entre l'accord et la validation, la voisine propose Damien le 5 de jour.
+reset role;
+insert into assignments (station_id, shift_id, user_id, status, proposed_at, created_by)
+values (:V, :S6, :C, 'proposed', now(), :VADM);
+
+set local role authenticated;
+select tests_ech.qui(:ADM);
+do $$
+declare r jsonb;
+begin
+  r := decide_exchange((select val from t14 where cle = 'libre'), true);
+  perform tests_ech.code(r, 'exchange_failed', 'la validation échoue');
+  perform tests_ech.egal(r ->> 'reason_code', 'peer_taken_elsewhere',
+    'motif peer_taken_elsewhere : Damien est proposé ailleurs sur le même créneau');
+end $$;
+reset role;
+select tests_ech.egal((select status::text from assignments where id = :A1), 'accepted',
+  'la garde de Bruno n''a pas bougé');
+
+-- Désormais pris : une nouvelle demande à Damien est refusée d'emblée…
+set local role authenticated;
+select tests_ech.qui(:A);
+do $$
+declare r jsonb;
+begin
+  r := request_exchange('07300000-0000-4000-8000-000000000501', '07300000-0000-4000-8000-000000000103');
+  perform tests_ech.code(r, 'taken_elsewhere', 'demande à un collègue pris ailleurs refusée');
+  perform tests_ech.egal(r ->> 'who', 'target', 'le refus désigne le destinataire');
+  perform tests_ech.check(r::text not like '%07300000-0000-4000-8000-000000000002%'
+                          and r::text not like '%Voisine%',
+    'et ne dit rien de l''autre caserne');
+end $$;
+
+-- … et une demande à la caserne ne lui parvient pas.
+insert into t14 select 'caserne', (request_exchange(:A1) ->> 'exchange_id')::uuid;
+reset role;
+select tests_ech.egal(
+  (select array_agg(r ->> 'user_id' order by r ->> 'user_id')::text
+     from notification_outbox o, jsonb_array_elements(o.recipients) r
+    where o.dedupe_key = 'exchange_requested:' || (select val from t14 where cle = 'caserne')),
+  format('{%s}', :F), 'à la caserne : Farid seul, Damien pris ailleurs n''est pas sollicité');
+set local role authenticated;
+select tests_ech.qui(:C);
+select tests_ech.code(respond_exchange((select val from t14 where cle = 'caserne')), 'taken_elsewhere',
+  'et s''il la reprend quand même, la règle le refuse');
+select tests_ech.qui(:A);
+select cancel_exchange((select val from t14 where cle = 'caserne'));
+
+-- Le demandeur d'un échange : Bruno tient la nuit du 5 dans la voisine, il ne
+-- peut pas demander la nuit du 5 de Chloé en retour.
+do $$
+declare r jsonb;
+begin
+  r := request_exchange('07300000-0000-4000-8000-000000000501', '07300000-0000-4000-8000-000000000102',
+                        '07300000-0000-4000-8000-000000000502');
+  perform tests_ech.code(r, 'taken_elsewhere', 'échange refusé : le demandeur est pris ailleurs');
+  perform tests_ech.egal(r ->> 'who', 'requester', 'le refus désigne le demandeur');
+end $$;
+
+-- À la validation : Bruno libre au moment de la demande, pris ensuite.
+reset role;
+update assignments set status = 'cancelled'
+ where station_id = :V and user_id = :A and shift_id = '07300000-0000-4000-8000-000000000408';
+set local role authenticated;
+select tests_ech.qui(:A);
+insert into t14 select 'swap', (tests_ech.ok(request_exchange(:A1, :B, :A2),
+  'libéré ailleurs, Bruno peut proposer l''échange') ->> 'exchange_id')::uuid;
+select tests_ech.qui(:B);
+select respond_exchange((select val from t14 where cle = 'swap'));
+reset role;
+update shifts set required_count = 2 where id = '07300000-0000-4000-8000-000000000408';
+insert into assignments (station_id, shift_id, user_id, status, proposed_at, created_by)
+values (:V, '07300000-0000-4000-8000-000000000408', :A, 'proposed', null, :VADM);
+set local role authenticated;
+select tests_ech.qui(:ADM);
+do $$
+declare r jsonb;
+begin
+  r := decide_exchange((select val from t14 where cle = 'swap'), true);
+  perform tests_ech.egal(r ->> 'reason_code', 'requester_taken_elsewhere',
+    'un brouillon de la voisine suffit : requester_taken_elsewhere, tout ou rien');
+end $$;
+reset role;
+select tests_ech.egal((select status::text || '/' || (select status::text from assignments where id = :A2)
+                         from assignments where id = :A1),
+  'accepted/accepted', 'aucune des deux gardes n''a bougé');
+drop table t14;
+rollback to savepoint s14;
 
 \echo ''
 \echo '=== Échanges d''astreintes : tous les tests passent ==='
