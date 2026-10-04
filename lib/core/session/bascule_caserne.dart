@@ -143,7 +143,10 @@ class BasculeCaserne extends Notifier<BasculeAutomatique?> {
   /// **Seulement pour un même compte** : à un changement de session, la liste
   /// passe d'un compte à l'autre — Riverpod garde la précédente pendant la
   /// lecture —, et ce n'est pas un accès retiré.
-  void _surveillerLesAcces(List<Appartenance>? avant, List<Appartenance> apres) {
+  void _surveillerLesAcces(
+    List<Appartenance>? avant,
+    List<Appartenance> apres,
+  ) {
     final userId = ref.read(sessionProvider).value?.userId;
     final memeCompte = userId != null && userId == _compte;
     _compte = userId;
@@ -173,5 +176,41 @@ class BasculeCaserne extends Notifier<BasculeAutomatique?> {
 }
 
 final NotifierProvider<BasculeCaserne, BasculeAutomatique?>
-basculeCaserneProvider =
-    NotifierProvider<BasculeCaserne, BasculeAutomatique?>(BasculeCaserne.new);
+basculeCaserneProvider = NotifierProvider<BasculeCaserne, BasculeAutomatique?>(
+  BasculeCaserne.new,
+);
+
+/// **La bascule demandée par une adresse, en attendant d'être faite**
+/// (ticket 072).
+///
+/// La redirection du routeur ne change jamais l'état d'un fournisseur : elle
+/// tourne pendant que Riverpod construit ceux dont elle dépend, et une
+/// caserne choisie à ce moment-là relançait une redirection imbriquée sur un
+/// fournisseur encore en construction. Elle **note** donc la caserne du lien
+/// ici — un objet simple, pas un état observé, comme la destination initiale
+/// —, la garde lit le rôle de cette caserne-là, et la bascule elle-même part
+/// dans une microtâche, hors de toute construction.
+class LienDeCaserne {
+  Appartenance? _cible;
+
+  /// La caserne d'un lien dont la bascule n'est pas encore faite.
+  Appartenance? get cible => _cible;
+
+  /// Note [cible] et programme [basculer] une fois. Une seconde passe de la
+  /// même image ne reprogramme rien.
+  void programmer(Appartenance cible, void Function() basculer) {
+    if (_cible?.stationId == cible.stationId) return;
+    _cible = cible;
+    scheduleMicrotask(() {
+      try {
+        basculer();
+      } finally {
+        if (_cible?.stationId == cible.stationId) _cible = null;
+      }
+    });
+  }
+}
+
+final Provider<LienDeCaserne> lienDeCaserneProvider = Provider<LienDeCaserne>(
+  (ref) => LienDeCaserne(),
+);

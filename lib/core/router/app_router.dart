@@ -405,6 +405,7 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(prechargement.relacher);
 
   final destinationInitiale = ref.watch(destinationInitialeProvider);
+  final lienDeCaserne = ref.watch(lienDeCaserneProvider);
 
   final routeur = GoRouter(
     initialLocation: AppRoutes.demarrage,
@@ -440,14 +441,40 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         destinationInitiale.repartDeLAttente();
       }
 
+      // **La caserne d'un lien** (ticket 072, `docs/WORKFLOWS.md § 8`) :
+      // `?station=<uuid>`. Une appartenance active seulement — la liste
+      // relue, jamais un cache ; `null` sinon.
+      Appartenance? caserneDuLien(String? stationId) {
+        if (stationId == null) return null;
+        for (final a in ref.read(appartenancesActivesProvider)) {
+          if (a.stationId == stationId) return a;
+        }
+        return null;
+      }
+
+      // Vrai pour une adresse qui porte la caserne d'un autre compte, ou d'une
+      // caserne quittée.
+      bool lienEtranger(String adresse) {
+        final stationId =
+            Uri.parse(adresse).queryParameters[AppRoutes.parametreStation];
+        return stationId != null && caserneDuLien(stationId) == null;
+      }
+
+      // L'appartenance dont le rôle décide : celle d'un lien dont la bascule
+      // est programmée mais pas encore faite, sinon la caserne ouverte.
+      Appartenance? effective([Uri? adresse]) =>
+          caserneDuLien(adresse?.queryParameters[AppRoutes.parametreStation]) ??
+          lienDeCaserne.cible ??
+          ref.read(appartenanceCouranteProvider);
+
       // La garde, pour un chemin donné. Elle sert deux fois : sur
       // l'emplacement courant, et sur la destination qu'on s'apprête à
       // rejouer — c'est la seconde qui compte, voir plus bas.
-      String? garde(String chemin) => redirectionAuth(
+      String? garde(String chemin, {Uri? adresse}) => redirectionAuth(
         etat: etat,
         chemin: chemin,
         outilsDevAutorises: env.isDev,
-        estAdmin: ref.read(appartenanceCouranteProvider)?.estAdmin ?? false,
+        estAdmin: effective(adresse)?.estAdmin ?? false,
         // `null` tant que la réponse n'est pas là : la garde attend plutôt que
         // de rediriger sur une supposition (`auth_redirection.dart`).
         estSuperAdmin: ref.read(estSuperAdminProvider).value,
@@ -456,22 +483,32 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             : AppRoutes.cheminInvitation(jeton),
       );
 
-      // **Un lien d'une autre caserne** (ticket 072, `docs/WORKFLOWS.md § 8`) :
-      // l'application bascule vers elle si le compte y est membre actif, puis
-      // ouvre le chemin, et un bandeau le dit ; sinon l'accueil, sans message.
-      // Avant la garde : c'est le rôle **de cette caserne-là** qui ouvre ou
-      // ferme `/admin`. Pendant la restauration, l'adresse est gardée telle
-      // quelle par la destination initiale, paramètre compris, et revient ici.
-      final stationLien =
-          state.uri.queryParameters[AppRoutes.parametreStation];
+      // **Un lien d'une autre caserne** : l'application bascule vers elle si
+      // le compte y est membre actif, puis ouvre le chemin, et un bandeau le
+      // dit ; sinon l'accueil, sans message. Avant la garde : c'est le rôle
+      // **de cette caserne-là** qui ouvre ou ferme `/admin`. Pendant la
+      // restauration, l'adresse est gardée telle quelle par la destination
+      // initiale, paramètre compris, et revient ici.
+      //
+      // **La redirection ne change aucun état** : la bascule est notée dans
+      // [LienDeCaserne] et part dans une microtâche. D'ici là, la garde et les
+      // liens publics lisent le rôle de la caserne notée.
+      final stationLien = state.uri.queryParameters[AppRoutes.parametreStation];
       if (stationLien != null && etat == EtatAuth.connecte) {
         // Regarder la destination gardée la marque atteinte quand c'est
         // elle : la passe suivante, sans le paramètre, ne la rejoue pas.
         destinationInitiale.reprendre(state.uri.toString());
-        final cible = ref
-            .read(basculeCaserneProvider.notifier)
-            .ouvrirPour(stationLien, raison: RaisonBascule.lien);
+        final cible = caserneDuLien(stationLien);
         if (cible == null) return AppRoutes.accueil;
+        if (cible.stationId !=
+            ref.read(appartenanceCouranteProvider)?.stationId) {
+          lienDeCaserne.programmer(
+            cible,
+            () => ref
+                .read(basculeCaserneProvider.notifier)
+                .ouvrirPour(cible.stationId, raison: RaisonBascule.lien),
+          );
+        }
         return sansParametreStation(state.uri);
       }
 
@@ -518,7 +555,15 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         // ticket 045 : elle est relâchée à l'image suivante. Une passe refusée
         // ne la rejoue donc pas davantage, mais une seconde passe de la même
         // image retrouve la même réponse que la première.
-        if (reprise != null && garde(Uri.parse(reprise).path) == null) {
+        // Le rôle qui décide est celui de la caserne du lien quand la
+        // destination en porte une (`?station=`, ticket 072).
+        // Un lien d'une caserne où le compte n'est pas membre actif n'est pas
+        // rejoué : il mènerait à l'accueil, d'où l'on part déjà — une boucle
+        // pour `go_router` (ticket 072).
+        if (reprise != null &&
+            !lienEtranger(reprise) &&
+            garde(Uri.parse(reprise).path, adresse: Uri.parse(reprise)) ==
+                null) {
           return reprise;
         }
       }
@@ -744,8 +789,13 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
           redirect: (context, state) =>
               destinationInterne(
                 state.uri.path,
+                // Le rôle de la caserne d'un lien en cours de bascule
+                // (ticket 072), sinon celui de la caserne ouverte.
                 admin:
-                    ref.read(appartenanceCouranteProvider)?.estAdmin ?? false,
+                    (ref.read(lienDeCaserneProvider).cible ??
+                            ref.read(appartenanceCouranteProvider))
+                        ?.estAdmin ??
+                    false,
               ) ??
               AppRoutes.accueil,
         ),
