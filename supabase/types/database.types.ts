@@ -748,6 +748,162 @@ export type Database = {
           },
         ]
       }
+      shift_exchanges: {
+        Row: {
+          accepted_at: string | null
+          assignment_id: string
+          auto_approved: boolean
+          closed_at: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          expires_at: string
+          id: string
+          kind: Database["public"]["Enums"]["exchange_kind"]
+          new_assignment_id: string | null
+          new_return_assignment_id: string | null
+          reason: string | null
+          reason_code: string | null
+          requester_id: string
+          return_assignment_id: string | null
+          return_shift_id: string | null
+          shift_id: string
+          station_id: string
+          status: Database["public"]["Enums"]["exchange_status"]
+          taker_id: string | null
+          target_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          assignment_id: string
+          auto_approved?: boolean
+          closed_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          expires_at: string
+          id?: string
+          kind: Database["public"]["Enums"]["exchange_kind"]
+          new_assignment_id?: string | null
+          new_return_assignment_id?: string | null
+          reason?: string | null
+          reason_code?: string | null
+          requester_id: string
+          return_assignment_id?: string | null
+          return_shift_id?: string | null
+          shift_id: string
+          station_id: string
+          status?: Database["public"]["Enums"]["exchange_status"]
+          taker_id?: string | null
+          target_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          assignment_id?: string
+          auto_approved?: boolean
+          closed_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          expires_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["exchange_kind"]
+          new_assignment_id?: string | null
+          new_return_assignment_id?: string | null
+          reason?: string | null
+          reason_code?: string | null
+          requester_id?: string
+          return_assignment_id?: string | null
+          return_shift_id?: string | null
+          shift_id?: string
+          station_id?: string
+          status?: Database["public"]["Enums"]["exchange_status"]
+          taker_id?: string | null
+          target_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_exchanges_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_new_assignment_id_fkey"
+            columns: ["new_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_new_return_assignment_id_fkey"
+            columns: ["new_return_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_return_assignment_id_fkey"
+            columns: ["return_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_return_shift_id_fkey"
+            columns: ["return_shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "stations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_taker_id_fkey"
+            columns: ["taker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_exchanges_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shifts: {
         Row: {
           created_at: string
@@ -1110,6 +1266,7 @@ export type Database = {
         Args: { p_assignment: string; p_reason?: string }
         Returns: Json
       }
+      cancel_exchange: { Args: { p_exchange: string }; Returns: Json }
       create_invitation: {
         Args: {
           p_email: string
@@ -1182,6 +1339,7 @@ export type Database = {
         }
         Returns: number
       }
+      cron_expire_exchanges: { Args: { p_reference?: string }; Returns: number }
       cron_late_responders_report: {
         Args: { p_reference?: string }
         Returns: number
@@ -1204,8 +1362,128 @@ export type Database = {
         Args: { p_reference?: string }
         Returns: number
       }
+      decide_exchange: {
+        Args: { p_approve: boolean; p_exchange: string; p_reason?: string }
+        Returns: Json
+      }
       delete_own_account: { Args: { p_user_id: string }; Returns: Json }
       est_jour_ferie: { Args: { p_date: string }; Returns: boolean }
+      exchange_apply: {
+        Args: { p_actor: string; p_auto: boolean; p_exchange: string }
+        Returns: Json
+      }
+      exchange_close: {
+        Args: {
+          p_actor?: string
+          p_channels?: string[]
+          p_detail?: string
+          p_exchange: string
+          p_reason?: string
+          p_reason_code: string
+          p_reference?: string
+          p_status: Database["public"]["Enums"]["exchange_status"]
+        }
+        Returns: {
+          accepted_at: string | null
+          assignment_id: string
+          auto_approved: boolean
+          closed_at: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          expires_at: string
+          id: string
+          kind: Database["public"]["Enums"]["exchange_kind"]
+          new_assignment_id: string | null
+          new_return_assignment_id: string | null
+          reason: string | null
+          reason_code: string | null
+          requester_id: string
+          return_assignment_id: string | null
+          return_shift_id: string | null
+          shift_id: string
+          station_id: string
+          status: Database["public"]["Enums"]["exchange_status"]
+          taker_id: string | null
+          target_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shift_exchanges"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      exchange_declared_available: {
+        Args: { p_shift: string; p_user: string }
+        Returns: boolean
+      }
+      exchange_expires_at: { Args: { p_shift: string }; Returns: string }
+      exchange_lock: {
+        Args: { p_exchange: string }
+        Returns: {
+          accepted_at: string | null
+          assignment_id: string
+          auto_approved: boolean
+          closed_at: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          expires_at: string
+          id: string
+          kind: Database["public"]["Enums"]["exchange_kind"]
+          new_assignment_id: string | null
+          new_return_assignment_id: string | null
+          reason: string | null
+          reason_code: string | null
+          requester_id: string
+          return_assignment_id: string | null
+          return_shift_id: string | null
+          shift_id: string
+          station_id: string
+          status: Database["public"]["Enums"]["exchange_status"]
+          taker_id: string | null
+          target_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shift_exchanges"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      exchange_member_name: {
+        Args: { p_station: string; p_user: string }
+        Returns: string
+      }
+      exchange_open_to_me: {
+        Args: { p_requester: string; p_shift: string; p_station: string }
+        Returns: boolean
+      }
+      exchange_payload: { Args: { p_exchange: string }; Returns: Json }
+      exchange_rule_check: {
+        Args: {
+          p_leaving?: string
+          p_shift: string
+          p_station: string
+          p_user: string
+        }
+        Returns: string
+      }
+      exchange_shift_start: { Args: { p_shift: string }; Returns: string }
+      exchangeable_shifts_of: {
+        Args: { p_peer: string }
+        Returns: {
+          assignment_id: string
+          date: string
+          expires_at: string
+          shift_id: string
+          slot: Database["public"]["Enums"]["slot_type"]
+          station_id: string
+        }[]
+      }
       export_own_data: { Args: { p_user_id: string }; Returns: Json }
       ics_feed_events: {
         Args: { p_reference?: string; p_token: string }
@@ -1357,6 +1635,18 @@ export type Database = {
         Args: { p_schedule: string; p_tout?: boolean }
         Returns: Json
       }
+      request_exchange: {
+        Args: {
+          p_assignment: string
+          p_return_assignment?: string
+          p_target?: string
+        }
+        Returns: Json
+      }
+      respond_exchange: {
+        Args: { p_accept?: boolean; p_exchange: string }
+        Returns: Json
+      }
       rotate_ics_token: { Args: never; Returns: string }
       schedule_complet: { Args: { p_schedule: string }; Returns: boolean }
       schedule_reevaluer: { Args: { p_schedule: string }; Returns: boolean }
@@ -1370,6 +1660,14 @@ export type Database = {
         Returns: unknown
       }
       station_access: { Args: { p_station: string }; Returns: Json }
+      station_exchange_auto_approve: {
+        Args: { p_station: string }
+        Returns: boolean
+      }
+      station_exchange_deadline_hours: {
+        Args: { p_station: string }
+        Returns: number
+      }
       station_invitation_hourly_limit: {
         Args: { p_station: string }
         Returns: number
@@ -1473,6 +1771,15 @@ export type Database = {
         | "replaced"
         | "cancelled"
       availability_status: "available" | "absent"
+      exchange_kind: "give" | "swap"
+      exchange_status:
+        | "open"
+        | "accepted_by_peer"
+        | "approved"
+        | "rejected"
+        | "cancelled"
+        | "expired"
+        | "failed"
       membership_role: "member" | "admin"
       membership_status: "invited" | "active" | "disabled"
       notification_channel: "push" | "email" | "inapp"
@@ -1489,6 +1796,11 @@ export type Database = {
         | "late_responders"
         | "subscription_trial_ending"
         | "subscription_suspended"
+        | "exchange_requested"
+        | "exchange_accepted"
+        | "exchange_approved"
+        | "exchange_rejected"
+        | "exchange_closed"
       period_status: "open" | "locked"
       push_platform: "ios" | "android" | "web"
       schedule_status: "draft" | "published" | "validated" | "archived"
@@ -1634,6 +1946,16 @@ export const Constants = {
         "cancelled",
       ],
       availability_status: ["available", "absent"],
+      exchange_kind: ["give", "swap"],
+      exchange_status: [
+        "open",
+        "accepted_by_peer",
+        "approved",
+        "rejected",
+        "cancelled",
+        "expired",
+        "failed",
+      ],
       membership_role: ["member", "admin"],
       membership_status: ["invited", "active", "disabled"],
       notification_channel: ["push", "email", "inapp"],
@@ -1650,6 +1972,11 @@ export const Constants = {
         "late_responders",
         "subscription_trial_ending",
         "subscription_suspended",
+        "exchange_requested",
+        "exchange_accepted",
+        "exchange_approved",
+        "exchange_rejected",
+        "exchange_closed",
       ],
       period_status: ["open", "locked"],
       push_platform: ["ios", "android", "web"],

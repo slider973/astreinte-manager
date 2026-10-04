@@ -67,6 +67,8 @@ function libelleBouton(route: string): string {
   if (route.startsWith("/availability")) return "Saisir mes disponibilités";
   if (route.startsWith("/admin/schedule")) return "Ouvrir le suivi du planning";
   if (route.startsWith("/admin/subscription")) return "Gérer l'abonnement";
+  if (route.startsWith("/admin/exchanges")) return "Ouvrir les échanges à valider";
+  if (route.startsWith("/exchanges")) return "Voir mes échanges";
   if (route.startsWith("/schedule")) return "Voir le planning";
   return "Ouvrir Astreinte SP";
 }
