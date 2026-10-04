@@ -276,10 +276,10 @@ final StreamProvider<MessagePush> messagesPremierPlanProvider =
 
 /// Les destinations postées par le service worker quand on touche une
 /// notification alors que l'application tourne en arrière-plan.
-final StreamProvider<String> routesServiceWorkerProvider =
-    StreamProvider<String>((ref) {
+final StreamProvider<OuverturePush> routesServiceWorkerProvider =
+    StreamProvider<OuverturePush>((ref) {
       if (!ref.watch(firebaseDemarrageProvider).estPret) {
-        return const Stream<String>.empty();
+        return const Stream<OuverturePush>.empty();
       }
       return routesDepuisServiceWorker();
     });

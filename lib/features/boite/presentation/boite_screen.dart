@@ -358,7 +358,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
     // déduit d'un refus du serveur. La seconde reste le filet — une Boîte
     // ouverte depuis dix minutes peut avoir manqué une suspension.
     final lectureSeule =
-        (ref.watch(propositionsControllerProvider).value?.lectureSeule ??
+        (ref.watch(propositionsOuvertesProvider).value?.lectureSeule ??
             false) ||
         ref.watch(lectureSeuleCaserneProvider);
     final raisonBlocage = _raisonBlocage(
@@ -450,7 +450,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
         raisonBlocage: _raisonBlocage(
           enLigne: ref.watch(enLigneProvider).value ?? true,
           lectureSeule:
-              (ref.watch(propositionsControllerProvider).value?.lectureSeule ??
+              (ref.watch(propositionsOuvertesProvider).value?.lectureSeule ??
                   false) ||
               ref.watch(lectureSeuleCaserneProvider),
         ),
@@ -469,7 +469,7 @@ class _BoiteScreenState extends ConsumerState<BoiteScreen>
   /// `settings` — exactement ce que `lireHeuresAffichage` rend elle-même quand
   /// la caserne est illisible.
   HeuresAffichage _heures() =>
-      ref.watch(astreintesControllerProvider).value?.donnees.heures ??
+      ref.watch(astreintesOuvertesProvider).value?.donnees.heures ??
       HeuresAffichage.defaut;
 
   String? _raisonBlocage({required bool enLigne, required bool lectureSeule}) {

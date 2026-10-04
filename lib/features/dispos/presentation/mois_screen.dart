@@ -225,8 +225,10 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
       },
     );
 
-    final periodes = ref.watch(periodesProvider);
-    final saisie = ref.watch(saisieControllerProvider);
+    // La caserne ouverte seulement (ticket 072) : après une bascule, le
+    // squelette, jamais le mois de l'ancienne caserne.
+    final periodes = ref.watch(periodesOuvertesProvider);
+    final saisie = ref.watch(saisieOuverteProvider);
     final etat = saisie.value;
     _saisie = ref.read(saisieControllerProvider.notifier);
 

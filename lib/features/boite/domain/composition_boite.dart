@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/session/caserne_ouverte.dart';
 import '../../notifications/domain/centre_providers.dart';
 import '../../notifications/domain/notification_interne.dart';
 import '../../propositions/domain/proposition.dart';
@@ -161,7 +162,7 @@ EtatBoite etatBoiteDe({
 /// sources.
 final Provider<EtatBoite> etatBoiteProvider = Provider<EtatBoite>(
   (ref) => etatBoiteDe(
-    propositions: ref.watch(propositionsControllerProvider),
+    propositions: caserneOuverteSeulement(ref, propositionsControllerProvider),
     centre: ref.watch(centreNotificationsProvider),
   ),
 );

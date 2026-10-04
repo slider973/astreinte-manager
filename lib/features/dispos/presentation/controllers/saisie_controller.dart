@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/caserne/caserne_providers.dart';
 import '../../../../core/l10n/app_strings.dart';
 import '../../../../core/reseau/connectivite.dart';
+import '../../../../core/session/caserne_ouverte.dart';
 import '../../../../core/session/session_providers.dart';
 import '../../../../core/theme/app_status.dart';
 import '../../data/dispos_repository.dart';
@@ -1467,6 +1468,11 @@ final AsyncNotifierProvider<SaisieController, EtatSaisie?>
 saisieControllerProvider = AsyncNotifierProvider<SaisieController, EtatSaisie?>(
   SaisieController.new,
 );
+
+/// La même source, sans rien de ce qui a été lu dans une autre caserne
+/// (ticket 072, `core/session/caserne_ouverte.dart`).
+final Provider<AsyncValue<EtatSaisie?>> saisieOuverteProvider =
+    dansLaCaserneOuverte(saisieControllerProvider);
 
 /// Le libellé d'un état de disponibilité, tel que le thème le nomme.
 ///

@@ -36,6 +36,7 @@ import '../../features/superadmin/domain/superadmin_providers.dart';
 import '../../features/superadmin/presentation/superadmin_screen.dart';
 import '../env.dart';
 import '../session/appartenance.dart';
+import '../session/bascule_caserne.dart';
 import '../session/email.dart';
 import '../session/etat_auth.dart';
 import '../session/jeton_invitation.dart';
@@ -272,6 +273,13 @@ abstract final class AppRoutes {
 
   // --- Liens publics des notifications (docs/WORKFLOWS.md § 8) -------------
 
+  /// La caserne d'un lien public (ticket 072) : `?station=<uuid>`, ajouté par
+  /// les courriels, par `webpush.fcm_options.link` et par le service worker.
+  /// Elle voyage **à côté** du chemin : un client qui l'ignore lit le même
+  /// chemin qu'avant. Le routeur bascule vers elle, puis l'efface de
+  /// l'adresse — la caserne n'est jamais dans l'historique.
+  static const String parametreStation = 'station';
+
   /// Le mois visé par un lien de notification, au format `AAAA-MM`.
   static const String parametrePeriode = 'periode';
 
@@ -447,6 +455,25 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             ? null
             : AppRoutes.cheminInvitation(jeton),
       );
+
+      // **Un lien d'une autre caserne** (ticket 072, `docs/WORKFLOWS.md § 8`) :
+      // l'application bascule vers elle si le compte y est membre actif, puis
+      // ouvre le chemin, et un bandeau le dit ; sinon l'accueil, sans message.
+      // Avant la garde : c'est le rôle **de cette caserne-là** qui ouvre ou
+      // ferme `/admin`. Pendant la restauration, l'adresse est gardée telle
+      // quelle par la destination initiale, paramètre compris, et revient ici.
+      final stationLien =
+          state.uri.queryParameters[AppRoutes.parametreStation];
+      if (stationLien != null && etat == EtatAuth.connecte) {
+        // Regarder la destination gardée la marque atteinte quand c'est
+        // elle : la passe suivante, sans le paramètre, ne la rejoue pas.
+        destinationInitiale.reprendre(state.uri.toString());
+        final cible = ref
+            .read(basculeCaserneProvider.notifier)
+            .ouvrirPour(stationLien, raison: RaisonBascule.lien);
+        if (cible == null) return AppRoutes.accueil;
+        return sansParametreStation(state.uri);
+      }
 
       final redirection = garde(state.matchedLocation);
       if (redirection != null) {
@@ -779,6 +806,18 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(routeur.dispose);
   return routeur;
 });
+
+/// [uri] sans `?station=` (ticket 072). Sans autre paramètre, le chemin nu :
+/// un `?` orphelin finirait dans la barre d'adresse.
+String sansParametreStation(Uri uri) {
+  final restants = <String, String>{
+    for (final entree in uri.queryParameters.entries)
+      if (entree.key != AppRoutes.parametreStation) entree.key: entree.value,
+  };
+  return restants.isEmpty
+      ? uri.path
+      : Uri(path: uri.path, queryParameters: restants).toString();
+}
 
 /// Le retour du prestataire de paiement, lu dans `?paiement=`.
 ///

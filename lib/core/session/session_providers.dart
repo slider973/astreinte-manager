@@ -10,6 +10,7 @@ import 'auth_repository.dart';
 import 'caserne_choisie.dart';
 import 'etat_auth.dart';
 import 'membership_repository.dart';
+import 'oubli_local.dart';
 import 'session_utilisateur.dart';
 
 /// Le dépôt d'authentification. Surchargé par un faux dans les tests.
@@ -71,7 +72,7 @@ final FutureProvider<List<Appartenance>> appartenancesProvider =
           .read(appartenancesReluesProvider)
           .prendre(session.userId);
       if (relues != null) {
-        await local.ecrire(session.userId, relues);
+        await _garderEtOublierLesQuittees(ref, session.userId, relues);
         return relues;
       }
 
@@ -79,7 +80,7 @@ final FutureProvider<List<Appartenance>> appartenancesProvider =
         final appartenances = await ref
             .watch(membershipRepositoryProvider)
             .mesAppartenances(session.userId);
-        await local.ecrire(session.userId, appartenances);
+        await _garderEtOublierLesQuittees(ref, session.userId, appartenances);
         return appartenances;
       } on AuthEchec catch (echec) {
         if (echec.erreur != AuthErreur.reseau) rethrow;
@@ -90,6 +91,37 @@ final FutureProvider<List<Appartenance>> appartenancesProvider =
         ];
       }
     });
+
+/// Range la liste lue **en base**, et efface les caches des casernes que le
+/// compte a quittées (ticket 072).
+///
+/// Une caserne est quittée quand son appartenance est désactivée, ou quand elle
+/// était gardée sur l'appareil et que la base ne la rend plus active. Ses
+/// astreintes, son planning et sa file de saisie partent alors de l'appareil,
+/// comme à la déconnexion (`oubli_local.dart`). Jamais sur le repli hors
+/// ligne : seule une lecture réussie dit qu'un accès a pris fin.
+Future<void> _garderEtOublierLesQuittees(
+  Ref ref,
+  String userId,
+  List<Appartenance> lues,
+) async {
+  final local = ref.read(appartenancesLocalesProvider);
+  final avant = await local.lire(userId);
+  await local.ecrire(userId, lues);
+
+  final actives = <String>{
+    for (final appartenance in lues)
+      if (appartenance.estActive) appartenance.stationId,
+  };
+  final quittees = <String>{
+    for (final appartenance in <Appartenance>[...avant, ...lues])
+      if (!actives.contains(appartenance.stationId)) appartenance.stationId,
+  };
+  if (quittees.isEmpty) return;
+  await ref
+      .read(oubliLocalProvider)
+      .casernesQuittees(userId: userId, stations: quittees);
+}
 
 /// La réponse d'une relecture des appartenances, en attente d'être reprise
 /// par [appartenancesProvider].

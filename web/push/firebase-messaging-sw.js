@@ -96,10 +96,27 @@ if (configComplete) {
       icon: `${PORTEE}icons/Icon-192.png`,
       badge: `${PORTEE}icons/Icon-192.png`,
       tag: donnees.tag || undefined,
-      /* La destination voyage avec la notification : c'est elle qu'on ouvre. */
-      data: { route: donnees.route || ACCUEIL },
+      /*
+       * La destination voyage avec la notification : c'est elle qu'on ouvre.
+       * La caserne aussi (ticket 072) : l'application bascule vers elle avant
+       * d'ouvrir la destination (`docs/WORKFLOWS.md § 8`).
+       */
+      data: { route: donnees.route || ACCUEIL, station_id: caserneDe(donnees) },
     });
   });
+}
+
+/*
+ * La caserne d'une notification (ticket 072), ou `undefined`.
+ *
+ * Un identifiant de caserne est un UUID et rien d'autre : une valeur qui n'en
+ * a pas la forme n'est pas transmise — elle finirait dans l'adresse ouverte.
+ */
+const FORME_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function caserneDe(donnees) {
+  const brute = donnees && donnees.station_id;
+  return typeof brute === 'string' && FORME_UUID.test(brute) ? brute : undefined;
 }
 
 /*
@@ -114,7 +131,7 @@ if (configComplete) {
  * sur l'accueil : une notification ne doit jamais pouvoir ouvrir autre chose
  * que cette application.
  */
-function adresseInterne(lien) {
+function adresseInterne(lien, station) {
   const interne =
     typeof lien === 'string' &&
     lien.startsWith('/') &&
@@ -125,7 +142,15 @@ function adresseInterne(lien) {
   if (!interne) return accueil.href;
 
   const cible = new URL(`${PORTEE}${lien.slice(1)}`, self.location.origin);
-  return cible.origin === self.location.origin ? cible.href : accueil.href;
+  if (cible.origin !== self.location.origin) return accueil.href;
+  /*
+   * La caserne voyage à côté du chemin, jamais dedans : `?station=<uuid>`,
+   * la forme du lien des courriels (ticket 072). L'application la lit au
+   * démarrage à froid et bascule avant d'ouvrir le chemin.
+   */
+  const caserne = caserneDe({ station_id: station });
+  if (caserne) cible.searchParams.set('station', caserne);
+  return cible.href;
 }
 
 /*
@@ -141,11 +166,10 @@ self.addEventListener('notificationclick', (evenement) => {
   evenement.notification.close();
 
   const donnees = evenement.notification.data || {};
-  const lien =
-    donnees.route ||
-    (donnees.FCM_MSG && donnees.FCM_MSG.data && donnees.FCM_MSG.data.route) ||
-    ACCUEIL;
-  const cible = adresseInterne(lien);
+  const fcm = (donnees.FCM_MSG && donnees.FCM_MSG.data) || {};
+  const lien = donnees.route || fcm.route || ACCUEIL;
+  const station = caserneDe(donnees) || caserneDe(fcm);
+  const cible = adresseInterne(lien, station);
 
   evenement.waitUntil(
     self.clients
@@ -158,9 +182,10 @@ self.addEventListener('notificationclick', (evenement) => {
              * L'application est déjà ouverte : on lui poste le chemin interne
              * (`/proposals`), qu'elle sait traduire et filtrer
              * (`destination_push.dart`). Pas d'adresse complète ici : elle
-             * n'aurait rien à en faire.
+             * n'aurait rien à en faire. La caserne suit à côté (ticket 072) :
+             * c'est elle qui décide de la bascule (`pont_web.dart`).
              */
-            fenetre.postMessage({ type: TYPE_NAVIGATION, route: lien });
+            fenetre.postMessage({ type: TYPE_NAVIGATION, route: lien, station_id: station });
             return fenetre.focus();
           }
         }

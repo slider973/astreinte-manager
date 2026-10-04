@@ -2654,10 +2654,14 @@ abstract final class AppStrings {
   static const String proposerDecouverts = 'sans candidat';
 
   /// Ce que la machine s'interdit, dit une fois, à l'endroit où on le croit.
+  ///
+  /// La dernière clause vient du ticket 072 : la base écarte aussi qui a déjà
+  /// une astreinte dans une autre caserne sur un créneau qui chevauche.
   static const String proposerPromesse =
       'Les créneaux que tu as remplis toi-même ne sont pas touchés. Personne '
-      'n\'est désigné hors de ses disponibilités, et personne ne dépasse le '
-      'nombre d\'astreintes qu\'il a accepté.';
+      'ne dépasse le nombre d\'astreintes qu\'il a accepté, et personne n\'est '
+      'proposé sur un créneau où il a déjà une astreinte dans une autre '
+      'caserne.';
 
   static String proposerSansCandidat(int n) => n == 1
       ? '1 créneau reste sans candidat'
@@ -4150,4 +4154,108 @@ abstract final class AppStrings {
   /// dans l'ordre des gardes.
   static String icsNomFichier({required String jourIso, required bool nuit}) =>
       'astreinte-$jourIso-${nuit ? 'nuit' : 'jour'}.ics';
+
+  // ===================================================================
+  // Plusieurs casernes (ticket 072, `design/072-plusieurs-casernes.md § 7`)
+  // ===================================================================
+
+  // --- Sélecteur -------------------------------------------------------
+
+  static String caserneSelecteurSemantique(String caserne) =>
+      'Caserne ouverte : $caserne. Changer de caserne.';
+
+  static String caserneSelecteurNonLuesAilleurs(int n) => n <= 1
+      ? '$n notification non lue dans tes autres casernes.'
+      : '$n notifications non lues dans tes autres casernes.';
+
+  static const String caserneChoixTitre = 'Changer de caserne';
+  static const String caserneChoixOuverte = 'Ouverte';
+
+  static String caserneChoixLigne(String role, int nonLues) => nonLues <= 0
+      ? role
+      : nonLues == 1
+      ? '$role · 1 non lue'
+      : '$role · $nonLues non lues';
+
+  static const String caserneChoixInvitationsTitre = 'Invitations en attente';
+
+  static String caserneChoixInvitation(String caserne) =>
+      'Invitation : $caserne';
+
+  static const String caserneChoixInvitationAction = 'Voir';
+
+  static String caserneOuverteAnnonce(String caserne) => '$caserne ouverte.';
+
+  static const String caserneChoixFermer = 'Fermer';
+
+  // --- Bandeau de bascule ----------------------------------------------
+
+  static String bandeauCaserneOuverte(String caserne) =>
+      '$caserne est ouverte.';
+
+  static String bandeauRaisonNotification(String ancienne) =>
+      'La notification venait de cette caserne. Tu étais dans $ancienne.';
+
+  static String bandeauRaisonLien(String ancienne) =>
+      'Le lien venait de cette caserne. Tu étais dans $ancienne.';
+
+  static String bandeauRaisonDesactivee(String ancienne) =>
+      'Ton accès à $ancienne a été désactivé.';
+
+  static String bandeauRevenir(String ancienne) => 'Revenir à $ancienne';
+
+  static const String bandeauFermer = 'Fermer le bandeau';
+
+  static String pushTitreAutreCaserne(String caserne, String titre) =>
+      '$caserne · $titre';
+
+  // --- Invitations d'un membre déjà rattaché ----------------------------
+
+  static String accueilInvitationTitre(String caserne) => '$caserne t\'invite';
+
+  static String accueilInvitationDetail(String inviteur, String date) =>
+      'Par $inviteur · jusqu\'au $date';
+
+  static String accueilInvitationDetailSansInviteur(String date) =>
+      'Jusqu\'au $date';
+
+  static const String accueilInvitationAction = 'Voir l\'invitation';
+
+  static String accueilInvitationSemantique(String caserne, String date) =>
+      'Invitation de $caserne, valable jusqu\'au $date.';
+
+  static String profilInvitationLigne(String caserne, String date) =>
+      'Invitation : $caserne · jusqu\'au $date';
+
+  static String profilInvitationExpiree(String caserne) =>
+      'Invitation expirée : $caserne. Demande à ton chef de centre de la '
+      'renvoyer.';
+
+  static const String profilInvitationsEchec =
+      'Impossible de vérifier tes invitations.';
+
+  // --- Boîte -------------------------------------------------------------
+
+  static String boitePasserelle(String caserne, int n) => n == 1
+      ? '$caserne · 1 non lue'
+      : '$caserne · $n non lues';
+
+  static const String boitePasserelleAction = 'Ouvrir';
+
+  static String boitePasserelleSemantique(String caserne, int n) => n == 1
+      ? '1 non lue dans $caserne. Ouvrir cette caserne.'
+      : '$n non lues dans $caserne. Ouvrir cette caserne.';
+
+  // --- Admin ---------------------------------------------------------------
+
+  static const String matriceLegendeAilleurs = 'Astreinte ailleurs';
+
+  /// Ajouté à la phrase de la case, précédé d'une virgule.
+  static const String matriceCaseAilleursSemantique =
+      'astreinte dans une autre caserne sur ce créneau';
+
+  static const String matriceCaseAilleursInfobulle =
+      'Astreinte dans une autre caserne sur ce créneau';
+
+  static const String candidatAilleurs = 'Astreinte ailleurs sur ce créneau';
 }

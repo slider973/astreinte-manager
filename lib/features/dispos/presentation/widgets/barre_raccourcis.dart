@@ -40,7 +40,7 @@ class BarreRaccourcis extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final etat = ref.watch(saisieControllerProvider).value;
+    final etat = ref.watch(saisieOuverteProvider).value;
     if (etat == null) return const SizedBox.shrink();
 
     final marge = vertical

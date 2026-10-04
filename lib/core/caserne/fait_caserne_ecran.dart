@@ -21,7 +21,7 @@ import 'caserne_providers.dart';
 FaitCaserne? faitCaserneEcran(BuildContext context, WidgetRef ref) {
   final admin = ref.watch(appartenanceCouranteProvider)?.estAdmin ?? false;
   return faitCaserne(
-    etat: ref.watch(etatCaserneProvider).value,
+    etat: ref.watch(etatCaserneOuvertProvider).value,
     admin: admin,
     maintenant: ref.watch(horlogeCaserneProvider)(),
     versAbonnement: admin
