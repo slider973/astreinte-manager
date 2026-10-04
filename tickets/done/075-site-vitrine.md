@@ -5,7 +5,7 @@
 - **Dépend de** : —
 - **Branche** : `feat/075-site-vitrine`
 - **PR** : https://github.com/slider973/astreinte-manager/pull/80
-- **Statut** : rouvert le 2026-10-04
+- **Statut** : terminé le 2026-10-04 (manuel)
 
 ## Contexte
 
