@@ -25,7 +25,12 @@ export type TypeNotification =
   | "schedule_all_accepted"
   | "late_responders"
   | "subscription_trial_ending"
-  | "subscription_suspended";
+  | "subscription_suspended"
+  | "exchange_requested"
+  | "exchange_accepted"
+  | "exchange_approved"
+  | "exchange_rejected"
+  | "exchange_closed";
 
 export type Canal = "push" | "email" | "inapp";
 
@@ -72,6 +77,11 @@ export const TOUS_LES_TYPES: readonly TypeNotification[] = [
   "late_responders",
   "subscription_trial_ending",
   "subscription_suspended",
+  "exchange_requested",
+  "exchange_accepted",
+  "exchange_approved",
+  "exchange_rejected",
+  "exchange_closed",
 ];
 
 export function estTypeNotification(valeur: unknown): valeur is TypeNotification {
@@ -103,6 +113,14 @@ export const CANAUX_PAR_DEFAUT: Record<TypeNotification, Canal[]> = {
   // (ticket 030, migration 0024).
   subscription_trial_ending: ["email", "inapp"],
   subscription_suspended: ["email", "inapp"],
+  // Échanges d'astreintes (ticket 073, migration 0041) : des faits qui
+  // concernent une personne, au moment où ils arrivent. La tâche d'expiration
+  // force `inapp` seul hors de la fenêtre horaire locale de la caserne.
+  exchange_requested: ["push", "inapp"],
+  exchange_accepted: ["push", "inapp"],
+  exchange_approved: ["push", "inapp"],
+  exchange_rejected: ["push", "inapp"],
+  exchange_closed: ["push", "inapp"],
 };
 
 /**
@@ -284,6 +302,21 @@ export function routePour(type: TypeNotification, payload: ChargeUtile): string 
     case "subscription_trial_ending":
     case "subscription_suspended":
       return "/admin/subscription";
+    // Échanges d'astreintes (ticket 073) : deux destinations publiques de plus,
+    // sans mois — une demande vit dans une liste, pas dans un planning.
+    // `/exchanges` : les demandes reçues, à reprendre et envoyées du pompier ;
+    // `/admin/exchanges` : la file des échanges à valider.
+    case "exchange_requested":
+    case "exchange_rejected":
+    case "exchange_closed":
+      return "/exchanges";
+    case "exchange_accepted":
+      return "/admin/exchanges";
+    // Validé : le pompier va voir son planning, là où la garde a changé de
+    // main ; l'administrateur informé d'une validation automatique va à sa file.
+    case "exchange_approved":
+      if (payload.audience === "admin") return "/admin/exchanges";
+      return periode ? `/schedule/${periode}` : "/exchanges";
   }
 }
 
@@ -440,6 +473,32 @@ function nombre(payload: ChargeUtile, cle: string): number | null {
  */
 const MOTIFS: Record<string, string> = {
   reassigned: "le créneau a été confié à un autre pompier",
+};
+
+/**
+ * Pourquoi un échange n'a pas pu se faire : la liste fermée de
+ * `shift_exchanges.reason_code` pour une demande `failed` (migration 0041).
+ * Les codes `peer_*` parlent du repreneur, `requester_*` du demandeur.
+ *
+ * « Pris dans une autre caserne » (ticket 072) n'y figure **pas** : A et B
+ * lisent ce motif, et rien de l'agenda d'un collègue dans une autre caserne ne
+ * doit leur parvenir. La base le rend en `*_already_assigned` — « déjà sur ce
+ * créneau » — et garde le détail au journal des administrateurs.
+ */
+export const MOTIFS_ECHEC_ECHANGE: Record<string, string> = {
+  station_suspended: "la caserne est en lecture seule",
+  assignment_changed: "l'astreinte a été modifiée par le chef de centre",
+  assignment_not_accepted: "l'astreinte cédée n'est plus acquise",
+  return_assignment_not_accepted: "l'astreinte donnée en retour n'est plus acquise",
+  schedule_not_published: "le planning n'est plus modifiable",
+  requester_not_active: "le demandeur n'est plus membre actif de la caserne",
+  peer_not_active: "le remplaçant n'est plus membre actif de la caserne",
+  peer_already_assigned: "le remplaçant est déjà sur ce créneau",
+  peer_shift_quota_reached: "le remplaçant a atteint son plafond d'astreintes du mois",
+  peer_weekend_quota_reached: "le remplaçant a atteint son plafond de weekends du mois",
+  requester_already_assigned: "le demandeur est déjà sur le créneau rendu",
+  requester_shift_quota_reached: "le demandeur a atteint son plafond d'astreintes du mois",
+  requester_weekend_quota_reached: "le demandeur a atteint son plafond de weekends du mois",
 };
 
 function motifCode(payload: ChargeUtile): string | null {
@@ -749,6 +808,169 @@ export function construireContenu(
         route,
       };
     }
+
+    case "exchange_requested":
+    case "exchange_accepted":
+    case "exchange_approved":
+    case "exchange_rejected":
+    case "exchange_closed":
+      return contenuEchange(type, payload, route);
+  }
+}
+
+/** Le créneau rendu d'un échange (`return_shift`), s'il est bien formé. */
+function creneauRendu(payload: ChargeUtile): Creneau | null {
+  const brut = payload.return_shift;
+  if (typeof brut !== "object" || brut === null || Array.isArray(brut)) return null;
+  return lireCreneaux({ shifts: [brut] })[0] ?? null;
+}
+
+/** « l'astreinte du lundi 12 octobre, de nuit ». */
+function astreinteDu(c: Creneau | null | undefined): string {
+  return c ? `l'astreinte du ${jourLong(c.date)}, ${creneauLong(c.slot)}` : "une astreinte";
+}
+
+/** « celle du mardi 13 octobre, de jour ». */
+function celleDu(c: Creneau): string {
+  return `celle du ${jourLong(c.date)}, ${creneauLong(c.slot)}`;
+}
+
+/** « Échange validé : 12 octobre, nuit ». */
+function titreCreneau(prefixe: string, c: Creneau | undefined): string {
+  return c ? `${prefixe} : ${jourCourt(c.date)}, ${creneauCourt(c.slot)}` : prefixe;
+}
+
+type TypeEchange =
+  | "exchange_requested"
+  | "exchange_accepted"
+  | "exchange_approved"
+  | "exchange_rejected"
+  | "exchange_closed";
+
+/**
+ * Le français des échanges d'astreintes (ticket 073, migration 0041).
+ *
+ * La charge utile commune vient de `exchange_payload` : `kind` (`give` |
+ * `swap`), `broadcast`, `shifts[0]` (la garde cédée), `return_shift` (la garde
+ * rendue d'un échange), `requester_name`, `taker_name`. S'y ajoutent
+ * `expires_at` à la demande, `outcome`, `reason_code` et `reason` à la clôture,
+ * `audience` et `auto_approved` à la validation.
+ */
+function contenuEchange(type: TypeEchange, payload: ChargeUtile, route: string): Contenu {
+  const c = lireCreneaux(payload)[0];
+  const rendu = creneauRendu(payload);
+  const demandeur = texte(payload, "requester_name") ?? "Un collègue";
+  const repreneur = texte(payload, "taker_name");
+
+  switch (type) {
+    case "exchange_requested": {
+      if (payload.broadcast === true) {
+        return {
+          titre: titreCreneau("Remplaçant cherché", c),
+          corps: `${demandeur} cherche quelqu'un pour ${
+            astreinteDu(c)
+          }. Tu t'es déclaré disponible : le premier qui accepte la reprend.`,
+          route,
+        };
+      }
+      if (payload.kind === "swap" && rendu) {
+        return {
+          titre: titreCreneau("Échange proposé", c),
+          corps: `${demandeur} te propose ${astreinteDu(c)}, contre ta garde du ${
+            jourLong(rendu.date)
+          }, ${creneauLong(rendu.slot)}. Accepte ou décline depuis l'application.`,
+          route,
+        };
+      }
+      return {
+        titre: titreCreneau("Astreinte à reprendre", c),
+        corps: `${demandeur} te propose de reprendre ${
+          astreinteDu(c)
+        }. Accepte ou décline depuis l'application.`,
+        route,
+      };
+    }
+
+    case "exchange_accepted": {
+      const contre = payload.kind === "swap" && rendu ? `, contre ${celleDu(rendu)}` : "";
+      return {
+        titre: titreCreneau("Échange à valider", c),
+        corps:
+          `${repreneur ?? "Un collègue"} reprend ${astreinteDu(c)} de ${demandeur}${contre}. ` +
+          "Valide ou refuse depuis l'application.",
+        route,
+      };
+    }
+
+    case "exchange_approved": {
+      const qui = repreneur ?? "Le remplaçant";
+      const faits = payload.kind === "swap" && rendu
+        ? `${qui} tient ${astreinteDu(c)} et ${demandeur} ${celleDu(rendu)}.`
+        : `${qui} tient désormais ${astreinteDu(c)}, à la place de ${demandeur}.`;
+      if (payload.audience === "admin") {
+        return {
+          titre: titreCreneau("Échange validé automatiquement", c),
+          corps: `${faits} Le remplaçant s'était déclaré disponible : tu n'as rien à faire.`,
+          route,
+        };
+      }
+      return {
+        titre: titreCreneau("Échange validé", c),
+        corps: `${faits} Le planning est à jour.`,
+        route,
+      };
+    }
+
+    case "exchange_rejected": {
+      if (texte(payload, "reason_code") === "peer_declined") {
+        return {
+          titre: titreCreneau("Échange décliné", c),
+          corps: `${repreneur ?? "Ton collègue"} a décliné ta demande pour ${
+            astreinteDu(c)
+          }. Tu gardes cette astreinte.`,
+          route,
+        };
+      }
+      const motif = texte(payload, "reason");
+      return {
+        titre: titreCreneau("Échange refusé", c),
+        corps: [
+          `Le chef de centre a refusé l'échange de ${astreinteDu(c)}.`,
+          motif ? `Motif : ${motif}.` : null,
+          "Rien ne change dans le planning.",
+        ].filter((p): p is string => p !== null).join(" "),
+        route,
+      };
+    }
+
+    case "exchange_closed": {
+      const issue = texte(payload, "outcome");
+      if (issue === "cancelled") {
+        return {
+          titre: titreCreneau("Demande d'échange retirée", c),
+          corps: `${demandeur} a retiré sa demande pour ${astreinteDu(c)}. Tu n'as rien à faire.`,
+          route,
+        };
+      }
+      if (issue === "failed") {
+        const code = texte(payload, "reason_code");
+        const motif = code ? MOTIFS_ECHEC_ECHANGE[code] ?? null : null;
+        return {
+          titre: titreCreneau("Échange impossible", c),
+          corps: `L'échange de ${astreinteDu(c)} n'a pas pu se faire${
+            motif ? ` : ${motif}` : ""
+          }. Rien ne change dans le planning.`,
+          route,
+        };
+      }
+      return {
+        titre: titreCreneau("Demande d'échange expirée", c),
+        corps: `La demande pour ${
+          astreinteDu(c)
+        } n'a pas abouti à temps. Rien ne change dans le planning : ${demandeur} garde cette astreinte.`,
+        route,
+      };
+    }
   }
 }
 
@@ -758,8 +980,28 @@ export function construireContenu(
  * Deux notifications de même étiquette se remplacent au lieu de s'empiler : un
  * rappel qui repart n'ajoute pas une ligne de plus dans le centre de
  * notifications du système.
+ *
+ * **La caserne en fait partie** depuis le ticket 072 : sans elle, les
+ * propositions d'octobre de B remplaçaient sur l'écran verrouillé celles
+ * d'octobre de A, pour un pompier des deux. Les huit premiers caractères de
+ * l'identifiant suffisent à séparer les casernes d'un même compte et gardent
+ * l'étiquette sous les 64 octets d'`apns-collapse-id` (fcm.ts).
  */
-export function etiquette(type: TypeNotification, payload: ChargeUtile): string {
+export function etiquette(
+  type: TypeNotification,
+  payload: ChargeUtile,
+  stationId?: string | null,
+): string {
+  // Une demande d'échange est un fait à elle seule (ticket 073) : deux demandes
+  // du même mois ne se remplacent pas, elles appellent deux réponses. Son
+  // identifiant tient lieu de mois. « exchange_requested:<8>:<8> » : 36 octets.
+  const echange = type.startsWith("exchange_") ? texte(payload, "exchange_id") : null;
   const periode = lirePeriode(payload);
-  return periode ? `${type}:${periode}` : type;
+  const base = echange
+    ? `${type}:${echange.toLowerCase().slice(0, 8)}`
+    : periode
+    ? `${type}:${periode}`
+    : type;
+  const caserne = stationId?.trim().toLowerCase().slice(0, 8);
+  return caserne ? `${base}:${caserne}` : base;
 }

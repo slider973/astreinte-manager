@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Concurrence de la validation automatique d'un planning (migration 0019,
-# ticket 019) et de la réattribution d'un créneau (migration 0020, ticket 020).
+# ticket 019), de la réattribution d'un créneau (migration 0020, ticket 020) et
+# des échanges d'astreintes (migration 0041, ticket 073).
 #
 # Lancé par scripts/test_rls.sh, donc joué en CI comme en local.
 #
@@ -61,6 +62,11 @@ A1="77777777-0000-4000-8000-000000000201"
 A2="77777777-0000-4000-8000-000000000202"
 CRENEAU2="77777777-0000-4000-8000-000000000005"
 A3="77777777-0000-4000-8000-000000000203"
+# Une seconde caserne, pour la course « pris ailleurs » (tickets 072 et 073).
+STATION2="77777777-0000-4000-8000-000000000011"
+PERIODE2="77777777-0000-4000-8000-000000000012"
+PLANNING2="77777777-0000-4000-8000-000000000013"
+CRENEAU_B="77777777-0000-4000-8000-000000000014"
 
 total=0
 echecs=0
@@ -88,13 +94,13 @@ nettoyer() {
   # `scripts/test_functions.sh` le fait pour le sien.
   sql "alter table schedules disable trigger schedules_guard_suppression;
        alter table shifts    disable trigger shifts_guard_suppression;
-       delete from notification_outbox where station_id = '$STATION';
-       delete from notifications where station_id = '$STATION';
-       delete from audit_log where station_id = '$STATION';
-       delete from schedules where station_id = '$STATION';
-       delete from periods where station_id = '$STATION';
-       delete from memberships where station_id = '$STATION';
-       delete from stations where id = '$STATION';
+       delete from notification_outbox where station_id in ('$STATION', '$STATION2');
+       delete from notifications where station_id in ('$STATION', '$STATION2');
+       delete from audit_log where station_id in ('$STATION', '$STATION2');
+       delete from schedules where station_id in ('$STATION', '$STATION2');
+       delete from periods where station_id in ('$STATION', '$STATION2');
+       delete from memberships where station_id in ('$STATION', '$STATION2');
+       delete from stations where id in ('$STATION', '$STATION2');
        delete from auth.users where email like '%@concurrence.test';
        -- Depuis la migration 0026, `profiles` ne pend plus à `auth.users` : le
        -- profil d'essai ne part plus tout seul, il se supprime ici.
@@ -112,7 +118,7 @@ nettoyer_silencieux=1
 sql "alter table schedules disable trigger schedules_guard_suppression;
      delete from schedules where station_id = '$STATION';
      alter table schedules enable trigger schedules_guard_suppression;
-     delete from stations where id = '$STATION';" >/dev/null 2>&1 || true
+     delete from stations where id in ('$STATION', '$STATION2');" >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------------------
 # Fixtures, **committées** : deux sessions concurrentes ne voient pas les
@@ -304,6 +310,260 @@ verifier "un seul téléphone sonne" "1" \
            where station_id = '$STATION' and type = 'assignment_proposed'")"
 verifier "le refus garde le fil vers l'attribution qui l'a comblé" "t" \
   "$(sql "select replaced_by is not null from assignments where id = '$A3'")"
+
+# ---------------------------------------------------------------------------
+# Échanges d'astreintes (migration 0041, ticket 073).
+# ---------------------------------------------------------------------------
+# Deux courses, celles que le ticket nomme :
+#   1. deux repreneurs acceptent **en même temps** la même demande « à la
+#      caserne » : un seul la prend, l'autre lit `exchange_not_open` ;
+#   2. une validation d'échange et une réattribution de l'administrateur sur la
+#      **même garde**, dans les deux ordres : la seconde arrivée attend la
+#      première sur la ligne de l'attribution, puis refuse proprement — jamais
+#      deux titulaires, jamais d'interblocage.
+echo "== concurrence des échanges"
+
+CRENEAU3="77777777-0000-4000-8000-000000000006"
+CRENEAU4="77777777-0000-4000-8000-000000000007"
+A5="77777777-0000-4000-8000-000000000205"
+A6="77777777-0000-4000-8000-000000000206"
+
+"${PSQL[@]}" >/dev/null <<SQL
+insert into shifts (id, station_id, schedule_id, date, slot, required_count) values
+  ('$CRENEAU3', '$STATION', '$PLANNING', '2029-04-03', 'day', 1),
+  ('$CRENEAU4', '$STATION', '$PLANNING', '2029-04-04', 'day', 1);
+
+insert into assignments (id, station_id, shift_id, user_id, status, proposed_at, responded_at, created_by) values
+  ('$A5', '$STATION', '$CRENEAU3', '$M1', 'accepted', now(), now(), '$ADMIN'),
+  ('$A6', '$STATION', '$CRENEAU4', '$M1', 'accepted', now(), now(), '$ADMIN');
+
+-- Ana et Cora sont libres le 3 avril : toutes deux recevront la demande.
+insert into availabilities (station_id, user_id, date, slot, status, set_by) values
+  ('$STATION', '$ADMIN', '2029-04-03', 'day', 'available', '$ADMIN'),
+  ('$STATION', '$M2',    '2029-04-03', 'day', 'available', '$M2');
+
+delete from concurrence_resultats;
+
+-- Bilal cherche un remplaçant le 3 avril, et propose le 4 à Cora, qui accepte.
+select set_config('request.jwt.claims', '{"sub": "$M1", "role": "authenticated"}', false);
+insert into concurrence_resultats values ('x', request_exchange('$A5'));
+insert into concurrence_resultats values ('y', request_exchange('$A6', '$M2'));
+select set_config('request.jwt.claims', '{"sub": "$M2", "role": "authenticated"}', false);
+insert into concurrence_resultats values ('y-ok',
+  respond_exchange(((select r from concurrence_resultats where qui = 'y') ->> 'exchange_id')::uuid));
+SQL
+
+X="$(sql "select r ->> 'exchange_id' from concurrence_resultats where qui = 'x'")"
+Y="$(sql "select r ->> 'exchange_id' from concurrence_resultats where qui = 'y'")"
+verifier "la demande à la caserne est ouverte" "open" \
+  "$(sql "select status from shift_exchanges where id = '$X'")"
+verifier "la demande à Cora attend l'administrateur" "accepted_by_peer" \
+  "$(sql "select status from shift_exchanges where id = '$Y'")"
+
+# --- 1. Deux repreneurs ----------------------------------------------------
+mkfifo "$travail/e.in" "$travail/f.in"
+"${PSQL[@]}" < "$travail/e.in" > "$travail/e.out" 2>&1 &
+pid_e=$!
+"${PSQL[@]}" < "$travail/f.in" > "$travail/f.out" 2>&1 &
+pid_f=$!
+exec 7> "$travail/e.in"
+exec 8> "$travail/f.in"
+
+printf "begin;\nselect set_config('request.jwt.claims', '{\"sub\": \"%s\", \"role\": \"authenticated\"}', true);\ninsert into concurrence_resultats values ('e', respond_exchange('%s'));\n" \
+  "$ADMIN" "$X" >&7
+sleep 1
+printf "begin;\nselect set_config('request.jwt.claims', '{\"sub\": \"%s\", \"role\": \"authenticated\"}', true);\ninsert into concurrence_resultats values ('f', respond_exchange('%s'));\n" \
+  "$M2" "$X" >&8
+sleep 2
+
+verifier "le second repreneur attend le premier" "1" \
+  "$(sql "select count(*) from pg_stat_activity
+           where datname = current_database()
+             and wait_event_type = 'Lock'
+             and query ilike '%respond_exchange%'")"
+
+printf "commit;\n" >&7
+sleep 1
+printf "commit;\n" >&8
+sleep 1
+exec 7>&-
+exec 8>&-
+wait "$pid_e" "$pid_f" 2>/dev/null || true
+
+verifier "le premier prend la garde" "true" \
+  "$(sql "select r ->> 'ok' from concurrence_resultats where qui = 'e'")"
+verifier "le second trouve la demande déjà prise" "exchange_not_open" \
+  "$(sql "select r ->> 'code' from concurrence_resultats where qui = 'f'")"
+verifier "un seul repreneur inscrit" "$ADMIN" \
+  "$(sql "select taker_id from shift_exchanges where id = '$X'")"
+
+# --- 2a. Validation d'abord, réattribution ensuite -------------------------
+mkfifo "$travail/g.in" "$travail/h.in"
+"${PSQL[@]}" < "$travail/g.in" > "$travail/g.out" 2>&1 &
+pid_g=$!
+"${PSQL[@]}" < "$travail/h.in" > "$travail/h.out" 2>&1 &
+pid_h=$!
+exec 7> "$travail/g.in"
+exec 8> "$travail/h.in"
+
+# Ana valide la reprise du 3 avril (par elle-même : elle est seule admin).
+printf "begin;\nselect set_config('request.jwt.claims', '{\"sub\": \"%s\", \"role\": \"authenticated\"}', true);\ninsert into concurrence_resultats values ('g', decide_exchange('%s', true));\n" \
+  "$ADMIN" "$X" >&7
+sleep 1
+# Au même moment, la réattribution du même créneau vers Cora, sur la garde de Bilal.
+printf "begin;\ninsert into concurrence_resultats values ('h', reassign_shift('%s', '%s', '%s', '%s'));\n" \
+  "$CRENEAU3" "$M2" "$ADMIN" "$A5" >&8
+sleep 2
+
+verifier "la réattribution attend la validation" "1" \
+  "$(sql "select count(*) from pg_stat_activity
+           where datname = current_database()
+             and wait_event_type = 'Lock'
+             and query ilike '%reassign_shift%'")"
+
+printf "commit;\n" >&7
+sleep 1
+printf "commit;\n" >&8
+sleep 1
+exec 7>&-
+exec 8>&-
+wait "$pid_g" "$pid_h" 2>/dev/null || true
+
+verifier "la validation aboutit" "approved" \
+  "$(sql "select r ->> 'status' from concurrence_resultats where qui = 'g'")"
+verifier "la réattribution refuse : la garde est déjà remplacée" "assignment_not_replaceable" \
+  "$(sql "select r ->> 'code' from concurrence_resultats where qui = 'h'")"
+verifier "une seule garde active le 3 avril, celle d'Ana" "1|$ADMIN" \
+  "$(sql "select count(*) || '|' || max(user_id::text) from assignments
+           where shift_id = '$CRENEAU3' and status in ('proposed', 'accepted')")"
+
+# --- 2b. Réattribution d'abord, validation ensuite -------------------------
+mkfifo "$travail/i.in" "$travail/j.in"
+"${PSQL[@]}" < "$travail/i.in" > "$travail/i.out" 2>&1 &
+pid_i=$!
+"${PSQL[@]}" < "$travail/j.in" > "$travail/j.out" 2>&1 &
+pid_j=$!
+exec 7> "$travail/i.in"
+exec 8> "$travail/j.in"
+
+printf "begin;\ninsert into concurrence_resultats values ('i', reassign_shift('%s', '%s', '%s', '%s'));\n" \
+  "$CRENEAU4" "$ADMIN" "$ADMIN" "$A6" >&7
+sleep 1
+printf "begin;\nselect set_config('request.jwt.claims', '{\"sub\": \"%s\", \"role\": \"authenticated\"}', true);\ninsert into concurrence_resultats values ('j', decide_exchange('%s', true));\n" \
+  "$ADMIN" "$Y" >&8
+sleep 2
+
+verifier "la validation attend la réattribution" "1" \
+  "$(sql "select count(*) from pg_stat_activity
+           where datname = current_database()
+             and wait_event_type = 'Lock'
+             and query ilike '%decide_exchange%'")"
+
+printf "commit;\n" >&7
+sleep 1
+printf "commit;\n" >&8
+sleep 1
+exec 7>&-
+exec 8>&-
+wait "$pid_i" "$pid_j" 2>/dev/null || true
+
+verifier "la réattribution aboutit" "true" \
+  "$(sql "select r ->> 'ok' from concurrence_resultats where qui = 'i'")"
+verifier "la validation trouve la demande close" "exchange_not_pending" \
+  "$(sql "select r ->> 'code' from concurrence_resultats where qui = 'j'")"
+verifier "la demande a échoué, garde changée" "failed|assignment_changed" \
+  "$(sql "select status || '|' || reason_code from shift_exchanges where id = '$Y'")"
+verifier "une seule garde active le 4 avril, aucune pour Cora" "1|0" \
+  "$(sql "select count(*) || '|' || count(*) filter (where user_id = '$M2') from assignments
+           where shift_id = '$CRENEAU4' and status in ('proposed', 'accepted')")"
+verifier "aucun interblocage détecté" "0" \
+  "$(cat "$travail"/[e-j].out | grep -ci 'deadlock' || true)"
+
+# --- 3. Validation d'échange contre remplissage automatique ailleurs --------
+# Cora sert aussi dans une seconde caserne. Ici, Bilal lui cède le 5 avril ;
+# là-bas, au même instant, l'administrateur lance le remplissage automatique
+# qui la pose le 5 avril, sur un créneau qui chevauche. Chacun lirait « pas
+# pris ailleurs » avant que l'autre ne valide : c'est le verrou consultatif par
+# pompier (0040, repris par `exchange_apply` en 0041) qui sérialise. Le second
+# attend, puis voit l'attribution du premier et s'écarte. Aucun interblocage :
+# le remplissage tient son brouillon puis le verrou de Cora, l'échange tient ses
+# lignes publiées puis le verrou de Cora — rien de commun avant le verrou.
+CRENEAU5="77777777-0000-4000-8000-000000000008"
+A7="77777777-0000-4000-8000-000000000207"
+
+"${PSQL[@]}" >/dev/null <<SQL
+insert into stations (id, name, slug, timezone)
+values ('$STATION2', 'CIS Concurrence 2', 'cis-concurrence-2', 'Europe/Paris');
+insert into memberships (station_id, user_id, role, status, display_name) values
+  ('$STATION2', '$ADMIN', 'admin',  'active', 'Ana A.'),
+  ('$STATION2', '$M2',    'member', 'active', 'Cora C.');
+insert into periods (id, station_id, year, month, status, deadline_at)
+values ('$PERIODE2', '$STATION2', 2029, 4, 'locked', '2029-03-15 23:59:59+01');
+insert into schedules (id, station_id, period_id, created_by)
+values ('$PLANNING2', '$STATION2', '$PERIODE2', '$ADMIN');
+insert into shifts (id, station_id, schedule_id, date, slot, required_count)
+values ('$CRENEAU_B', '$STATION2', '$PLANNING2', '2029-04-05', 'day', 1);
+insert into availabilities (station_id, user_id, date, slot, status, set_by)
+values ('$STATION2', '$M2', '2029-04-05', 'day', 'available', '$M2');
+
+insert into shifts (id, station_id, schedule_id, date, slot, required_count)
+values ('$CRENEAU5', '$STATION', '$PLANNING', '2029-04-05', 'day', 1);
+insert into assignments (id, station_id, shift_id, user_id, status, proposed_at, responded_at, created_by)
+values ('$A7', '$STATION', '$CRENEAU5', '$M1', 'accepted', now(), now(), '$ADMIN');
+
+select set_config('request.jwt.claims', '{"sub": "$M1", "role": "authenticated"}', false);
+insert into concurrence_resultats values ('z', request_exchange('$A7', '$M2'));
+select set_config('request.jwt.claims', '{"sub": "$M2", "role": "authenticated"}', false);
+insert into concurrence_resultats values ('z-ok',
+  respond_exchange(((select r from concurrence_resultats where qui = 'z') ->> 'exchange_id')::uuid));
+SQL
+
+Z="$(sql "select r ->> 'exchange_id' from concurrence_resultats where qui = 'z'")"
+verifier "la cession à Cora attend l'administrateur" "accepted_by_peer" \
+  "$(sql "select status from shift_exchanges where id = '$Z'")"
+
+mkfifo "$travail/k.in" "$travail/l.in"
+"${PSQL[@]}" < "$travail/k.in" > "$travail/k.out" 2>&1 &
+pid_k=$!
+"${PSQL[@]}" < "$travail/l.in" > "$travail/l.out" 2>&1 &
+pid_l=$!
+exec 7> "$travail/k.in"
+exec 8> "$travail/l.in"
+
+# K : le remplissage de la seconde caserne pose Cora le 5 avril, et reste ouvert.
+printf "begin;\ninsert into concurrence_resultats values ('k', apply_auto_proposal('%s', '%s', '[{\"shift_id\": \"%s\", \"user_id\": \"%s\"}]'));\n" \
+  "$PLANNING2" "$ADMIN" "$CRENEAU_B" "$M2" >&7
+sleep 1
+# L : Ana valide la cession du 5 avril à Cora, ici.
+printf "begin;\nselect set_config('request.jwt.claims', '{\"sub\": \"%s\", \"role\": \"authenticated\"}', true);\ninsert into concurrence_resultats values ('l', decide_exchange('%s', true));\n" \
+  "$ADMIN" "$Z" >&8
+sleep 2
+
+verifier "la validation attend le verrou de Cora" "1" \
+  "$(sql "select count(*) from pg_stat_activity
+           where datname = current_database()
+             and wait_event_type = 'Lock'
+             and query ilike '%decide_exchange%'")"
+
+printf "commit;\n" >&7
+sleep 1
+printf "commit;\n" >&8
+sleep 1
+exec 7>&-
+exec 8>&-
+wait "$pid_k" "$pid_l" 2>/dev/null || true
+
+verifier "le remplissage pose Cora dans la seconde caserne" "1" \
+  "$(sql "select r ->> 'applied' from concurrence_resultats where qui = 'k'")"
+verifier "la validation voit Cora prise ailleurs et échoue" "peer_already_assigned|peer_taken_elsewhere" \
+  "$(sql "select (r ->> 'reason_code') || '|' || (r ->> 'detail') from concurrence_resultats where qui = 'l'")"
+verifier "Bilal garde son 5 avril, Cora n'a qu'un 5 avril" "accepted|1" \
+  "$(sql "select (select status from assignments where id = '$A7') || '|' ||
+                 (select count(*) from assignments a join shifts s on s.id = a.shift_id
+                   where a.user_id = '$M2' and s.date = '2029-04-05'
+                     and a.status in ('proposed', 'accepted'))")"
+verifier "aucun interblocage détecté (course 3)" "0" \
+  "$(cat "$travail"/[kl].out | grep -ci 'deadlock' || true)"
 
 if [ "$echecs" -eq 0 ]; then
   echo "Concurrence : $total tests, tous verts"

@@ -62,8 +62,8 @@ conditions d'utilisation. Sans lui, la répartition ci-dessus n'existe que dans 
 |---|---|
 | **Finalité** | Savoir qui peut tenir une garde, composer le planning mensuel du centre, proposer les astreintes et suivre les réponses |
 | **Personnes concernées** | Les membres actifs d'une caserne |
-| **Données** | Disponibilité ou absence par date et par créneau (jour / nuit) ; quotas souhaités par mois et commentaire libre ; attributions, acceptations, refus et leur motif ; mention « attribué hors disponibilité » |
-| **Tables** | `availabilities`, `availability_preferences`, `periods`, `schedules`, `shifts`, `assignments` |
+| **Données** | Disponibilité ou absence par date et par créneau (jour / nuit) ; quotas souhaités par mois et commentaire libre ; attributions, acceptations, refus et leur motif ; mention « attribué hors disponibilité » ; demandes d'échange ou de cession d'une garde entre pompiers — qui demande, à qui, qui accepte, qui valide ou refuse, quand, et le motif d'un refus de l'administrateur (ticket 073) |
+| **Tables** | `availabilities`, `availability_preferences`, `periods`, `schedules`, `shifts`, `assignments`, `shift_exchanges` |
 | **Base légale** | Exécution du contrat et intérêt légitime de la caserne à assurer la continuité du service (art. 6.1.b et 6.1.f) |
 | **Destinataires** | Le membre pour ses propres lignes ; les administrateurs de sa caserne pour toutes ; les autres membres uniquement quand le planning est **publié ou validé** (`docs/PRD.md § 7` règle 1) |
 | **Conservation** | Les disponibilités et les quotas sont effacés à la suppression du compte. **Les attributions sont conservées sans limite**, sous la mention « Membre supprimé » : elles décrivent une garde tenue, c'est-à-dire un fait de service de la caserne, et non plus une donnée d'identité (`docs/PRD.md § 7` règle 6) |
@@ -119,6 +119,7 @@ table, et il se relit à chaque migration qui ajoute une table.
 | `profiles`, `memberships` | tant que l'appartenance existe, puis **anonymisé sans limite** | `delete_own_account` (migration `0026`) |
 | `availabilities`, `availability_preferences` | effacées à la suppression du compte | `delete_own_account` (migration `0026`) |
 | `periods`, `schedules`, `shifts`, `assignments` | **sans limite**, et c'est assumé : une garde tenue est un fait de service (`docs/PRD.md § 7` règle 6) | — |
+| `shift_exchanges` | **sans limite, comme `assignments`** : un échange validé explique pourquoi telle personne a tenu telle garde, c'est un fait de service ; une demande close sans suite en est l'historique (ticket 073, migration `0041`) | — |
 | `subscriptions` | tant que la caserne existe | suppression en cascade avec `stations` |
 | `notifications` | 90 jours après lecture, 365 jours sans lecture | tâche `prune_notifications` (migration `0030`) |
 | `push_tokens` | 365 jours sans usage | tâche `prune_retention` (migration `0030`) |
@@ -153,6 +154,15 @@ usuel ». Le chiffre est retenu, et voici sur quoi il repose plutôt que sur l'u
    mention « attribué hors disponibilité » vivent dans `assignments`, conservés sans limite
    (§ 2.2). Ce qui expire au bout de trois ans, c'est le **nom de celui qui a posé le geste**,
    pas la garde.
+
+   **Deux exceptions assumées, du même ordre que `assignments.created_by` et
+   `assignments.decline_reason`** : `shift_exchanges.decided_by` (l'administrateur qui a validé
+   ou refusé un échange, ou le collègue qui l'a décliné) et `shift_exchanges.reason` (le motif
+   d'un refus de l'administrateur) **survivent à la purge de trois ans d'`audit_log`**. Elles
+   sont portées par la demande elle-même, conservée sans limite comme la garde qu'elle a fait
+   changer de main (§ 2 bis) : sans elles, l'historique d'un échange ne dirait plus qui l'a
+   accordé. Le détail purement administratif — un échec dû à une garde tenue dans une autre
+   caserne — ne vit, lui, que dans `audit_log` et expire avec lui.
 
 `[À COMPLÉTER : une caserne publique dont le SDIS applique la déchéance quadriennale (loi du
 31 décembre 1968) voudra quatre ans. C'est un seul chiffre — le paramètre p_days de
@@ -265,6 +275,12 @@ qui sont à surveiller et non à écarter :
    le récapitulatif chiffré, et **rien n'est écrit tant qu'il n'a pas confirmé**. Aucune décision
    n'est prise sans lui. Si un jour la suggestion devenait une application directe, l'analyse serait
    à refaire.
+3. La **validation automatique d'un échange de garde** (ticket 073) écrit sans clic de
+   l'administrateur, mais elle n'est pas une décision automatisée au sens de l'art. 22 : elle est
+   **pilotée par des humains** de bout en bout. Elle n'existe que si l'administrateur l'a activée
+   pour sa caserne (`exchange_auto_approve`, désactivé par défaut), elle n'exécute que ce que A a
+   demandé et que B a accepté, et seulement si B s'était lui-même déclaré disponible ;
+   l'administrateur en est informé et garde la main pour réattribuer.
 
 `[À COMPLÉTER : position du responsable de traitement. Un SDIS a souvent un cadre interne qui
 impose une AIPD indépendamment de ce raisonnement.]`
