@@ -65,7 +65,7 @@ ne le connaît pas : la seule adresse est l'app elle-même (`https://astreinte.s
    États-Unis), et le site le dit.
 5. Prix : 55 €/mois, 550 €/an (valeurs Stripe de production).
 6. Restent à compléter par le propriétaire, marqués `[À COMPLÉTER …]` : mention TVA, adresse, État
-   et numéro d'enregistrement de Staticflow LLC, directeur de la publication (Jonathan Lemaine, à
+   et numéro d'enregistrement de Staticflow LLC, directeur de la publication (à
    confirmer), et les rubriques de confidentialité du brief § 8.2.
 7. Captures depuis `supabase db reset` et un planning fictif, en AVIF et WebP avec budgets.
 8. Projet Vercel séparé, déployé par l'API ; le projet et le DNS sont créés par le propriétaire
@@ -100,9 +100,10 @@ Branche `feat/075b-mentions-legales`, PR https://github.com/slider973/astreinte-
 sont remplacées par les décisions du propriétaire, pour que `verifier.py --marqueurs` passe et que
 la tâche « Site vitrine — mise en ligne » de `deploy.yml` publie enfin le site :
 
-- **Éditeur** : Staticflow LLC, Limited Liability Company immatriculée dans l'État du Wyoming
-  (États-Unis) le 17 novembre 2025 sous le numéro 2025-001817566, siège 30 N Gould St, Ste R,
-  Sheridan, WY 82801, États-Unis. L'EIN n'est pas publié.
+- **Éditeur** : Staticflow LLC, Limited Liability Company de l'État du Wyoming (États-Unis),
+  siège 30 N Gould St, Ste R, Sheridan, WY 82801, États-Unis. Ni numéro d'enregistrement, ni date
+  d'immatriculation, ni EIN : confidentialité de la LLC, décision du propriétaire (complément
+  `feat/075c-editeur-sans-numero`). Aucun nom de personne sur le site.
 - **Directeur de la publication** : rubrique **retirée** de `mentions-legales.html` à la demande du
   propriétaire, sans phrase de remplacement. La LCEN (art. 6, III) prévoit normalement le nom du
   directeur de la publication ; l'écart est une décision du propriétaire.
