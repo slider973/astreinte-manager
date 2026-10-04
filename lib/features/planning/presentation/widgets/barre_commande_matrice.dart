@@ -53,6 +53,7 @@ class BarreCommandeMatrice extends StatefulWidget {
     required this.affiches,
     required this.matriceVisible,
     required this.planning,
+    this.ailleurs = false,
     super.key,
   });
 
@@ -108,6 +109,10 @@ class BarreCommandeMatrice extends StatefulWidget {
   /// lu** : tant qu'on ne sait pas s'il existe, on n'affirme ni qu'il existe
   /// ni le contraire.
   final CommandePlanning? planning;
+
+  /// Le mois contient au moins une astreinte dans une autre caserne (ticket
+  /// 072) : la légende gagne son entrée.
+  final bool ailleurs;
 
   @override
   State<BarreCommandeMatrice> createState() => _BarreCommandeMatriceState();
@@ -253,6 +258,11 @@ class _BarreCommandeMatriceState extends State<BarreCommandeMatrice> {
             // du mois, sous la légende de répartition, qui parle déjà des
             // mêmes attributions (`DESIGN.md § Écarts, 061c-2`).
             const LegendeEtats(espacement: AppSpacing.sm),
+            // « Astreinte ailleurs » (ticket 072), seulement si le mois en a.
+            if (widget.ailleurs) ...<Widget>[
+              const SizedBox(width: AppSpacing.sm),
+              const LegendeAilleurs(),
+            ],
             const SizedBox(width: AppSpacing.sm),
             SaveIndicator(
               etat: widget.sync,

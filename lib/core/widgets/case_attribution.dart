@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_strings.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_status.dart';
+import 'coin_ailleurs.dart';
 import 'slot_chip.dart';
 
 /// **Le bloc d'attribution** — la case du registre quand quelqu'un y est posé.
@@ -35,6 +37,7 @@ class CaseAttribution extends StatelessWidget {
     required this.libelleSemantique,
     super.key,
     this.erreur = false,
+    this.ailleurs = false,
     this.onTap,
     this.actionSemantique,
   });
@@ -52,6 +55,9 @@ class CaseAttribution extends StatelessWidget {
   /// contour passe à `error`, comme sur la case nue. Sans lui, armer la saisie
   /// sur une case attribuée aurait fait disparaître la seule marque d'échec.
   final bool erreur;
+
+  /// Astreinte dans une autre caserne sur ce créneau (ticket 072).
+  final bool ailleurs;
 
   final VoidCallback? onTap;
 
@@ -91,9 +97,24 @@ class CaseAttribution extends StatelessWidget {
         ),
       ),
     );
+    final peint = ailleurs
+        ? Stack(
+            fit: StackFit.passthrough,
+            children: <Widget>[
+              corps,
+              Positioned(
+                top: 0,
+                right: 0,
+                child: CoinAilleurs(cote: CoinAilleurs.pourCase(cote)),
+              ),
+            ],
+          )
+        : corps;
 
     return Semantics(
-      label: libelleSemantique,
+      label: ailleurs
+          ? '$libelleSemantique, ${AppStrings.matriceCaseAilleursSemantique}'
+          : libelleSemantique,
       hint: actionnable ? actionSemantique : null,
       button: actionnable,
       enabled: actionnable,
@@ -105,9 +126,9 @@ class CaseAttribution extends StatelessWidget {
           ? InkWell(
               onTap: onTap,
               borderRadius: AppRadius.caseRegistreRadius,
-              child: corps,
+              child: peint,
             )
-          : corps,
+          : peint,
     );
   }
 }

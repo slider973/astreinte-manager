@@ -248,6 +248,11 @@ class PropositionAutomatique {
     required Map<String, Set<DateTime>> unites,
   }) {
     for (final candidat in disponibles) {
+      // **Comme la base** (`apply_auto_proposal`, migration `0040`) : qui a
+      // déjà une astreinte dans une autre caserne sur un créneau qui
+      // chevauche n'est pas proposé. Le récapitulatif annonce ce qui sera
+      // vraiment appliqué (ticket 072).
+      if (candidat.ailleurs) continue;
       if (candidat.quotaAtteint) continue;
       if (unite != null && _weekendPlein(candidat, unite, unites)) continue;
       return candidat;

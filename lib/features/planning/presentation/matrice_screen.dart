@@ -793,6 +793,9 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen>
       affiches: visibles.length,
       matriceVisible: matriceVisible,
       planning: commande,
+      ailleurs: etat.matrice.lignes.any(
+        (LigneMatrice ligne) => ligne.aUneAstreinteAilleurs,
+      ),
     );
 
     /// La zone du planning du bandeau, **sur grand écran seulement**.
