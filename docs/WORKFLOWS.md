@@ -91,6 +91,53 @@ Règles :
   La publication renseigne `proposed_at`. Les crons de relance ignorent `proposed_at is null`.
   Une attribution née d'une réattribution est horodatée **dès sa création** : elle est partie.
 
+## 3 bis. Échange d'astreinte (`shift_exchanges.status`) *(ticket 073, migration `0041`)*
+
+```mermaid
+stateDiagram-v2
+  [*] --> open : A propose sa garde acceptée (request_exchange)
+  open --> accepted_by_peer : B accepte (respond_exchange)
+  open --> rejected : B désigné décline
+  open --> cancelled : A retire sa demande
+  open --> expired : échéance (cron ou geste en retard)
+  open --> failed : la garde de A change de main (admin)
+  accepted_by_peer --> approved : admin valide, ou validation automatique
+  accepted_by_peer --> rejected : admin refuse
+  accepted_by_peer --> cancelled : A retire sa demande
+  accepted_by_peer --> expired : échéance
+  accepted_by_peer --> failed : une règle ne tient plus à la validation
+  approved --> [*]
+```
+
+Règles :
+- **Deux façons de demander.** À un collègue précis (`target_id`), ou « à la caserne »
+  (`target_id` nul) : la demande ne parvient qu'aux membres actifs qui ont déclaré `available` sur
+  ce créneau, et le premier qui accepte la prend. Les autres ne la voient pas.
+- **Deux formes.** Cession (`give`) : B prend la garde de A. Échange (`swap`, à un collègue précis
+  seulement) : B prend la garde de A **et** A prend une garde acceptée de B, désignée à la demande
+  parmi `exchangeable_shifts_of(B)`. Les deux mouvements passent ou échouent ensemble.
+- **Seule une garde `accepted`** d'un planning publié ou validé, avant l'échéance, se propose. Une
+  seule demande ouverte par attribution, cédée ou rendue : une garde engagée n'est pas proposable.
+- **B** accepte ou décline une demande qui lui est adressée, sans motif ; une demande à la caserne
+  ne se décline pas, elle s'ignore. Une fois d'accord, **B ne revient pas en arrière** : il passe
+  par le chef, qui peut refuser.
+- **A** retire sa demande tant qu'elle n'est pas validée. **L'administrateur ne retire pas** la
+  demande d'un pompier ; il valide ou refuse, avec un motif facultatif, une demande acceptée.
+- **Validation par l'administrateur, par défaut.** Automatique seulement si la caserne a réglé
+  `exchange_auto_approve` **et** si le remplaçant avait déclaré `available` sur le créneau (pour un
+  échange, chacun sur celui qu'il reprend) ; l'administrateur est alors seulement informé.
+- **À la validation, tout ou rien** : chaque règle revérifiée — garde de A toujours acceptée,
+  remplaçant actif, pas déjà sur le créneau, plafonds du mois non dépassés (un plafond dépassé
+  **bloque**), caserne inscriptible. Une seule qui ne tient plus : rien ne bouge, `failed` avec
+  son motif. Sinon : l'ancienne garde passe `replaced` (§ 3), `replaced_by` vers la nouvelle,
+  **née `accepted`** — B a déjà dit oui.
+- **Échéance** : au début du créneau moins `exchange_deadline_hours` (24 h par défaut, de 1 à
+  168), posée à la création. Une demande échue ne se prend ni ne se valide.
+- **Lecture seule** : rien ne se crée, rien ne s'accepte, une validation échoue
+  (`station_suspended`) ; les clôtures restent possibles.
+- **Une garde retirée par l'administrateur** (`reassign_shift`, `cancel_assignment`) fait échouer
+  la demande qui la porte, dans la même transaction (`assignment_changed`).
+
 ## 4. Séquence : publication et validation
 
 ```mermaid
@@ -164,6 +211,39 @@ Dans les deux cas, une acceptation qui disparaît fait repasser le planning de `
 `published` (§ 2) : seuls les créneaux touchés changent d'état, `published_at` ne se réécrit pas, et
 personne n'est notifié de ce recul — la conséquence est déjà partie à qui de droit.
 
+## 5 bis. Séquence : échange d'astreinte *(ticket 073, migration `0041`)*
+
+```mermaid
+sequenceDiagram
+  participant A as Pompier A (app)
+  participant DB as Postgres
+  participant N as send-notification
+  participant B as Pompier B (app)
+  participant AD as Admin (PWA)
+
+  A->>DB: request_exchange(garde, B | null, garde de B?)
+  DB->>DB: verrou de la garde ; règles ; insert shift_exchanges (open)
+  DB->>N: exchange_requested à B, ou aux disponibles du créneau
+  N-->>B: push « Astreinte à reprendre : 12 octobre, nuit » → /exchanges
+  B->>DB: respond_exchange(demande, true)
+  DB->>DB: verrous garde(s) puis demande ; règles du repreneur ; accepted_by_peer
+  alt réglage auto ET disponibilité déclarée
+    DB->>DB: exchange_apply — tout ou rien
+    DB->>N: exchange_approved à A (+ admins, « informés »)
+  else validation par l'admin
+    DB->>N: exchange_accepted aux admins actifs → /admin/exchanges
+    AD->>DB: decide_exchange(demande, true)
+    DB->>DB: exchange_apply — verrous des plannings, règles revérifiées
+    DB->>DB: B accepted, A replaced + replaced_by ; approved ; audit ; schedule_reevaluer
+    DB->>N: exchange_approved à A et B → /schedule/<mois>
+  end
+```
+
+Si une règle ne tient plus à la validation, rien ne change dans le planning : la demande passe
+`failed` avec son motif et `exchange_closed` part à A et B. Refus de l'admin ou de B :
+`exchange_rejected` ; retrait par A : `exchange_closed` au destinataire ou au repreneur ;
+expiration : `exchange_closed` à A et au destinataire ou repreneur.
+
 ## 6. Séquence : relances
 
 ```mermaid
@@ -234,6 +314,11 @@ Règles (migration `0021`, ticket 022) :
 | `late_responders` | admins | inapp + push | un par jour et par planning |
 | `subscription_trial_ending` | admins | email + inapp | un par fin d'essai (J-7) |
 | `subscription_suspended` | admins | email + inapp | un par suspension |
+| `exchange_requested` | B désigné, ou les membres actifs disponibles sur le créneau (demande à la caserne) | push + inapp | non |
+| `exchange_accepted` | admins actifs, sauf le repreneur | push + inapp | non |
+| `exchange_approved` | A et B, sauf l'acteur ; en validation automatique, aussi les admins actifs (`audience: admin`) | push + inapp | non |
+| `exchange_rejected` | A (et B quand c'est l'admin qui refuse) | push + inapp | non |
+| `exchange_closed` | A et B désigné ou repreneur, sauf l'acteur : retrait, expiration, échec | push + inapp ; **inapp seul** pour une expiration hors de la fenêtre locale | non |
 
 Les deux types d'abonnement sont les seuls, avec `invitation`, à partir par **courriel** : un
 abonnement ne se règle pas depuis l'écran verrouillé d'un téléphone, et le courriel est le seul
@@ -255,6 +340,13 @@ notifications et les propositions dans la Boîte (chantier 064b).
 | `/admin/schedule/<period>` | `/admin/suivi?mois=<period>` *(admin seulement)* |
 | `/availability/<period>` | `/calendrier?mois=<period>` |
 | `/admin/subscription` | `/admin/abonnement` *(admin seulement)* |
+| `/exchanges` | *(à brancher au chantier PWA du ticket 073 : demandes reçues, à reprendre et envoyées, dans la Boîte)* |
+| `/admin/exchanges` | *(à brancher au chantier PWA du ticket 073 : file des échanges à valider)* *(admin seulement)* |
+
+`/exchanges` et `/admin/exchanges` sont posés par le chantier base du ticket 073 (`exchange_*`,
+migration `0041`) ; leur emplacement interne est décidé par les chantiers PWA et iOS. D'ici là, ils
+tombent sous la règle qui suit. `exchange_approved` mène les pompiers à `/schedule/<period>`, où la
+garde a changé de main.
 
 Un lien inconnu, mal formé, ou visant un écran que ce compte n'a pas le droit d'ouvrir retombe sur
 l'accueil **sans message d'erreur** : le membre n'a rien fait de mal, et le lien peut dater d'avant
@@ -277,6 +369,8 @@ le push touché (app froide comme chaude) et la ligne touchée dans le centre de
 | `/availability/<period>` | Disponibilités, sur le mois `<period>` |
 | `/admin/schedule/<period>` | la PWA dans Safari, `/admin/suivi?mois=<period>` *(admin seulement)* |
 | `/admin/subscription` | la PWA dans Safari, `/admin/abonnement` *(admin seulement)* |
+| `/exchanges` | *(à brancher au chantier iOS du ticket 073 : les échanges du pompier)* |
+| `/admin/exchanges` | la PWA dans Safari, file des échanges à valider *(admin seulement ; adresse interne fixée au chantier PWA)* |
 
 L'admin reste dans la PWA (décision 7 du ticket 066) : ses deux liens ouvrent la PWA plutôt qu'un
 écran natif qui n'existe pas. Mêmes règles que la PWA : `<period>` est un `AAAA-MM` valide ou le lien

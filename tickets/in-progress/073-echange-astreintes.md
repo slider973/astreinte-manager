@@ -74,6 +74,20 @@ Ticket découpé en chantiers (une PR par chantier) : base, PWA, iOS.
    l'admin valide depuis la PWA, seul canal de l'admin. Nouveau build TestFlight.
 4. **PRD** : l'échange passe de v1.1 à livré ; décisions ci-dessus recopiées.
 
+## Notes du chantier base (073a, migration `0041`)
+
+- **Règle du 072 « pas pris ailleurs » : non branchée.** Point d'extension commenté dans
+  `exchange_rule_check` (`supabase/migrations/0041_echanges_astreintes.sql`), seul endroit à
+  toucher : `request_exchange`, `respond_exchange` et la validation y passent tous. Les codes
+  `peer_taken_elsewhere` / `requester_taken_elsewhere` sont déjà dans la liste fermée de
+  `shift_exchanges.reason_code` et traduits par `send-notification` ; le 072 n'aura qu'à appeler sa
+  fonction et rendre `taken_elsewhere`.
+- Le rang `0040` reste au 072 ; `0041` ne dépend d'aucun de ses objets.
+- Décisions du brief de design retenues en base : B ne revient pas sur son accord ; une demande à
+  la caserne ne se décline pas ; B ne donne pas de motif ; l'admin n'annule pas la demande d'un
+  pompier ; un plafond dépassé bloque ; échéance de 1 à 168 h, 24 par défaut ; une garde engagée
+  dans une demande ouverte n'est pas proposable.
+
 ## Critères d'acceptation
 
 - Tests SQL : cession et échange validés (statuts, `replaced_by`, attributions `accepted`, audit,
