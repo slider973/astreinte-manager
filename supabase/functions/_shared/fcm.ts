@@ -28,7 +28,13 @@ export type CompteDeService = {
 export type MessagePush = {
   titre: string;
   corps: string;
-  /** Paires de chaînes : FCM refuse tout ce qui n'est pas une chaîne. */
+  /**
+   * Paires de chaînes : FCM refuse tout ce qui n'est pas une chaîne.
+   *
+   * Recopiées telles quelles dans `message.data`. Pour une notification de
+   * caserne, elles portent `route`, `type`, `station_id` (ticket 072 : l'app
+   * bascule vers cette caserne avant d'ouvrir `route`) et `notification_id`.
+   */
   donnees: Record<string, string>;
   /**
    * Le lien ouvert au clic, côté web (`webpush.fcm_options.link`).

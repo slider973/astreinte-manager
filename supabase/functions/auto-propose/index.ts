@@ -37,7 +37,7 @@ type LigneEcartee = {
   code: string;
 };
 
-/** Ce que rend `apply_auto_proposal` (migration 0028). */
+/** Ce que rend `apply_auto_proposal` (migrations 0028 et 0040). */
 type ResultatProposition = {
   ok: boolean;
   code?: string;
@@ -48,6 +48,8 @@ type ResultatProposition = {
   applied?: number;
   skipped?: LigneEcartee[];
   shifts_short?: number;
+  /** Lignes écartées pour `taken_elsewhere` (migration 0040, ticket 072). */
+  taken_elsewhere?: number;
 };
 
 /** Messages rendus au client, en français, jamais de détail technique. */
@@ -172,5 +174,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     skipped: resultat.skipped ?? [],
     /** Créneaux encore à découvert après coup, comptés en base. */
     shifts_short: resultat.shifts_short ?? 0,
+    /** Lignes écartées parce que le pompier est déjà proposé ou accepté dans
+     * une autre caserne sur un créneau qui chevauche (ticket 072). Rien de
+     * l'autre caserne : un compte, et les lignes de `skipped` au code
+     * `taken_elsewhere`. */
+    taken_elsewhere: resultat.taken_elsewhere ?? 0,
   });
 });

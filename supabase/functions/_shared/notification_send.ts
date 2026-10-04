@@ -84,7 +84,11 @@ export type Profil = {
 
 export type Jeton = { token: string; platform: string };
 
-export type Caserne = { name: string; timezone: string };
+/**
+ * La caserne de la demande. `id` est celui de `demande.station_id` : il sert au
+ * lien du courriel (`?station=`, ticket 072), comme `data.station_id` sert au push.
+ */
+export type Caserne = { id: string; name: string; timezone: string };
 
 export type LigneNotification = {
   station_id: string | null;
@@ -256,6 +260,12 @@ async function servirUnDestinataire(
   });
   const maintenant = deps.maintenant().toISOString();
 
+  // `station_id` dans les données : c'est ce que l'app lit pour basculer vers
+  // la bonne caserne quand on touche un push d'une autre que celle ouverte
+  // (ticket 072, décision 2). Il est dans la ligne `inapp`, la ligne `push`, la
+  // ligne `email` et le bloc `data` du message FCM — donc à la racine du
+  // `userInfo` iOS et dans `FCM_MSG.data` du service worker. `route` ne change
+  // pas : le lien public reste le même, la caserne voyage à côté.
   const donnees: Record<string, unknown> = {
     route: contenu.route,
     type: demande.type,
@@ -328,8 +338,8 @@ async function servirUnDestinataire(
         // le message entier. `lienPubliable` (fcm.ts) l'écarte si l'origine n'est
         // pas en `https` — en local, le push part alors sans ce champ, et le
         // service worker retrouve la destination dans `data.route`.
-        lien: lienApplication(contenu.route),
-        etiquette: etiquette(demande.type, destinataire.payload),
+        lien: lienApplication(contenu.route, demande.station_id),
+        etiquette: etiquette(demande.type, destinataire.payload, demande.station_id),
       });
 
       // Les jetons définitivement rejetés partent. Un échec temporaire ne

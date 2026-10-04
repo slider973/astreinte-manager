@@ -76,7 +76,7 @@ Clés, types et bornes — **la liste est une liste blanche, une clé inconnue e
 
 | Clé | Type | Bornes | Rôle |
 |---|---|---|---|
-| `day_start`, `day_end` | `"HH:MM"` | 00:00–23:59, et différentes l'une de l'autre | affichage uniquement |
+| `day_start`, `day_end` | `"HH:MM"` | 00:00–23:59, et différentes l'une de l'autre | affichage, flux calendrier, et depuis `0040` le chevauchement de deux créneaux de casernes différentes (`shift_window`, § 3) |
 | `required_day`, `required_night` | entier | 0–50 | effectif par défaut d'un créneau |
 | `required_overrides` | objet, **optionnel** | voir ci-dessous | exceptions à l'effectif |
 | `availability_deadline_day` | entier | 1–28 (le jour doit exister en février) | jour du mois précédent où la saisie se verrouille |
@@ -866,7 +866,7 @@ pas.
 | Fonction | Signature | Rôle |
 |---|---|---|
 | `reassign_shift` | `(p_shift uuid, p_user uuid, p_actor uuid, p_previous uuid default null) returns jsonb` `security definer`, **réservée à `service_role`** | La réattribution, **en une transaction** : nouvelle attribution `proposed` avec `proposed_at = now()`, `created_by` et `was_available` posés par la fonction, ancienne marquée `replaced` (`accepted` ou `proposed`) ou **laissée telle quelle** (`declined`, `cancelled` : un statut terminal a déjà été notifié sous ce nom), `replaced_by` posé dans les quatre cas, notifications, `audit_log` et `schedule_reevaluer`. **Rend `notified`** (migration `0039`, ticket 055) : vrai quand la demande `assignment_proposed` de l'entrant est en file, à côté de `previous_notified` pour le sortant — **mis en file, pas livré**, dans les deux cas (§ 5, « Ce que garantit la réponse d'un membre »). `p_previous` omis sur un créneau qui porte un trou non comblé — un refus ou une annulation : la fonction rattache la nouvelle au **plus ancien** d'entre eux. Seul `replaced` n'est pas remplaçable : ce qui a déjà trouvé son remplaçant ne s'en cherche pas un second. **Deux verrous, dans l'ordre d'une réponse de membre** — l'attribution remplacée, puis le planning —, et **le compte des places** après eux : une réattribution remplace, elle n'ajoute pas. Refus métier en `{"ok": false, "code": …}` : `shift_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `member_not_active`, `already_assigned`, `shift_already_filled`, `assignment_not_found`, `assignment_not_replaceable`. |
-| `apply_auto_proposal` | `(p_schedule uuid, p_actor uuid, p_picks jsonb) returns jsonb` `security definer`, **réservée à `service_role`** | Applique un plan de remplissage automatique sur un planning **en brouillon**, en une transaction. `p_picks` est un tableau ordonné de `{"shift_id", "user_id"}`, composé par l'application avec le tri des candidats du ticket 017 : la base ne choisit personne, elle **limite**. Chaque ligne est revérifiée — créneau du planning, membre actif, disponibilité **déclarée** (`availabilities.status = 'available'` : ni l'absent ni celui qui n'a rien saisi ne passent), pas de doublon, effectif requis pas dépassé, plafonds `max_shifts` et `max_weekends` pas dépassés (comptés comme `v_member_load` les compte, et **relus à chaque ligne**, donc les attributions posées par l'appel comptent) — puis insérée `proposed` avec `proposed_at` nul, `was_available = true` et `created_by = p_actor`. Une ligne qui ne passe pas est **écartée** avec son motif, les autres passent : `invalid_pick`, `shift_not_in_schedule`, `member_not_active`, `not_available`, `already_assigned`, `shift_already_filled`, `shift_quota_reached`, `weekend_quota_reached`. **Un verrou sur le planning**, comme `reassign_shift` : deux administrateurs qui appuient en même temps ne posent pas deux pompiers sur une place. Refus globaux : `invalid_picks`, `too_many_picks` (500), `schedule_not_found`, `not_admin`, `station_suspended`, `schedule_not_draft`. |
+| `apply_auto_proposal` | `(p_schedule uuid, p_actor uuid, p_picks jsonb) returns jsonb` `security definer`, **réservée à `service_role`** | Applique un plan de remplissage automatique sur un planning **en brouillon**, en une transaction. `p_picks` est un tableau ordonné de `{"shift_id", "user_id"}`, composé par l'application avec le tri des candidats du ticket 017 : la base ne choisit personne, elle **limite**. Chaque ligne est revérifiée — créneau du planning, membre actif, disponibilité **déclarée** (`availabilities.status = 'available'` : ni l'absent ni celui qui n'a rien saisi ne passent), pas de doublon, effectif requis pas dépassé, plafonds `max_shifts` et `max_weekends` pas dépassés (comptés comme `v_member_load` les compte, et **relus à chaque ligne**, donc les attributions posées par l'appel comptent) — puis insérée `proposed` avec `proposed_at` nul, `was_available = true` et `created_by = p_actor`. Une ligne qui ne passe pas est **écartée** avec son motif, les autres passent : `invalid_pick`, `shift_not_in_schedule`, `member_not_active`, `not_available`, `already_assigned`, `taken_elsewhere` *(migration `0040`, ticket 072 : déjà proposé ou accepté dans une autre caserne sur un créneau qui chevauche, voir « Plusieurs casernes » ci-dessous)*, `shift_already_filled`, `shift_quota_reached`, `weekend_quota_reached`. La réponse porte aussi `taken_elsewhere`, le **nombre** de lignes écartées pour ce motif (`0040`). **Un verrou sur le planning**, comme `reassign_shift` : deux administrateurs qui appuient en même temps ne posent pas deux pompiers sur une place. **Et un verrou par pompier** (`0040`, `pg_advisory_xact_lock`, pris dans l'ordre des identifiants) : deux casernes qui remplissent au même instant ne posent pas la même personne au même moment. Refus globaux : `invalid_picks`, `too_many_picks` (500), `schedule_not_found`, `not_admin`, `station_suspended`, `schedule_not_draft`. |
 | `cancel_assignment` | `(p_assignment uuid, p_reason text default null) returns jsonb` `security definer`, ouverte à `authenticated` | L'annulation d'une attribution d'un planning publié : statut `cancelled`, motif conservé dans `decline_reason`, notification `assignment_cancelled` **si la garde était acceptée**, `audit_log` et `schedule_reevaluer`. Refus : `assignment_not_found`, `not_admin`, `station_suspended`, `schedule_not_published`, `assignment_not_active`. |
 
 **Une notification, et une seule, sauf quand une garde acquise disparaît.** Un refus suivi d'une
@@ -886,6 +886,37 @@ où il n'a plus rien à faire.
 ici ni regroupement à faire ni compte rendu à montrer — et la file garantit le rejeu si le processus
 appelant meurt. Un pompier qui ignore qu'il est d'astreinte est le seul défaut que ce geste n'a pas
 le droit de produire.
+
+### Plusieurs casernes (migration `0040`, ticket 072)
+
+Un pompier peut être membre de plusieurs casernes (`memberships unique (station_id, user_id)`).
+Décision du propriétaire du 28 septembre 2026 : **le planning automatique ne le propose pas s'il est
+déjà proposé ou accepté ailleurs sur un créneau qui chevauche, et l'administrateur voit qu'il est
+pris ailleurs sans voir le détail de l'autre caserne.**
+
+| Fonction | Signature | Rôle |
+|---|---|---|
+| `shift_window` | `(p_date date, p_slot slot_type, p_timezone text, p_settings jsonb) returns tstzrange` `stable`, fermée aux clients | L'intervalle **réel** d'un créneau, dans le fuseau et aux heures (`day_start`, `day_end`) de sa caserne : la nuit est le complément du jour, un créneau qui franchit minuit finit le lendemain, bornes `[)` — la relève de 19:00 ne chevauche pas la garde qui finit à 19:00. Même calcul que le flux calendrier (`ics-feed/calendrier.ts`). Pure : elle ne lit aucune table. |
+| `member_taken_elsewhere` | `(p_station uuid, p_user uuid, p_date date, p_slot slot_type) returns boolean` `security definer`, **réservée à `service_role`** et aux fonctions de la base | Vrai si le membre a, dans **une autre caserne** que `p_station`, une attribution `proposed` (brouillon compris) ou `accepted` dont l'intervalle chevauche celui du créneau `(p_date, p_slot)` de `p_station`. **Ne rend qu'un booléen** : ni la caserne, ni l'heure, ni le statut. L'appartenance à l'autre caserne n'est pas relue — une attribution active est un engagement tant que son administrateur ne l'a pas retirée. |
+
+**Pourquoi le chevauchement réel, et pas `(date, slot)`.** Deux casernes n'ont pas forcément les
+mêmes heures : le jour de A (07:00–19:00) le 11 chevauche la nuit de B (20:00–08:00) du 10, autre
+date, autre créneau. Comparer `(date, slot)` aurait laissé passer ce doublon et bloqué à tort deux
+casernes dont les heures se suivent. Les heures de `settings` ne sont donc plus « affichage
+uniquement » (§ 2.1) : elles décident aussi de ce chevauchement.
+
+**Pourquoi `member_taken_elsewhere` est fermée aux clients.** Ouverte à `authenticated`, elle serait
+un oracle : n'importe quel administrateur pourrait interroger l'agenda de n'importe quel identifiant,
+membre de sa caserne ou non. L'administrateur lit le même renseignement **par la matrice**
+(`availability_matrix`, § 6), qui ne le donne que pour les membres actifs de **sa** caserne :
+colonnes `day_taken_elsewhere` / `night_taken_elsewhere`. Les deux écritures de la règle — la
+fonction, et sa version ensembliste dans la matrice — sont tenues égales par
+`supabase/tests/plusieurs_casernes_test.sql` sur un mois entier.
+
+**Une attribution posée à la main reste permise** sur un pompier pris ailleurs : l'administrateur
+garde la main (`docs/PRD.md § 6.4`), il voit « Astreinte ailleurs » dans la grille et décide. La
+règle de la décision 1 est celle du planning **automatique**. **Aucune politique RLS n'est touchée**,
+aucune table, aucune colonne de table.
 
 ### Relances automatiques (migration `0021`, ticket 022)
 
@@ -1639,9 +1670,14 @@ encodé en **deux chaînes de longueur fixe**, un caractère par jour :
 | `shifts_left`, `weekends_left` | `integer` | restes, `null` si illimité, **négatifs** si dépassés |
 | `accepted_previous` | `integer` | astreintes acceptées sur les trois mois précédents |
 | `day_slots`, `night_slots` | `text` | un caractère par jour du mois : `.` non saisi, `D`/`d` disponible, `A`/`a` absent — **minuscule si la case a été saisie par un administrateur** (`set_by <> user_id`) |
+| `day_taken_elsewhere`, `night_taken_elsewhere` | `text` | *(migration `0040`, ticket 072)* un caractère par jour du mois : `.` libre, `X` **pris ailleurs** — proposé ou accepté dans une autre caserne sur un créneau qui chevauche celui-ci (§ 3, « Plusieurs casernes »). Rien d'autre de l'autre caserne n'est rendu |
 
-La position `i` (0 en tête) de `day_slots` et `night_slots` est le jour `i + 1` ; leur longueur
-est le nombre de jours du mois. **La casse est la seule différence** : qui l'ignore retrouve
+La position `i` (0 en tête) de `day_slots` et `night_slots` — et de `day_taken_elsewhere` et
+`night_taken_elsewhere` — est le jour `i + 1` ; leur longueur est le nombre de jours du mois.
+**Pourquoi deux colonnes de plus et pas une lettre de plus dans `day_slots`** : « pris ailleurs »
+n'est pas un état de la saisie, il se superpose à elle (on peut être disponible ici et pris
+ailleurs), et une lettre nouvelle aurait cassé les clients qui lisent l'alphabet du § 2.6. Un client
+qui ignore les deux colonnes n'y voit aucune différence. **La casse est la seule différence** : qui l'ignore retrouve
 exactement les trois états du § 2.6, et le test le vérifie. Une ligne sans `set_by` — antérieure
 au déclencheur `availabilities_trace_auteur` (`0012`) — compte comme saisie par le membre. Les sept colonnes de quotas **viennent de `v_member_load`**,
 elles n'en sont pas une seconde écriture.
@@ -1752,7 +1788,7 @@ même règle que les crons de relance (`docs/WORKFLOWS.md § 3`).
 
 | Fonction | Déclencheur | Rôle |
 |---|---|---|
-| `send-notification` | appel interne : `public.notify(...)` → pg_net (déclencheurs, crons), ou HTTP direct depuis une autre Edge Function | Prend un `notification_type`, des destinataires, une caserne et une charge utile ; regroupe, construit le texte français, écrit la ligne `inapp`, envoie le push FCM à tous les appareils du membre, envoie le courriel si le canal est demandé ou si le membre n'a aucun appareil, supprime les jetons définitivement rejetés (ticket 025, contrat dans `supabase/functions/README.md`) |
+| `send-notification` | appel interne : `public.notify(...)` → pg_net (déclencheurs, crons), ou HTTP direct depuis une autre Edge Function | Prend un `notification_type`, des destinataires, une caserne et une charge utile ; regroupe, construit le texte français, écrit la ligne `inapp`, envoie le push FCM à tous les appareils du membre, envoie le courriel si le canal est demandé ou si le membre n'a aucun appareil, supprime les jetons définitivement rejetés (ticket 025, contrat dans `supabase/functions/README.md`). **La caserne voyage avec la notification** (ticket 072, décision 2) : `station_id` dans `data` — ligne `inapp`, traces `push` et `email`, bloc `data` du message FCM —, `?station=<uuid>` ajouté au lien du courriel et à `webpush.fcm_options.link` (le chemin public, lui, ne change pas), et la caserne dans l'étiquette de regroupement (`<type>:<période>:<8 premiers caractères>`), pour que les propositions d'octobre de B ne remplacent pas celles de A sur l'écran verrouillé |
 | `publish-schedule` | app admin | Appelle `publish_schedule` (SQL, atomique), puis `send-notification` avec les destinataires **déjà groupés par membre** : sept créneaux font une notification, pas sept (ticket 019, contrat dans `supabase/functions/README.md`) |
 | `reassign-shift` | app admin | Appelle `reassign_shift` (SQL, atomique) : l'ancienne attribution est marquée `replaced` ou reste `declined`, la nouvelle est créée `proposed` et horodatée, `replaced_by` relie les deux, et **une seule** notification part — au nouveau membre, plus l'ancien si sa garde était acceptée (ticket 020, contrat dans `supabase/functions/README.md`). Rend `notified` pour l'entrant et `previous.notified` pour le sortant : **des demandes mises en file**, pas des livraisons (ticket 055). L'annulation, elle, est une RPC (`cancel_assignment`) et non une Edge Function |
 | `auto-propose` | app admin | **Applique** un remplissage automatique du brouillon, il ne le compose pas : le plan — une liste ordonnée de couples (créneau, pompier) — est calculé dans l'application avec le **tri des candidats du ticket 017**, celui que l'administrateur lit dans le panneau d'un créneau, pour que le récapitulatif qu'il valide soit exactement ce qui part. `apply_auto_proposal` (SQL, atomique) revérifie chaque ligne — membre actif, disponibilité déclarée, plafonds d'astreintes et de weekends, effectif requis, doublons — et **écarte** celles qui ne passent pas avec leur motif au lieu de tout refuser. Aucune notification : un brouillon ne sort pas du bureau (ticket 018, contrat dans `supabase/functions/README.md`) |
@@ -1986,6 +2022,11 @@ Ordre proposé :
     prévenait personne avant lui** ; `reassign_shift` redéfinie à l'identique, plus la clé
     `notified` pour l'entrant. **Aucune politique RLS touchée**, aucune colonne ajoutée, la
     requête de réponse des clients inchangée)
+40. `0040_plusieurs_casernes.sql` (ticket 072 : `shift_window`, `member_taken_elsewhere` réservée à
+    `service_role`, `apply_auto_proposal` redéfinie — motif `taken_elsewhere`, son compte dans la
+    réponse, verrou par pompier —, `availability_matrix` supprimée puis recréée avec
+    `day_taken_elsewhere` / `night_taken_elsewhere`, droits inchangés. **Aucune politique RLS
+    touchée**, aucune table, aucune colonne de table)
 
 Les rangs 15 et 16 ont glissé d'un cran au ticket 025 : le chemin d'appel des
 notifications devait exister avant les tâches qui s'en servent, et une migration déjà
@@ -2027,7 +2068,8 @@ par `supabase/tests/heure_locale_notifications_test.sql` et le nom porté par l'
 par `supabase/tests/import_membres_test.sql`, la trace d'envoi de `0035` par
 `supabase/tests/trace_envoi_invitation_test.sql` et les invitations en attente vues par
 l'invité de `0036` par `supabase/tests/invitations_en_attente_test.sql`, et l'enregistrement du
-jeton push de `0037` par `supabase/tests/enregistrement_jeton_push_test.sql`, joués par le même
+jeton push de `0037` par `supabase/tests/enregistrement_jeton_push_test.sql`, et le pompier de
+deux casernes de `0040` par `supabase/tests/plusieurs_casernes_test.sql`, joués par le même
 script. La logique pure
 des Edge Functions (libellés, regroupement, liens profonds, classement des erreurs FCM,
 enchaînement d'un envoi) est couverte par `deno test supabase/functions/tests/`, qui ne
