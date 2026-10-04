@@ -349,13 +349,16 @@ notifications et les propositions dans la Boîte (chantier 064b).
 | `/admin/schedule/<period>` | `/admin/suivi?mois=<period>` *(admin seulement)* |
 | `/availability/<period>` | `/calendrier?mois=<period>` |
 | `/admin/subscription` | `/admin/abonnement` *(admin seulement)* |
-| `/exchanges` | *(à brancher au chantier PWA du ticket 073 : demandes reçues, à reprendre et envoyées, dans la Boîte)* |
-| `/admin/exchanges` | *(à brancher au chantier PWA du ticket 073 : file des échanges à valider)* *(admin seulement)* |
+| `/exchanges` | `/boite?onglet=propositions` : le groupe « Demandes de collègues » (reçues et à reprendre), et le lien « Suivre mes échanges » vers la section « Échanges » d'`/astreintes` |
+| `/admin/exchanges` | `/admin/echanges?filtre=a-valider` *(admin seulement)* |
 
 `/exchanges` et `/admin/exchanges` sont posés par le chantier base du ticket 073 (`exchange_*`,
-migration `0041`) ; leur emplacement interne est décidé par les chantiers PWA et iOS. D'ici là, ils
-tombent sous la règle qui suit. `exchange_approved` mène les pompiers à `/schedule/<period>`, où la
-garde a changé de main.
+migration `0041`) ; le chantier PWA les a branchés comme ci-dessus. `exchange_requested` est une
+**question** : comme `assignment_proposed`, elle n'est ni un rappel ni une non-lue, la carte de la
+Boîte la porte. Les autres types `exchange_*` sont des faits, dans « Rappels ». `exchange_approved`
+mène les pompiers à `/schedule/<period>`, où la garde a changé de main. Le parcours de demande vit
+à `/astreintes/echange?attribution=<id>&etape=qui|quoi|verifier` — adresse interne, jamais envoyée
+dans une notification.
 
 Un lien inconnu, mal formé, ou visant un écran que ce compte n'a pas le droit d'ouvrir retombe sur
 l'accueil **sans message d'erreur** : le membre n'a rien fait de mal, et le lien peut dater d'avant

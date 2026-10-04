@@ -7,7 +7,9 @@
 //   5. la recrue refuse un créneau et en accepte un autre, et l'astreinte
 //      acceptée apparaît sur son accueil (ticket 070) ;
 //   6. l'administrateur réattribue le créneau refusé ;
-//   7. le second pompier accepte, et le planning se valide tout seul.
+//   7. le second pompier accepte, et le planning se valide tout seul ;
+//   8. la recrue cède sa nuit au second pompier, qui accepte, et
+//      l'administrateur valide la cession (ticket 073).
 //
 // Comment ce test est piloté, et pourquoi
 // ---------------------------------------
@@ -52,8 +54,12 @@ import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/core/widgets/primary_button.dart';
 import 'package:astreinte_sp/core/widgets/slot_chip.dart';
 import 'package:astreinte_sp/features/accueil/presentation/widgets/carte_jour.dart';
+import 'package:astreinte_sp/features/astreintes/presentation/widgets/ligne_astreinte.dart';
 import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/presentation/mois_screen.dart';
+import 'package:astreinte_sp/features/echanges/domain/echange.dart';
+import 'package:astreinte_sp/features/echanges/presentation/widgets/carte_demande_recue.dart';
+import 'package:astreinte_sp/features/echanges/presentation/widgets/panneau_decision_echange.dart';
 import 'package:astreinte_sp/features/invitation/presentation/invitation_screen.dart';
 import 'package:astreinte_sp/features/membres/presentation/inviter_screen.dart';
 import 'package:astreinte_sp/features/planning/presentation/widgets/ligne_candidat.dart';
@@ -400,8 +406,96 @@ void main() {
         findsOneWidget,
       );
     });
+
+    // --- Ticket 073 : une cession validée par l'administrateur ------------
+
+    testWidgets('8a. la recrue propose sa nuit au second pompier', (
+      tester,
+    ) async {
+      // La veille du 1er au matin : la nuit du 1er est à venir, et
+      // l'échéance (24 h avant 19:00) n'est pas passée.
+      await _monterMembre(
+        tester,
+        _marieId,
+        _adresseRecrue,
+        aujourdhui: _veilleDuPremier,
+      );
+      await ouvrirRoute(tester, AppRoutes.astreintes);
+
+      await _toucher(tester, find.byType(LigneDAstreinte).first);
+      await _toucher(tester, _bouton(AppStrings.echangeProposer));
+      await _toucher(tester, find.text(AppStrings.echangeCollegue));
+      await _toucher(tester, find.text('Thomas Moreau'));
+      await _toucher(tester, _bouton(AppStrings.echangeContinuer));
+      // « Céder » est le choix par défaut.
+      await _toucher(tester, _bouton(AppStrings.echangeContinuer));
+      await _toucher(tester, _bouton(AppStrings.echangeEnvoyer));
+
+      final demande = backend.echanges.single;
+      expect(demande.statut, StatutEchange.ouvert);
+      expect(demande.cibleId, thomasId);
+      expect(demande.attributionId, _attributionDe(_creneauAccepte, _marieId)!.id);
+      expect(backend.notifications.last.type, 'exchange_requested');
+      expect(backend.notifications.last.destinataires, <String>[thomasId]);
+      expect(
+        find.text(AppStrings.echangeEnvoyeeA('Thomas Moreau')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('8b. le second pompier accepte la garde', (tester) async {
+      await _monterMembre(
+        tester,
+        thomasId,
+        'membre2@caserne-a.test',
+        aujourdhui: _veilleDuPremier,
+      );
+      // Le lien de la notification `exchange_requested`.
+      await ouvrirRoute(tester, AppRoutes.lienEchanges);
+
+      await _toucher(tester, find.byType(CarteDemandeRecue));
+      await _toucher(tester, _bouton(AppStrings.echangeAccepterGarde));
+
+      expect(backend.echanges.single.statut, StatutEchange.accepteParPair);
+      expect(backend.notifications.last.type, 'exchange_accepted');
+      expect(backend.notifications.last.destinataires, <String>[adminId]);
+      expect(find.text(AppStrings.echangeAccordEnvoye), findsOneWidget);
+    });
+
+    testWidgets('8c. l\'administrateur valide la cession', (tester) async {
+      await _monterAdmin(tester);
+      // Le lien de la notification `exchange_accepted`.
+      await ouvrirRoute(tester, AppRoutes.lienEchangesAdmin);
+
+      // Sur le poste, la première demande à valider est ouverte d'office.
+      expect(find.byType(PanneauDecisionEchange), findsOneWidget);
+      await _toucher(tester, _bouton(AppStrings.echangesValiderCession));
+      await _toucher(tester, _bouton(AppStrings.echangesValiderEtPrevenir));
+
+      final demande = backend.echanges.single;
+      expect(demande.statut, StatutEchange.valide);
+      final cedee = _attributionDe(_creneauAccepte, _marieId)!;
+      final reprise = backend.attributionParId(demande.nouvelleAttributionId!)!;
+      expect(cedee.etat, AttributionEtat.remplace);
+      expect(cedee.remplaceParId, reprise.id);
+      expect(reprise.userId, thomasId);
+      expect(reprise.etat, AttributionEtat.accepte);
+      expect(backend.notifications.last.type, 'exchange_approved');
+      // Le planning reste complet : la garde a changé de main, pas de trou.
+      expect(backend.etatPlanning, PlanningEtat.valide);
+      expect(
+        find.text(AppStrings.echangesValide('Marie Lefebvre', 'Thomas Moreau')),
+        findsOneWidget,
+      );
+    });
   });
 }
+
+/// La veille du 1er du mois, à 8 h.
+DateTime get _veilleDuPremier =>
+    DateTime(_moisAffiche.year, _moisAffiche.month, 0, 8);
+
+Finder _bouton(String libelle) => find.widgetWithText(PrimaryButton, libelle);
 
 // ===========================================================================
 // Montage : une session par personne, comme un appareil par personne
@@ -426,6 +520,7 @@ Future<void> _monterAdmin(WidgetTester tester) async {
     suivi: backend.suiviDe(adminId),
     propositions: backend.propositionsRepository,
     astreintes: backend.astreintesRepository,
+    echanges: backend.echangesDe(adminId),
     caserne: backend.caserneRepository,
     taille: _poste,
   );
@@ -452,6 +547,7 @@ Future<void> _monterMembre(
     dispos: backend.disposDe(userId),
     propositions: backend.propositionsRepository,
     astreintes: backend.astreintesRepository,
+    echanges: backend.echangesDe(userId),
     caserne: backend.caserneRepository,
     invitations: backend.invitationRepository,
     reperes: ReperesLocauxMemoire(<RepereAccueil>{

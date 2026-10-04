@@ -12,15 +12,20 @@ import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/bouton_retour.dart';
 import '../../../../core/widgets/carre_creneau.dart';
 import '../../../../core/widgets/carte_douce.dart';
+import '../../../../core/widgets/choix_exclusif.dart';
 import '../../../../core/widgets/count_stat.dart';
 import '../../../../core/widgets/day_cell.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/entete_section.dart';
 import '../../../../core/widgets/loading_skeleton.dart';
 import '../../../../core/widgets/primary_button.dart';
+import '../../../../core/widgets/rangee_garde.dart';
 import '../../../../core/widgets/save_indicator.dart';
 import '../../../../core/widgets/slot_chip.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../astreintes/domain/astreinte.dart';
+import '../../../echanges/domain/echange.dart';
+import '../../../echanges/presentation/widgets/carte_echange.dart';
 import 'dev_section.dart';
 
 /// Le catalogue complet : chaque composant, chaque état.
@@ -42,6 +47,7 @@ class DevCatalogue extends StatelessWidget {
         _SectionJours(),
         _SectionCartes(),
         _SectionLignesPompier(),
+        _SectionEchanges(),
         _SectionBadges(),
         _SectionBannieres(),
         _SectionEtatsVides(),
@@ -595,6 +601,144 @@ class _SectionLignesPompier extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+/// Ticket 073 : le choix exclusif, la rangée de garde, et la carte d'échange
+/// dans ses huit états — ceux d'une demande, vus par celui qui l'a faite.
+class _SectionEchanges extends StatelessWidget {
+  const _SectionEchanges();
+
+  static Echange _exemple(
+    StatutEchange statut, {
+    bool caserne = false,
+    String? motif,
+  }) => Echange(
+    id: 'dev-${statut.name}-$caserne',
+    stationId: 'dev',
+    forme: FormeEchange.cession,
+    statut: statut,
+    demandeurId: 'moi',
+    demandeurNom: 'Antoine C.',
+    cibleId: caserne ? null : 'chloe',
+    cibleNom: caserne ? null : 'Chloé C.',
+    repreneurId: statut == StatutEchange.ouvert ? null : 'chloe',
+    repreneurNom: statut == StatutEchange.ouvert ? null : 'Chloé C.',
+    decideurId: statut.terminal ? 'marie' : null,
+    decideurNom: statut.terminal ? 'Marie D.' : null,
+    codeMotif: switch (statut) {
+      StatutEchange.echoue => 'peer_weekend_quota_reached',
+      StatutEchange.refuse => 'admin_rejected',
+      _ => null,
+    },
+    motif: motif,
+    garde: GardeEchange(
+      jour: DateTime(2026, 10, 24),
+      creneau: CreneauType.nuit,
+    ),
+    expireLe: DateTime(2026, 10, 23, 19),
+    creeLe: DateTime(2026, 10, 4, 8),
+    accepteLe: statut == StatutEchange.ouvert ? null : DateTime(2026, 10, 4, 9),
+    decideLe: statut.terminal ? DateTime(2026, 10, 4, 10) : null,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final maintenant = DateTime(2026, 10, 4, 12);
+    return DevSection(
+      titre: 'ChoixExclusif · RangeeGarde · CarteEchange',
+      note:
+          'Ticket 073. Le choix exclusif se coche (icône, filet de 2, état '
+          '« sélectionné ») ; la rangée de garde dit son sens par le verbe et '
+          'l\'icône, jamais par une flèche ; la carte d\'échange porte la '
+          'marque, l\'icône et le libellé de chacun des huit états.',
+      children: <Widget>[
+        DevSpecimen(
+          nom: 'choix : choisi, libre, inerte avec sa raison',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              ChoixExclusif(
+                icone: Icons.person_outline,
+                titre: AppStrings.echangeCollegue,
+                aide: AppStrings.echangeCollegueAide,
+                choisi: true,
+                onChoisir: () {},
+              ),
+              const SizedBox(height: AppSpacing.entreCibles),
+              ChoixExclusif(
+                icone: Icons.groups_outlined,
+                titre: AppStrings.echangeCaserne,
+                aide: AppStrings.echangeCaserneAide,
+                choisi: false,
+                onChoisir: () {},
+              ),
+              const SizedBox(height: AppSpacing.entreCibles),
+              ChoixExclusif(
+                icone: Icons.swap_horiz,
+                titre: AppStrings.echangeEchanger,
+                choisi: false,
+                onChoisir: null,
+                raisonInerte: AppStrings.echangeAucuneGarde('Chloé C.'),
+              ),
+            ],
+          ),
+        ),
+        DevSpecimen(
+          nom: 'rangées : tu donnes, tu prends',
+          child: Column(
+            children: <Widget>[
+              RangeeGarde(
+                verbe: AppStrings.echangeTuDonnes,
+                sens: SensGarde.donne,
+                jour: DateTime(2026, 10, 27),
+                creneau: CreneauType.jour,
+                debut: '07:00',
+                fin: '19:00',
+              ),
+              const AppDivider(),
+              RangeeGarde(
+                verbe: AppStrings.echangeTuPrends,
+                sens: SensGarde.prend,
+                jour: DateTime(2026, 10, 24),
+                creneau: CreneauType.nuit,
+                debut: '19:00',
+                fin: '07:00',
+              ),
+            ],
+          ),
+        ),
+        DevSpecimen(
+          nom: 'carte d\'échange : les huit états',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              for (final e in <Echange>[
+                _exemple(StatutEchange.ouvert),
+                _exemple(StatutEchange.ouvert, caserne: true),
+                _exemple(StatutEchange.accepteParPair),
+                _exemple(StatutEchange.valide),
+                _exemple(StatutEchange.refuse, motif: 'Équipe complète'),
+                _exemple(StatutEchange.annule),
+                _exemple(StatutEchange.expire),
+                _exemple(StatutEchange.echoue),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: CarteEchange(
+                    echange: e,
+                    moi: 'moi',
+                    heures: HeuresAffichage.defaut,
+                    maintenant: maintenant,
+                  ),
+                ),
+            ],
           ),
         ),
       ],
