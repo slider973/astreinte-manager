@@ -5,7 +5,7 @@
 - **Dépend de** : 070, 071
 - **Branche** : `feat/072-plusieurs-casernes`
 - **PR** : —
-- **Statut** : en cours depuis 2026-10-04
+- **Statut** : terminé le 2026-10-04 (PR créée)
 
 ## Contexte
 
