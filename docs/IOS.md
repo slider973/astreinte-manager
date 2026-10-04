@@ -634,6 +634,186 @@ Swift ; fusionnée en squash ; course verte sur `main` du fork
 ([36707326215](https://github.com/slider973/Foco/actions/runs/36707326215), 0 avertissement) au
 commit `929f313`, visé par le pointeur `foco/`. Build TestFlight **1.0 (106)**.
 
+## 4 octies. Ticket 072 — un pompier dans plusieurs casernes
+
+Chantier iOS du ticket 072 (`design/072-plusieurs-casernes.md`, décisions du propriétaire du
+28 septembre 2026). La référence de comportement est la PWA : `BasculeCaserne`
+(`lib/core/session/bascule_caserne.dart`), le traitement de `?station=` par le routeur, le centre
+filtré (`centre_providers.dart`) et `OubliLocal.casernesQuittees`.
+
+**Contrat** — une seule requête change, comme dans la PWA (`notifications_repository.dart`) :
+
+| Appel Swift | Requête | Côté PWA |
+|---|---|---|
+| `fetchNotifications` | `GET notifications?select=id, station_id, type, title, body, data, read_at, error, created_at&…` | `lister` (`station_id` lu) |
+| `markAllNotificationsRead` | `PATCH notifications?user_id=eq&channel=eq.inapp&read_at=is.null&or=(station_id.eq.<s>,station_id.is.null)&select=id` | `toutMarquerLu(stationId:)` |
+| `acceptInvitation` | `POST functions/v1/accept-invitation`, inchangé ; la réponse est lue : `membership.station_id` | `ResultatAcceptation.stationId` |
+| `fetchMemberships` | inchangée, **relue** avant toute bascule venue d'un push | `appartenancesActivesProvider` |
+
+Aucune colonne, table ni fonction nouvelle. Le lien de l'admin ouvert dans Safari porte
+`?station=<uuid>` : la PWA bascule d'elle-même avant l'écran (`docs/WORKFLOWS.md § 8`).
+
+**Règles, comme la PWA**
+
+- **La caserne d'un message** : `station_id` à la racine du `userInfo` (`PushPayload.station`),
+  sinon `?station=` dans `data.route` (`PushDestination.station(inRoute:)`). Une valeur illisible
+  n'est jamais devinée.
+- **Bascule sur un push d'une autre caserne** (`AppStore.takeRouteRequest`) : les appartenances
+  sont **relues en base** — jamais le cache de l'appareil ; une appartenance **active** là-bas,
+  et l'écran est **décidé avec le rôle de cette caserne-là**, puis l'app bascule : la caserne
+  ouverte ne change jamais pendant la décision. Pas (ou plus) membre actif, caserne inconnue,
+  lecture impossible : pas de bascule, l'accueil, sans message.
+- **Rien de l'ancienne caserne pendant la bascule** (le défaut relevé à l'audit,
+  `AppStore.swift:259-263`) : `open` oublie la saisie, les propositions, les astreintes, le
+  planning et les échanges **avant la première attente** ; `load` lit ensuite la nouvelle
+  caserne et s'arrête si une autre a été ouverte entre-temps (jeton `selection`). Hors ligne, les
+  écrans disent « Réessayer » dans la nouvelle caserne, jamais les données de l'ancienne.
+- **Bandeau** (`StationSwitchBanner`) : « {caserne} est ouverte. » puis la raison (« La
+  notification venait de cette caserne. Tu étais dans {ancienne}. »), « Revenir à {ancienne} » et
+  « Fermer le bandeau ». Huit secondes, **gardé sous VoiceOver**, annoncé sans prendre le focus,
+  au-dessus de l'écran ouvert. « Revenir » rebascule vers l'accueil de l'ancienne caserne, sans
+  nouveau bandeau, et seulement si elle est encore active.
+- **Accès retiré dans la caserne ouverte** (`refreshMemberships`) : bascule vers la première
+  caserne active qui reste, dans l'ordre alphabétique, bandeau « Ton accès à {ancienne} a été
+  désactivé. », **sans « Revenir »**. Aucune ne reste : « Accès désactivé », comme avant.
+- **Invitation acceptée** : `membership.station_id` de la réponse devient la caserne ouverte, sans
+  bandeau (« Tu fais maintenant partie de… » le dit). **Invitations en attente visibles** pour un
+  membre déjà rattaché : une carte par invitation valable sur l'accueil (« {caserne} t'invite »,
+  « Voir l'invitation »), une ligne dans le sélecteur ; une expirée, un échec de lecture : rien
+  sur l'accueil. Relues à l'entrée et au retour au premier plan.
+- **Sélecteur** (`StationButton`, `StationPickerSheet`) : sur l'accueil, à partir de deux
+  casernes actives, la caserne ouverte en toutes lettres et la pastille du **nombre** de non-lues
+  des autres casernes ; la feuille « Changer de caserne » marque l'ouverte par le cercle plein, la
+  coche **et** le mot « Ouverte », lignes de 64 pt, ordre alphabétique, un toucher bascule (sans
+  bandeau, annonce « {caserne} ouverte. »). Le bouton des Réglages reste.
+- **Centre de notifications** : la caserne ouverte et les lignes sans caserne ; la cloche les
+  compte ; une **passerelle** par autre caserne qui a des rappels non lus (« {caserne} · 2 non
+  lues », « Ouvrir ») ; « Tout marquer comme lu » ne marque que ce qui est à l'écran.
+- **Caches d'une caserne quittée** (`LocalWipe.forgetStations`) : dès une lecture **réussie** des
+  appartenances, la file de saisie (`PendingQueueMemory`) d'une caserne désactivée ou absente de
+  la lecture part de l'appareil, et le choix gardé qui la désignait aussi. Une panne de réseau
+  n'efface rien. La déconnexion efface toujours tout (`forgetEverything`).
+
+**Tests** (`FocoTests/MultiStationTests.swift`, 18) : caserne du message (`station_id`,
+`?station=`, valeur illisible) ; bascule sur push avec relecture, bandeau et **aucune donnée de A
+pendant la lecture de B** ; écran décidé avec le rôle de B ; même caserne ou sans caserne : rien ;
+caserne inactive, inconnue ou illisible : l'accueil ; **bascule hors ligne** sans rien de A ;
+« Revenir » ; choix manuel sans bandeau ; A désactivée → B, file de A effacée, celle de B gardée ;
+caserne absente effacée, panne de réseau sans effet ; invitation visible puis rejointe → B ouverte
+sans bandeau ; centre filtré, cloche, non-lues ailleurs, « tout marquer » limité ; contrat ;
+**déconnexion à deux casernes** qui efface les deux files.
+
+**CI** : PR [slider973/Foco#17](https://github.com/slider973/Foco/pull/17). Première course
+[37195005957](https://github.com/slider973/Foco/actions/runs/37195005957) verte (263 tests) mais
+avec un avertissement Swift de test (bac à sable créé dans un argument par défaut) ; corrigé
+(`378a290`), course [37195706808](https://github.com/slider973/Foco/actions/runs/37195706808)
+verte, 263 tests, 0 avertissement ; fusionnée en squash ; course verte sur `main` du fork
+([37196395636](https://github.com/slider973/Foco/actions/runs/37196395636)) au commit `cb5be0c`.
+
+### Écarts de 072 avec la PWA, et pourquoi
+
+- **Pas de bandeau de push au premier plan préfixé** (« CS Ury · Nouvelle astreinte proposée ») :
+  au premier plan, c'est la bannière d'iOS qui s'affiche (066d) ; la bascule a lieu quand on la
+  touche.
+- **Pas de lien `?station=` hors push** : l'app iOS n'ouvre pas d'adresse web (pas de lien
+  universel) ; la caserne vient du message, et `?station=` de sa route si `station_id` manque.
+- **Le sélecteur ne vit que sur l'accueil** et dans les Réglages : pas de titre actionnable, l'app
+  n'a pas d'en-tête de travail sur grand écran.
+- **L'invitation s'ouvre dans un écran de l'app** (la carte et « Rejoindre {caserne} ») plutôt que
+  `/rejoindre/:id` ; mêmes appels.
+
+## 4 nonies. Ticket 073 — échanger ou céder une astreinte
+
+Chantier iOS du ticket 073 (`design/073-echange-astreintes.md`), après celui du 072. **Le pompier
+seulement** : proposer, suivre, annuler, répondre. L'administrateur valide depuis la PWA, seul
+canal de l'admin ; son lien (`/admin/exchanges`) ouvre la PWA dans Safari.
+
+**Contrat** (`foco/Foco/Core/Backend/ExchangesContract.swift`) — exactement les requêtes de
+`lib/features/echanges/data/echanges_repository.dart`, sauf `decide_exchange` (l'admin) :
+
+| Appel Swift | Requête | Côté PWA |
+|---|---|---|
+| `fetchExchanges` | `GET shift_exchanges?select=<Echange.colonnes>&station_id=eq.<s>&or=(status.in.(open,accepted_by_peer),updated_at.gte.<30 j>)&order=created_at.desc&limit=200`, puis les noms (`memberships`, la requête de `_noms`) ; pour un admin, `rpc/exchange_open_to_me` par demande « à la caserne » ouverte qui n'est pas la sienne | `lister` |
+| `fetchColleagues` | `GET memberships?select=user_id, display_name, profiles!inner(first_name, last_name)&station_id=eq&status=eq.active` | `collegues` |
+| `fetchExchangeableShifts` | `POST rpc/exchangeable_shifts_of {p_peer}`, gardées pour la caserne ouverte | `gardesDe` |
+| `requestExchange` | `POST rpc/request_exchange {p_assignment, p_target, p_return_assignment}` (`null` écrits) | `demander` |
+| `respondExchange` | `POST rpc/respond_exchange {p_exchange, p_accept}` | `repondre` |
+| `cancelExchange` | `POST rpc/cancel_exchange {p_exchange}` | `annuler` |
+
+Les réglages (`exchange_auto_approve`, `exchange_deadline_hours`) se lisent dans
+`stations.settings`, par la lecture de la caserne que « Mes astreintes » fait déjà
+(`PlanningContract.decodeStationSettings`) : la même requête que `reglages`, une de moins.
+
+**Parcours** (`ExchangeBoard`, `ExchangeRules`, `Features/Exchanges/`)
+
+- **Proposer** : dans le détail d'un jour, sur une astreinte acceptée d'un planning publié ou
+  validé, à venir, « Proposer un échange » ; absent sur une passée ; grisé avec sa raison écrite
+  (caserne suspendue, hors ligne, échéance passée — l'échéance est **annoncée**, la base la pose).
+  Trois étapes au plus, la garde en tête, le retour recule d'une étape : « À qui ? » (un collègue,
+  recherche au-delà de douze, ou toute la caserne), « Céder ou échanger ? » (collègue seulement ;
+  « Échanger » grisé si le collègue n'a pas de garde à venir, gardes du même créneau écartées),
+  « Vérifie ta demande » (« Tu donnes / Tu prends », « À », validation par le chef ou automatique,
+  échéance). Envoyée : retour à l'astreinte, message passager ; **`notified = 0` se dit**
+  (« Demande enregistrée, mais personne n'a été prévenu… »). Refusée : le récapitulatif reste,
+  la phrase du motif au-dessus.
+- **Suivre** : section « Échanges » en tête de « Mes astreintes » (à valider, puis ouvertes, puis
+  terminées tant que la garde est à venir ; repliée au-delà de trois), mention « Échange en cours »
+  sur la ligne de la garde, carte de la demande à la place du bouton dans le détail du jour. Le
+  détail donne l'état (icône **et** mot), la ligne du lecteur, les gardes et le fil.
+- **Annuler** : pour A, tant que la demande n'est pas validée, derrière une confirmation dont le
+  texte dit qui sera prévenu ; validée entre-temps : « Trop tard : l'échange vient d'être validé. »
+- **Répondre** : « Demandes de collègues · n » en tête des propositions, et « Suivre mes
+  échanges » vers « Mes astreintes ». Le panneau dit « Tu donnes » d'abord pour un échange ;
+  « Accepter la garde », « Accepter l'échange » ou « Je la prends » ; **pas de « Refuser » pour une
+  demande à la caserne** ; **B ne revient pas sur son accord** (« Pour revenir sur ton accord,
+  contacte ton chef de centre. »). Une course perdue est une information et la carte part ; une
+  règle qui refuse reste dans le panneau. Une réponse qui a pu changer une garde relit le planning.
+- **Phrases** : celles de la PWA (`causeEchange`, `issueDemande`, `issueReponse`,
+  `issueAnnulation`), **jamais « ailleurs »** — la base rend « déjà pris sur ce créneau ».
+- **Notifications** : `exchange_requested` est une question (ni rappel ni non-lue, la carte la
+  porte) ; `exchange_accepted`, `_approved`, `_rejected`, `_closed` sont des faits. `/exchanges`
+  ouvre les propositions ; « À traiter » de l'accueil et la tuile des propositions comptent les
+  demandes reçues.
+- **Caserne ouverte** : la liste est celle de la caserne ouverte, oubliée à la bascule (072) et à
+  la déconnexion. **Aucun cache sur l'appareil** (noms de tiers) : rien à brancher dans `LocalWipe`.
+  Relue à l'ouverture des écrans, au retour au premier plan, à un push reçu et après chaque geste ;
+  **rien ne part d'une file locale** : un geste fait sonner un téléphone.
+
+**Tests** (`FocoTests/ExchangeTests.swift`, 27) : contrat figé (colonnes, filtre, fonctions,
+paramètres et `null`), décodage des lignes et des réponses, gardes de la seule caserne ouverte,
+réglages ; causes sans « ailleurs », issues de chaque geste (dont `notified = 0`, courses,
+plafonds, échec), point de vue du lecteur, proposable et raisons, types de notification, liens ;
+lecture à l'entrée, reçues et suivies, proposer (arguments, relecture), à la caserne sans
+personne, hors ligne, répondre (relecture du planning), course perdue, annuler, échecs de
+lecture, drapeau admin, push reçu, **bascule de caserne qui vide les échanges de A**, déconnexion.
+
+**CI** : PR [slider973/Foco#18](https://github.com/slider973/Foco/pull/18). Première course
+[37196427941](https://github.com/slider973/Foco/actions/runs/37196427941) **rouge, non
+volontaire** : trois tests lisaient « Thomas M.. » (double point, voir plus bas), et un
+avertissement d'isolation (`ExchangeableShift.ordered`) ; corrigés (`937bcd1`, `f56059b`), course
+[37197187365](https://github.com/slider973/Foco/actions/runs/37197187365) verte, 291 tests,
+0 avertissement Swift ; fusionnée en squash au commit `c1b75da`, course sur `main` du fork
+verte ([37197977329](https://github.com/slider973/Foco/actions/runs/37197977329), 291 tests, 0 avertissement), visée par le pointeur `foco/`.
+
+### Écarts de 073 avec la PWA, et pourquoi
+
+- **Pas d'écran de l'administrateur** : la file « Échanges » et `decide_exchange` restent dans la
+  PWA (décision 7 du ticket 066).
+- **Le parcours de demande est un écran poussé** avec ses étapes en mémoire (pas d'adresse
+  `?etape=`) : le bouton retour de l'écran recule d'une étape.
+- **Les réglages d'échange** viennent de la lecture de la caserne de « Mes astreintes » plutôt
+  que d'une lecture à part : même requête, une de moins ; tant qu'elle n'est pas faite, les
+  défauts (24 h, validation par le chef), et la base reste juge.
+
+### Écart relevé dans la PWA au 073 (signalé, non corrigé : `lib/` n'est pas touché)
+
+- **Double point après un nom abrégé.** `AppStrings.echangeEnvoyeeA`, `echangeRefusEnvoye`,
+  `echangeInfoValidation` et `echangeDetailRefuseChef` ajoutent un point après le nom ; quand le
+  nom d'usage (`memberships.display_name`) finit par le sien, comme « Marie L. » et « Thomas M. »
+  du seed, la PWA écrit « Demande envoyée à Thomas M.. ». L'app iOS ne
+  l'ajoute pas s'il y est déjà (`FocoStrings.endingSentence`) ; relevé par la première course de
+  la PR, rouge sur trois tests.
+
 ## 5. Déconnexion et caches locaux
 
 La règle de `CLAUDE.md` s'applique à l'app iOS. Un seul point : `LocalWipe`
@@ -642,11 +822,12 @@ trousseau de l'app (la session Supabase), tout le domaine `UserDefaults`, `Cache
 (l'export `.ics`), `Application Support`, le cache HTTP et les cookies.
 
 - `signOut()` fait quatre choses, dans cet ordre :
-  1. **la saisie, le planning et le centre** : `AvailabilityEntry.reset()` arrête minuteurs et
-     envois, pour qu'aucune écriture en vol ne réécrive sa file sur l'appareil après
+  1. **la saisie, le planning, les échanges et le centre** : `AvailabilityEntry.reset()` arrête
+     minuteurs et envois, pour qu'aucune écriture en vol ne réécrive sa file sur l'appareil après
      l'effacement ; `PlanningJourney.reset()` oublie propositions, astreintes, mois lus, noms et
      lien d'abonnement, et fait ignorer toute réponse arrivée après (066c) ;
-     `NotificationInbox.reset()` oublie les notifications (066d) ;
+     `ExchangeBoard.reset()` oublie les demandes d'échange (073) ; `NotificationInbox.reset()`
+     oublie les notifications (066d) ; une caserne en cours de lecture (bascule du 072) s'arrête ;
   2. **le jeton push** (066d) : `PushCenter.forget()` supprime la ligne de `push_tokens` tant que
      la session le permet et que la mémoire du jeton (`PushTokenMemory`, `UserDefaults`) est encore
      là, puis FCM oublie le jeton de l'appareil. Hors ligne, la ligne reste : c'est
@@ -658,6 +839,9 @@ trousseau de l'app (la session Supabase), tout le domaine `UserDefaults`, `Cache
   `foco.dispos.file.<caserne>.<membre>`, 066b).
 - Une appartenance relue de l'appareil revient **toujours en simple membre** (le rôle n'est même
   pas gardé) ; le repli sur ce cache ne couvre qu'une panne réseau, jamais un refus de la base.
+- **Une caserne quittée** (ticket 072) n'attend pas la déconnexion : dès une lecture réussie des
+  appartenances, sa file de saisie et le choix gardé qui la désignait partent
+  (`LocalWipe.forgetStations`, § 4 octies).
 
 ## 6. Vérifier
 
