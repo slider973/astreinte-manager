@@ -555,8 +555,8 @@ wait "$pid_k" "$pid_l" 2>/dev/null || true
 
 verifier "le remplissage pose Cora dans la seconde caserne" "1" \
   "$(sql "select r ->> 'applied' from concurrence_resultats where qui = 'k'")"
-verifier "la validation voit Cora prise ailleurs et échoue" "peer_taken_elsewhere" \
-  "$(sql "select r ->> 'reason_code' from concurrence_resultats where qui = 'l'")"
+verifier "la validation voit Cora prise ailleurs et échoue" "peer_already_assigned|peer_taken_elsewhere" \
+  "$(sql "select (r ->> 'reason_code') || '|' || (r ->> 'detail') from concurrence_resultats where qui = 'l'")"
 verifier "Bilal garde son 5 avril, Cora n'a qu'un 5 avril" "accepted|1" \
   "$(sql "select (select status from assignments where id = '$A7') || '|' ||
                  (select count(*) from assignments a join shifts s on s.id = a.shift_id

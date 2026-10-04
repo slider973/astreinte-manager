@@ -77,11 +77,19 @@ Ticket découpé en chantiers (une PR par chantier) : base, PWA, iOS.
 ## Notes du chantier base (073a, migration `0041`)
 
 - **Règle du 072 « pas pris ailleurs » : branchée** après la fusion de la PR #84.
-  `exchange_rule_check` appelle `member_taken_elsewhere` (`0040`) : code `taken_elsewhere` à la
-  demande et à l'accord, motif `peer_taken_elsewhere` / `requester_taken_elsewhere` à la
-  validation ; une demande à la caserne ne parvient pas à qui est pris ailleurs. `exchange_apply`
+  `exchange_rule_check` appelle `member_taken_elsewhere` (`0040`) : rendu `already_assigned` à la
+  demande et à l'accord, `peer_already_assigned` / `requester_already_assigned` à la validation,
+  le détail « pris ailleurs » au seul `audit_log` ; une demande à la caserne ne parvient pas à qui est pris ailleurs. `exchange_apply`
   prend le verrou consultatif par pompier d'`apply_auto_proposal`, même clé, même ordre (uuid
   trié), après ses propres verrous : course vérifiée à deux sessions.
+- **Suite à faire (RGPD, art. 15)** : l'export `export_own_data` (`0027`) n'inclut ni
+  `shift_exchanges` ni les actes d'administration journalisés sur `requester_id` / `taker_id`
+  (`audit_log` des échanges). À traiter par un ticket `supabase-dev` dédié ; `docs/RGPD.md` § 2.2
+  et § 2 bis décrivent déjà la table et sa conservation.
+- Revue du chantier base : un admin qui est A ou B ne tranche pas sa propre demande sauf s'il est
+  le seul admin actif (`cannot_decide_own_exchange`) ; un nom n'est jamais une adresse ; une demande
+  à la caserne n'est visible que de ceux à qui elle est envoyée ; « pris ailleurs » n'est jamais
+  dit à un pompier (`already_assigned`, détail au seul `audit_log`).
 - Décisions du brief de design retenues en base : B ne revient pas sur son accord ; une demande à
   la caserne ne se décline pas ; B ne donne pas de motif ; l'admin n'annule pas la demande d'un
   pompier ; un plafond dépassé bloque ; échéance de 1 à 168 h, 24 par défaut ; une garde engagée

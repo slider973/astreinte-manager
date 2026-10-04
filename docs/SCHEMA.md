@@ -718,11 +718,16 @@ né d'une réattribution ou d'une annulation de garde par l'administrateur (`ass
 | `rejected` | `peer_declined`, `admin_rejected` (seul cas où `reason` est permise) |
 | `cancelled` | `requester_cancelled` |
 | `expired` | `deadline_reached` |
-| `failed` | `station_suspended`, `assignment_changed`, `assignment_not_accepted`, `return_assignment_not_accepted`, `schedule_not_published`, `requester_not_active`, `peer_not_active`, `peer_already_assigned`, `peer_shift_quota_reached`, `peer_weekend_quota_reached`, `peer_taken_elsewhere`, `requester_already_assigned`, `requester_shift_quota_reached`, `requester_weekend_quota_reached`, `requester_taken_elsewhere` |
+| `failed` | `station_suspended`, `assignment_changed`, `assignment_not_accepted`, `return_assignment_not_accepted`, `schedule_not_published`, `requester_not_active`, `peer_not_active`, `peer_already_assigned`, `peer_shift_quota_reached`, `peer_weekend_quota_reached`, `requester_already_assigned`, `requester_shift_quota_reached`, `requester_weekend_quota_reached` |
 
 `peer_*` parle du repreneur, `requester_*` du demandeur (le second mouvement d'un échange).
-`*_taken_elsewhere` : proposé ou accepté (brouillon compris) sur un créneau qui chevauche dans une
-autre caserne, au sens de `member_taken_elsewhere` (`0040`, ticket 072).
+**« Pris dans une autre caserne » n'a pas de code lisible par un pompier.** `reason_code` est lu
+par A et B (`shift_exchanges_select_party`) et part dans leur notification : un échec pour ce motif
+(`member_taken_elsewhere`, `0040`) y est écrit `peer_already_assigned` /
+`requester_already_assigned` — « déjà sur ce créneau ». Le motif précis, `peer_taken_elsewhere` /
+`requester_taken_elsewhere`, va dans `audit_log.data.detail`, que seuls les administrateurs lisent,
+et dans la clé `detail` de la réponse de `decide_exchange`, appelée par un administrateur. Rien de
+l'agenda d'un collègue dans une autre caserne ne parvient à un pompier.
 
 « Une seule demande ouverte par attribution » : l'index partiel tient la garde **cédée** ; la garde
 **rendue** d'un échange est vérifiée par `request_exchange` sous le verrou des deux attributions.
@@ -975,9 +980,9 @@ Function : l'identité vient de `auth.uid()`, jamais d'un paramètre, et les not
 
 | Fonction | Qui | Rôle |
 |---|---|---|
-| `request_exchange(p_assignment uuid, p_target uuid default null, p_return_assignment uuid default null) returns jsonb` | A | Propose sa garde **`accepted`**, d'un planning publié ou validé, avant l'échéance. `p_target` nul : demande « à la caserne », envoyée aux membres actifs **qui ont déclaré `available`** sur ce créneau et que les règles laissent reprendre ; sinon au collègue désigné. `p_return_assignment` : échange contre une garde **acceptée** de ce collègue (exige `p_target`). Rend `{ok, exchange_id, status: 'open', kind, broadcast, expires_at, notified}` — `notified` est le nombre de destinataires **mis en file** (0 pour une demande à la caserne que personne n'est libre de reprendre). Codes : `assignment_not_found`, `not_member`, `station_suspended`, `swap_requires_target`, `target_is_self`, `target_not_member`, `return_assignment_not_found`, `assignment_not_accepted`, `return_assignment_not_accepted`, `schedule_not_published` (+`status`), `too_late` (+`expires_at`), `exchange_already_open`, et les règles du remplaçant `already_assigned`, `shift_quota_reached`, `weekend_quota_reached`, `taken_elsewhere` avec `who: 'target' \| 'requester'` |
-| `respond_exchange(p_exchange uuid, p_accept boolean default true) returns jsonb` | B | Accepte, ou décline une demande **qui lui est adressée** (une demande à la caserne ne se décline pas : `not_target`, elle s'ignore). B ne donne pas de motif et **ne revient pas sur son accord** (il passe par le chef). Le premier qui accepte une demande à la caserne la prend. Après l'accord : exécution immédiate si `exchange_auto_approve` **et** disponibilité `available` déclarée (pour un échange, chacun sur le créneau qu'il reprend), sinon `exchange_accepted` aux administrateurs. Rend `{ok, exchange_id, status: 'accepted_by_peer' \| 'approved' \| 'rejected', auto_approved}`. Codes : `exchange_not_found`, `not_target`, `station_suspended` (accepter seulement), `exchange_not_open` (+`status`), `exchange_expired`, `not_available`, `already_assigned`, `shift_quota_reached`, `weekend_quota_reached`, `taken_elsewhere`, `exchange_failed` (+`reason_code`) |
-| `decide_exchange(p_exchange uuid, p_approve boolean, p_reason text default null) returns jsonb` | admin | Valide (exécution, ci-dessous) ou refuse, motif facultatif ≤ 500, une demande **`accepted_by_peer`**. Rend `{ok, exchange_id, status: 'approved' \| 'rejected', auto_approved, new_assignment_id, new_return_assignment_id}`. Codes : `exchange_not_found`, `not_admin`, `reason_too_long`, `exchange_not_pending` (+`status`), `exchange_expired`, `exchange_failed` (+`reason_code`) |
+| `request_exchange(p_assignment uuid, p_target uuid default null, p_return_assignment uuid default null) returns jsonb` | A | Propose sa garde **`accepted`**, d'un planning publié ou validé, avant l'échéance. `p_target` nul : demande « à la caserne », envoyée aux membres actifs **qui ont déclaré `available`** sur ce créneau et que les règles laissent reprendre ; sinon au collègue désigné. `p_return_assignment` : échange contre une garde **acceptée** de ce collègue (exige `p_target`). Rend `{ok, exchange_id, status: 'open', kind, broadcast, expires_at, notified}` — `notified` est le nombre de destinataires **mis en file** (0 pour une demande à la caserne que personne n'est libre de reprendre). Codes : `assignment_not_found`, `not_member`, `station_suspended`, `swap_requires_target`, `target_is_self`, `target_not_member`, `return_assignment_not_found`, `assignment_not_accepted`, `return_assignment_not_accepted`, `schedule_not_published` (+`status`), `too_late` (+`expires_at`), `exchange_already_open`, et les règles du remplaçant `already_assigned` (y compris pris dans une autre caserne, jamais dit comme tel), `shift_quota_reached`, `weekend_quota_reached` avec `who: 'target' \| 'requester'` |
+| `respond_exchange(p_exchange uuid, p_accept boolean default true) returns jsonb` | B | Accepte, ou décline une demande **qui lui est adressée** (une demande à la caserne ne se décline pas : `not_target`, elle s'ignore). B ne donne pas de motif et **ne revient pas sur son accord** (il passe par le chef). Le premier qui accepte une demande à la caserne la prend. Après l'accord : exécution immédiate si `exchange_auto_approve` **et** disponibilité `available` déclarée (pour un échange, chacun sur le créneau qu'il reprend), sinon `exchange_accepted` aux administrateurs. Rend `{ok, exchange_id, status: 'accepted_by_peer' \| 'approved' \| 'rejected', auto_approved}`. Codes : `exchange_not_found`, `not_target`, `station_suspended` (accepter seulement), `exchange_not_open` (+`status`), `exchange_expired`, `not_available`, `already_assigned`, `shift_quota_reached`, `weekend_quota_reached`, `exchange_failed` (+`reason_code`) |
+| `decide_exchange(p_exchange uuid, p_approve boolean, p_reason text default null) returns jsonb` | admin | Valide (exécution, ci-dessous) ou refuse, motif facultatif ≤ 500, une demande **`accepted_by_peer`**. Un administrateur **qui est A ou B ne tranche pas sa propre demande** (`cannot_decide_own_exchange`), ni pour valider ni pour refuser, **sauf s'il est le seul administrateur actif** de la caserne ; l'accord du repreneur reste journalisé (`exchange.accepted`) même quand personne d'autre n'est à prévenir. Rend `{ok, exchange_id, status: 'approved' \| 'rejected', auto_approved, new_assignment_id, new_return_assignment_id}`. Codes : `exchange_not_found`, `not_admin`, `reason_too_long`, `exchange_not_pending` (+`status`), `cannot_decide_own_exchange`, `exchange_expired`, `exchange_failed` (+`reason_code`, et `detail` pour un motif que les pompiers ne lisent pas) |
 | `cancel_exchange(p_exchange uuid) returns jsonb` | A | Retire sa demande tant qu'elle n'est pas validée (`open` ou `accepted_by_peer`). **L'administrateur n'annule pas la demande d'un pompier** ; il peut refuser une demande acceptée. Codes : `exchange_not_found`, `exchange_not_open` (+`status`) |
 | `exchangeable_shifts_of(p_peer uuid) returns table (assignment_id, shift_id, station_id, date, slot, expires_at)` | A | Les gardes de B que A peut demander en retour : `accepted`, planning publié ou validé, échéance non passée, **pas engagées dans une demande ouverte**, sur un créneau que A ne tient pas, dans les casernes où A et B sont tous deux actifs. Rien d'autre de B. Vide pour soi-même ou un inconnu. Sans elle, un échange ne se compose pas sur un planning seulement publié : la RLS n'ouvre les attributions des autres que sur un planning validé |
 
@@ -988,10 +993,9 @@ créneau, plafonds `max_shifts` et `max_weekends` du mois **comptés comme `v_me
 même mois serait refusé à qui reste à sa charge. Un plafond dépassé **bloque**, à la demande, à
 l'accord et à la validation. Elles s'appliquent au repreneur, et au demandeur pour le second
 mouvement d'un échange. **Pas pris ailleurs** (ticket 072) : `member_taken_elsewhere`, appelée par
-`exchange_rule_check` — code `taken_elsewhere` à la demande et à l'accord (`who` dit qui), motif
-`peer_taken_elsewhere` / `requester_taken_elsewhere` à la validation. Rien de l'autre caserne ne
-sort : un booléen, et un code. Une demande « à la caserne » ne parvient pas à qui est pris
-ailleurs.
+`exchange_rule_check` — rendu `already_assigned` à la demande et à l'accord, et
+`*_already_assigned` à la validation, le détail allant au seul journal (§ 2.19). Une demande « à la
+caserne » ne parvient pas à qui est pris ailleurs, et ne lui est pas visible.
 
 **L'exécution** (`exchange_apply`, interne, appelée par `decide_exchange` et, en validation
 automatique, par `respond_exchange`) est **tout ou rien** : verrous des plannings, puis **chaque**
@@ -1022,7 +1026,7 @@ la même garde, dans les deux ordres — la seconde arrivée attend, puis refuse
 (`assignment_not_replaceable` ou `exchange_not_pending`), jamais deux titulaires, jamais
 d'interblocage ; **une validation pendant un remplissage automatique d'une autre caserne** sur la
 même personne — la validation attend le verrou du pompier, puis échoue en
-`peer_taken_elsewhere`.
+`peer_already_assigned` (détail `peer_taken_elsewhere` pour l'administrateur).
 
 **Lecture seule (suspension)** : aucune demande ne se crée (`station_suspended`), aucune ne
 s'accepte, et une validation passe `failed` (`station_suspended`). Les clôtures — décliner, annuler,
@@ -1033,6 +1037,11 @@ fuseau de la caserne) moins `exchange_deadline_hours`, posée **à la création*
 réglage ne déplace pas les demandes parties. Pour un échange, la plus proche des deux. Les fonctions
 refusent une demande échue même si la tâche `expire_exchanges` (§ 8) n'est pas encore passée, et la
 closent au passage.
+
+Le nom d'un membre dans les notifications (`exchange_member_name`) est son surnom de caserne, puis
+prénom et nom, puis « Un membre » — **jamais son adresse**. Le début d'un créneau
+(`exchange_shift_start`) est la borne basse de `shift_window` (`0040`) : une seule définition des
+heures réelles d'un créneau.
 
 Fonctions internes, exécution retirée à `public`, `anon` et `authenticated` :
 `station_exchange_auto_approve`, `station_exchange_deadline_hours`, `exchange_shift_start`,
@@ -1457,7 +1466,7 @@ une caserne suspendue passe en lecture seule. Seules exceptions, volontaires : `
 | `subscriptions` | admin de la caserne | service role uniquement (webhook Stripe) |
 | `invitation_rate_events` | admin de la caserne *(migration `0032`)* : il subit le refus, il doit pouvoir en voir la cause | personne — `insert`, `update` et `delete` retirés d'`anon` et d'`authenticated`. La seule main qui écrit est `create_invitation`, en `security definer` |
 | `audit_log` | admin de la caserne | service role et triggers |
-| `shift_exchanges` | membre actif : les siennes, comme demandeur, destinataire désigné ou repreneur, quel qu'en soit l'état ; **une demande « à la caserne » `open` si l'on a déclaré `available` sur son créneau et qu'on ne le tient pas déjà** — les autres membres ne la voient pas ; admin : toutes celles de la caserne *(migration `0041`)* | personne — `insert`, `update`, `delete` retirés à `anon` et `authenticated`. Les écritures passent par les quatre fonctions du § 3 |
+| `shift_exchanges` | membre actif : les siennes, comme demandeur, destinataire désigné ou repreneur, quel qu'en soit l'état ; **une demande « à la caserne » `open` si l'on est de ceux à qui elle est envoyée** — `available` déclaré sur son créneau, pas déjà dessus, plafonds du mois tenus, pas pris ailleurs (`exchange_open_to_me`, `security definer`, ouverte à `authenticated` parce qu'une politique s'évalue sous les droits du lecteur, et ne parlant que de lui) — les autres membres ne la voient pas ; admin : toutes celles de la caserne *(migration `0041`)* | personne — `insert`, `update`, `delete` retirés à `anon` et `authenticated`. Les écritures passent par les quatre fonctions du § 3 |
 | `super_admins` | super-admin | personne (SQL manuel) |
 
 **Depuis la migration `0025`, `is_super_admin()` n'apparaît plus que dans une seule politique

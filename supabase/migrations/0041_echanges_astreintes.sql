@@ -314,8 +314,9 @@ create table shift_exchanges (
   constraint shift_exchanges_reason_admin_only
     check (reason is null or reason_code = 'admin_rejected'),
   -- La liste fermée des motifs, par statut. Une demande ouverte ou validée n'en
-  -- porte aucun. `*_taken_elsewhere` : pris sur un créneau qui chevauche dans
-  -- une autre caserne (ticket 072, `member_taken_elsewhere`).
+  -- porte aucun. « Pris dans une autre caserne » (ticket 072) n'y figure pas :
+  -- A et B lisent ce motif, il devient `*_already_assigned`, et le détail va au
+  -- journal des administrateurs (`audit_log.data.detail`).
   constraint shift_exchanges_reason_code check (
     case status
       when 'open'             then reason_code is null
@@ -335,11 +336,9 @@ create table shift_exchanges (
         'peer_already_assigned',
         'peer_shift_quota_reached',
         'peer_weekend_quota_reached',
-        'peer_taken_elsewhere',
         'requester_already_assigned',
         'requester_shift_quota_reached',
-        'requester_weekend_quota_reached',
-        'requester_taken_elsewhere')
+        'requester_weekend_quota_reached')
     end)
 );
 
@@ -483,39 +482,44 @@ create policy "shift_exchanges_select_party"
     and auth.uid() in (requester_id, target_id, taker_id)
   );
 
--- « À la caserne » : visible des seuls membres actifs **qui ont déclaré une
--- disponibilité `available`** sur ce créneau et ne le tiennent pas déjà, tant
--- qu'elle est ouverte. Les autres ne la voient pas : pas de bruit pour qui
--- n'est pas libre (décision 1 du ticket). Une fois prise, elle sort de leur
--- vue ; le repreneur la garde par la politique précédente.
+-- « À la caserne » : visible **exactement** de ceux à qui elle a été — ou
+-- aurait été — envoyée : membres actifs qui ont déclaré `available` sur ce
+-- créneau et que les règles du remplaçant laissent la reprendre (pas déjà sur
+-- le créneau, plafonds du mois, pas pris ailleurs). Les autres ne la voient pas :
+-- pas de bruit pour qui n'est pas libre (décision 1 du ticket), et pas de
+-- demande visible qu'on ne pourrait pas prendre. Une fois prise, elle sort de
+-- leur vue ; le repreneur la garde par la politique précédente.
 --
--- Les deux sous-requêtes tournent sous la RLS de l'appelant, et c'est voulu :
--- il lit ses propres disponibilités, ses propres attributions et les créneaux
--- d'un planning publié — rien d'autre n'est nécessaire.
+-- Le test est porté par `exchange_open_to_me` : il lit des plafonds et des
+-- attributions que la RLS de l'appelant ne lui montrerait pas, d'où
+-- `security definer`. Il ne parle **que de l'appelant** (`auth.uid()`) : ouvert
+-- à `authenticated` — une politique s'évalue sous les droits de qui lit —, il
+-- n'est un oracle sur personne d'autre. Les fonctions qu'il appelle sont
+-- déclarées plus bas ; plpgsql ne les résout qu'à l'exécution.
+create function exchange_open_to_me(p_station uuid, p_shift uuid, p_requester uuid)
+returns boolean
+language plpgsql stable security definer
+set search_path = public, pg_temp
+as $$
+begin
+  return auth.uid() is not null
+     and p_requester <> auth.uid()
+     and exchange_declared_available(auth.uid(), p_shift)
+     and exchange_rule_check(p_station, auth.uid(), p_shift) is null;
+end $$;
+
+comment on function exchange_open_to_me(uuid, uuid, uuid) is
+  'Vrai si l''appelant est de ceux à qui une demande « à la caserne » sur ce créneau est envoyée : disponibilité available déclarée, et règles du remplaçant tenues (pas déjà sur le créneau, plafonds, pas pris ailleurs). Support de shift_exchanges_select_candidate. Ticket 073.';
+
+revoke execute on function exchange_open_to_me(uuid, uuid, uuid) from public, anon;
+grant  execute on function exchange_open_to_me(uuid, uuid, uuid) to authenticated;
+
 create policy "shift_exchanges_select_candidate"
   on shift_exchanges for select to authenticated
   using (
     target_id is null
     and status = 'open'
-    and requester_id <> auth.uid()
-    and is_member(station_id)
-    and exists (
-      select 1
-        from shifts s
-        join availabilities av
-          on av.station_id = s.station_id
-         and av.date = s.date
-         and av.slot = s.slot
-       where s.id = shift_exchanges.shift_id
-         and av.user_id = auth.uid()
-         and av.status = 'available'
-    )
-    and not exists (
-      select 1 from assignments a
-       where a.shift_id = shift_exchanges.shift_id
-         and a.user_id = auth.uid()
-         and a.status in ('proposed', 'accepted')
-    )
+    and exchange_open_to_me(station_id, shift_id, requester_id)
   );
 
 create policy "shift_exchanges_select_admin"
@@ -526,25 +530,22 @@ create policy "shift_exchanges_select_admin"
 -- 4. Fonctions internes (aucune n'est appelable par un client)
 -- ===========================================================================
 
--- Le début d'un créneau, en instant : le jour commence à `day_start`, la nuit à
--- `day_end`, dans le fuseau de la caserne. Le créneau reste une `date` partout
--- ailleurs (docs/SCHEMA.md, conventions) ; seule l'échéance a besoin d'heure.
+-- Le début d'un créneau, en instant : la borne basse de `shift_window` (0040),
+-- seule définition des heures réelles d'un créneau — le jour commence à
+-- `day_start`, la nuit à `day_end`, dans le fuseau de la caserne. Le créneau
+-- reste une `date` partout ailleurs ; seule l'échéance a besoin d'heure.
 create function exchange_shift_start(p_shift uuid) returns timestamptz
 language sql stable security definer
 set search_path = public, pg_temp
 as $$
-  select (s.date
-          + (case when s.slot = 'day'
-                  then st.settings ->> 'day_start'
-                  else st.settings ->> 'day_end' end)::time)
-         at time zone st.timezone
+  select lower(shift_window(s.date, s.slot, st.timezone, st.settings))
     from shifts s
     join stations st on st.id = s.station_id
    where s.id = p_shift;
 $$;
 
 comment on function exchange_shift_start(uuid) is
-  'Instant de début d''un créneau : date + day_start (jour) ou day_end (nuit), dans le fuseau de la caserne. Ticket 073.';
+  'Instant de début d''un créneau : borne basse de shift_window (0040), dans le fuseau et aux heures de la caserne. Ticket 073.';
 
 -- L'échéance d'une demande sur ce créneau : son début, moins
 -- `exchange_deadline_hours`. Calculée **à la création** et gelée : changer le
@@ -562,8 +563,9 @@ $$;
 comment on function exchange_expires_at(uuid) is
   'Échéance d''une demande d''échange sur un créneau : début du créneau moins settings.exchange_deadline_hours (24 h par défaut). Ticket 073.';
 
--- Le nom d'un membre dans sa caserne : surnom, puis prénom et nom, puis
--- adresse. La même règle que `assignments_notifier_refus` (0039).
+-- Le nom d'un membre dans sa caserne : surnom, puis prénom et nom, puis « Un
+-- membre ». **Jamais l'adresse** : ce nom part dans des notifications lues par
+-- des collègues, et une adresse n'est pas un nom.
 create function exchange_member_name(p_station uuid, p_user uuid) returns text
 language sql stable security definer
 set search_path = public, pg_temp
@@ -571,8 +573,7 @@ as $$
   select coalesce(
            (select coalesce(
                      nullif(btrim(m.display_name), ''),
-                     nullif(btrim(coalesce(pr.first_name, '') || ' ' || coalesce(pr.last_name, '')), ''),
-                     pr.email)
+                     nullif(btrim(coalesce(pr.first_name, '') || ' ' || coalesce(pr.last_name, '')), ''))
               from profiles pr
               left join memberships m
                 on m.station_id = p_station and m.user_id = pr.id
@@ -758,7 +759,10 @@ create function exchange_close(
   p_actor       uuid default null,
   p_reason      text default null,
   p_reference   timestamptz default null,
-  p_channels    text[] default null
+  p_channels    text[] default null,
+  -- Le motif précis, quand `p_reason_code` est volontairement neutre : écrit
+  -- au seul `audit_log`, lu par les seuls administrateurs (« pris ailleurs »).
+  p_detail      text default null
 ) returns shift_exchanges
 language plpgsql
 security definer
@@ -827,6 +831,7 @@ begin
       'target_id',     demande.target_id,
       'taker_id',      demande.taker_id,
       'reason_code',   p_reason_code,
+      'detail',        p_detail,
       'reason',        motif)));
 
   return demande;
@@ -902,6 +907,7 @@ declare
   destinataires   jsonb;
   pl              uuid;
   receveur        uuid;
+  detail          text;
 begin
   select * into demande from shift_exchanges where id = p_exchange;
   select * into cedee   from assignments where id = demande.assignment_id;
@@ -984,11 +990,19 @@ begin
     end if;
   end if;
 
+  -- « Pris ailleurs » ne se dit pas aux pompiers : `reason_code` est lisible
+  -- par A et B (`shift_exchanges_select_party`) et part dans leur notification.
+  -- Ils lisent le motif neutre « déjà sur ce créneau » ; le motif précis va au
+  -- journal, que seuls les administrateurs lisent, et dans la réponse quand
+  -- c'est un administrateur qui valide.
   if code is not null then
-    perform exchange_close(p_exchange, 'failed', code, p_actor);
-    return jsonb_build_object(
+    detail := case when code like '%taken_elsewhere' then code end;
+    code := replace(code, 'taken_elsewhere', 'already_assigned');
+    perform exchange_close(p_exchange, 'failed', code, p_actor, null, null, null, detail);
+    return jsonb_strip_nulls(jsonb_build_object(
       'ok', false, 'code', 'exchange_failed', 'reason_code', code,
-      'exchange_id', p_exchange, 'status', 'failed');
+      'detail', case when not p_auto then detail end,
+      'exchange_id', p_exchange, 'status', 'failed'));
   end if;
 
   -- ------------------------------------------------------------------
@@ -1120,7 +1134,7 @@ revoke execute on function exchange_member_name(uuid, uuid)                    f
 revoke execute on function exchange_rule_check(uuid, uuid, uuid, uuid)         from public, anon, authenticated;
 revoke execute on function exchange_declared_available(uuid, uuid)             from public, anon, authenticated;
 revoke execute on function exchange_payload(uuid)                              from public, anon, authenticated;
-revoke execute on function exchange_close(uuid, exchange_status, text, uuid, text, timestamptz, text[])
+revoke execute on function exchange_close(uuid, exchange_status, text, uuid, text, timestamptz, text[], text)
   from public, anon, authenticated;
 revoke execute on function exchange_lock(uuid)                                 from public, anon, authenticated;
 revoke execute on function exchange_apply(uuid, uuid, boolean)                 from public, anon, authenticated;
@@ -1274,13 +1288,18 @@ begin
   -- Les règles du remplaçant, et celles de A pour un échange.
   -- ------------------------------------------------------------------
   if p_target is not null then
-    code := exchange_rule_check(cedee.station_id, p_target, creneau.id, p_return_assignment);
+    -- `taken_elsewhere` devient `already_assigned` : A n'a pas à apprendre
+    -- qu'un collègue est pris dans une autre caserne (même règle partout côté
+    -- pompier).
+    code := replace(exchange_rule_check(cedee.station_id, p_target, creneau.id, p_return_assignment),
+                    'taken_elsewhere', 'already_assigned');
     if code is not null then
       return jsonb_build_object('ok', false, 'code', code, 'who', 'target');
     end if;
 
     if p_return_assignment is not null then
-      code := exchange_rule_check(cedee.station_id, moi, creneau_rendu.id, p_assignment);
+      code := replace(exchange_rule_check(cedee.station_id, moi, creneau_rendu.id, p_assignment),
+                      'taken_elsewhere', 'already_assigned');
       if code is not null then
         return jsonb_build_object('ok', false, 'code', code, 'who', 'requester');
       end if;
@@ -1444,8 +1463,9 @@ begin
 
   -- Les règles du repreneur : un refus qui le concerne ne clôt pas la demande,
   -- il lui est dit. Il peut décliner, un autre peut la prendre.
-  code := exchange_rule_check(demande.station_id, moi, demande.shift_id,
-                              demande.return_assignment_id);
+  code := replace(exchange_rule_check(demande.station_id, moi, demande.shift_id,
+                                      demande.return_assignment_id),
+                  'taken_elsewhere', 'already_assigned');
   if code is not null then
     return jsonb_build_object('ok', false, 'code', code);
   end if;
@@ -1538,6 +1558,20 @@ begin
   if demande.status <> 'accepted_by_peer' then
     return jsonb_build_object('ok', false, 'code', 'exchange_not_pending',
                               'status', demande.status);
+  end if;
+
+  -- Un administrateur qui est A ou B ne tranche pas sa propre demande — ni
+  -- pour la valider, ni pour la refuser (B se dédirait par cette porte) —,
+  -- **sauf s'il est le seul administrateur actif** : la caserne n'a alors
+  -- personne d'autre, et l'accord de B comme la décision restent journalisés.
+  if moi in (demande.requester_id, demande.taker_id)
+     and exists (
+       select 1 from memberships m
+        where m.station_id = demande.station_id
+          and m.role = 'admin'
+          and m.status = 'active'
+          and m.user_id <> moi) then
+    return jsonb_build_object('ok', false, 'code', 'cannot_decide_own_exchange');
   end if;
 
   if demande.expires_at <= now() then

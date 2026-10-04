@@ -35,6 +35,9 @@
 -- 14. « Pas pris ailleurs » (ticket 072) : un repreneur ou un demandeur
 --     proposé ou accepté sur un créneau qui chevauche dans une autre caserne
 --     est refusé à la demande, à l'accord et à la validation.
+-- 15. Revue : un admin ne tranche pas sa propre demande (sauf seul admin),
+--     un nom n'est jamais une adresse, la visibilité d'une demande à la
+--     caserne est exactement son ciblage, l'heure vient de shift_window.
 --
 -- Les courses à deux sessions réelles (deux repreneurs en même temps ; une
 -- validation pendant une réattribution) sont dans scripts/test_concurrence.sh.
@@ -1073,7 +1076,7 @@ begin
 
   foreach f in array array[
     'public.exchange_apply(uuid, uuid, boolean)',
-    'public.exchange_close(uuid, exchange_status, text, uuid, text, timestamptz, text[])',
+    'public.exchange_close(uuid, exchange_status, text, uuid, text, timestamptz, text[], text)',
     'public.exchange_lock(uuid)',
     'public.exchange_rule_check(uuid, uuid, uuid, uuid)',
     'public.exchange_payload(uuid)',
@@ -1134,10 +1137,20 @@ declare r jsonb;
 begin
   r := decide_exchange((select val from t14 where cle = 'libre'), true);
   perform tests_ech.code(r, 'exchange_failed', 'la validation échoue');
-  perform tests_ech.egal(r ->> 'reason_code', 'peer_taken_elsewhere',
-    'motif peer_taken_elsewhere : Damien est proposé ailleurs sur le même créneau');
+  perform tests_ech.egal(r ->> 'reason_code', 'peer_already_assigned',
+    'motif lisible par A et B : neutre, peer_already_assigned');
+  perform tests_ech.egal(r ->> 'detail', 'peer_taken_elsewhere',
+    'l''administrateur qui valide lit le détail : pris ailleurs');
 end $$;
 reset role;
+select tests_ech.egal((select reason_code from shift_exchanges where id = (select val from t14 where cle = 'libre')),
+  'peer_already_assigned', 'la ligne lue par A et B ne dit pas « ailleurs »');
+select tests_ech.egal((select payload ->> 'reason_code' from notification_outbox
+                        where dedupe_key = 'exchange_closed:' || (select val from t14 where cle = 'libre')),
+  'peer_already_assigned', 'leur notification non plus');
+select tests_ech.egal((select data ->> 'detail' from audit_log
+                        where entity_id = (select val from t14 where cle = 'libre') and action = 'exchange.failed'),
+  'peer_taken_elsewhere', 'le détail est au journal des administrateurs');
 select tests_ech.egal((select status::text from assignments where id = :A1), 'accepted',
   'la garde de Bruno n''a pas bougé');
 
@@ -1148,7 +1161,7 @@ do $$
 declare r jsonb;
 begin
   r := request_exchange('07300000-0000-4000-8000-000000000501', '07300000-0000-4000-8000-000000000103');
-  perform tests_ech.code(r, 'taken_elsewhere', 'demande à un collègue pris ailleurs refusée');
+  perform tests_ech.code(r, 'already_assigned', 'demande à un collègue pris ailleurs refusée, motif neutre');
   perform tests_ech.egal(r ->> 'who', 'target', 'le refus désigne le destinataire');
   perform tests_ech.check(r::text not like '%07300000-0000-4000-8000-000000000002%'
                           and r::text not like '%Voisine%',
@@ -1165,10 +1178,16 @@ select tests_ech.egal(
   format('{%s}', :F), 'à la caserne : Farid seul, Damien pris ailleurs n''est pas sollicité');
 set local role authenticated;
 select tests_ech.qui(:C);
-select tests_ech.code(respond_exchange((select val from t14 where cle = 'caserne')), 'taken_elsewhere',
-  'et s''il la reprend quand même, la règle le refuse');
+select tests_ech.egal((select count(*)::int from shift_exchanges
+                        where id = (select val from t14 where cle = 'caserne')), 0,
+  'et Damien ne la voit pas : visibilité = ciblage');
+select tests_ech.code(respond_exchange((select val from t14 where cle = 'caserne')), 'already_assigned',
+  'et s''il la reprend quand même, la règle le refuse, motif neutre');
+select tests_ech.qui(:F);
+select tests_ech.egal((select count(*)::int from shift_exchanges
+                        where id = (select val from t14 where cle = 'caserne')), 1, 'Farid la voit');
 select tests_ech.qui(:A);
-select cancel_exchange((select val from t14 where cle = 'caserne'));
+select tests_ech.ok(cancel_exchange((select val from t14 where cle = 'caserne')), 'Bruno retire sa demande à la caserne');
 
 -- Le demandeur d'un échange : Bruno tient la nuit du 5 dans la voisine, il ne
 -- peut pas demander la nuit du 5 de Chloé en retour.
@@ -1177,7 +1196,7 @@ declare r jsonb;
 begin
   r := request_exchange('07300000-0000-4000-8000-000000000501', '07300000-0000-4000-8000-000000000102',
                         '07300000-0000-4000-8000-000000000502');
-  perform tests_ech.code(r, 'taken_elsewhere', 'échange refusé : le demandeur est pris ailleurs');
+  perform tests_ech.code(r, 'already_assigned', 'échange refusé : le demandeur est pris ailleurs, motif neutre');
   perform tests_ech.egal(r ->> 'who', 'requester', 'le refus désigne le demandeur');
 end $$;
 
@@ -1201,8 +1220,9 @@ do $$
 declare r jsonb;
 begin
   r := decide_exchange((select val from t14 where cle = 'swap'), true);
-  perform tests_ech.egal(r ->> 'reason_code', 'requester_taken_elsewhere',
-    'un brouillon de la voisine suffit : requester_taken_elsewhere, tout ou rien');
+  perform tests_ech.egal(r ->> 'reason_code', 'requester_already_assigned',
+    'un brouillon de la voisine suffit : requester_already_assigned, tout ou rien');
+  perform tests_ech.egal(r ->> 'detail', 'requester_taken_elsewhere', 'détail pour l''admin');
 end $$;
 reset role;
 select tests_ech.egal((select status::text || '/' || (select status::text from assignments where id = :A2)
@@ -1210,6 +1230,89 @@ select tests_ech.egal((select status::text || '/' || (select status::text from a
   'accepted/accepted', 'aucune des deux gardes n''a bougé');
 drop table t14;
 rollback to savepoint s14;
+
+-- ===========================================================================
+-- 15. Revue : sa propre demande, le nom, la visibilité, l'heure
+-- ===========================================================================
+\echo ''
+\echo '--- 15. Un admin ne tranche pas sa propre demande ; noms ; visibilité = ciblage'
+savepoint s15;
+create temporary table t15 (cle text primary key, val uuid);
+grant all on t15 to authenticated;
+
+-- Nadia, seule administratrice, reprend la garde de Bruno.
+set local role authenticated;
+select tests_ech.qui(:A);
+insert into t15 select 'n', (request_exchange(:A1, :ADM) ->> 'exchange_id')::uuid;
+select tests_ech.qui(:ADM);
+select tests_ech.ok(respond_exchange((select val from t15 where cle = 'n')), 'Nadia accepte');
+reset role;
+select tests_ech.check(exists (select 1 from audit_log
+                                where entity_id = (select val from t15 where cle = 'n')
+                                  and action = 'exchange.accepted' and actor_id = :ADM::uuid),
+  'son accord est journalisé, même sans autre admin à prévenir');
+select tests_ech.egal(tests_ech.nb('exchange_accepted'), 0,
+  'personne d''autre à prévenir : aucune demande exchange_accepted');
+
+savepoint s15a;
+-- Un second administrateur arrive : Nadia ne tranche plus sa propre demande.
+update memberships set role = 'admin' where station_id = :E and user_id = :F;
+set local role authenticated;
+select tests_ech.qui(:ADM);
+select tests_ech.code(decide_exchange((select val from t15 where cle = 'n'), true),
+  'cannot_decide_own_exchange', 'Nadia, repreneuse, ne valide pas avec un autre admin actif');
+select tests_ech.code(decide_exchange((select val from t15 where cle = 'n'), false),
+  'cannot_decide_own_exchange', 'ni ne refuse (elle se dédirait par cette porte)');
+select tests_ech.qui(:F);
+select tests_ech.ok(decide_exchange((select val from t15 where cle = 'n'), true), 'Farid, l''autre admin, valide');
+rollback to savepoint s15a;
+
+set local role authenticated;
+select tests_ech.qui(:ADM);
+select tests_ech.ok(decide_exchange((select val from t15 where cle = 'n'), true),
+  'seule administratrice active : Nadia peut valider');
+reset role;
+select tests_ech.egal((select decided_by from shift_exchanges where id = (select val from t15 where cle = 'n')),
+  :ADM::uuid, 'et c''est tracé');
+
+-- Le nom ne retombe jamais sur l'adresse.
+update memberships set display_name = null where station_id = :E and user_id = :C;
+update profiles set first_name = '', last_name = '' where id = :C;
+select tests_ech.egal(exchange_member_name(:E, :C), 'Un membre', 'sans nom : « Un membre », pas l''adresse');
+select tests_ech.check(exchange_member_name(:E, :C) not like '%@%', 'aucune adresse');
+
+-- Visibilité = ciblage : Farid disponible mais au plafond ne voit ni ne reçoit.
+insert into availability_preferences (station_id, user_id, period_id, max_shifts)
+values (:E, :F, '07300000-0000-4000-8000-000000000201', 1);
+delete from notification_outbox where station_id = :E;
+insert into availabilities (station_id, user_id, date, slot, status, set_by) values
+  (:E, :F, '2029-03-06', 'day', 'available', :F),
+  (:E, :B, '2029-03-06', 'day', 'available', :B);
+set local role authenticated;
+select tests_ech.qui(:C);
+insert into t15 select 'c2', (tests_ech.ok(request_exchange(:A3), 'Damien cherche un remplaçant le 6') ->> 'exchange_id')::uuid;
+select tests_ech.qui(:F);
+select tests_ech.egal((select count(*)::int from shift_exchanges where id = (select val from t15 where cle = 'c2')), 0,
+  'Farid, disponible mais au plafond d''astreintes, ne voit pas la demande');
+select tests_ech.qui(:B);
+select tests_ech.egal((select count(*)::int from shift_exchanges where id = (select val from t15 where cle = 'c2')), 1,
+  'Chloé, disponible et sous plafond, la voit');
+reset role;
+select tests_ech.egal(
+  (select array_agg(r ->> 'user_id')::text from notification_outbox o, jsonb_array_elements(o.recipients) r
+    where o.dedupe_key = 'exchange_requested:' || (select val from t15 where cle = 'c2')),
+  format('{%s}', :B), 'et c''est exactement à qui elle a été envoyée');
+select tests_ech.check(has_function_privilege('authenticated', 'public.exchange_open_to_me(uuid, uuid, uuid)', 'execute')
+                       and not has_function_privilege('anon', 'public.exchange_open_to_me(uuid, uuid, uuid)', 'execute'),
+  'exchange_open_to_me : ouverte à authenticated (support de politique), pas à anon');
+
+-- L'échéance se lit sur shift_window (0040) : une seule définition des heures.
+select tests_ech.check(
+  (select bool_and(exchange_shift_start(s.id) = lower(shift_window(s.date, s.slot, st.timezone, st.settings)))
+     from shifts s join stations st on st.id = s.station_id where s.station_id in (:E, :V)),
+  'exchange_shift_start = début de shift_window, pour chaque créneau');
+drop table t15;
+rollback to savepoint s15;
 
 \echo ''
 \echo '=== Échanges d''astreintes : tous les tests passent ==='

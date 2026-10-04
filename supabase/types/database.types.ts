@@ -1376,6 +1376,7 @@ export type Database = {
         Args: {
           p_actor?: string
           p_channels?: string[]
+          p_detail?: string
           p_exchange: string
           p_reason?: string
           p_reason_code: string
@@ -1456,6 +1457,10 @@ export type Database = {
       exchange_member_name: {
         Args: { p_station: string; p_user: string }
         Returns: string
+      }
+      exchange_open_to_me: {
+        Args: { p_requester: string; p_shift: string; p_station: string }
+        Returns: boolean
       }
       exchange_payload: { Args: { p_exchange: string }; Returns: Json }
       exchange_rule_check: {
