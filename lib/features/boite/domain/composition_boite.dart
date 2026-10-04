@@ -163,7 +163,9 @@ EtatBoite etatBoiteDe({
 final Provider<EtatBoite> etatBoiteProvider = Provider<EtatBoite>(
   (ref) => etatBoiteDe(
     propositions: caserneOuverteSeulement(ref, propositionsControllerProvider),
-    centre: ref.watch(centreNotificationsProvider),
+    // Filtré par la caserne ouverte (ticket 072) : la Boîte est le journal
+    // d'un cadre, pas une vue consolidée.
+    centre: ref.watch(centreCaserneOuverteProvider),
   ),
 );
 

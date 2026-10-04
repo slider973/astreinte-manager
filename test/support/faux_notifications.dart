@@ -26,6 +26,9 @@ class FauxNotificationsRepository implements NotificationsRepository {
   final List<String> marquages = <String>[];
   int marquagesGlobaux = 0;
 
+  /// La caserne passée à chaque « Tout marquer comme lu » (ticket 072).
+  final List<String?> casernesMarquees = <String?>[];
+
   /// L'instant écrit par la base. Fixe, pour que les tests s'y accrochent.
   static final DateTime instantDeLecture = DateTime.utc(2026, 9, 20, 10);
 
@@ -61,14 +64,16 @@ class FauxNotificationsRepository implements NotificationsRepository {
   }
 
   @override
-  Future<int> toutMarquerLu(String userId) async {
+  Future<int> toutMarquerLu(String userId, {String? stationId}) async {
     marquagesGlobaux++;
+    casernesMarquees.add(stationId);
     if (erreurEcriture) throw const FormatException('écriture refusée');
 
     var compte = 0;
     notifications = <NotificationInterne>[
       for (final notification in notifications)
-        if (notification.lue)
+        if (notification.lue ||
+            (stationId != null && !notification.visibleDans(stationId)))
           notification
         else
           () {
@@ -98,6 +103,7 @@ NotificationInterne notification({
   DateTime? creeLe,
   DateTime? lueLe,
   String? erreur,
+  String? stationId,
 }) => NotificationInterne(
   id: id,
   type: type,
@@ -107,4 +113,5 @@ NotificationInterne notification({
   route: route,
   lueLe: lueLe,
   erreur: erreur,
+  stationId: stationId,
 );

@@ -159,6 +159,10 @@ abstract final class AppStrings {
     required int annee,
   }) => '${jour == 1 ? '1er' : jour} ${moisLongs[mois - 1]} $annee';
 
+  /// « 18 octobre ». Une échéance proche, dont l'année va de soi (ticket 072).
+  static String jourEtMois({required int jour, required int mois}) =>
+      '${jour == 1 ? '1er' : jour} ${moisLongs[mois - 1]}';
+
   /// « 15 sept. ». Sans l'année : elle est déjà dans le sélecteur de mois.
   static String dateCourte({required int jour, required int mois}) =>
       '${jour == 1 ? '1er' : jour} ${moisCourts[mois - 1]}';

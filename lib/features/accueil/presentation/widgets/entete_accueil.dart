@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/l10n/app_strings.dart';
+import '../../../../core/session/caserne_choisie.dart';
 import '../../../../core/session/session_providers.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/widgets/bouton_caserne.dart';
 import '../../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../../profil/presentation/widgets/bouton_compte.dart';
 import '../../domain/composition_accueil.dart';
@@ -46,7 +48,7 @@ class EnteteAccueil extends ConsumerWidget {
     );
     final salutation = salutationDe(maintenant);
 
-    return Row(
+    final rangee = Row(
       children: <Widget>[
         if (avecActions) ...<Widget>[
           const BoutonCompte(taille: tailleAvatar),
@@ -85,6 +87,27 @@ class EnteteAccueil extends ConsumerWidget {
           const SizedBox(width: AppSpacing.sm),
           const BoutonNotifications(),
         ],
+      ],
+    );
+
+    // **Le sélecteur de caserne** (ticket 072, `design/072 § 6.1`), sous la
+    // salutation et aligné sur elle, seulement en `compact` et `medium` : dès
+    // `expanded`, c'est le titre de l'en-tête de travail qui le porte. Il ne
+    // se construit qu'à partir de deux casernes actives.
+    if (!avecActions || !ref.watch(plusieursCasernesProvider)) return rangee;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        rangee,
+        const SizedBox(height: AppSpacing.sm),
+        const Padding(
+          padding: EdgeInsets.only(left: tailleAvatar + AppSpacing.md),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: BoutonCaserne.puce(),
+          ),
+        ),
       ],
     );
   }

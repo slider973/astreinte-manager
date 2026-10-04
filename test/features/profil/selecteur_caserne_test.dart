@@ -59,7 +59,7 @@ void main() {
 
       // Un contrôle à un seul choix est un contrôle de trop.
       expect(find.text(AppStrings.profilCaserneChoixTitre), findsNothing);
-      expect(find.byType(RadioListTile<String>), findsNothing);
+      expect(find.byType(Radio<String>), findsNothing);
     });
 
     testWidgets(
@@ -92,7 +92,7 @@ void main() {
       );
 
       expect(find.text(AppStrings.profilCaserneChoixTitre), findsOneWidget);
-      expect(find.byType(RadioListTile<String>), findsNWidgets(2));
+      expect(find.byType(Radio<String>), findsNWidgets(2));
 
       // Sans choix gardé, c'est la première dans l'ordre alphabétique.
       expect(

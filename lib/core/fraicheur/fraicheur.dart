@@ -9,6 +9,7 @@ import '../../features/astreintes/domain/planning_caserne_providers.dart';
 import '../../features/dispos/domain/dispos_providers.dart';
 import '../../features/dispos/presentation/controllers/rafraichissement_periodes.dart';
 import '../../features/dispos/presentation/controllers/saisie_controller.dart';
+import '../../features/invitation/domain/invitation_providers.dart';
 import '../../features/notifications/domain/centre_providers.dart';
 import '../../features/planning/domain/matrice_providers.dart';
 import '../../features/planning/domain/planning_providers.dart';
@@ -50,6 +51,10 @@ enum Donnee {
 
   /// Le suivi du planning publié, côté admin.
   suivi,
+
+  /// Les invitations en attente d'un membre déjà rattaché (ticket 072) : la
+  /// carte de l'accueil. Rien n'en est gardé sur l'appareil.
+  invitations,
 }
 
 /// **Un seul endroit décide des relectures** (ticket 070).
@@ -334,6 +339,15 @@ class Fraicheur {
       case Donnee.periodes:
         // Délégué plus haut, dans `_relire`.
         return Relecture.inchangee;
+
+      case Donnee.invitations:
+        // Auto-disposée, et source secondaire : sans écran qui la montre, on
+        // ne la fait pas naître ; en vie, on la relit sans vider la carte.
+        if (!_ref.exists(invitationsRecuesProvider)) {
+          return Relecture.inchangee;
+        }
+        _ref.invalidate(invitationsRecuesProvider);
+        return Relecture.publiee;
     }
   }
 

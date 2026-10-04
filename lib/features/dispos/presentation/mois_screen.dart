@@ -240,6 +240,8 @@ class _MoisScreenState extends ConsumerState<MoisScreen>
     final destinations = ref.watch(destinationsProvider);
 
     return AppScaffold(
+      // Sur grand écran, le nom de la caserne devient le sélecteur (072).
+      selecteurCaserne: true,
       titre: AppStrings.navCalendrier,
       destinations: destinations,
       indexSelectionne: indexDestination(

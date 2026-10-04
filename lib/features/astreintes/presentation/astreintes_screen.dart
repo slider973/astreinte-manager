@@ -136,6 +136,8 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
     final destinations = ref.watch(destinationsProvider);
 
     return AppScaffold(
+      // Sur grand écran, le nom de la caserne devient le sélecteur (072).
+      selecteurCaserne: true,
       // Le titre suit la portée : la barre d'application est ce qu'un lecteur
       // d'écran annonce en arrivant, et « Mes astreintes » serait faux de
       // l'autre côté du sélecteur.

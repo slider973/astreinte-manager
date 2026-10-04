@@ -77,6 +77,7 @@ class NotificationInterne {
     this.periode,
     this.lueLe,
     this.erreur,
+    this.stationId,
   });
 
   final String id;
@@ -106,7 +107,16 @@ class NotificationInterne {
   /// son contenu est un motif technique, jamais montré au membre.
   final String? erreur;
 
+  /// `station_id` : la caserne de la notification, `null` pour une ligne
+  /// rattachée au compte (ticket 072). La Boîte ne montre que la caserne
+  /// ouverte et les lignes sans caserne (`design/072 § 6.6`).
+  final String? stationId;
+
   bool get lue => lueLe != null;
+
+  /// Vrai si la ligne se montre quand [ouverte] est la caserne ouverte.
+  bool visibleDans(String? ouverte) =>
+      stationId == null || stationId == ouverte;
 
   /// Vrai quand cette ligne s'affiche dans l'onglet « Rappels » de la Boîte.
   /// Voir [TypeNotification.estProposition] pour les deux exclues et pourquoi.
@@ -125,6 +135,7 @@ class NotificationInterne {
     periode: periode,
     lueLe: instant,
     erreur: erreur,
+    stationId: stationId,
   );
 
   /// Lit une ligne PostgREST.
@@ -148,6 +159,9 @@ class NotificationInterne {
       periode: _texte(carte['period']),
       lueLe: _instant(ligne['read_at']),
       erreur: _texte(ligne['error']),
+      // La colonne d'abord ; `data.station_id` pour une ligne qui ne
+      // porterait que lui (`docs/WORKFLOWS.md § 8`).
+      stationId: _texte(ligne['station_id']) ?? _texte(carte['station_id']),
     );
   }
 
@@ -173,7 +187,8 @@ class NotificationInterne {
       other.route == route &&
       other.periode == periode &&
       other.lueLe == lueLe &&
-      other.erreur == erreur;
+      other.erreur == erreur &&
+      other.stationId == stationId;
 
   @override
   int get hashCode => Object.hash(
@@ -186,6 +201,7 @@ class NotificationInterne {
     periode,
     lueLe,
     erreur,
+    stationId,
   );
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../data/notifications_repository.dart';
@@ -57,13 +58,42 @@ class EtatCentre {
     ]),
   );
 
-  /// Toutes les lignes marquées lues à [instant].
-  EtatCentre toutesLues(DateTime instant) => EtatCentre(
+  /// Les lignes marquées lues à [instant] — toutes, ou celles que la Boîte
+  /// montre dans la caserne [ouverte] (ticket 072).
+  EtatCentre toutesLues(
+    DateTime instant, {
+    bool Function(NotificationInterne)? si,
+  }) => EtatCentre(
     notifications: List<NotificationInterne>.unmodifiable(<NotificationInterne>[
       for (final existante in notifications)
-        if (existante.lue) existante else existante.avecLecture(instant),
+        if (existante.lue || !(si?.call(existante) ?? true))
+          existante
+        else
+          existante.avecLecture(instant),
     ]),
   );
+
+  /// **Ce que la Boîte montre dans la caserne [ouverte]** (ticket 072) : ses
+  /// lignes, et celles rattachées au compte. Les autres casernes ont leur
+  /// passerelle, jamais leurs lignes.
+  EtatCentre pourCaserne(String? ouverte) => EtatCentre(
+    notifications: List<NotificationInterne>.unmodifiable(<NotificationInterne>[
+      for (final notification in notifications)
+        if (notification.visibleDans(ouverte)) notification,
+    ]),
+  );
+
+  /// Les rappels non lus **des autres casernes**, par identifiant de caserne.
+  Map<String, int> nonLuesAilleurs(String? ouverte) {
+    final comptes = <String, int>{};
+    for (final notification in notifications) {
+      final caserne = notification.stationId;
+      if (caserne == null || caserne == ouverte) continue;
+      if (notification.lue || !notification.estRappel) continue;
+      comptes[caserne] = (comptes[caserne] ?? 0) + 1;
+    }
+    return comptes;
+  }
 }
 
 /// Le centre de notifications du membre connecté.
@@ -145,16 +175,31 @@ class CentreNotificationsController extends AsyncNotifier<EtatCentre> {
   }
 
   /// Marque lues toutes les non-lues. Rend faux si la base a refusé.
+  ///
+  /// **Seulement ce qui est à l'écran** (ticket 072) : la caserne ouverte et
+  /// les lignes sans caserne. Jamais l'autre caserne en silence.
   Future<bool> toutMarquerLu() async {
     final etat = state.value;
     final userId = ref.read(sessionProvider).value?.userId;
-    if (etat == null || userId == null || etat.nonLues == 0) return true;
+    final ouverte = ref.read(caserneOuverteIdProvider);
+    if (etat == null ||
+        userId == null ||
+        etat.pourCaserne(ouverte).nonLues == 0) {
+      return true;
+    }
 
     final avant = etat;
-    state = AsyncValue<EtatCentre>.data(etat.toutesLues(DateTime.now()));
+    state = AsyncValue<EtatCentre>.data(
+      etat.toutesLues(
+        DateTime.now(),
+        si: (NotificationInterne n) => n.visibleDans(ouverte),
+      ),
+    );
 
     try {
-      await ref.read(notificationsRepositoryProvider).toutMarquerLu(userId);
+      await ref
+          .read(notificationsRepositoryProvider)
+          .toutMarquerLu(userId, stationId: ouverte);
       return true;
     } on Object {
       if (ref.mounted) state = AsyncValue<EtatCentre>.data(avant);
@@ -175,6 +220,29 @@ centreNotificationsProvider =
 /// Un provider dérivé plutôt qu'un `select` sur place : la barre
 /// d'application ne se reconstruit que quand le **compte** change, pas à
 /// chaque relecture de la liste.
+///
+/// **La caserne ouverte seulement**, plus les lignes sans caserne (ticket
+/// 072) : les non-lues des autres casernes vont au sélecteur de caserne.
 final Provider<int> notificationsNonLuesProvider = Provider<int>(
-  (ref) => ref.watch(centreNotificationsProvider).value?.nonLues ?? 0,
+  (ref) => ref.watch(centreCaserneOuverteProvider).value?.nonLues ?? 0,
 );
+
+/// Le centre **tel que la Boîte le montre** : la caserne ouverte et les lignes
+/// rattachées au compte (ticket 072, `design/072 § 6.6`). Les comptes par
+/// caserne sortent de la même lecture, sans requête nouvelle.
+final Provider<AsyncValue<EtatCentre>> centreCaserneOuverteProvider =
+    Provider<AsyncValue<EtatCentre>>((ref) {
+      final ouverte = ref.watch(caserneOuverteIdProvider);
+      return ref
+          .watch(centreNotificationsProvider)
+          .whenData((EtatCentre etat) => etat.pourCaserne(ouverte));
+    });
+
+/// Les rappels non lus des **autres** casernes, par caserne : la pastille du
+/// sélecteur, ses lignes, et les passerelles de la Boîte.
+final Provider<Map<String, int>> nonLuesAilleursProvider =
+    Provider<Map<String, int>>((ref) {
+      final ouverte = ref.watch(caserneOuverteIdProvider);
+      final etat = ref.watch(centreNotificationsProvider).value;
+      return etat?.nonLuesAilleurs(ouverte) ?? const <String, int>{};
+    });

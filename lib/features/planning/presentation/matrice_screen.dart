@@ -625,6 +625,8 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen>
     final compact = AppWindowClass.of(context).estCompact;
 
     return AppScaffold(
+      // Sur grand écran, le nom de la caserne devient le sélecteur (072).
+      selecteurCaserne: true,
       titre: AppStrings.matriceTitre,
       // Sur grand écran, l'en-tête de la zone de travail porte le nom de la
       // caserne : le titre de l'écran, lui, est le mois, et il vit dans le
