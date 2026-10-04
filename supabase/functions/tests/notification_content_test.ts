@@ -19,6 +19,7 @@ import {
   lireCreneaux,
   lirePeriode,
   listerCreneaux,
+  MOTIFS_ECHEC_ECHANGE,
   regrouper,
   routePour,
   TOUS_LES_TYPES,
@@ -487,5 +488,185 @@ Deno.test("les deux types d'abonnement partent par courriel, pas en push", () =>
     assertEquals(CANAUX_PAR_DEFAUT[type], ["email", "inapp"]);
     assert(!CANAUX_PAR_DEFAUT[type].includes("push"), `${type} ne part pas en push`);
     assert(!TYPES_REGROUPES.has(type), `${type} décrit un fait unique`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Échanges d'astreintes — ticket 073, migration 0041
+// ---------------------------------------------------------------------------
+
+const ECHANGE = {
+  exchange_id: "e1",
+  period: "2026-10",
+  shifts: [{ date: "2026-10-12", slot: "night" }],
+  requester_name: "Bruno B.",
+  taker_name: "Damien D.",
+};
+
+Deno.test("échange : cession à un collègue, le titre porte la date et le corps le geste", () => {
+  const contenu = construireContenu(
+    "exchange_requested",
+    { ...ECHANGE, kind: "give", broadcast: false },
+    CASERNE,
+  );
+  assertEquals(contenu.titre, "Astreinte à reprendre : 12 octobre, nuit");
+  assertEquals(
+    contenu.corps,
+    "Bruno B. te propose de reprendre l'astreinte du lundi 12 octobre, de nuit. " +
+      "Accepte ou décline depuis l'application.",
+  );
+  assertEquals(contenu.route, "/exchanges");
+});
+
+Deno.test("échange : à la caserne, le texte dit pourquoi on le reçoit", () => {
+  const contenu = construireContenu(
+    "exchange_requested",
+    { ...ECHANGE, kind: "give", broadcast: true, taker_name: undefined },
+    CASERNE,
+  );
+  assertEquals(contenu.titre, "Remplaçant cherché : 12 octobre, nuit");
+  assertStringIncludes(contenu.corps, "Tu t'es déclaré disponible");
+  assertStringIncludes(contenu.corps, "le premier qui accepte");
+});
+
+Deno.test("échange : un échange nomme les deux gardes", () => {
+  const contenu = construireContenu(
+    "exchange_requested",
+    {
+      ...ECHANGE,
+      kind: "swap",
+      broadcast: false,
+      return_shift: { date: "2026-10-13", slot: "day" },
+    },
+    CASERNE,
+  );
+  assertEquals(contenu.titre, "Échange proposé : 12 octobre, nuit");
+  assertStringIncludes(contenu.corps, "lundi 12 octobre, de nuit");
+  assertStringIncludes(contenu.corps, "contre ta garde du mardi 13 octobre, de jour");
+});
+
+Deno.test("échange : l'accord du repreneur part vers la file de l'administrateur", () => {
+  const contenu = construireContenu("exchange_accepted", { ...ECHANGE, kind: "give" }, CASERNE);
+  assertEquals(contenu.titre, "Échange à valider : 12 octobre, nuit");
+  assertStringIncludes(contenu.corps, "Damien D. reprend l'astreinte du lundi 12 octobre");
+  assertStringIncludes(contenu.corps, "de Bruno B.");
+  assertEquals(contenu.route, "/admin/exchanges");
+});
+
+Deno.test("échange validé : le pompier va au planning, l'admin informé à sa file", () => {
+  const membre = construireContenu(
+    "exchange_approved",
+    { ...ECHANGE, kind: "give", audience: "member", auto_approved: false },
+    CASERNE,
+  );
+  assertEquals(membre.titre, "Échange validé : 12 octobre, nuit");
+  assertEquals(membre.route, "/schedule/2026-10");
+  assertStringIncludes(membre.corps, "Damien D. tient désormais");
+
+  const admin = construireContenu(
+    "exchange_approved",
+    { ...ECHANGE, kind: "give", audience: "admin", auto_approved: true },
+    CASERNE,
+  );
+  assertEquals(admin.titre, "Échange validé automatiquement : 12 octobre, nuit");
+  assertStringIncludes(admin.corps, "tu n'as rien à faire");
+  assertEquals(admin.route, "/admin/exchanges");
+
+  const echange = construireContenu(
+    "exchange_approved",
+    {
+      ...ECHANGE,
+      kind: "swap",
+      audience: "member",
+      return_shift: { date: "2026-10-13", slot: "day" },
+    },
+    CASERNE,
+  );
+  assertStringIncludes(echange.corps, "et Bruno B. celle du mardi 13 octobre, de jour");
+});
+
+Deno.test("échange refusé : par le collègue ou par le chef, avec son motif", () => {
+  const decline = construireContenu(
+    "exchange_rejected",
+    { ...ECHANGE, outcome: "rejected", reason_code: "peer_declined" },
+    CASERNE,
+  );
+  assertEquals(decline.titre, "Échange décliné : 12 octobre, nuit");
+  assertStringIncludes(decline.corps, "Tu gardes cette astreinte");
+
+  const refus = construireContenu(
+    "exchange_rejected",
+    {
+      ...ECHANGE,
+      outcome: "rejected",
+      reason_code: "admin_rejected",
+      reason: "formation ce jour-là",
+    },
+    CASERNE,
+  );
+  assertEquals(refus.titre, "Échange refusé : 12 octobre, nuit");
+  assertStringIncludes(refus.corps, "Motif : formation ce jour-là.");
+  assertEquals(refus.route, "/exchanges");
+});
+
+Deno.test("échange clos : expiré, retiré, impossible — rien ne change dans le planning", () => {
+  const expire = construireContenu("exchange_closed", { ...ECHANGE, outcome: "expired" }, CASERNE);
+  assertEquals(expire.titre, "Demande d'échange expirée : 12 octobre, nuit");
+  assertStringIncludes(expire.corps, "Bruno B. garde cette astreinte");
+
+  const retire = construireContenu(
+    "exchange_closed",
+    { ...ECHANGE, outcome: "cancelled" },
+    CASERNE,
+  );
+  assertEquals(retire.titre, "Demande d'échange retirée : 12 octobre, nuit");
+
+  const echec = construireContenu(
+    "exchange_closed",
+    { ...ECHANGE, outcome: "failed", reason_code: "peer_shift_quota_reached" },
+    CASERNE,
+  );
+  assertEquals(echec.titre, "Échange impossible : 12 octobre, nuit");
+  assertStringIncludes(echec.corps, "plafond d'astreintes");
+  assertStringIncludes(echec.corps, "Rien ne change dans le planning");
+  assertEquals(echec.route, "/exchanges");
+});
+
+Deno.test("échange : chaque motif d'échec de la liste fermée a sa phrase", () => {
+  // La liste de la contrainte `shift_exchanges_reason_code` (migration 0041),
+  // statut `failed`. Un code ajouté là sans phrase ici rendrait un texte nu.
+  const liste = [
+    "station_suspended",
+    "assignment_changed",
+    "assignment_not_accepted",
+    "return_assignment_not_accepted",
+    "schedule_not_published",
+    "requester_not_active",
+    "peer_not_active",
+    "peer_already_assigned",
+    "peer_shift_quota_reached",
+    "peer_weekend_quota_reached",
+    "peer_taken_elsewhere",
+    "requester_already_assigned",
+    "requester_shift_quota_reached",
+    "requester_weekend_quota_reached",
+    "requester_taken_elsewhere",
+  ];
+  assertEquals(Object.keys(MOTIFS_ECHEC_ECHANGE).sort(), [...liste].sort());
+});
+
+Deno.test("échange : aucun type d'échange n'est regroupé ni critique", () => {
+  for (
+    const type of [
+      "exchange_requested",
+      "exchange_accepted",
+      "exchange_approved",
+      "exchange_rejected",
+      "exchange_closed",
+    ] as const
+  ) {
+    assert(!TYPES_REGROUPES.has(type), `${type} décrit un fait unique`);
+    assert(!TYPES_CRITIQUES.has(type), `${type} reste désactivable`);
+    assertEquals(CANAUX_PAR_DEFAUT[type], ["push", "inapp"]);
   }
 });
