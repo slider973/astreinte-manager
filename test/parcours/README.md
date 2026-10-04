@@ -4,7 +4,8 @@ Ticket 035. Un mois d'astreintes suivi d'un bout à l'autre : l'administrateur i
 la recrue accepte, elle saisit son mois, l'administrateur construit le planning et le
 publie, la recrue refuse un créneau et en accepte un autre — et le retrouve sur son accueil
 sans passer par l'onglet Astreintes (ticket 070) —, l'administrateur réattribue, le second
-pompier accepte, le planning se valide tout seul.
+pompier accepte, le planning se valide tout seul — puis la recrue cède sa nuit au second pompier,
+qui l'accepte, et l'administrateur valide la cession (ticket 073).
 
 Le parcours existe en **deux exemplaires**, qui suivent le même fil par deux côtés :
 

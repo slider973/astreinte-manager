@@ -40,6 +40,14 @@
 //     le planning est validé ou archivé.
 //   - `station_access` (0024, rejoué au ticket 070) : le statut de la caserne
 //     et son droit d'écrire, lus par tous les écrans qui écrivent.
+//   - Les échanges d'astreintes (0041, ticket 073) : `request_exchange` sur
+//     une garde `accepted` d'un planning publié ou validé, une seule demande
+//     ouverte par garde ; `respond_exchange` par le destinataire, qui passe la
+//     demande `accepted_by_peer` et prévient les administrateurs ;
+//     `decide_exchange` qui exécute en tout ou rien — le repreneur naît
+//     `accepted`, l'ancienne garde passe `replaced` avec `replaced_by`, puis
+//     `schedule_reevaluer`. Les règles fines (plafonds, échéance, pris
+//     ailleurs, courses) sont éprouvées en SQL (`echanges_test.sql`).
 //
 // Ce qui n'est **pas** rejoué est dit une fois : la RLS. Elle est éprouvée là
 // où elle vit, en SQL (`supabase/tests/`, `scripts/test_rls.sh`), et la
@@ -61,6 +69,8 @@ import 'package:astreinte_sp/features/dispos/domain/creneau_cle.dart';
 import 'package:astreinte_sp/features/dispos/domain/disponibilite_mois.dart';
 import 'package:astreinte_sp/features/dispos/domain/periode_saisie.dart';
 import 'package:astreinte_sp/features/dispos/domain/preferences_mois.dart';
+import 'package:astreinte_sp/features/echanges/data/echanges_repository.dart';
+import 'package:astreinte_sp/features/echanges/domain/echange.dart';
 import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart';
 import 'package:astreinte_sp/features/invitation/domain/acceptation.dart';
 import 'package:astreinte_sp/features/invitation/domain/invitation_recue.dart';
@@ -226,8 +236,7 @@ class BackendMemoire {
          annee: annee,
          mois: mois,
          statut: PeriodeEtat.ouverte,
-         dateLimite:
-             dateLimite ?? DateTime.now().add(const Duration(days: 7)),
+         dateLimite: dateLimite ?? DateTime.now().add(const Duration(days: 7)),
        );
 
   final String stationId;
@@ -340,10 +349,11 @@ class BackendMemoire {
     return null;
   }
 
-  List<AttributionMemoire> attributionsDe(String creneauId) => <AttributionMemoire>[
-    for (final attribution in attributions)
-      if (attribution.creneauId == creneauId) attribution,
-  ];
+  List<AttributionMemoire> attributionsDe(String creneauId) =>
+      <AttributionMemoire>[
+        for (final attribution in attributions)
+          if (attribution.creneauId == creneauId) attribution,
+      ];
 
   AttributionMemoire? attributionParId(String id) {
     for (final attribution in attributions) {
@@ -384,9 +394,9 @@ class BackendMemoire {
   /// attributions acceptées**.
   bool get _complet {
     for (final creneau in creneaux) {
-      final acceptees = attributionsDe(
-        creneau.id,
-      ).where((AttributionMemoire a) => a.etat == AttributionEtat.accepte).length;
+      final acceptees = attributionsDe(creneau.id)
+          .where((AttributionMemoire a) => a.etat == AttributionEtat.accepte)
+          .length;
       if (acceptees < creneau.effectifRequis) return false;
     }
     return true;
@@ -470,6 +480,42 @@ class BackendMemoire {
   );
 
   CaserneRepository get caserneRepository => _CaserneMemoire(this);
+
+  /// `shift_exchanges` (migration 0041, ticket 073).
+  final List<EchangeMemoire> echanges = <EchangeMemoire>[];
+
+  /// Le dépôt d'échanges **d'une session donnée** : `auth.uid()` décide de
+  /// qui demande, répond ou tranche.
+  EchangesRepository echangesDe(String userId) =>
+      _EchangesMemoire(this, userId);
+}
+
+/// Une ligne de `shift_exchanges`.
+class EchangeMemoire {
+  EchangeMemoire({
+    required this.id,
+    required this.demandeurId,
+    required this.attributionId,
+    required this.creneauId,
+    required this.creeLe,
+    required this.expireLe,
+    this.cibleId,
+  });
+
+  final String id;
+  final String demandeurId;
+  final String attributionId;
+  final String creneauId;
+  final String? cibleId;
+  final DateTime creeLe;
+  final DateTime expireLe;
+
+  StatutEchange statut = StatutEchange.ouvert;
+  String? repreneurId;
+  String? nouvelleAttributionId;
+  String? decideurId;
+  DateTime? accepteLe;
+  DateTime? decideLe;
 }
 
 // ===========================================================================
@@ -483,20 +529,24 @@ class _MembresMemoire implements MembresRepository {
 
   @override
   Future<List<MembreCaserne>> membres(String stationId) async {
-    final liste = <MembreCaserne>[
-      for (final membre in _base.membres)
-        if (membre.statut != StatutMembre.invite)
-          MembreCaserne(
-            id: membre.membershipId,
-            userId: membre.userId,
-            role: membre.role,
-            statut: membre.statut,
-            prenom: membre.prenom,
-            nom: membre.nom,
-            email: membre.email,
-            nomAffiche: membre.nomAffiche,
-          ),
-    ]..sort((MembreCaserne a, MembreCaserne b) => a.cleDeTri.compareTo(b.cleDeTri));
+    final liste =
+        <MembreCaserne>[
+          for (final membre in _base.membres)
+            if (membre.statut != StatutMembre.invite)
+              MembreCaserne(
+                id: membre.membershipId,
+                userId: membre.userId,
+                role: membre.role,
+                statut: membre.statut,
+                prenom: membre.prenom,
+                nom: membre.nom,
+                email: membre.email,
+                nomAffiche: membre.nomAffiche,
+              ),
+        ]..sort(
+          (MembreCaserne a, MembreCaserne b) =>
+              a.cleDeTri.compareTo(b.cleDeTri),
+        );
     return List<MembreCaserne>.unmodifiable(liste);
   }
 
@@ -569,9 +619,7 @@ class _MembresMemoire implements MembresRepository {
       }
 
       final existante = _base.invitations
-          .where(
-            (InvitationMemoire i) => i.enAttente && i.email == email,
-          )
+          .where((InvitationMemoire i) => i.enAttente && i.email == email)
           .toList(growable: false);
       if (existante.isNotEmpty) {
         // Une invitation qui court encore est **renvoyée**, pas dupliquée.
@@ -602,8 +650,7 @@ class _MembresMemoire implements MembresRepository {
       // L'**appartenance**, elle, n'arrive qu'à l'acceptation : la personne
       // existe, elle n'est pas encore de la caserne.
       if (_base.membreParEmail(email) == null) {
-        final identite =
-            _base.annuaire[email] ?? (prenom: '', nom: '');
+        final identite = _base.annuaire[email] ?? (prenom: '', nom: '');
         _base.membres.add(
           MembreMemoire(
             membershipId: _base._id('m'),
@@ -631,10 +678,8 @@ class _MembresMemoire implements MembresRepository {
   }
 
   @override
-  Future<void> annuler(String invitationId) async =>
-      _base.invitations.removeWhere(
-        (InvitationMemoire i) => i.id == invitationId,
-      );
+  Future<void> annuler(String invitationId) async => _base.invitations
+      .removeWhere((InvitationMemoire i) => i.id == invitationId);
 
   @override
   Future<void> changerRole({
@@ -656,9 +701,7 @@ class _MembresMemoire implements MembresRepository {
 
   MembreMemoire _membre(String membershipId) => _base.membres.firstWhere(
     (MembreMemoire m) => m.membershipId == membershipId,
-    orElse: () => throw const EchecAdministration(
-      ErreurAdministration.refusee,
-    ),
+    orElse: () => throw const EchecAdministration(ErreurAdministration.refusee),
   );
 }
 
@@ -739,10 +782,7 @@ class _InvitationMemoire implements InvitationRepository {
           caserne: caserne,
         );
       }
-      throw EchecAcceptation(
-        ErreurAcceptation.dejaAcceptee,
-        caserne: caserne,
-      );
+      throw EchecAcceptation(ErreurAcceptation.dejaAcceptee, caserne: caserne);
     }
 
     if (invitation.expireLe.isBefore(_base.horloge())) {
@@ -799,7 +839,8 @@ class _DisposMemoire implements DisposRepository {
     required int annee,
     required int mois,
   }) async {
-    final carte = _base.dispos[userId] ?? const <CreneauCle, DisponibiliteEtat>{};
+    final carte =
+        _base.dispos[userId] ?? const <CreneauCle, DisponibiliteEtat>{};
     return <CreneauCle, DisponibiliteEtat>{
       for (final entree in carte.entries)
         if (entree.key.date.year == annee && entree.key.date.month == mois)
@@ -895,11 +936,14 @@ class _MatriceMemoire implements MatriceRepository {
     final jours = _base.periode.nombreDeJours;
     final charges = _charges();
 
-    final lignes = <LigneMatrice>[
-      for (final membre in _base.membres)
-        if (membre.actif)
-          _ligne(membre, jours, charges[membre.userId]),
-    ]..sort((LigneMatrice a, LigneMatrice b) => a.nomAffiche.compareTo(b.nomAffiche));
+    final lignes =
+        <LigneMatrice>[
+          for (final membre in _base.membres)
+            if (membre.actif) _ligne(membre, jours, charges[membre.userId]),
+        ]..sort(
+          (LigneMatrice a, LigneMatrice b) =>
+              a.nomAffiche.compareTo(b.nomAffiche),
+        );
     return List<LigneMatrice>.unmodifiable(lignes);
   }
 
@@ -934,15 +978,13 @@ class _MatriceMemoire implements MatriceRepository {
   /// L'alphabet de `availability_matrix` : `.`, `D`, `A`, et leurs minuscules
   /// quand un administrateur a saisi à la place du membre.
   String _chaine(String userId, int jours, CreneauType creneau) {
-    final carte = _base.dispos[userId] ?? const <CreneauCle, DisponibiliteEtat>{};
+    final carte =
+        _base.dispos[userId] ?? const <CreneauCle, DisponibiliteEtat>{};
     final auteurs = _base.auteursDispos[userId] ?? const <CreneauCle, String>{};
     final tampon = StringBuffer();
 
     for (var jour = 1; jour <= jours; jour++) {
-      final cle = CreneauCle(
-        DateTime(_base.annee, _base.mois, jour),
-        creneau,
-      );
+      final cle = CreneauCle(DateTime(_base.annee, _base.mois, jour), creneau);
       final etat = carte[cle];
       if (etat == null) {
         tampon.write('.');
@@ -1000,8 +1042,10 @@ class _MatriceMemoire implements MatriceRepository {
   }) async {
     if (etat == DisponibiliteEtat.nonSaisi) return false;
     final cle = CreneauCle(jour, creneau);
-    _base.dispos.putIfAbsent(userId, () => <CreneauCle, DisponibiliteEtat>{})[cle] =
-        etat;
+    _base.dispos.putIfAbsent(
+      userId,
+      () => <CreneauCle, DisponibiliteEtat>{},
+    )[cle] = etat;
     // `availabilities_trace_auteur` : l'auteur est l'appelant, et ici c'est
     // toujours un administrateur — d'où la minuscule au relecture.
     _base.auteursDispos.putIfAbsent(userId, () => <CreneauCle, String>{})[cle] =
@@ -1182,7 +1226,9 @@ class _PlanningMemoire implements PlanningRepository {
       if (!_base._etaitDisponible(userId, creneau)) continue;
 
       final lignes = _base.attributionsDe(creneauId);
-      if (lignes.any((AttributionMemoire a) => a.userId == userId && a.active)) {
+      if (lignes.any(
+        (AttributionMemoire a) => a.userId == userId && a.active,
+      )) {
         continue;
       }
       if (lignes.where((AttributionMemoire a) => a.active).length >=
@@ -1321,7 +1367,10 @@ class _PlanningMemoire implements PlanningRepository {
     await Completer<void>().future;
   }
 
-  static int _ordreDuPlusAncienTrou(AttributionMemoire a, AttributionMemoire b) {
+  static int _ordreDuPlusAncienTrou(
+    AttributionMemoire a,
+    AttributionMemoire b,
+  ) {
     final reponseA = a.repondueLe;
     final reponseB = b.repondueLe;
     if (reponseA != null && reponseB != null && reponseA != reponseB) {
@@ -1541,7 +1590,8 @@ class _PropositionsMemoire implements PropositionsRepository {
         if (attribution.userId == userId &&
             attribution.etat == AttributionEtat.propose &&
             attribution.proposeeLe != null)
-          if (_creneau(attribution.creneauId) case final CreneauPlanning creneau)
+          if (_creneau(attribution.creneauId)
+              case final CreneauPlanning creneau)
             Proposition(
               id: attribution.id,
               creneauId: attribution.creneauId,
@@ -1671,4 +1721,314 @@ class _CaserneMemoire implements CaserneRepository {
 
   @override
   Future<EtatCaserne?> essayer(String stationId) async => _base.etatCaserne;
+}
+
+/// Les échanges d'une session. **Une cession**, la forme que le parcours
+/// joue ; l'échange en miroir et les règles du remplaçant sont éprouvés en
+/// SQL.
+class _EchangesMemoire implements EchangesRepository {
+  _EchangesMemoire(this._base, this._moi);
+
+  final BackendMemoire _base;
+  final String _moi;
+
+  CreneauPlanning? _creneau(String id) {
+    for (final creneau in _base.creneaux) {
+      if (creneau.id == id) return creneau;
+    }
+    return null;
+  }
+
+  /// `exchange_open_to_me` : l'appelant a déclaré `available` sur le créneau,
+  /// n'est pas le demandeur et n'est pas déjà dessus. Les plafonds et « pris
+  /// ailleurs » sont éprouvés en SQL.
+  bool _ouverteAMoi(EchangeMemoire e) {
+    final c = _creneau(e.creneauId);
+    if (c == null || e.demandeurId == _moi) return false;
+    final dejaLa = _base
+        .attributionsDe(e.creneauId)
+        .any((AttributionMemoire a) => a.userId == _moi && a.active);
+    return !dejaLa && _base._etaitDisponible(_moi, c);
+  }
+
+  /// La RLS de `shift_exchanges` (0041) : un pompier voit les siennes —
+  /// demandeur, destinataire, repreneur — et les demandes « à la caserne »
+  /// ouvertes qui lui sont envoyées ; un administrateur voit toute la caserne.
+  bool _visible(EchangeMemoire e, {required bool admin}) =>
+      admin ||
+      e.demandeurId == _moi ||
+      e.cibleId == _moi ||
+      e.repreneurId == _moi ||
+      (e.cibleId == null &&
+          e.statut == StatutEchange.ouvert &&
+          _ouverteAMoi(e));
+
+  @override
+  Future<List<Echange>> lister({
+    required String stationId,
+    String moi = '',
+    bool admin = false,
+  }) async => <Echange>[
+    for (final e in _base.echanges)
+      if (_visible(e, admin: _base.membreParId(_moi)?.role == RoleMembre.admin))
+        if (_creneau(e.creneauId) case final CreneauPlanning c)
+          Echange(
+            ouverteAMoi: e.cibleId != null || _ouverteAMoi(e),
+            id: e.id,
+            stationId: stationId,
+            forme: FormeEchange.cession,
+            statut: e.statut,
+            demandeurId: e.demandeurId,
+            demandeurNom: _base.membreParId(e.demandeurId)?.libelle ?? '',
+            cibleId: e.cibleId,
+            cibleNom: e.cibleId == null
+                ? null
+                : _base.membreParId(e.cibleId!)?.libelle,
+            repreneurId: e.repreneurId,
+            repreneurNom: e.repreneurId == null
+                ? null
+                : _base.membreParId(e.repreneurId!)?.libelle,
+            decideurId: e.decideurId,
+            decideurNom: e.decideurId == null
+                ? null
+                : _base.membreParId(e.decideurId!)?.libelle,
+            garde: GardeEchange(
+              jour: DateTime(_base.annee, _base.mois, c.jour),
+              creneau: c.creneau,
+              attributionId: e.attributionId,
+              creneauId: c.id,
+            ),
+            expireLe: e.expireLe,
+            creeLe: e.creeLe,
+            accepteLe: e.accepteLe,
+            decideLe: e.decideLe,
+            closLe: e.decideLe,
+          ),
+  ];
+
+  @override
+  Future<List<Collegue>> collegues({
+    required String stationId,
+    required String moi,
+  }) async => <Collegue>[
+    for (final m in _base.membres)
+      if (m.actif && m.userId != moi)
+        Collegue(userId: m.userId, nom: m.libelle),
+  ];
+
+  @override
+  Future<List<GardeProposable>> gardesDe({
+    required String pairId,
+    required String stationId,
+  }) async => const <GardeProposable>[];
+
+  @override
+  Future<ReglagesEchange> reglages(String stationId) async =>
+      ReglagesEchange.defaut;
+
+  @override
+  Future<ResultatEchange> demander({
+    required String attributionId,
+    String? cibleId,
+    String? attributionRendueId,
+  }) async {
+    final garde = _base.attributionParId(attributionId);
+    if (garde == null || garde.userId != _moi) {
+      return const ResultatEchange(ok: false, code: 'assignment_not_found');
+    }
+    if (garde.etat != AttributionEtat.accepte) {
+      return const ResultatEchange(ok: false, code: 'assignment_not_accepted');
+    }
+    if (_base.etatPlanning != PlanningEtat.publie &&
+        _base.etatPlanning != PlanningEtat.valide) {
+      return const ResultatEchange(ok: false, code: 'schedule_not_published');
+    }
+    // `shift_exchanges_open_uniq` : une seule demande ouverte par garde.
+    if (_base.echanges.any(
+      (EchangeMemoire e) =>
+          e.attributionId == attributionId && e.statut.enCours,
+    )) {
+      return const ResultatEchange(ok: false, code: 'exchange_already_open');
+    }
+    final cible = cibleId == null ? null : _base.membreParId(cibleId);
+    if (cibleId != null && (cible == null || !cible.actif)) {
+      return const ResultatEchange(ok: false, code: 'target_not_member');
+    }
+    final creneau = _creneau(garde.creneauId)!;
+    final debut = DateTime(
+      _base.annee,
+      _base.mois,
+      creneau.jour,
+      creneau.creneau == CreneauType.jour ? 7 : 19,
+    );
+    final demande = EchangeMemoire(
+      id: _base._id('ech'),
+      demandeurId: _moi,
+      attributionId: attributionId,
+      creneauId: garde.creneauId,
+      cibleId: cibleId,
+      creeLe: _base.horloge(),
+      expireLe: debut.subtract(const Duration(hours: 24)),
+    );
+    _base.echanges.add(demande);
+    final destinataires = cibleId == null
+        ? <String>[
+            for (final m in _base.membres)
+              if (m.actif &&
+                  m.userId != _moi &&
+                  _base._etaitDisponible(m.userId, creneau))
+                m.userId,
+          ]
+        : <String>[cibleId];
+    if (destinataires.isNotEmpty) {
+      _base._notifier('exchange_requested', destinataires);
+    }
+    return ResultatEchange(
+      ok: true,
+      statut: StatutEchange.ouvert,
+      notifies: destinataires.length,
+      echangeId: demande.id,
+      expireLe: demande.expireLe,
+    );
+  }
+
+  EchangeMemoire? _demande(String id) {
+    for (final e in _base.echanges) {
+      if (e.id == id) return e;
+    }
+    return null;
+  }
+
+  @override
+  Future<ResultatEchange> repondre({
+    required String echangeId,
+    required bool accepte,
+  }) async {
+    final demande = _demande(echangeId);
+    if (demande == null) {
+      return const ResultatEchange(ok: false, code: 'exchange_not_found');
+    }
+    if (demande.cibleId != null && demande.cibleId != _moi) {
+      return const ResultatEchange(ok: false, code: 'not_target');
+    }
+    if (demande.statut != StatutEchange.ouvert) {
+      return ResultatEchange(
+        ok: false,
+        code: 'exchange_not_open',
+        statut: demande.statut,
+      );
+    }
+    if (!accepte) {
+      demande
+        ..statut = StatutEchange.refuse
+        ..decideurId = _moi
+        ..decideLe = _base.horloge();
+      _base._notifier('exchange_rejected', <String>[demande.demandeurId]);
+      return const ResultatEchange(ok: true, statut: StatutEchange.refuse);
+    }
+    demande
+      ..statut = StatutEchange.accepteParPair
+      ..repreneurId = _moi
+      ..accepteLe = _base.horloge();
+    // Validation par l'administrateur, par défaut : les administrateurs
+    // actifs, sauf le repreneur.
+    _base._notifier('exchange_accepted', <String>[
+      for (final m in _base.membres)
+        if (m.actif && m.role == RoleMembre.admin && m.userId != _moi) m.userId,
+    ]);
+    return const ResultatEchange(
+      ok: true,
+      statut: StatutEchange.accepteParPair,
+    );
+  }
+
+  @override
+  Future<ResultatEchange> decider({
+    required String echangeId,
+    required bool valide,
+    String? motif,
+  }) async {
+    final demande = _demande(echangeId);
+    if (demande == null) {
+      return const ResultatEchange(ok: false, code: 'exchange_not_found');
+    }
+    if (demande.statut != StatutEchange.accepteParPair) {
+      return ResultatEchange(
+        ok: false,
+        code: 'exchange_not_pending',
+        statut: demande.statut,
+      );
+    }
+    final repreneur = demande.repreneurId!;
+    demande
+      ..decideurId = _moi
+      ..decideLe = _base.horloge();
+    if (!valide) {
+      demande.statut = StatutEchange.refuse;
+      _base._notifier('exchange_rejected', <String>[
+        demande.demandeurId,
+        repreneur,
+      ]);
+      return const ResultatEchange(ok: true, statut: StatutEchange.refuse);
+    }
+
+    // `exchange_apply` : tout ou rien. La garde de A doit toujours être à
+    // lui et acceptée, et B ne doit pas déjà tenir ce créneau.
+    final ancienne = _base.attributionParId(demande.attributionId)!;
+    final dejaLa = _base
+        .attributionsDe(demande.creneauId)
+        .any((AttributionMemoire a) => a.userId == repreneur && a.active);
+    if (ancienne.etat != AttributionEtat.accepte || dejaLa) {
+      demande.statut = StatutEchange.echoue;
+      return ResultatEchange(
+        ok: false,
+        code: 'exchange_failed',
+        codeMotif: dejaLa ? 'peer_already_assigned' : 'assignment_not_accepted',
+      );
+    }
+    final creneau = _creneau(demande.creneauId)!;
+    final nouvelle = AttributionMemoire(
+      id: _base._id('att'),
+      creneauId: demande.creneauId,
+      userId: repreneur,
+      etaitDisponible: _base._etaitDisponible(repreneur, creneau),
+      auteurId: _moi,
+      etat: AttributionEtat.accepte,
+      proposeeLe: _base.horloge(),
+      repondueLe: _base.horloge(),
+    );
+    _base.attributions.add(nouvelle);
+    demande
+      ..statut = StatutEchange.valide
+      ..nouvelleAttributionId = nouvelle.id;
+    ancienne
+      ..etat = AttributionEtat.remplace
+      ..remplaceParId = nouvelle.id;
+    _base._notifier('exchange_approved', <String>[
+      demande.demandeurId,
+      repreneur,
+    ]);
+    _base._reevaluer();
+    return ResultatEchange(
+      ok: true,
+      statut: StatutEchange.valide,
+      echangeId: demande.id,
+    );
+  }
+
+  @override
+  Future<ResultatEchange> annuler({required String echangeId}) async {
+    final demande = _demande(echangeId);
+    if (demande == null || !demande.statut.enCours) {
+      return ResultatEchange(
+        ok: false,
+        code: 'exchange_not_open',
+        statut: demande?.statut,
+      );
+    }
+    demande
+      ..statut = StatutEchange.annule
+      ..decideLe = _base.horloge();
+    return const ResultatEchange(ok: true, statut: StatutEchange.annule);
+  }
 }

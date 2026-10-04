@@ -9,6 +9,7 @@ import '../../features/astreintes/domain/planning_caserne_providers.dart';
 import '../../features/dispos/domain/dispos_providers.dart';
 import '../../features/dispos/presentation/controllers/rafraichissement_periodes.dart';
 import '../../features/dispos/presentation/controllers/saisie_controller.dart';
+import '../../features/echanges/domain/echanges_providers.dart';
 import '../../features/invitation/domain/invitation_providers.dart';
 import '../../features/notifications/domain/centre_providers.dart';
 import '../../features/planning/domain/matrice_providers.dart';
@@ -51,6 +52,9 @@ enum Donnee {
 
   /// Le suivi du planning publié, côté admin.
   suivi,
+
+  /// Les demandes d'échange de la caserne (`EchangesController`, ticket 073).
+  echanges,
 
   /// Les invitations en attente d'un membre déjà rattaché (ticket 072) : la
   /// carte de l'accueil. Rien n'en est gardé sur l'appareil.
@@ -213,6 +217,8 @@ class Fraicheur {
       _ref.read(planningControllerProvider.notifier).derniereLecture,
     Donnee.suivi when _ref.exists(suiviControllerProvider) =>
       _ref.read(suiviControllerProvider.notifier).derniereLecture,
+    Donnee.echanges when _ref.exists(echangesControllerProvider) =>
+      _ref.read(echangesControllerProvider.notifier).derniereLecture,
     _ => null,
   };
 
@@ -336,6 +342,19 @@ class Fraicheur {
         await _ref.read(suiviControllerProvider.notifier).rafraichir();
         return _issue(_ref.read(suiviControllerProvider));
 
+      case Donnee.echanges:
+        switch (await _premiereLecture(echangesControllerProvider)) {
+          case null:
+            return Relecture.echouee;
+          case true:
+            return Relecture.inchangee;
+          case false:
+            break;
+        }
+        return _ref
+            .read(echangesControllerProvider.notifier)
+            .rafraichir(publierSi: () => !_echangesOccupes);
+
       case Donnee.periodes:
         // Délégué plus haut, dans `_relire`.
         return Relecture.inchangee;
@@ -425,6 +444,10 @@ class Fraicheur {
       _ref.read(matriceControllerProvider).value?.sync ==
           SyncEtat.enregistrement;
 
+  bool get _echangesOccupes =>
+      _ref.exists(echangesControllerProvider) &&
+      _ref.read(echangesControllerProvider.notifier).ecritureEnAttente;
+
   bool get _propositionsOccupees =>
       _ref.exists(propositionsControllerProvider) &&
       _ref.read(propositionsControllerProvider.notifier).ecritureEnAttente;
@@ -445,6 +468,9 @@ class Fraicheur {
       planningControllerProvider,
     ],
     Donnee.suivi => <ProviderListenable<Object?>>[suiviControllerProvider],
+    Donnee.echanges => <ProviderListenable<Object?>>[
+      echangesControllerProvider,
+    ],
     _ => <ProviderListenable<Object?>>[
       if (_ref.exists(saisieControllerProvider)) saisieControllerProvider,
       if (_ref.exists(matriceControllerProvider)) matriceControllerProvider,
@@ -455,6 +481,7 @@ class Fraicheur {
 
   bool _occupee(Donnee donnee) => switch (donnee) {
     Donnee.propositions => _propositionsOccupees,
+    Donnee.echanges => _echangesOccupes,
     Donnee.matrice => _matriceOccupee,
     Donnee.planningAdmin =>
       _ref.exists(planningControllerProvider) &&

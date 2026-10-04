@@ -6,6 +6,8 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/entete_section.dart';
 import '../../../astreintes/domain/astreinte.dart';
+import '../../../echanges/domain/echange.dart';
+import '../../../echanges/presentation/widgets/carte_demande_recue.dart';
 import '../../../notifications/domain/notification_interne.dart';
 import '../../../notifications/presentation/widgets/ligne_notification.dart';
 import '../../../propositions/domain/proposition.dart';
@@ -84,6 +86,7 @@ class ListeTout extends StatelessWidget {
     required this.onRappel,
     required this.onRelire,
     super.key,
+    this.onDemande,
   });
 
   final EtatBoite etat;
@@ -91,6 +94,9 @@ class ListeTout extends StatelessWidget {
   final DateTime maintenant;
   final ValueChanged<Proposition> onProposition;
   final ValueChanged<NotificationInterne> onRappel;
+
+  /// Ouvre le panneau d'une demande d'échange (ticket 073).
+  final ValueChanged<Echange>? onDemande;
   final VoidCallback onRelire;
 
   @override
@@ -135,6 +141,12 @@ class ListeTout extends StatelessWidget {
             maintenant: maintenant,
             onOuvrir: () => onProposition(proposition),
           ),
+          DemandeBoite(:final echange) => CarteDemandeRecue(
+            key: ValueKey<String>(element.cle),
+            echange: echange,
+            maintenant: maintenant,
+            onOuvrir: () => onDemande?.call(echange),
+          ),
           RappelBoite(:final notification) => _CarteRappel(
             key: ValueKey<String>(notification.id),
             notification: notification,
@@ -162,7 +174,12 @@ class ListePropositions extends StatelessWidget {
     required this.onOuvrir,
     required this.onRelire,
     super.key,
+    this.enTete = const <Widget>[],
   });
+
+  /// Ce qui précède les mois : le groupe « Demandes de collègues »
+  /// (ticket 073), qui passe devant parce qu'il expire plus vite.
+  final List<Widget> enTete;
 
   final List<ElementListe> elements;
   final HeuresAffichage heures;
@@ -173,17 +190,21 @@ class ListePropositions extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _Colonne(
     cle: 'boite-propositions',
-    compte: elements.length,
+    compte: enTete.length + elements.length,
     onRelire: () async => onRelire(),
     // Les en-têtes portent déjà leur propre écart au-dessus d'eux
     // (`EnteteSection`) : un séparateur de plus creuserait un trou entre le
     // dernier mois et le suivant.
     separateur: (BuildContext context, int index) =>
-        elements[index + 1] is EnteteMois
+        index + 1 < enTete.length ||
+            (index + 1 >= enTete.length &&
+                index + 1 - enTete.length < elements.length &&
+                elements[index + 1 - enTete.length] is EnteteMois)
         ? const SizedBox.shrink()
         : const SizedBox(height: AppSpacing.sm),
     constructeur: (BuildContext context, int index) {
-      final element = elements[index];
+      if (index < enTete.length) return enTete[index];
+      final element = elements[index - enTete.length];
       return switch (element) {
         EnteteMois() => EnteteSection(
           titre: element.libelle,

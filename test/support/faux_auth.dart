@@ -32,6 +32,8 @@ import 'package:astreinte_sp/features/astreintes/domain/planning_caserne_provide
 import 'package:astreinte_sp/features/dispos/data/dispos_repository.dart';
 import 'package:astreinte_sp/features/dispos/data/file_locale.dart';
 import 'package:astreinte_sp/features/dispos/domain/dispos_providers.dart';
+import 'package:astreinte_sp/features/echanges/data/echanges_repository.dart';
+import 'package:astreinte_sp/features/echanges/domain/echanges_providers.dart';
 import 'package:astreinte_sp/features/invitation/data/invitation_repository.dart';
 import 'package:astreinte_sp/features/invitation/domain/invitation_providers.dart';
 import 'package:astreinte_sp/features/membres/data/membres_repository.dart';
@@ -69,6 +71,7 @@ import 'faux_astreintes.dart';
 import 'faux_calendrier.dart';
 import 'faux_caserne.dart';
 import 'faux_dispos.dart';
+import 'faux_echanges.dart';
 import 'faux_export.dart';
 import 'faux_fichier.dart';
 import 'faux_invitations.dart';
@@ -272,6 +275,7 @@ Future<AppMontee> monterApp(
   PlanningRepository? planning,
   SuiviRepository? suivi,
   PropositionsRepository? propositions,
+  EchangesRepository? echanges,
   AstreintesRepository? astreintes,
   CacheAstreintes? cacheAstreintes,
   PlanningCaserneRepository? planningCaserne,
@@ -421,6 +425,12 @@ Future<AppMontee> monterApp(
         // chaque test toucherait un client Supabase qui n'existe pas en test.
         propositionsRepositoryProvider.overrideWithValue(
           propositions ?? FauxPropositionsRepository(),
+        ),
+        // Les échanges (ticket 073) sont lus par Astreintes, la Boîte et
+        // l'accueil : sans faux, ces écrans toucheraient un client Supabase
+        // qui n'existe pas en test. Par défaut, aucune demande.
+        echangesRepositoryProvider.overrideWithValue(
+          echanges ?? FauxEchangesRepository(),
         ),
         // « Mes astreintes » (ticket 027) vit sur l'onglet 2, et son
         // contrôleur n'est pas auto-disposé : sans faux, tout test qui passe

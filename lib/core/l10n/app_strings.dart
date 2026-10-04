@@ -3239,6 +3239,458 @@ abstract final class AppStrings {
   static const int refusMotifLongueurMax = 120;
 
   // -------------------------------------------------------------------
+  // Échanges et cessions d'astreintes (ticket 073)
+  // -------------------------------------------------------------------
+  // `design/073-echange-astreintes.md § 10`. Tutoiement partout, masculin
+  // générique (le profil ne porte pas de genre), aucune flèche.
+
+  // --- Les mots d'une garde ---------------------------------------------
+
+  /// « nuit du samedi 12 octobre » : la garde dans une phrase.
+  static String echangeCreneauPhrase({
+    required bool nuit,
+    required String jourEtDate,
+  }) => '${nuit ? 'nuit' : 'jour'} du $jourEtDate';
+
+  /// « sam. 12 oct. · Nuit » : la garde dans une ligne courte.
+  static String echangeGardeCourte({
+    required String jourCourt,
+    required int jour,
+    required int mois,
+    required String creneau,
+  }) =>
+      '$jourCourt ${jour == 1 ? '1er' : jour} ${moisCourts[mois - 1]} · '
+      '$creneau';
+
+  /// « Samedi 12 octobre · Nuit » : le titre d'une carte.
+  static String echangeGardeTitre(String jourEtDate, String creneau) =>
+      '${jourEtDate[0].toUpperCase()}${jourEtDate.substring(1)} · $creneau';
+
+  /// « Tu donnes : mardi 15 octobre, jour, de 07:00 à 19:00 ».
+  static String echangeRangeeSemantique({
+    required String verbe,
+    required String jourEtDate,
+    required String creneau,
+    required String debut,
+    required String fin,
+  }) => '$verbe : $jourEtDate, ${creneau.toLowerCase()}, de $debut à $fin';
+
+  // --- Pompier A : proposer --------------------------------------------
+
+  static const String echangeProposer = 'Proposer un échange';
+  static const String echangeTitre = 'Proposer un échange';
+  static String echangeEtape(int n, int total) => 'Étape $n sur $total';
+  static const String echangeQuiTitre = 'À qui ?';
+  static const String echangeCollegue = 'Un collègue';
+  static const String echangeCollegueAide =
+      'Tu choisis la personne. Tu peux céder ta garde ou l\'échanger contre '
+      'une des siennes.';
+  static const String echangeCaserne = 'Toute la caserne';
+  static const String echangeCaserneAide =
+      'Les collègues qui se sont dits disponibles ce créneau la verront. Le '
+      'premier qui accepte la prend.';
+  static const String echangeChercher = 'Chercher un collègue';
+  static String echangeChercherVide(String q) =>
+      'Aucun collègue ne correspond à « $q ».';
+  static const String echangeSeul =
+      'Tu es seul dans ta caserne pour l\'instant.';
+  static const String echangeCollegues = 'Tes collègues';
+  static const String echangeCollegueErreur =
+      'Impossible de charger tes collègues. Vérifie le réseau et réessaie.';
+  static const String echangeContinuer = 'Continuer';
+  static const String echangeChoisirQui =
+      'Choisis un collègue ou toute la caserne.';
+  static const String echangeQuoiTitre = 'Céder ou échanger ?';
+  static const String echangeCeder = 'Céder';
+  static String echangeCederAide(String nom) =>
+      '$nom prend ta garde. Tu ne prends rien en retour.';
+  static const String echangeEchanger = 'Échanger';
+  static String echangeEchangerAide(String nom) =>
+      '$nom prend ta garde, et tu prends une des siennes.';
+  static String echangeSesGardes(String nom) => 'Les gardes à venir de $nom';
+  static String echangeAucuneGarde(String nom) =>
+      '$nom n\'a pas de garde à venir à échanger.';
+  static const String echangeGardesErreur =
+      'Impossible de charger ses gardes. Vérifie le réseau et réessaie.';
+  static const String echangeChoisirGarde =
+      'Choisis la garde que tu prends en retour.';
+  static const String echangeVerifierTitre = 'Vérifie ta demande';
+  static const String echangeTuDonnes = 'Tu donnes';
+  static const String echangeTuPrends = 'Tu prends';
+  static const String echangeA = 'À';
+  static const String echangeLesDisponibles =
+      'Les collègues disponibles ce créneau';
+  static String echangeInfoValidation(String nom) =>
+      'Ton chef de centre devra valider après l\'accord de $nom.';
+  static const String echangeInfoValidationCaserne =
+      'Ton chef de centre devra valider après l\'accord d\'un collègue.';
+  static String echangeInfoAuto(String nom) =>
+      'Si $nom s\'était dit disponible ce créneau, l\'échange sera validé dès '
+      'son accord. Sinon, ton chef de centre validera.';
+  static const String echangeInfoAutoCaserne =
+      'Le collègue qui la prend s\'était dit disponible ce créneau : '
+      'l\'échange sera validé dès son accord.';
+  static String echangeExpireLe(String date, String heure) =>
+      'La demande expire le $date à $heure.';
+  static const String echangeEnvoyer = 'Envoyer la demande';
+  static String echangeEnvoyeeA(String nom) => 'Demande envoyée à $nom.';
+  static const String echangeEnvoyeeCaserne =
+      'Demande envoyée aux collègues disponibles.';
+
+  /// `notified = 0` : la demande est enregistrée, mais aucun téléphone n'a
+  /// sonné. L'écran le dit plutôt que de laisser croire le contraire.
+  static const String echangeEnvoyeePersonne =
+      'Demande enregistrée, mais personne n\'a été prévenu : aucun collègue '
+      'ne s\'est dit disponible ce créneau pour l\'instant.';
+  static const String echangeEnvoiEchec =
+      'Ta demande n\'est pas partie. Vérifie le réseau et réessaie.';
+  static String echangeEnvoiRefuse(String cause) =>
+      'Ta demande n\'a pas pu partir : $cause.';
+  static const String echangeEnvoiRefuseAide =
+      'Le récapitulatif est resté là : change de collègue ou de garde et '
+      'réessaie.';
+  static String echangeTropTard(String date, String heure) =>
+      'Trop tard pour proposer un échange : la demande devait partir avant '
+      'le $date à $heure.';
+  static const String echangeHorsLigneRaison =
+      'Une demande d\'échange a besoin du réseau.';
+  static const String echangeLectureSeuleRaison =
+      'Caserne suspendue : les échanges sont bloqués. Contacte ton chef de '
+      'centre.';
+  static const String echangeIntrouvable =
+      'Cette garde ne peut plus être proposée : elle a changé entre-temps.';
+  static const String echangeEnCoursMention = 'Échange en cours';
+  static const String echangeEnCoursSemantique = 'échange en cours';
+  static String echangeSection(int n) => 'Échanges · $n';
+  static String echangeVoirTous(int n) => 'Voir les $n échanges';
+  static const String echangeVoirMoins = 'Voir moins';
+  static const String echangeSectionErreur =
+      'Impossible de charger tes échanges.';
+  static String echangeDetailTitreEchange(String creneau) =>
+      'Échange de la $creneau';
+  static String echangeDetailTitreCession(String creneau) =>
+      'Cession de la $creneau';
+  static String echangeFilDemandee(String date) => 'Demandée le $date';
+  static String echangeFilAcceptee(String nom, String date) =>
+      'Acceptée par $nom le $date';
+  static String echangeFilValidee(String nom, String date) =>
+      'Validée par $nom le $date';
+  static String echangeFilValideeAuto(String date) =>
+      'Validée automatiquement le $date';
+  static String echangeFilRefusee(String nom, String date) =>
+      'Refusée par $nom le $date';
+  static String echangeFilAnnulee(String date) => 'Annulée le $date';
+  static String echangeFilExpiree(String date) => 'Expirée le $date';
+  static String echangeFilEchec(String date) => 'Échec le $date';
+
+  /// « 9 oct. à 07:02 » : un horodatage du fil.
+  static String echangeInstant(String date, String heure) => '$date à $heure';
+  static const String echangeAnnuler = 'Annuler la demande';
+  static const String echangeAnnulerTitre = 'Annuler ta demande ?';
+  static String echangeAnnulerTexteCollegue(String nom, String creneau) =>
+      '$nom sera prévenu. Ta garde du $creneau reste la tienne.';
+  static const String echangeAnnulerTexteCaserne =
+      'Les collègues qui la voyaient ne la verront plus. Ta garde reste la '
+      'tienne.';
+  static String echangeAnnulerTexteAcceptee(String nom) =>
+      '$nom avait accepté. Lui et ton chef de centre seront prévenus. Ta garde '
+      'reste la tienne.';
+  static const String echangeGarder = 'Garder la demande';
+  static const String echangeAnnulee = 'Demande annulée.';
+  static const String echangeAnnulerTropTard =
+      'Trop tard : l\'échange vient d\'être validé.';
+  static const String echangeAnnulerEchec =
+      'L\'annulation n\'est pas partie. Vérifie le réseau et réessaie.';
+  static const String echangeFermer = 'Fermer';
+  static const String echangeSuivreMesDemandes = 'Suivre mes échanges';
+  static String echangeMesDemandes(int n) => n <= 1
+      ? '$n demande d\'échange suivie'
+      : '$n demandes d\'échange suivies';
+
+  // --- États ------------------------------------------------------------
+
+  static String echangeEtatAttenteDe(String nom) => 'En attente de $nom';
+  static const String echangeEtatCherche = 'Cherche un remplaçant';
+  static const String echangeEtatAValider = 'À valider par le chef';
+  static const String echangeEtatValide = 'Validé';
+  static const String echangeEtatRefuse = 'Refusé';
+  static const String echangeEtatAnnule = 'Annulé';
+  static const String echangeEtatExpire = 'Expiré';
+  static const String echangeEtatEchec = 'N\'a pas pu se faire';
+  static String echangeDetailEnvoyee(
+    String depuis,
+    String date,
+    String heure,
+  ) => 'Envoyée $depuis. Expire le $date à $heure.';
+  static String echangeDetailVisibleDispos(String date, String heure) =>
+      'Visible des collègues disponibles ce créneau. Expire le $date à '
+      '$heure.';
+  static String echangeDetailCherchePourB(String nom) =>
+      '$nom cherche un remplaçant.';
+  static String echangeDetailEnvoyeeAdmin(String depuis, String nom) =>
+      'Envoyée $depuis à $nom.';
+  static String echangeDetailEnvoyeeDispos(String depuis) =>
+      'Envoyée $depuis aux disponibles.';
+  static String echangeDetailAccepteParPourA(String nom, String depuis) =>
+      '$nom a accepté $depuis. Ton chef de centre doit valider.';
+  static String echangeDetailTuAsAccepte(String depuis) =>
+      'Tu as accepté $depuis. Ton chef de centre doit valider.';
+  static String echangeDetailAccepteAdmin(String nom, String depuis) =>
+      'Accepté par $nom $depuis.';
+  static const String echangeDetailRetractation =
+      'Pour revenir sur ton accord, contacte ton chef de centre.';
+  static String echangeDetailValidePourA(
+    String nom,
+    String date,
+    String repreneur,
+  ) => 'Validé par $nom le $date. $repreneur assure cette garde.';
+  static String echangeDetailValidePourB(String nom, String date) =>
+      'Validé par $nom le $date. C\'est ta garde.';
+  static String echangeDetailValideAuto(String date) =>
+      'Validé automatiquement le $date.';
+  static String echangeDetailValideAdmin(String nom, String date) =>
+      'Validé par $nom le $date.';
+  static String echangeDetailRefusePair(String nom) => '$nom a refusé.';
+  static const String echangeDetailTuAsRefuse = 'Tu as refusé.';
+  static String echangeDetailRefuseChef(String nom) => 'Refusé par $nom.';
+  static String echangeDetailRefuseChefMotif(String nom, String motif) =>
+      'Refusé par $nom : « $motif »';
+  static const String echangeDetailAnnuleParA = 'Tu as annulé ta demande.';
+  static String echangeDetailAnnulePourB(String nom) =>
+      '$nom a annulé sa demande.';
+  static String echangeDetailAnnuleAdmin(String nom) => 'Annulé par $nom.';
+  static const String echangeDetailExpirePourA =
+      'Personne n\'a répondu à temps. Ta garde reste la tienne.';
+  static const String echangeDetailExpire = 'Cette demande a expiré.';
+  static const String echangeDetailExpireAdmin = 'Expiré sans réponse.';
+  static String echangeDetailEchecPourA(String cause) =>
+      'L\'échange n\'a pas pu se faire : $cause. Ta garde reste la tienne.';
+  static String echangeDetailEchec(String cause) =>
+      'L\'échange n\'a pas pu se faire : $cause.';
+  static String echangeDetailEchecAdmin(String cause) => 'Échec : $cause.';
+
+  /// « toi », quand l'administrateur qui lit est celui qui a tranché.
+  static const String echangeToi = 'toi';
+
+  /// Le nom d'un membre que la caserne ne sait plus nommer.
+  static const String echangeMembreInconnu = 'Un membre';
+
+  /// « Échange de la nuit du samedi 12 octobre, en attente de Chloé C. ».
+  static String echangeCarteSemantique(String titre, String etat) =>
+      '$titre, ${etat[0].toLowerCase()}${etat.substring(1)}';
+
+  // --- Causes -----------------------------------------------------------
+
+  static const String echangeCauseGardeChangee =
+      'la garde a changé entre-temps';
+  static String echangeCauseDejaPris(String nom) =>
+      '$nom est déjà pris sur ce créneau';
+  static String echangeCausePlafondAstreintes(String nom) =>
+      '$nom a atteint son maximum d\'astreintes du mois';
+  static String echangeCausePlafondWeekends(String nom) =>
+      '$nom a atteint son maximum de weekends du mois';
+  static String echangeCauseInactif(String nom) =>
+      '$nom n\'est plus membre de la caserne';
+  static const String echangeCauseSuspendue = 'la caserne est en lecture seule';
+  static const String echangeCauseCommence = 'le créneau a commencé';
+  static const String echangeCauseDejaOuverte =
+      'une demande est déjà en cours sur cette garde';
+  static const String echangeCauseToiDejaPris =
+      'tu es déjà de garde sur le créneau que tu prendrais';
+  static const String echangeCauseToiPlafondAstreintes =
+      'tu as atteint ton maximum d\'astreintes du mois';
+  static const String echangeCauseToiPlafondWeekends =
+      'tu as atteint ton maximum de weekends du mois';
+  static const String echangeCauseAilleurs =
+      'le collègue est déjà de garde ailleurs sur ce créneau';
+  static const String echangeCauseAutre = 'la situation a changé entre-temps';
+
+  // --- Pompier B : répondre ---------------------------------------------
+
+  static String echangeGroupeRecues(int n) => 'Demandes de collègues · $n';
+  static String echangeLigneCession(String nom) => '$nom te propose sa garde';
+  static String echangeLigneEchange(String nom, String garde) =>
+      '$nom te propose un échange contre ton $garde';
+  static String echangeLigneReprendre(String nom) =>
+      'À reprendre · $nom cherche un remplaçant';
+  static String echangePanneauTitreEchange(String nom) =>
+      'Échange proposé par $nom';
+  static String echangePanneauTitreCession(String nom) =>
+      'Garde proposée par $nom';
+  static String echangePanneauTitreReprendre(String nom) =>
+      '$nom cherche un remplaçant';
+  static String echangePanneauExpire(
+    String depuis,
+    String date,
+    String heure,
+  ) => '$depuis · expire le $date à $heure';
+  static const String echangePanneauInfo =
+      'Ton chef de centre validera après ton accord.';
+  static const String echangePanneauInfoReprendre =
+      'Le premier qui accepte la prend. Ton chef de centre validera ensuite.';
+  static const String echangeAccepterGarde = 'Accepter la garde';
+  static const String echangeAccepterEchange = 'Accepter l\'échange';
+  static const String echangeJeLaPrends = 'Je la prends';
+  static const String echangeRefuser = 'Refuser';
+  static const String echangeAccordEnvoye =
+      'Accord envoyé. Ton chef de centre doit valider.';
+  static String echangeAccordValide(String creneau) =>
+      'C\'est fait : la garde du $creneau est à toi.';
+  static String echangeRefusEnvoye(String nom) => 'Refus envoyé à $nom.';
+  static const String echangeDejaReprise =
+      'Cette garde a déjà été reprise par un collègue.';
+  static String echangeAnnuleeParA(String nom) => '$nom a annulé sa demande.';
+  static const String echangeExpiree = 'Cette demande a expiré.';
+  static const String echangePlusOuverte = 'Cette demande n\'est plus ouverte.';
+  static const String echangeTonPlafondAstreintes =
+      'Tu as atteint ton maximum d\'astreintes du mois : tu ne peux pas '
+      'accepter.';
+  static const String echangeTonPlafondWeekends =
+      'Tu as atteint ton maximum de weekends du mois : tu ne peux pas '
+      'accepter.';
+  static const String echangeTuEsDejaPris =
+      'Tu es déjà de garde sur ce créneau : tu ne peux pas accepter.';
+  static const String echangePasDisponible =
+      'Tu ne t\'es pas dit disponible sur ce créneau : tu ne peux pas la '
+      'prendre.';
+  static const String echangeReponseEchec = 'Ta réponse n\'est pas partie.';
+  static const String echangeReponseEchecDetail =
+      'Vérifie le réseau et réessaie.';
+  static const String echangeReponseLectureSeule =
+      'Caserne suspendue : tu ne peux pas accepter de garde pour l\'instant.';
+  static const String echangeBanniereFermer = 'Fermer';
+
+  // --- Admin --------------------------------------------------------------
+
+  static const String echangesTitre = 'Échanges d\'astreintes';
+  static const String echangesLien = 'Échanges d\'astreintes';
+  static String echangesFiltreAValider(int n) => 'À valider · $n';
+  static String echangesFiltreEnAttente(int n) =>
+      'En attente d\'un collègue · $n';
+  static const String echangesFiltreTermines = 'Terminés';
+  static String echangesAnnonceFiltre(int n) =>
+      n <= 1 ? '$n échange à valider' : '$n échanges à valider';
+  static String echangesBlocSuivi(int n) =>
+      n <= 1 ? '$n échange à valider' : '$n échanges à valider';
+  static const String echangesBlocSuiviAction = 'Voir les échanges';
+  static const String echangesVideAValiderTitre = 'Aucun échange à valider';
+  static const String echangesVideAValiderTexte =
+      'Quand un pompier accepte de reprendre la garde d\'un collègue, la '
+      'demande arrive ici.';
+  static const String echangesVideEnAttente =
+      'Aucune demande en attente d\'un collègue.';
+  static const String echangesVideTermines =
+      'Aucun échange terminé ces 30 derniers jours.';
+  static const String echangesVideTitre = 'Rien ici';
+  static const String echangesErreur = 'Impossible de charger les échanges.';
+  static const String echangesRafraichir = 'Rafraîchir les échanges';
+  static String echangesLigneCede(String a, String b) => '$a cède à $b';
+  static String echangesLigneEchange(String a, String b) =>
+      '$a échange avec $b';
+  static String echangesLigneCherche(String a) => '$a cherche un remplaçant';
+  static const String echangesCession = 'Cession';
+  static String echangesLigneAccepte(String depuis) => 'accepté $depuis';
+  static String echangesLigneExpire(String date, String heure) =>
+      'expire $date $heure';
+  static String echangesLigneContre(String garde) => 'Échange contre le $garde';
+  static String echangesPanneauTitreCession(String creneau) =>
+      'Cession · $creneau';
+  static String echangesPanneauTitreEchange(String creneau) =>
+      'Échange · $creneau';
+  static String echangesCede(String nom) => '$nom cède';
+  static const String echangesChargeTitre = 'Charge après l\'échange';
+  static const String echangesLibere = 'libère cette garde';
+
+  /// « octobre · 7/8 astr. · 3/2 w-e ». La charge du mois **après** l'échange,
+  /// sur son plafond : sans barre de fraction, le plafond est illimité.
+  static String echangesCharge({
+    required String mois,
+    required int astreintes,
+    required int? maxAstreintes,
+    required int weekends,
+    required int? maxWeekends,
+  }) => <String>[
+    mois,
+    maxAstreintes == null
+        ? '$astreintes astr.'
+        : '$astreintes/$maxAstreintes astr.',
+    maxWeekends == null ? '$weekends w-e' : '$weekends/$maxWeekends w-e',
+  ].join(' · ');
+  static const String echangesChargeErreur =
+      'La charge de chacun n\'a pas pu être lue. La validation la revérifiera.';
+  static String echangesDepasseAstreintes(int max) =>
+      'Dépasserait son maximum d\'astreintes ($max).';
+  static String echangesDepasseWeekends(int max) =>
+      'Dépasserait son maximum de weekends ($max).';
+  static const String echangesWeekendAVerifier =
+      'Si ce weekend n\'est pas déjà compté, la validation le refusera.';
+  static const String echangesDispoDeclaree = 'Disponibilité déclarée';
+  static const String echangesPrisAilleurs =
+      'Déjà de garde ailleurs sur ce créneau.';
+  static const String echangesValider = 'Valider l\'échange';
+  static const String echangesValiderCession = 'Valider la cession';
+  static const String echangesRefuser = 'Refuser';
+  static const String echangesConfirmerValiderEchange = 'Valider l\'échange ?';
+  static const String echangesConfirmerValiderCession = 'Valider la cession ?';
+  static String echangesConfirmerCession(String creneau, String a, String b) =>
+      'La $creneau passe de $a à $b. Les deux seront prévenus.';
+  static String echangesConfirmerEchange(
+    String c1,
+    String b,
+    String c2,
+    String a,
+  ) => 'La $c1 passe à $b, et le $c2 à $a. Les deux seront prévenus.';
+  static const String echangesValiderEtPrevenir = 'Valider et prévenir';
+  static const String echangesRevenir = 'Revenir';
+  static const String echangesRefuserTitre = 'Refuser l\'échange ?';
+  static String echangesRefuserTexte(String a, String creneau, String b) =>
+      '$a garde sa $creneau. $a et $b seront prévenus.';
+  static const String echangesMotif = 'Motif (facultatif)';
+  static const String echangesMotifAide = 'Il sera envoyé aux deux pompiers.';
+  static const int echangesMotifLongueurMax = 120;
+  static const String echangesRefuserEtPrevenir = 'Refuser et prévenir';
+  static String echangesValide(String a, String b) =>
+      'Échange validé. $a et $b seront prévenus.';
+  static String echangesRefuse(String a, String b) =>
+      'Échange refusé. $a et $b seront prévenus.';
+  static String echangesEchec(String cause) =>
+      'L\'échange n\'a pas pu se faire : $cause. Rien n\'a changé dans le '
+      'planning.';
+  static const String echangesPasSaDecision =
+      'Tu es concerné par cet échange : un autre administrateur doit le '
+      'trancher.';
+  static const String echangesPlusEnAttente =
+      'Cette demande n\'attend plus de décision : la liste a été relue.';
+  static const String echangesDecisionEchec =
+      'La décision n\'est pas partie. Vérifie le réseau et réessaie.';
+  static const String echangesHorsLigneRaison =
+      'Une décision a besoin du réseau.';
+  static const String echangesLectureSeuleRaison =
+      'Caserne suspendue : les échanges sont bloqués.';
+  static const String echangesReserveAdmin =
+      'Cet écran est réservé aux administrateurs de la caserne.';
+  static const String echangesVoletVide =
+      'Choisis une demande pour la lire et la trancher.';
+  static const String echangesLectureSeuleLigne =
+      'Rien à trancher ici : cette demande se suit seulement.';
+
+  // --- Réglages -----------------------------------------------------------
+
+  static const String parametresEchangesTitre = 'Échanges d\'astreintes';
+  static const String parametresEchangesNote =
+      'Ce que les pompiers s\'échangent entre eux.';
+  static const String parametresEchangesAuto = 'Valider automatiquement';
+  static const String parametresEchangesAutoAide =
+      'Quand le collègue qui reprend s\'était dit disponible ce créneau, '
+      'l\'échange est validé dès son accord. Tu es seulement prévenu. Sinon, '
+      'il attend ta validation.';
+  static const String parametresEchangesEcheance = 'Fin des demandes';
+  static const String parametresEchangesEcheanceSuffixe =
+      'heures avant le créneau';
+  static const String parametresEchangesEcheanceErreur =
+      'Entre 1 et 168 heures.';
+
+  // -------------------------------------------------------------------
   // Mes astreintes (ticket 027)
   // -------------------------------------------------------------------
 

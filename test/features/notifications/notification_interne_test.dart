@@ -22,6 +22,12 @@ void main() {
         'late_responders',
         'subscription_trial_ending',
         'subscription_suspended',
+        // Migration 0041, ticket 073.
+        'exchange_requested',
+        'exchange_accepted',
+        'exchange_approved',
+        'exchange_rejected',
+        'exchange_closed',
       };
 
       final connus = <String>{

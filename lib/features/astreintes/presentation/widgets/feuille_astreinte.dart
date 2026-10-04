@@ -7,6 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_divider.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../echanges/presentation/widgets/bouton_echange_astreinte.dart';
 import '../../domain/astreinte.dart';
 import 'bouton_ajout_calendrier.dart';
 
@@ -174,6 +175,9 @@ class _BlocCreneau extends StatelessWidget {
           heures: heures,
           nomCaserne: nomCaserne,
         ),
+        // Ticket 073 : proposer un échange, ou la demande déjà en cours.
+        const SizedBox(height: AppSpacing.entreCibles),
+        BoutonEchangeAstreinte(astreinte: astreinte, heures: heures),
       ],
     );
   }

@@ -17,6 +17,9 @@ enum ChampParametre {
   relanceEmail,
   rapportRetard,
   surcharges,
+
+  /// `exchange_deadline_hours` (ticket 073).
+  echeanceEchange,
 }
 
 /// Les bornes du document `settings`.
@@ -38,6 +41,11 @@ abstract final class LimitesParametres {
   /// 336 heures = deux semaines. Au-delà, une relance ne relance plus.
   static const int delaiMin = 1;
   static const int delaiMax = 336;
+
+  /// `exchange_deadline_hours` : de 1 à 168 heures (une semaine), migration
+  /// `0041`.
+  static const int echeanceEchangeMin = 1;
+  static const int echeanceEchangeMax = 168;
 }
 
 final RegExp _heure = RegExp(r'^([01][0-9]|2[0-3]):[0-5][0-9]$');
@@ -138,6 +146,15 @@ Map<ChampParametre, String> validerParametres(ParametresCaserne parametres) {
     LimitesParametres.delaiMin,
     LimitesParametres.delaiMax,
     AppStrings.parametresDelaiBorne,
+  );
+
+  _borne(
+    erreurs,
+    ChampParametre.echeanceEchange,
+    parametres.echangeEcheanceHeures,
+    LimitesParametres.echeanceEchangeMin,
+    LimitesParametres.echeanceEchangeMax,
+    AppStrings.parametresEchangesEcheanceErreur,
   );
 
   for (final surcharge in parametres.surcharges) {

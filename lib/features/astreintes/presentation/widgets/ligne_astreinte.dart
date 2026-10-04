@@ -30,11 +30,17 @@ class LigneDAstreinte extends StatelessWidget {
     required this.onOuvrir,
     super.key,
     this.passee = false,
+    this.echangeEnCours = false,
   });
 
   final Astreinte astreinte;
   final HeuresAffichage heures;
   final VoidCallback onOuvrir;
+
+  /// Une demande d'échange est en cours sur cette garde (ticket 073) : une
+  /// seconde ligne de mention, **sans badge de couleur** — l'état vit dans la
+  /// carte d'échange.
+  final bool echangeEnCours;
 
   /// Les passées sont atténuées : ce sont des faits, pas des rendez-vous.
   final bool passee;
@@ -49,20 +55,24 @@ class LigneDAstreinte extends StatelessWidget {
         '${creneau.libelle} · ${heures.intervalle(astreinte.creneau)}';
     final ferie = nomJourFerie(astreinte.jour);
 
+    final semantique = AppStrings.astreintesLigneSemantique(
+      jourEtDate: jourEtDate,
+      creneau: creneau.libelle,
+      heures: AppStrings.astreintesIntervalleDit(
+        astreinte.creneau == CreneauType.jour
+            ? heures.debutJour
+            : heures.finJour,
+        astreinte.creneau == CreneauType.jour
+            ? heures.finJour
+            : heures.debutJour,
+      ),
+    );
+
     return Semantics(
       button: true,
-      label: AppStrings.astreintesLigneSemantique(
-        jourEtDate: jourEtDate,
-        creneau: creneau.libelle,
-        heures: AppStrings.astreintesIntervalleDit(
-          astreinte.creneau == CreneauType.jour
-              ? heures.debutJour
-              : heures.finJour,
-          astreinte.creneau == CreneauType.jour
-              ? heures.finJour
-              : heures.debutJour,
-        ),
-      ),
+      label: echangeEnCours
+          ? '$semantique, ${AppStrings.echangeEnCoursSemantique}'
+          : semantique,
       excludeSemantics: true,
       child: CarteDouce(
         onTap: onOuvrir,
@@ -109,6 +119,25 @@ class LigneDAstreinte extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (echangeEnCours)
+                    Row(
+                      children: <Widget>[
+                        Icon(
+                          Icons.swap_horiz,
+                          size: AppSpacing.lg,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: Text(
+                            AppStrings.echangeEnCoursMention,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

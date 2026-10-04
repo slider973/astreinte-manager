@@ -19,6 +19,9 @@ import '../../../core/widgets/app_divider.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/entete_section.dart';
+import '../../echanges/domain/echange.dart';
+import '../../echanges/domain/echanges_providers.dart';
+import '../../echanges/presentation/widgets/section_echanges.dart';
 import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../profil/presentation/widgets/bouton_compte.dart';
 import '../domain/astreinte.dart';
@@ -85,8 +88,11 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
   Set<Donnee> get donneesAffichees => <Donnee>{
     if (ref.read(porteeAstreintesProvider) == PorteeAstreintes.caserne)
       Donnee.planningCaserne
-    else
+    else ...<Donnee>{
       Donnee.astreintes,
+      // Ticket 073 : la section « Échanges » vit en tête de « Moi ».
+      Donnee.echanges,
+    },
   };
 
   /// « Réessayer » : un geste délibéré, qui relit la portée affichée tout de
@@ -350,6 +356,8 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
                       _ouvrir(astreintes, heures),
                 )
               : _Liste(
+                  enTete: const SectionEchanges(),
+                  enEchange: _enEchange(),
                   elements: ref.watch(elementsAstreintesProvider),
                   heures: heures,
                   onOuvrir: (Astreinte astreinte) =>
@@ -372,6 +380,20 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
   }
 }
 
+/// Les attributions engagées dans une demande en cours (ticket 073) : leur
+/// ligne porte la mention « Échange en cours ».
+extension on _AstreintesScreenState {
+  Set<String> _enEchange() => <String>{
+    for (final echange
+        in ref.watch(echangesOuvertsProvider).value?.echanges ??
+            const <Echange>[])
+      if (echange.statut.enCours) ...<String>{
+        ?echange.garde.attributionId,
+        ?echange.gardeRendue?.attributionId,
+      },
+  };
+}
+
 /// La liste, groupée par mois et **virtualisée**.
 ///
 /// L'historique n'est jamais supprimé (`docs/PRD.md § 7.6`) : les passées se
@@ -379,6 +401,8 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
 /// `SingleChildScrollView` les construirait toutes à chaque image.
 class _Liste extends StatelessWidget {
   const _Liste({
+    required this.enTete,
+    required this.enEchange,
     required this.elements,
     required this.heures,
     required this.onOuvrir,
@@ -386,6 +410,13 @@ class _Liste extends StatelessWidget {
     required this.onRafraichir,
     required this.onVersPropositions,
   });
+
+  /// Ce qui précède les mois : la section « Échanges » (ticket 073). Elle se
+  /// réduit à rien quand il n'y a rien à suivre.
+  final Widget enTete;
+
+  /// Les attributions dont une demande d'échange est en cours.
+  final Set<String> enEchange;
 
   final List<ElementAstreintes> elements;
   final HeuresAffichage heures;
@@ -404,7 +435,8 @@ class _Liste extends StatelessWidget {
     final classe = AppWindowClass.of(context);
     final marge = classe.margePage;
     final vide = _aucuneAVenir;
-    final entete = vide ? 1 : 0;
+    // La section d'échanges, puis l'état vide s'il y a lieu.
+    final entete = 1 + (vide ? 1 : 0);
 
     return RefreshIndicator(
       onRefresh: onRafraichir,
@@ -418,7 +450,8 @@ class _Liste extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(marge, 0, marge, AppSpacing.xxl),
             itemCount: elements.length + entete,
             itemBuilder: (BuildContext context, int index) {
-              if (vide && index == 0) {
+              if (index == 0) return enTete;
+              if (vide && index == 1) {
                 return ConstrainedBox(
                   // Un **minimum**, jamais une hauteur figée : l'état vide
                   // grandit avec l'échelle de texte au lieu de déborder.
@@ -465,6 +498,7 @@ class _Liste extends StatelessWidget {
                     astreinte: astreinte,
                     heures: heures,
                     passee: passee,
+                    echangeEnCours: enEchange.contains(astreinte.id),
                     onOuvrir: () => onOuvrir(astreinte),
                   ),
                 ),

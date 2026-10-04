@@ -15,6 +15,10 @@ import '../../features/demarrage/presentation/configuration_absente_screen.dart'
 import '../../features/demarrage/presentation/demarrage_screen.dart';
 import '../../features/dev/presentation/dev_components_screen.dart';
 import '../../features/dispos/presentation/mois_screen.dart';
+import '../../features/echanges/domain/demande_echange.dart';
+import '../../features/echanges/domain/filtre_echanges.dart';
+import '../../features/echanges/presentation/demande_echange_screen.dart';
+import '../../features/echanges/presentation/echanges_admin_screen.dart';
 import '../../features/invitation/domain/acceptation.dart';
 import '../../features/invitation/presentation/invitation_screen.dart';
 import '../../features/legal/presentation/document_legal_screen.dart';
@@ -298,6 +302,52 @@ abstract final class AppRoutes {
   /// `/availability/<period>` — la saisie du mois.
   static const String lienSaisie = '/availability/:$parametrePeriode';
   static const String lienSaisieName = 'lienSaisie';
+
+  // --- Échanges d'astreintes (ticket 073) ----------------------------------
+
+  /// `/exchanges` — les demandes reçues et à reprendre : l'onglet
+  /// « Propositions » de la Boîte, où elles se répondent.
+  static const String lienEchanges = '/exchanges';
+  static const String lienEchangesName = 'lienEchanges';
+
+  /// `/admin/exchanges` — la file des échanges à valider *(admin)*.
+  static const String lienEchangesAdmin = '/admin/exchanges';
+  static const String lienEchangesAdminName = 'lienEchangesAdmin';
+
+  /// **Proposer un échange**, écran poussé. L'étape et les choix sont dans
+  /// l'adresse (`design/073 § 6.2`).
+  static const String demandeEchange = '/astreintes/echange';
+  static const String demandeEchangeName = 'demandeEchange';
+  static const String parametreAttribution = 'attribution';
+  static const String parametreEtape = 'etape';
+  static const String parametreCible = 'cible';
+  static const String parametreForme = 'forme';
+  static const String parametreRetour = 'retour';
+
+  /// Les paramètres d'une étape du parcours de demande.
+  static Map<String, String> parametresDemandeEchange({
+    required String attribution,
+    required EtapeDemande etape,
+    String? cible,
+    bool echanger = false,
+    String? retour,
+  }) => <String, String>{
+    parametreAttribution: attribution,
+    parametreEtape: etape.valeurUrl,
+    parametreCible: ?cible,
+    if (echanger) parametreForme: formeEchanger,
+    parametreRetour: ?retour,
+  };
+
+  /// La file des échanges de l'administrateur, filtre dans l'adresse.
+  static const String echangesAdmin = '/admin/echanges';
+  static const String echangesAdminName = 'echangesAdmin';
+  static const String parametreFiltre = 'filtre';
+
+  static String echangesAdminFiltre(FiltreEchanges filtre) => Uri(
+    path: echangesAdmin,
+    queryParameters: <String, String>{parametreFiltre: filtre.valeurUrl},
+  ).toString();
 
   /// `/install` — l'aide à l'ajout à l'écran d'accueil (ticket 032).
   ///
@@ -707,6 +757,36 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.periodesName,
         builder: (context, state) => const PeriodesScreen(),
       ),
+      // Ticket 073 : le parcours de demande d'échange (poussé), et la file
+      // des échanges de l'administrateur.
+      GoRoute(
+        path: AppRoutes.demandeEchange,
+        name: AppRoutes.demandeEchangeName,
+        redirect: (context, state) =>
+            (state.uri.queryParameters[AppRoutes.parametreAttribution] ?? '')
+                .isEmpty
+            ? AppRoutes.astreintes
+            : null,
+        builder: (context, state) {
+          final params = state.uri.queryParameters;
+          return DemandeEchangeScreen(
+            attributionId: params[AppRoutes.parametreAttribution] ?? '',
+            etape: EtapeDemande.depuisUrl(params[AppRoutes.parametreEtape]),
+            cible: params[AppRoutes.parametreCible],
+            forme: params[AppRoutes.parametreForme],
+            retour: params[AppRoutes.parametreRetour],
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.echangesAdmin,
+        name: AppRoutes.echangesAdminName,
+        builder: (context, state) => EchangesAdminScreen(
+          filtre: FiltreEchanges.depuisUrl(
+            state.uri.queryParameters[AppRoutes.parametreFiltre],
+          ),
+        ),
+      ),
       GoRoute(
         path: AppRoutes.abonnement,
         name: AppRoutes.abonnementName,
@@ -782,6 +862,8 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         AppRoutes.lienPlanning: AppRoutes.lienPlanningName,
         AppRoutes.lienSuiviAdmin: AppRoutes.lienSuiviAdminName,
         AppRoutes.lienSaisie: AppRoutes.lienSaisieName,
+        AppRoutes.lienEchanges: AppRoutes.lienEchangesName,
+        AppRoutes.lienEchangesAdmin: AppRoutes.lienEchangesAdminName,
       }.entries)
         GoRoute(
           path: chemin.key,
