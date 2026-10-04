@@ -103,6 +103,8 @@ class _CoucheNotificationsState extends ConsumerState<CoucheNotifications> {
         Donnee.propositions,
         Donnee.astreintes,
         Donnee.periodes,
+        // Ticket 073 : une demande reçue, un accord, une validation.
+        Donnee.echanges,
       }),
     );
   }

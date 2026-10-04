@@ -136,6 +136,8 @@ class ParametresCaserne {
     required this.rapportRetardHeures,
     this.surcharges = const <SurchargeEffectif>[],
     this.autresReglages = const <String, dynamic>{},
+    this.echangeAutoLu,
+    this.echangeEcheanceLue,
   });
 
   /// Les clés de `settings` que cette classe sait lire et réécrire.
@@ -154,7 +156,16 @@ class ParametresCaserne {
     'response_email_hours',
     'late_report_hours',
     'required_overrides',
+    // Ticket 073 : deux clés **optionnelles**, et qui doivent le rester
+    // (`docs/SCHEMA.md § 2.1`). Lues ici, réécrites seulement si elles
+    // étaient là ou si l'écran les a touchées.
+    'exchange_auto_approve',
+    'exchange_deadline_hours',
   };
+
+  /// Les valeurs que la base applique quand les clés d'échange sont absentes.
+  static const bool echangeAutoDefaut = false;
+  static const int echangeEcheanceDefaut = 24;
 
   /// Les valeurs du `default` de la colonne `settings` (migration `0001`).
   static const ParametresCaserne defauts = ParametresCaserne(
@@ -203,6 +214,13 @@ class ParametresCaserne {
         defauts.rapportRetardHeures,
       ),
       surcharges: _surcharges(reglages['required_overrides']),
+      // `true` / `false` JSON seulement : la contrainte refuse `"true"` et `1`.
+      echangeAutoLu: reglages['exchange_auto_approve'] is bool
+          ? reglages['exchange_auto_approve'] as bool
+          : null,
+      echangeEcheanceLue: reglages.containsKey('exchange_deadline_hours')
+          ? _entier(reglages['exchange_deadline_hours'], echangeEcheanceDefaut)
+          : null,
       autresReglages: Map<String, dynamic>.unmodifiable(<String, dynamic>{
         for (final MapEntry<String, dynamic> entree in reglages.entries)
           if (!clesConnues.contains(entree.key)) entree.key: entree.value,
@@ -242,6 +260,20 @@ class ParametresCaserne {
   /// le défaut. La clé fait donc l'aller-retour, quelle qu'elle soit.
   final Map<String, dynamic> autresReglages;
 
+  /// `exchange_auto_approve` tel qu'il a été lu ou posé, `null` s'il est
+  /// absent du document.
+  final bool? echangeAutoLu;
+
+  /// `exchange_deadline_hours`, `null` s'il est absent du document.
+  final int? echangeEcheanceLue;
+
+  /// La validation automatique des échanges (ticket 073). Faux par défaut :
+  /// l'administrateur valide.
+  bool get echangeAuto => echangeAutoLu ?? echangeAutoDefaut;
+
+  /// L'échéance d'une demande d'échange, en heures avant le créneau.
+  int get echangeEcheanceHeures => echangeEcheanceLue ?? echangeEcheanceDefaut;
+
   List<SurchargeEffectif> get surchargesDatees => surcharges
       .where((SurchargeEffectif s) => s.jourSemaine == null)
       .toList(growable: false);
@@ -275,6 +307,9 @@ class ParametresCaserne {
         for (final SurchargeEffectif surcharge in surcharges)
           surcharge.cle: surcharge.versJson,
       },
+    if (echangeAutoLu != null) 'exchange_auto_approve': echangeAutoLu,
+    if (echangeEcheanceLue != null)
+      'exchange_deadline_hours': echangeEcheanceLue,
   };
 
   /// Pose ou remplace une surcharge, et retire celles qui ne surchargent plus
@@ -305,6 +340,8 @@ class ParametresCaserne {
     int? relanceEmailHeures,
     int? rapportRetardHeures,
     List<SurchargeEffectif>? surcharges,
+    bool? echangeAuto,
+    int? echangeEcheanceHeures,
   }) => ParametresCaserne(
     stationId: stationId,
     nom: nom ?? this.nom,
@@ -319,6 +356,8 @@ class ParametresCaserne {
     rapportRetardHeures: rapportRetardHeures ?? this.rapportRetardHeures,
     surcharges: surcharges ?? this.surcharges,
     autresReglages: autresReglages,
+    echangeAutoLu: echangeAuto ?? echangeAutoLu,
+    echangeEcheanceLue: echangeEcheanceHeures ?? echangeEcheanceLue,
   );
 
   @override
@@ -336,7 +375,9 @@ class ParametresCaserne {
       other.relanceEmailHeures == relanceEmailHeures &&
       other.rapportRetardHeures == rapportRetardHeures &&
       listEquals(other.surcharges, surcharges) &&
-      mapEquals(other.autresReglages, autresReglages);
+      mapEquals(other.autresReglages, autresReglages) &&
+      other.echangeAutoLu == echangeAutoLu &&
+      other.echangeEcheanceLue == echangeEcheanceLue;
 
   @override
   int get hashCode => Object.hash(
@@ -356,6 +397,7 @@ class ParametresCaserne {
     // sous les mêmes clés restent inégaux, et c'est tout ce qu'on demande à
     // un condensat.
     Object.hashAll(autresReglages.keys.toList()..sort()),
+    Object.hash(echangeAutoLu, echangeEcheanceLue),
   );
 
   static String _texte(Object? valeur, String defaut) =>

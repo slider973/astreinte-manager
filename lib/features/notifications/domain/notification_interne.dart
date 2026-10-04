@@ -24,6 +24,13 @@ enum TypeNotification {
   finEssai('subscription_trial_ending', Icons.hourglass_top),
   caserneSuspendue('subscription_suspended', Icons.visibility_outlined),
 
+  // Ticket 073 : les échanges d'astreintes.
+  echangeDemande('exchange_requested', Icons.swap_horiz),
+  echangeAccepte('exchange_accepted', Icons.how_to_reg),
+  echangeValide('exchange_approved', Icons.verified),
+  echangeRefuse('exchange_rejected', Icons.cancel),
+  echangeClos('exchange_closed', Icons.block),
+
   /// Un type que cette version de l'application ne connaît pas.
   inconnu('', Icons.notifications_outlined);
 
@@ -49,7 +56,16 @@ enum TypeNotification {
   /// pas une question, même si son lien public mène aussi aux propositions
   /// (`supabase/functions/README.md § Liens profonds`). La règle porte donc
   /// sur le type, jamais sur la route.
-  bool get estProposition => this == astreinteProposee || this == rappelReponse;
+  ///
+  /// **`exchange_requested` en est** (ticket 073) : une demande d'un collègue
+  /// pose la question que la carte « Demandes de collègues » porte, et c'est
+  /// elle qui se répond (`design/073 § 7.1`). Les issues d'un échange —
+  /// accord, validation, refus, clôture — sont des faits : elles restent des
+  /// rappels.
+  bool get estProposition =>
+      this == astreinteProposee ||
+      this == rappelReponse ||
+      this == echangeDemande;
 
   /// Ne lève jamais : un type inconnu est [inconnu].
   static TypeNotification depuisSql(String? valeur) {
