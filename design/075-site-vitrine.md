@@ -510,8 +510,8 @@ la CI la cherche (§ 9.3).
 - **Éditeur** : Staticflow LLC, `[À COMPLÉTER : forme, État d'immatriculation, numéro
   d'enregistrement]`, `[À COMPLÉTER : adresse du siège]`. Contact : l'adresse de contact
   (§ 7.3).
-- **Directeur de la publication** : `[À COMPLÉTER : nom et qualité — a priori Jonathan
-  Lemaine, gérant]`.
+- **Directeur de la publication** : `[À COMPLÉTER : nom et qualité]`
+  (rubrique retirée le 4 octobre 2026 à la demande du propriétaire).
 - **Hébergeur** : Vercel Inc., 440 N Barranca Ave #4133, Covina, CA 91723, États-Unis,
   `[À COMPLÉTER : téléphone ou moyen de contact de l'hébergeur, exigé par la LCEN — vérifier sur
   vercel.com/legal]`.
