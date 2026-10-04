@@ -42,7 +42,7 @@ class BoutonEchangeAstreinte extends ConsumerWidget {
     final maintenant = ref.watch(horlogeAstreintesProvider)();
     if (!proposable(astreinte, maintenant)) return const SizedBox.shrink();
 
-    final etat = ref.watch(echangesControllerProvider).value;
+    final etat = ref.watch(echangesOuvertsProvider).value;
     final enCours = etat?.enCoursSur(astreinte.id);
     if (etat != null && enCours != null) {
       return CarteEchange(

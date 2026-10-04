@@ -84,7 +84,7 @@ class _EchangesAdminScreenState extends ConsumerState<EchangesAdminScreen>
   Widget build(BuildContext context) {
     final admin = ref.watch(estAdminCaserneProvider);
     final destinations = ref.watch(destinationsProvider);
-    final asynchrone = ref.watch(echangesControllerProvider);
+    final asynchrone = ref.watch(echangesOuvertsProvider);
     final etat = asynchrone.value;
     final liste = etat == null ? const <Echange>[] : _liste(etat);
 

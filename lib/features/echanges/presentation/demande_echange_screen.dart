@@ -174,7 +174,7 @@ class _DemandeEchangeScreenState extends ConsumerState<DemandeEchangeScreen> {
     final astreinte = _astreinte();
     final aujourdhui = ref.watch(horlogeAstreintesProvider)();
     final dejaEngagee = ref
-        .watch(echangesControllerProvider)
+        .watch(echangesOuvertsProvider)
         .value
         ?.enCoursSur(widget.attributionId);
 

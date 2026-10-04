@@ -35,7 +35,7 @@ class _SectionEchangesState extends ConsumerState<SectionEchanges> {
 
   @override
   Widget build(BuildContext context) {
-    final etat = ref.watch(echangesControllerProvider);
+    final etat = ref.watch(echangesOuvertsProvider);
     final suivis = ref.watch(echangesSuivisProvider);
     final maintenant = ref.watch(horlogeAstreintesProvider)();
 

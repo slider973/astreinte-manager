@@ -120,7 +120,7 @@ class _DetailEchangeState extends ConsumerState<DetailEchange> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final etat = ref.watch(echangesControllerProvider).value;
+    final etat = ref.watch(echangesOuvertsProvider).value;
     final echange = etat?.parId(widget.echangeId);
     if (etat == null || echange == null) return const SizedBox.shrink();
 

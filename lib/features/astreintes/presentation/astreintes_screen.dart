@@ -385,7 +385,7 @@ class _AstreintesScreenState extends ConsumerState<AstreintesScreen>
 extension on _AstreintesScreenState {
   Set<String> _enEchange() => <String>{
     for (final echange
-        in ref.watch(echangesControllerProvider).value?.echanges ??
+        in ref.watch(echangesOuvertsProvider).value?.echanges ??
             const <Echange>[])
       if (echange.statut.enCours) ...<String>{
         ?echange.garde.attributionId,

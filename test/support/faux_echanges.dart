@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/echanges/data/echanges_repository.dart';
 import 'package:astreinte_sp/features/echanges/domain/echange.dart';
@@ -91,6 +93,13 @@ class FauxEchangesRepository implements EchangesRepository {
   void Function(String fonction, Map<String, dynamic> arguments)? apres;
 
   int lectures = 0;
+
+  /// Les demandes d'une autre caserne (ticket 072), par identifiant de
+  /// caserne. Une caserne absente rend [definir].
+  final Map<String, List<Echange>> parCaserne = <String, List<Echange>>{};
+
+  /// Les lectures qui n'aboutissent qu'à la complétion de leur `Completer`.
+  final Map<String, Completer<void>> retenues = <String, Completer<void>>{};
   final List<(String, Map<String, dynamic>)> appels =
       <(String, Map<String, dynamic>)>[];
 
@@ -109,7 +118,10 @@ class FauxEchangesRepository implements EchangesRepository {
     lectures++;
     final echec = erreurLecture;
     if (echec != null) throw EchecEchange(echec);
-    return List<Echange>.unmodifiable(_echanges);
+    // Une lecture retenue : le réseau n'a pas encore répondu.
+    final retenue = retenues[stationId];
+    if (retenue != null) await retenue.future;
+    return List<Echange>.unmodifiable(parCaserne[stationId] ?? _echanges);
   }
 
   @override

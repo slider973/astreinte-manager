@@ -75,7 +75,7 @@ class _PanneauEchangeState extends ConsumerState<PanneauEchange> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final etat = ref.watch(echangesControllerProvider).value;
+    final etat = ref.watch(echangesOuvertsProvider).value;
     final lu = etat?.parId(widget.echangeId);
     if (lu != null && lu.statut == StatutEchange.ouvert) _dernier = lu;
     final echange = _dernier;

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/session/session_providers.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/theme/app_status.dart';
 import '../../dispos/domain/disponibilite_mois.dart';
 import '../../dispos/domain/dispos_providers.dart';
@@ -150,12 +150,12 @@ List<ChargePersonne> chargeApresEchange(
 /// nouvelle**, une lecture par mois touché.
 final chargeEchangeProvider = FutureProvider.autoDispose
     .family<List<ChargePersonne>, String>((ref, String echangeId) async {
-      final appartenance = ref.watch(appartenanceCouranteProvider);
-      final echange = ref
-          .read(echangesControllerProvider)
-          .value
-          ?.parId(echangeId);
-      if (appartenance == null || echange == null) {
+      final caserne = ref.watch(caserneOuverteIdProvider);
+      final echange = caserneOuverteSeulement(
+        ref,
+        echangesControllerProvider,
+      ).value?.parId(echangeId);
+      if (caserne == null || echange == null) {
         return const <ChargePersonne>[];
       }
       final periodes = await ref.watch(periodesProvider.future);
@@ -172,7 +172,7 @@ final chargeEchangeProvider = FutureProvider.autoDispose
         if (periode == null) continue;
         final lignes = await ref
             .read(matriceRepositoryProvider)
-            .matrice(stationId: appartenance.stationId, periodeId: periode.id);
+            .matrice(stationId: caserne, periodeId: periode.id);
         matrices[cle] = <String, LigneMatrice>{
           for (final ligne in lignes) ligne.userId: ligne,
         };

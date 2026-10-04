@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/fraicheur/fraicheur.dart';
 import '../../../core/fraicheur/relecture.dart';
+import '../../../core/session/caserne_ouverte.dart';
 import '../../../core/session/session_providers.dart';
 import '../../../core/supabase/supabase_bootstrap.dart';
 import '../../astreintes/domain/astreintes_providers.dart';
@@ -157,10 +158,10 @@ class EchangesController extends AsyncNotifier<EtatEchanges>
       final echanges = await ref
           .read(echangesRepositoryProvider)
           .lister(
-          stationId: appartenance.stationId,
-          moi: session.userId,
-          admin: appartenance.estAdmin,
-        );
+            stationId: appartenance.stationId,
+            moi: session.userId,
+            admin: appartenance.estAdmin,
+          );
       if (!ref.mounted) return Relecture.inchangee;
       marquerLu();
       if (ecritureEnAttente || (publierSi != null && !publierSi())) {
@@ -273,17 +274,25 @@ echangesControllerProvider =
       EchangesController.new,
     );
 
+/// La même source, **sans rien de ce qui a été lu dans une autre caserne**
+/// (ticket 072, `core/session/caserne_ouverte.dart`). C'est elle que les
+/// écrans lisent : après une bascule, ils montrent leur squelette jusqu'à la
+/// première réponse de la nouvelle caserne, jamais ses demandes à elle.
+final Provider<AsyncValue<EtatEchanges>> echangesOuvertsProvider =
+    dansLaCaserneOuverte(echangesControllerProvider);
+
 /// Les demandes auxquelles je dois répondre, pour la Boîte et l'accueil.
 final Provider<List<Echange>> echangesRecusProvider = Provider<List<Echange>>(
   (ref) =>
-      ref.watch(echangesControllerProvider).value?.recues ?? const <Echange>[],
+      caserneOuverteSeulement(ref, echangesControllerProvider).value?.recues ??
+      const <Echange>[],
 );
 
 /// Les demandes que je suis, pour la section « Échanges » d'Astreintes.
 final Provider<List<Echange>> echangesSuivisProvider = Provider<List<Echange>>(
   (ref) =>
       ref
-          .watch(echangesControllerProvider)
+          .watch(echangesOuvertsProvider)
           .value
           ?.suivies(ref.watch(horlogeAstreintesProvider)()) ??
       const <Echange>[],
@@ -291,7 +300,12 @@ final Provider<List<Echange>> echangesSuivisProvider = Provider<List<Echange>>(
 
 /// Le nombre de demandes à valider, pour le bloc du Suivi et le filtre.
 final Provider<int> echangesAValiderProvider = Provider<int>(
-  (ref) => ref.watch(echangesControllerProvider).value?.aValider.length ?? 0,
+  (ref) =>
+      caserneOuverteSeulement(
+        ref,
+        echangesControllerProvider,
+      ).value?.aValider.length ??
+      0,
 );
 
 // ---------------------------------------------------------------------------
@@ -304,30 +318,28 @@ final Provider<int> echangesAValiderProvider = Provider<int>(
 final FutureProvider<List<Collegue>> colleguesEchangeProvider =
     FutureProvider.autoDispose<List<Collegue>>((ref) async {
       final session = ref.watch(sessionProvider).value;
-      final appartenance = ref.watch(appartenanceCouranteProvider);
-      if (session == null || appartenance == null) return const <Collegue>[];
+      final caserne = ref.watch(caserneOuverteIdProvider);
+      if (session == null || caserne == null) return const <Collegue>[];
       return ref
           .read(echangesRepositoryProvider)
-          .collegues(stationId: appartenance.stationId, moi: session.userId);
+          .collegues(stationId: caserne, moi: session.userId);
     });
 
 /// Les gardes à venir d'un collègue, que je peux prendre en retour.
 final gardesProposablesProvider = FutureProvider.autoDispose
     .family<List<GardeProposable>, String>((ref, String pairId) async {
-      final appartenance = ref.watch(appartenanceCouranteProvider);
-      if (appartenance == null) return const <GardeProposable>[];
+      final caserne = ref.watch(caserneOuverteIdProvider);
+      if (caserne == null) return const <GardeProposable>[];
       return ref
           .read(echangesRepositoryProvider)
-          .gardesDe(pairId: pairId, stationId: appartenance.stationId);
+          .gardesDe(pairId: pairId, stationId: caserne);
     });
 
 /// Les réglages d'échange de la caserne, pour annoncer l'échéance et la
 /// validation automatique. Un confort : en cas d'échec, les défauts.
 final FutureProvider<ReglagesEchange> reglagesEchangeProvider =
     FutureProvider.autoDispose<ReglagesEchange>((ref) async {
-      final appartenance = ref.watch(appartenanceCouranteProvider);
-      if (appartenance == null) return ReglagesEchange.defaut;
-      return ref
-          .read(echangesRepositoryProvider)
-          .reglages(appartenance.stationId);
+      final caserne = ref.watch(caserneOuverteIdProvider);
+      if (caserne == null) return ReglagesEchange.defaut;
+      return ref.read(echangesRepositoryProvider).reglages(caserne);
     });
