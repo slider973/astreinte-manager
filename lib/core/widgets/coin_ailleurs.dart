@@ -13,25 +13,48 @@ import 'package:flutter/material.dart';
 ///
 /// Décoratif pour les lecteurs d'écran : la case dit la même chose en mots.
 class CoinAilleurs extends StatelessWidget {
-  const CoinAilleurs({required this.cote, super.key});
+  const CoinAilleurs({required this.cote, super.key, this.fond});
 
   /// Le côté du triangle : 8 en densité dense (case de 28), 12 au-delà.
   final double cote;
+
+  /// Le fond de la case. L'encre du coin est celle du texte (`on-surface`),
+  /// **sauf** quand ce fond est plus proche d'elle que du papier — l'orange
+  /// d'une proposition en thème sombre ne laisse que 1,8:1 à l'encre claire.
+  /// Le coin prend alors l'encre du papier, et le liseré l'autre : il reste à
+  /// 3:1 au moins sur les six états, dans les deux thèmes.
+  final Color? fond;
+
+  /// L'encre la plus lisible sur [fond], entre l'encre du texte et le papier.
+  static (Color encre, Color lisere) encres(ColorScheme scheme, Color? fond) {
+    final texte = scheme.onSurface;
+    final papier = scheme.surface;
+    if (fond == null) return (texte, papier);
+    return ratio(texte, fond) >= ratio(papier, fond)
+        ? (texte, papier)
+        : (papier, texte);
+  }
+
+  /// Rapport de contraste WCAG entre deux couleurs opaques.
+  static double ratio(Color a, Color b) {
+    final la = a.computeLuminance();
+    final lb = b.computeLuminance();
+    final claire = la > lb ? la : lb;
+    final sombre = la > lb ? lb : la;
+    return (claire + 0.05) / (sombre + 0.05);
+  }
 
   /// Le côté pour une case de [taille].
   static double pourCase(double taille) => taille <= 28 ? 8 : 12;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final (encre, lisere) = encres(Theme.of(context).colorScheme, fond);
     return IgnorePointer(
       child: ExcludeSemantics(
         child: CustomPaint(
           size: Size.square(cote),
-          painter: PeintureCoinAilleurs(
-            encre: scheme.onSurface,
-            lisere: scheme.surface,
-          ),
+          painter: PeintureCoinAilleurs(encre: encre, lisere: lisere),
         ),
       ),
     );

@@ -163,19 +163,25 @@ class LigneCandidat extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.entreCibles),
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xs),
-            // **L'étiquette nomme la personne**, pas seulement l'action : au
-            // lecteur d'écran, douze boutons « Réattribuer » à la suite ne
-            // disent rien de ce qu'on choisit. Elle passe par le texte du
-            // bouton et non par un `Semantics` englobant, qui effacerait
-            // l'action du nœud avec `excludeSemantics`.
-            child: TextButton.icon(
-              onPressed: onAction,
-              icon: Icon(action.icone, size: AppTouch.icone),
-              label: Text(
-                _libelleAction,
-                semanticsLabel: '$_libelleAction ${membre.nomAffiche}',
+          // Souple : « Attribuer quand même » (ticket 072) ne tient pas
+          // toujours sur une ligne à côté du nom, à 390 ou en grande échelle
+          // de texte. Il passe à la ligne plutôt que de déborder.
+          Flexible(
+            child: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              // **L'étiquette nomme la personne**, pas seulement l'action : au
+              // lecteur d'écran, douze boutons « Réattribuer » à la suite ne
+              // disent rien de ce qu'on choisit. Elle passe par le texte du
+              // bouton et non par un `Semantics` englobant, qui effacerait
+              // l'action du nœud avec `excludeSemantics`.
+              child: TextButton.icon(
+                onPressed: onAction,
+                icon: Icon(action.icone, size: AppTouch.icone),
+                label: Text(
+                  _libelleAction,
+                  semanticsLabel: '$_libelleAction ${membre.nomAffiche}',
+                  maxLines: 2,
+                ),
               ),
             ),
           ),

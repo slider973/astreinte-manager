@@ -202,6 +202,7 @@ class SlotChip extends StatelessWidget {
                   right: 0,
                   child: CoinAilleurs(
                     cote: CoinAilleurs.pourCase(densite.taille),
+                    fond: apparence.fond,
                   ),
                 ),
               ],

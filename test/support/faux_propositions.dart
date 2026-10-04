@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:astreinte_sp/core/theme/app_status.dart';
 import 'package:astreinte_sp/features/propositions/data/propositions_repository.dart';
 import 'package:astreinte_sp/features/propositions/domain/proposition.dart';
@@ -62,6 +64,19 @@ class FauxPropositionsRepository implements PropositionsRepository {
 
   final List<String> planningsRelus = <String>[];
 
+  /// **Une liste par caserne** (ticket 072) : la lecture d'une caserne
+  /// présente ici ne rend que la sienne. Les autres retombent sur la liste
+  /// commune.
+  final Map<String, List<Proposition>> parCaserne =
+      <String, List<Proposition>>{};
+
+  /// Les lectures d'une caserne retenues jusqu'à ce que le test complète le
+  /// verrou : c'est l'instant entre la bascule et la première réponse.
+  final Map<String, Completer<void>> retenues = <String, Completer<void>>{};
+
+  /// Les casernes lues, dans l'ordre.
+  final List<String> casernesLues = <String>[];
+
   /// Remplace la liste servie à la prochaine lecture.
   void definir(List<Proposition> propositions) =>
       _propositions = <Proposition>[...propositions];
@@ -72,13 +87,16 @@ class FauxPropositionsRepository implements PropositionsRepository {
     required String stationId,
   }) async {
     lectures++;
+    casernesLues.add(stationId);
+    final retenue = retenues[stationId];
+    if (retenue != null) await retenue.future;
     final echec = erreurLecture;
     if (echec != null) throw EchecProposition(echec);
     // Le même tri que `SupabasePropositionsRepository` : une proposition d'un
     // mois archivé n'est plus répondable, donc elle n'est plus listée
     // (ticket 044).
     return <Proposition>[
-      for (final proposition in _propositions)
+      for (final proposition in parCaserne[stationId] ?? _propositions)
         if (proposition.repondable) proposition,
     ]..sort((Proposition a, Proposition b) => a.comparer(b));
   }

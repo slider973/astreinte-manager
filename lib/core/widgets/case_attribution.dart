@@ -105,7 +105,10 @@ class CaseAttribution extends StatelessWidget {
               Positioned(
                 top: 0,
                 right: 0,
-                child: CoinAilleurs(cote: CoinAilleurs.pourCase(cote)),
+                child: CoinAilleurs(
+                  cote: CoinAilleurs.pourCase(cote),
+                  fond: descripteur.blocFond,
+                ),
               ),
             ],
           )

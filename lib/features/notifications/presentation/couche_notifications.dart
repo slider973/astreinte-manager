@@ -395,6 +395,7 @@ class BandeauBascule extends StatelessWidget {
               ? null
               : AppStrings.bandeauRevenir(ancienne),
           onAction: onRevenir,
+          actionSousTexte: true,
           onFermer: onFermer,
           libelleFermer: AppStrings.bandeauFermer,
         ),

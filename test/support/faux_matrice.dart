@@ -20,6 +20,8 @@ LigneMatrice ligneMatrice({
   int? astreintesRestantes,
   int? weekendsRestants,
   int accepteesPrecedentes = 0,
+  String ailleursJours = '',
+  String ailleursNuits = '',
 }) => LigneMatrice(
   userId: userId,
   nomAffiche: nom,
@@ -33,6 +35,8 @@ LigneMatrice ligneMatrice({
   astreintesRestantes: astreintesRestantes ?? _reste(maxAstreintes, astreintes),
   weekendsRestants: weekendsRestants ?? _reste(maxWeekends, unitesWeekend),
   accepteesPrecedentes: accepteesPrecedentes,
+  ailleursJours: ailleursJours,
+  ailleursNuits: ailleursNuits,
 );
 
 /// `null` quand le plafond est `null` : un illimité n'a pas de reste.
