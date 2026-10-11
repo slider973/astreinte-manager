@@ -166,6 +166,60 @@ void main() {
     });
   });
 
+  // Ticket 078 : FCM renouvelle un jeton de sa propre initiative — mise à jour
+  // du navigateur, nettoyage du stockage, réinstallation de la PWA, longue
+  // inactivité. Sans ces écoutes, la base gardait l'ancien jeton et le pompier
+  // devenait injoignable **en silence**, son écran affichant toujours
+  // « notifications activées ».
+  group('Rotation du jeton', () {
+    testWidgets('un jeton renouvelé par FCM est republié', (tester) async {
+      final messagerie = FauxMessageriePush(
+        etatPermission: PermissionPush.accordee,
+      );
+      final faux = await _lancer(tester, messagerie: messagerie);
+
+      // Le lancement a publié ; le compte exact dépend de l'ordre d'arrivée de
+      // la session et de l'autorisation, ce qui n'est pas ce qu'on teste ici.
+      final ecrituresAuLancement = faux.jetons.ecritures.length;
+      expect(ecrituresAuLancement, greaterThan(0));
+
+      // FCM fait tourner le jeton pendant que l'application est ouverte.
+      messagerie.jetonRendu = 'jeton-renouvele';
+      messagerie.rotations.add('jeton-renouvele');
+      await tester.pumpAndSettle();
+
+      expect(
+        faux.jetons.ecritures.length,
+        greaterThan(ecrituresAuLancement),
+        reason: 'la rotation doit déclencher une republication',
+      );
+      expect(faux.jetons.ecritures.last.token, 'jeton-renouvele');
+    });
+
+    testWidgets('sans autorisation, une rotation n\'écrit rien', (tester) async {
+      final messagerie = FauxMessageriePush(
+        etatPermission: PermissionPush.refusee,
+      );
+      final faux = await _lancer(tester, messagerie: messagerie);
+
+      messagerie.rotations.add('jeton-renouvele');
+      await tester.pumpAndSettle();
+
+      expect(
+        faux.jetons.ecritures,
+        isEmpty,
+        reason: 'une autorisation refusée reste refusée, rotation ou non',
+      );
+    });
+
+    // Pas de test « rotation après désenregistrement » : `desenregistrer()`
+    // seul n'est pas une déconnexion (la session et l'autorisation restent),
+    // et une rotation doit alors bel et bien republier. La protection
+    // d'après-déconnexion est déjà couverte par le groupe « Déconnexion »,
+    // test « un jeton rendu par FCM après la déconnexion n'écrit ni ligne ni
+    // clé », qui passe par le vrai parcours de l'écran de profil.
+  });
+
   // Ticket 057 : un téléphone de caserne est prêté. À la déconnexion, la ligne
   // de `push_tokens` part côté serveur, **puis** la clé locale, et les deux
   // avant la fermeture de session. Le stockage est le vrai

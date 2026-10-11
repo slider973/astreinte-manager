@@ -51,6 +51,17 @@ abstract interface class MessageriePush {
   /// Les messages reçus **pendant que l'application est au premier plan**. Le
   /// système n'affiche rien dans ce cas : c'est l'application qui montre.
   Stream<MessagePush> get messagesPremierPlan;
+
+  /// Les jetons que **FCM renouvelle de sa propre initiative**.
+  ///
+  /// `jeton()` est un appel ponctuel : il ne dit rien des rotations qui
+  /// surviennent ensuite. Or FCM renouvelle un jeton après une mise à jour du
+  /// navigateur, un nettoyage du stockage, une réinstallation de la PWA ou une
+  /// longue inactivité. Sans ce flux, la rotation passe inaperçue entre deux
+  /// lancements : `push_tokens` garde l'ancien jeton, FCM le rejette, et le
+  /// pompier ne reçoit plus rien **alors que son écran affiche toujours
+  /// « activées »** (ticket 078).
+  Stream<String> get jetonsRenouveles;
 }
 
 /// Le dossier du service worker des push, **relatif au base href**.
@@ -186,6 +197,14 @@ class MessageriePushFirebase implements MessageriePush {
     }
   }
 
+  /// Le flux de rotation du SDK, tel quel.
+  ///
+  /// Rien à filtrer ici : c'est `JetonPushController.publier` qui décide
+  /// d'écrire ou non, avec sa protection de génération.
+  @override
+  Stream<String> get jetonsRenouveles =>
+      FirebaseMessaging.instance.onTokenRefresh;
+
   @override
   Stream<MessagePush> get messagesPremierPlan =>
       FirebaseMessaging.onMessage.map(
@@ -238,4 +257,7 @@ class MessageriePushIndisponible implements MessageriePush {
 
   @override
   Stream<MessagePush> get messagesPremierPlan => const Stream<MessagePush>.empty();
+
+  @override
+  Stream<String> get jetonsRenouveles => const Stream<String>.empty();
 }

@@ -206,6 +206,14 @@ class _CoucheNotificationsState extends ConsumerState<CoucheNotifications> {
       if (suivant.value != null) _publier();
     });
 
+    // **La rotation de jeton** (ticket 078). FCM renouvelle sans prévenir ;
+    // republier est le seul moyen que la base suive. `publier()` relit le
+    // jeton auprès du SDK — le jeton émis ici sert de déclencheur, pas de
+    // valeur, pour que la protection de génération reste la seule autorité.
+    ref.listen(jetonsRenouvelesProvider, (_, suivant) {
+      if (suivant.value != null) _publier();
+    });
+
     ref.listen(messagesPremierPlanProvider, (_, suivant) {
       final message = suivant.value;
       if (message == null) return;

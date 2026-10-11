@@ -7,7 +7,6 @@ Généré par `scripts/ticket.sh board` le 2026-10-11. Ne pas éditer à la main
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 077 | [Servir l'app sur app.astreinte-sp.fr](in-progress/077-app-sur-app-astreinte-sp-fr.md) | P1 | 075 | — |
-| 078 | [Les notifications n'arrivent qu'à une partie des pompiers](in-progress/078-rotation-jeton-push.md) | P0 | 074 |  |
 | 079 | [Le suivi de planning est sans retour, et la réattribution avec lui](in-progress/079-acces-suivi-planning.md) | P1 | 019 020 |  |
 | 080 | [Afficher la version pour distinguer ce qui est déployé](in-progress/080-version-visible.md) | P1 |  |  |
 
@@ -94,4 +93,5 @@ Généré par `scripts/ticket.sh board` le 2026-10-11. Ne pas éditer à la main
 | 074 | [Aucune notification push n'arrive sur la PWA](done/074-push-web-portee-service-worker.md) | P0 | 070 | https://github.com/slider973/astreinte-manager/pull/78 |
 | 075 | [Le site vitrine astreinte-sp.fr](done/075-site-vitrine.md) | P1 |  | https://github.com/slider973/astreinte-manager/pull/80 |
 | 076 | [Ouvrir l'app iOS à des testeurs externes par TestFlight](done/076-testflight-testeurs-externes.md) | P1 | 067 071 | https://github.com/slider973/astreinte-manager/pull/81 |
+| 078 | [Les notifications n'arrivent qu'à une partie des pompiers](done/078-rotation-jeton-push.md) | P0 | 074 | https://github.com/slider973/astreinte-manager/pull/91 |
 

@@ -53,6 +53,12 @@ class FauxMessageriePush implements MessageriePush {
   final StreamController<MessagePush> messages =
       StreamController<MessagePush>.broadcast();
 
+  /// Les rotations de jeton que le test déclenche (ticket 078).
+  final StreamController<String> rotations = StreamController<String>.broadcast();
+
+  @override
+  Stream<String> get jetonsRenouveles => rotations.stream;
+
   @override
   Future<bool> estSupportee() async => supportee;
 
@@ -90,7 +96,10 @@ class FauxMessageriePush implements MessageriePush {
   @override
   Stream<MessagePush> get messagesPremierPlan => messages.stream;
 
-  void fermer() => messages.close();
+  void fermer() {
+    unawaited(messages.close());
+    unawaited(rotations.close());
+  }
 }
 
 /// Un appel à `register_push_token`, tel que le dépôt l'a reçu. Pas
