@@ -61,8 +61,30 @@ command -v brotli >/dev/null ||
 [ -f "$ENV_FILE" ] ||
   die "$ENV_FILE absent. Copier env/prod.json.example et le remplir (voir env/README.md)."
 
+# **Ce qui identifie la construction** (ticket 080). Le propriétaire teste après
+# chaque correctif et doit pouvoir lire, dans l'app, ce qu'il a sous les yeux :
+# un service worker sert parfois l'ancienne version depuis le cache. Le commit
+# court plutôt qu'une version sémantique — `pubspec.yaml` est resté à `0.1.0+1`
+# pendant 79 livraisons, un numéro que personne ne fait avancer mentirait.
+#
+# Les deux valeurs sont injectées à la compilation, pas lues à l'exécution :
+# aucun paquet, rien au démarrage. Un dépôt absent ne fait pas échouer la
+# construction — `local` suffit à dire « ce n'est pas une livraison ».
+COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo local)"
+# `--porcelain` plutôt que `diff --quiet` : il voit aussi les fichiers non
+# suivis. Une construction faite sur un arbre modifié n'est pas le commit
+# qu'elle annonce, et le suffixe le dit.
+if [ "$COMMIT" != "local" ] && [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+  COMMIT="$COMMIT+local"
+fi
+DATE_BUILD="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+echo "→ construction $COMMIT du $DATE_BUILD"
 echo "→ flutter build web --release --wasm --no-web-resources-cdn --dart-define-from-file=$ENV_FILE"
-flutter build web --release --wasm --no-web-resources-cdn --dart-define-from-file="$ENV_FILE"
+flutter build web --release --wasm --no-web-resources-cdn \
+  --dart-define-from-file="$ENV_FILE" \
+  --dart-define=APP_COMMIT="$COMMIT" \
+  --dart-define=APP_BUILD_DATE="$DATE_BUILD"
 
 # Garde-fou : si un jour le chargeur repartait chez Google, la mise en ligne
 # doit s'arrêter ici plutôt que de le découvrir au journal réseau d'un
