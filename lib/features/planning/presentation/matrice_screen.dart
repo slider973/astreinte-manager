@@ -666,7 +666,56 @@ class _MatriceScreenState extends ConsumerState<MatriceScreen>
     );
   }
 
+  /// Le planning du mois ouvert est-il publié, donc suivable ?
+  ///
+  /// Le suivi n'a de sens que sur un planning publié ou validé : en brouillon,
+  /// personne n'a encore été sollicité.
+  bool get _planningSuivable {
+    final etat = ref.watch(planningOuvertProvider).value;
+    final planningEtat = etat?.planning.planning?.etat;
+    return planningEtat == PlanningEtat.publie ||
+        planningEtat == PlanningEtat.valide;
+  }
+
+  /// Le lien vers le suivi du mois ouvert, avec le compte des refus à traiter.
+  ///
+  /// Le compte est écrit, pas seulement coloré : contexte d'usage binding —
+  /// extérieur, gants, coup d'œil rapide.
+  Widget _lienSuivi() {
+    final etat = ref.watch(planningOuvertProvider).value;
+    final cle = etat?.periode.cle;
+    final refus = _refusATraiter(etat);
+
+    return IconButton(
+      onPressed: cle == null
+          ? null
+          : () => context.goNamed(
+              AppRoutes.suiviName,
+              queryParameters: <String, String>{AppRoutes.parametreMois: cle},
+            ),
+      icon: refus > 0
+          ? Badge(label: Text('$refus'), child: const Icon(Icons.fact_check_outlined))
+          : const Icon(Icons.fact_check_outlined),
+      tooltip: AppStrings.suiviVersSuivi,
+    );
+  }
+
+  /// Combien d'astreintes refusées attendent une réattribution.
+  int _refusATraiter(EtatPlanning? etat) {
+    final planning = etat?.planning;
+    if (planning == null) return 0;
+    return planning.attributions
+        .where((a) => a.etat == AttributionEtat.refuse)
+        .length;
+  }
+
   List<Widget> _liensAdmin() => <Widget>[
+    // **Le retour vers le suivi** (ticket 079). Avant, on n'y accédait qu'en
+    // publiant ou par une notification : sorti de l'écran, un administrateur
+    // n'avait aucun moyen d'y revenir, et la réattribution — qui ne vit que
+    // là — devenait inatteignable avec lui. Le libellé `suiviVersSuivi`
+    // existait déjà, sans que rien ne l'utilise.
+    if (_planningSuivable) _lienSuivi(),
     IconButton(
       onPressed: () => context.goNamed(AppRoutes.membresName),
       icon: const Icon(Icons.group_outlined),

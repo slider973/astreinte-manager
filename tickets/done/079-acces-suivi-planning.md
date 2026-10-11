@@ -4,7 +4,8 @@
 - **Priorité** : P1
 - **Dépend de** : 019, 020
 - **Branche** : `feat/079-acces-suivi-planning`
-- **Statut** : en cours depuis 2026-10-11
+- **PR** : https://github.com/slider973/astreinte-manager/pull/92
+- **Statut** : terminé le 2026-10-11 (PR créée)
 
 ## Contexte
 
@@ -24,13 +25,19 @@ Diagnostic (lu dans le code, le 10 octobre) :
    Boîte, et Admin pour les administrateurs. `AppRoutes.suivi` n'en fait pas partie — le mot
    « suivi » n'apparaît ni dans `app_scaffold.dart` ni dans `destinations.dart`.
 
-2. **Deux seuls chemins y mènent**, et aucun n'est un retour :
-   - un lien de notification (`destination_push.dart:114`),
-   - la matrice admin après publication (`matrice_screen.dart:473`).
+2. **Le chemin manquant est l'aller, pas le retour.** Correction du diagnostic
+   initial de ce ticket, qui affirmait l'inverse :
+   - Le **retour** existe déjà : `suivi_screen.dart:361-374` porte un lien vers la matrice,
+     en icône sur grand écran et dans le menu `_MenuAdmin` (`:640-660`) sur téléphone.
+   - L'**aller** manquait : depuis `MatriceScreen`, rien ne menait au suivi. `_liensAdmin()`
+     offrait Membres, Réglages, Mois de saisie et Échanges — pas le suivi. Le libellé
+     `AppStrings.suiviVersSuivi` (`app_strings.dart:2821`) était déclaré et **utilisé
+     nulle part**, trace du lien oublié.
 
-   Sorti de l'écran, un administrateur n'a aucun moyen d'y revenir : il doit republier un
-   planning ou attendre une notification. Ce n'est pas un défaut de recherche de
-   l'utilisateur, c'est une impasse de navigation.
+   Les deux seuls chemins vers le suivi étaient donc un lien de notification
+   (`destination_push.dart:114`) et la redirection après publication
+   (`matrice_screen.dart:472`) — deux événements, jamais une navigation délibérée. Une fois
+   le planning publié et la notification balayée, l'écran devenait inatteignable.
 
 3. **La réattribution n'existe que là.** Le geste vit uniquement dans
    `suivi_screen.dart:127-234` (`_reattribuer`, `cibleReattributionProvider`,
