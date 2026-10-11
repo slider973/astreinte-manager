@@ -9,6 +9,7 @@ Généré par `scripts/ticket.sh board` le 2026-10-11. Ne pas éditer à la main
 | 077 | [Servir l'app sur app.astreinte-sp.fr](in-progress/077-app-sur-app-astreinte-sp-fr.md) | P1 | 075 | — |
 | 078 | [Les notifications n'arrivent qu'à une partie des pompiers](in-progress/078-rotation-jeton-push.md) | P0 | 074 |  |
 | 079 | [Le suivi de planning est sans retour, et la réattribution avec lui](in-progress/079-acces-suivi-planning.md) | P1 | 019 020 |  |
+| 080 | [Afficher la version pour distinguer ce qui est déployé](in-progress/080-version-visible.md) | P1 |  |  |
 
 ## À faire
 

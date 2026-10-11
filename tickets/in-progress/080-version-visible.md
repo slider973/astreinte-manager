@@ -3,7 +3,7 @@
 - **Épopée** : E1 Socle
 - **Priorité** : P1
 - **Branche** : `feat/080-version-visible`
-- **Statut** : backlog
+- **Statut** : en cours depuis 2026-10-11
 
 ## Le besoin, dans les mots du propriétaire
 
