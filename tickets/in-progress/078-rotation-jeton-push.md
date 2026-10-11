@@ -4,7 +4,7 @@
 - **Priorité** : P0
 - **Dépend de** : 074
 - **Branche** : `feat/078-rotation-jeton-push`
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-10-11
 
 ## Contexte
 

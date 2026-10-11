@@ -1,12 +1,13 @@
 # Tableau des tickets
 
-Généré par `scripts/ticket.sh board` le 2026-10-04. Ne pas éditer à la main.
+Généré par `scripts/ticket.sh board` le 2026-10-11. Ne pas éditer à la main.
 
 ## En cours
 
 | # | Ticket | Prio | Dépend de | PR |
 |---|---|---|---|---|
 | 077 | [Servir l'app sur app.astreinte-sp.fr](in-progress/077-app-sur-app-astreinte-sp-fr.md) | P1 | 075 | — |
+| 078 | [Les notifications n'arrivent qu'à une partie des pompiers](in-progress/078-rotation-jeton-push.md) | P0 | 074 |  |
 
 ## À faire
 
@@ -14,6 +15,7 @@ Généré par `scripts/ticket.sh board` le 2026-10-04. Ne pas éditer à la main
 |---|---|---|---|---|
 | 033 | [Publication sur les stores (à la demande d'une caserne)](backlog/033-stores-ios-android.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 032 |  |
 | 036 | [Push natives iOS et Android (à la demande d'une caserne)](backlog/036-push-natives.md) | P2 — ne pas démarrer sans demande explicite d'une caserne | 024 025 |  |
+| 079 | [Le suivi de planning est sans retour, et la réattribution avec lui](backlog/079-acces-suivi-planning.md) | P1 | 019 020 |  |
 
 ## Terminés
 
