@@ -4,7 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 019, 020
 - **Branche** : `feat/079-acces-suivi-planning`
-- **Statut** : à faire
+- **Statut** : en cours depuis 2026-10-11
 
 ## Contexte
 
