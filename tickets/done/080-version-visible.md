@@ -3,6 +3,7 @@
 - **Épopée** : E1 Socle
 - **Priorité** : P1
 - **Branche** : `feat/080-version-visible`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/93
 - **Statut** : terminé le 2026-10-11 (PR créée)
 
 ## Le besoin, dans les mots du propriétaire
