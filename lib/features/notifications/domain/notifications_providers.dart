@@ -274,6 +274,15 @@ final StreamProvider<MessagePush> messagesPremierPlanProvider =
       (ref) => ref.watch(messageriePushProvider).messagesPremierPlan,
     );
 
+/// Les jetons que FCM renouvelle de lui-même (ticket 078).
+///
+/// Sans cette écoute, une rotation entre deux lancements laissait en base un
+/// jeton que FCM rejette : le pompier devenait injoignable en silence, son
+/// écran affichant toujours « notifications activées ».
+final StreamProvider<String> jetonsRenouvelesProvider = StreamProvider<String>(
+  (ref) => ref.watch(messageriePushProvider).jetonsRenouveles,
+);
+
 /// Les destinations postées par le service worker quand on touche une
 /// notification alors que l'application tourne en arrière-plan.
 final StreamProvider<OuverturePush> routesServiceWorkerProvider =
