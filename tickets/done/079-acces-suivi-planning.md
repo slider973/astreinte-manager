@@ -4,6 +4,7 @@
 - **Priorité** : P1
 - **Dépend de** : 019, 020
 - **Branche** : `feat/079-acces-suivi-planning`
+- **PR** : https://github.com/slider973/astreinte-manager/pull/92
 - **Statut** : terminé le 2026-10-11 (PR créée)
 
 ## Contexte
