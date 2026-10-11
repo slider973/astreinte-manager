@@ -3,7 +3,7 @@
 - **Épopée** : E1 Socle
 - **Priorité** : P1
 - **Branche** : `feat/080-version-visible`
-- **Statut** : en cours depuis 2026-10-11
+- **Statut** : terminé le 2026-10-11 (PR créée)
 
 ## Le besoin, dans les mots du propriétaire
 
