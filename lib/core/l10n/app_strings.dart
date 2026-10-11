@@ -4740,4 +4740,23 @@ abstract final class AppStrings {
       'Astreinte dans une autre caserne sur ce créneau';
 
   static const String candidatAilleurs = 'Astreinte ailleurs sur ce créneau';
+
+  // --- À propos : identifier la construction (ticket 080) ----------------
+
+  static const String aProposTitre = 'À propos';
+
+  /// Le commit court de la construction servie. Pas une version sémantique :
+  /// `pubspec.yaml` est resté à `0.1.0+1` pendant 79 livraisons, et un numéro
+  /// que personne ne fait avancer mentirait.
+  static String aProposVersion(String commit) => 'Version $commit';
+
+  /// Une construction faite hors livraison — `flutter run`, un test.
+  static const String aProposVersionLocale = 'Version locale';
+
+  static String aProposConstruiteLe(String date, String heure) =>
+      'Construite le $date à $heure';
+
+  /// Affiché **seulement hors production** : voir « dev » explique pourquoi les
+  /// données ne sont pas celles qu'on attendait.
+  static String aProposEnvironnement(String env) => 'Environnement : $env';
 }

@@ -10,6 +10,7 @@ import '../../notifications/presentation/widgets/bouton_notifications.dart';
 import '../../notifications/presentation/widgets/reglage_notifications.dart';
 import '../domain/profil.dart';
 import '../domain/profil_providers.dart';
+import 'widgets/bloc_a_propos.dart';
 import 'widgets/bloc_calendrier.dart';
 import 'widgets/bloc_caserne.dart';
 import 'widgets/bloc_compte.dart';
@@ -150,6 +151,11 @@ class _Contenu extends StatelessWidget {
                 _BlocLangue(langue: profil?.langue ?? Langue.francais),
                 const SizedBox(height: AppSpacing.auDessusTitre),
                 const BlocCompte(),
+                const SizedBox(height: AppSpacing.auDessusTitre),
+                // Le dernier bloc, et c'est voulu : on ne vient jamais pour la
+                // version, mais il faut pouvoir la trouver sans chercher
+                // (ticket 080).
+                const BlocAPropos(),
               ],
             ),
           ),
